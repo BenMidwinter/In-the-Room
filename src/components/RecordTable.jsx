@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react'
 
 const thClass = (col) => [
-  'px-3 py-2 text-left text-[0.68rem] font-bold uppercase tracking-wide text-subtle whitespace-nowrap',
+  'px-3 py-2 text-left text-[0.85rem] font-bold uppercase tracking-wide text-subtle whitespace-nowrap',
   col.hideOnMobile ? 'hidden md:table-cell' : '',
   col.className,
 ].filter(Boolean).join(' ')
 
 const tdClass = (col) => [
-  'border-b border-line-light px-3 py-2.5 align-middle text-ink',
+  'border-b border-line-light px-3 py-2.5 align-middle text-[1.05rem] text-ink',
   col.hideOnMobile ? 'hidden md:table-cell' : '',
   col.className,
 ].filter(Boolean).join(' ')
@@ -73,7 +73,7 @@ export default function RecordTable({
   }
 
   const filterInputClass =
-    'w-full min-w-0 rounded-sm border border-line bg-surface px-2 py-1.5 text-sm text-ink'
+    'w-full min-w-0 rounded-sm border border-line bg-surface px-2 py-1.5 text-[1.05rem] text-ink'
 
   const renderHeader = () => (
     <thead>
@@ -138,11 +138,11 @@ export default function RecordTable({
   if (!rows.length) {
     return (
       <div className={`w-full overflow-x-auto ${className}`.trim()}>
-        <table className="w-full border-collapse text-sm leading-snug">
+        <table className="w-full border-collapse text-[1.05rem] leading-snug">
           {renderHeader()}
           <tbody>
             <tr>
-              <td colSpan={columns.length} className="px-3 py-8 text-center text-subtle">
+              <td colSpan={columns.length} className="px-3 py-8 text-center text-[1.05rem] text-subtle">
                 {emptyMessage}
               </td>
             </tr>
@@ -154,12 +154,12 @@ export default function RecordTable({
 
   return (
     <div className={`w-full overflow-x-auto ${className}`.trim()}>
-      <table className="w-full border-collapse text-sm leading-snug">
+      <table className="w-full border-collapse text-[1.05rem] leading-snug">
         {renderHeader()}
         <tbody>
           {!displayRows.length ? (
             <tr>
-              <td colSpan={columns.length} className="px-3 py-8 text-center text-subtle">
+              <td colSpan={columns.length} className="px-3 py-8 text-center text-[1.05rem] text-subtle">
                 {displayEmptyMessage}
               </td>
             </tr>

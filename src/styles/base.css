@@ -79,7 +79,7 @@ a:hover { text-decoration: underline; }
   justify-content: flex-end;
   gap: 0;
   font-weight: 600;
-  font-size: 1.5rem;
+  font-size: 1.85rem;
   color: var(--col-accent);
   text-decoration: none;
   flex-shrink: 1;
@@ -96,7 +96,7 @@ a:hover { text-decoration: underline; }
   display: block;
   font-family: var(--font-head);
   font-weight: 600;
-  font-size: 1.5rem;
+  font-size: 1.85rem;
   font-variation-settings: var(--font-head-variation-brand);
   font-optical-sizing: none;
   line-height: 1.15;

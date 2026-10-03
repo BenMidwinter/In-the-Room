@@ -224,10 +224,11 @@ export async function fetchUpcomingAppointments(
   const today = todayYmd()
   return sortAppointmentsLatestFirst(
     all.filter((a) => {
-      if (a.attendance_status === 'cancelled') return false
+      if (a.attendance_status === 'cancelled' || a.attendance_status === 'attended') return false
       if ((a as { is_external_busy?: boolean }).is_external_busy) return false
       const role = (a as { block_role?: string | null }).block_role
-      if (role && role !== 'appointment' && role !== 'primary') return false
+      // Real sessions use client_session (or null); skip follow-on/busy blocks.
+      if (role === 'support' || role === 'admin' || role === 'busy') return false
       const { session_date } = appointmentSchedule(a as AppointmentLike)
       if (!session_date || session_date < today) return false
       // Prefer clinician assignment so upcoming still works before client cache hydrates.

@@ -43,10 +43,10 @@ export function getPersonalUpcomingAppointments(userId, clinicianName, workplace
   return sortUpcomingSoonestFirst(
     getAllAppointments().filter((appt) => {
       if (!appointmentAssignedToClinician(appt, userId, clinicianName)) return false
-      if (appt.attendance_status === 'cancelled') return false
+      if (appt.attendance_status === 'cancelled' || appt.attendance_status === 'attended') return false
       if (appt.is_external_busy) return false
       const role = appt.block_role
-      if (role && role !== 'appointment' && role !== 'primary') return false
+      if (role === 'support' || role === 'admin' || role === 'busy') return false
       const { session_date } = appointmentSchedule(appt)
       if (compareYmd(session_date, today) < 0) return false
       const client = db.clients.find(c => c.id === appt.client_id)
@@ -70,7 +70,7 @@ export function getNextProgressNoteTask(
     if (!appt?.id || appt.is_external_busy) return false
     if (appt.attendance_status === 'cancelled' || appt.attendance_status === 'did_not_attend') return false
     const role = appt.block_role
-    if (role && role !== 'appointment' && role !== 'primary') return false
+    if (role === 'support' || role === 'admin' || role === 'busy') return false
 
     const note = getNote(appt.id)
     if (note && isProgressNoteSignedOff(note)) return false

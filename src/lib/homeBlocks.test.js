@@ -81,9 +81,10 @@ describe('homeBlocks assignment filters', () => {
     }
     const task = getNextProgressNoteTask(
       [
-        { id: 'a1', session_date: '2020-01-01', start_time: '09:00', attendance_status: 'attended' },
-        { id: 'a2', session_date: '2020-01-02', start_time: '10:00', attendance_status: 'attended' },
-        { id: 'a3', session_date: '2020-01-03', start_time: '11:00', attendance_status: 'attended' },
+        { id: 'a1', session_date: '2020-01-01', start_time: '09:00', attendance_status: 'attended', block_role: 'client_session' },
+        { id: 'a2', session_date: '2020-01-02', start_time: '10:00', attendance_status: 'attended', block_role: 'client_session' },
+        { id: 'a3', session_date: '2020-01-03', start_time: '11:00', attendance_status: 'attended', block_role: 'client_session' },
+        { id: 'notes', session_date: '2020-01-02', start_time: '10:10', attendance_status: null, block_role: 'admin' },
       ],
       {
         getNote: (id) => notes[id] || null,

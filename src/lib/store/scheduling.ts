@@ -27,10 +27,10 @@ export function getUpcomingAppointments(userId, myWorkplace, options: { organisa
   const today = todayYmd()
   return sortAppointmentsLatestFirst(
     db.appointments.filter(a => {
-      if (a.attendance_status === 'cancelled') return false
+      if (a.attendance_status === 'cancelled' || a.attendance_status === 'attended') return false
       if ((a as { is_external_busy?: boolean }).is_external_busy) return false
       const role = (a as { block_role?: string | null }).block_role
-      if (role && role !== 'appointment' && role !== 'primary') return false
+      if (role === 'support' || role === 'admin' || role === 'busy') return false
       const { session_date } = appointmentSchedule(a as AppointmentLike)
       if (!session_date || session_date < today) return false
       if (!organisationWide && a.clinician_id && a.clinician_id === userId) return true
