@@ -13,20 +13,14 @@ This repository is linked to the **In the Room** Supabase project.
 | Region | `eu-west-2` |
 | API URL | `https://wejnkrjrhzzztrrizxai.supabase.co` |
 
-### Local setup
+### Setup
 
-1. Copy environment variables:
+```bash
+cp .env.example .env
+```
 
-   ```bash
-   cp .env.example .env
-   ```
+`.env.example` already includes the project URL and publishable keys for this project.
 
-2. Add a [personal access token](https://supabase.com/dashboard/account/tokens) and your database password to `.env` (`SUPABASE_ACCESS_TOKEN`, `SUPABASE_DB_PASSWORD`).
-
-3. Link the CLI (uses the env vars above):
-
-   ```bash
-   npx supabase link --project-ref wejnkrjrhzzztrrizxai
-   ```
-
-4. Cursor / agents: `.mcp.json` scopes the Supabase MCP server to this project (`project_ref=wejnkrjrhzzztrrizxai`).
+- Cursor / agents: `.mcp.json` scopes the Supabase MCP server to `project_ref=wejnkrjrhzzztrrizxai`
+- CLI project id: `supabase/config.toml` (`project_id = "in-the-room"`)
+- Project ref file: `supabase/.project-ref` (used when the CLI is not logged in)
