@@ -105,9 +105,10 @@ Before producing any database migration, API route, or frontend component, verif
 # IN THE ROOM — PRODUCT SCOPE (FREELANCE FIRST)
 
 - **Primary market:** private / freelance creative arts therapists.
-- **Phase 1:** individual practitioner tooling (clients, sessions, notes, calendar, profile, finance placeholders for Xero).
+- **Phase 1:** individual practitioner tooling (clients, episodes of care, sessions/appointments, progress notes, calendar, profile, clinician-designed forms & templates, contacts, client timeline, reporting, audit log, finance placeholders for Xero).
 - **Later:** workplace contracts, multi-user delegation, and org features — do not build these ahead of the freelance core.
 - **Out of scope for now:** workplace team admin, service-lead org consoles, and safeguarding workflows.
+- **Language:** product copy and schema naming stay practice/freelance-scoped. Do not describe Reporting or caseload as “organisation-wide” or “workplace” in Phase 1.
 
 ---
 
@@ -257,3 +258,213 @@ src/
 - **No Premature Monoliths:** Never build a page that includes its own input handlers and raw fetch requests. Break them immediately into `modules/`.
 - **Encrypted-At-Rest Verification:** Any module initiating an API mutation must pass data through the client encryption hook before invoking the Supabase client.
 - **Fail Gracefully on Locked Keys:** If a module mounts and finds the user's master key is not in memory (e.g., user refreshed tab), it must render an inline `<UnlockKeyringNotice />` instead of throwing an unhandled decrypt error.
+
+---
+
+# IN THE ROOM — SUPABASE DATA SCHEMA (FOUNDATION)
+
+Living schema brief for Supabase. Every table: RLS enabled, `owner_id` (= `auth.uid()` in freelance), nullable `organization_id` for later workplaces. Clinical/PII content lives in `encrypted_payload` JSONB (`{ v, alg, iv, ciphertext, tag_length }`) unless noted as queryable metadata. Companion `record_access_keys(record_table, record_id, user_id, wrapped_dek)` supports future delegation.
+
+Ciphertext must never be filtered via PostgREST query-string search; fetch by id / owner / date indexes only.
+
+## A. Ownership, crypto, audit
+
+### `profiles`
+1:1 with `auth.users`. Clinician identity, practice letterhead, timezone, and key material.
+
+- Queryable: `id`, `display_name`, `email`, `job_title`, `professional_title`, `registration_number`, `phone`, `photo_url`, `timezone`, practice letterhead fields, `public_key`, timestamps
+- Sensitive key material: `encrypted_private_key`, `encrypted_private_key_recovery`
+- Optional plaintext (owner’s own practice copy): `bio`
+
+### `record_access_keys`
+`id`, `record_table`, `record_id`, `user_id`, `wrapped_dek`, `created_at`
+
+### `audit_events` (append-only foundation)
+Every meaningful mutation writes a row. Clinicians may `INSERT` + `SELECT` only (no update/delete).
+
+- `id`, `owner_id`, `organization_id` null, `actor_id`
+- `action` (stable codes: `client.created`, `episode.opened`, `appointment.updated`, `note.signed_off`, `form.submitted`, `invoice.issued`, …)
+- `entity_type`, `entity_id`, optional `client_id`, optional `request_id`
+- `metadata` jsonb — **non-sensitive only** (status enums, field names, service slug, dates)
+- optional `encrypted_detail` jsonb — rare narrative that must not be plaintext
+- `created_at`
+
+Never store names, note bodies, DOB, or decrypted clinical text in `metadata`.
+
+## B. Clinician offers & calendar availability
+
+### `services`
+What the clinician offers (appointment / admin / busy). Drives calendar colours and bookable modalities.
+
+- `id`, `owner_id`, `organization_id` null, `service_type`, `name`, `slug`, `description`, `color`, `default_duration_minutes`, `buffer_minutes`, `is_active`, timestamps
+
+### `availability_rules`
+Weekly hours + which `service_ids` apply (replaces nested workplace settings for freelance).
+
+- `id`, `owner_id`, `timezone`, `weekly_hours` jsonb, `service_ids` uuid[], timestamps
+
+### `availability_exceptions`
+Holidays, one-off blocks, extended hours: `starts_at`, `ends_at`, `kind` (`unavailable`|`available`), optional `reason`, optional `service_ids`.
+
+Calendar free slots = rule window − exceptions − overlapping appointments.
+
+## C. Clients, contacts, episodes
+
+### `clients`
+Caseload row (no raw PII).
+
+- `id`, `owner_id`, `organization_id` null, `status` (`active`|`inactive`), `encrypted_pseudonym`, timestamps
+
+### `client_identities`
+Encrypted PII: legal name, DOB, school, addresses, emergency details.
+
+### `client_clinical_profiles`
+Encrypted formulation / goals / sensory / modality notes (profile summary fields).
+
+### `contacts`
+People linked to a client (e.g. parents who pay invoices).
+
+- Queryable: `id`, `owner_id`, `client_id`, `role` (`parent`|`guardian`|`referrer`|`gp`|`school`|`billing`|`other`), `is_billing_contact` bool, `is_primary` bool, timestamps
+- `encrypted_payload`: name, phone, email, address, relationship notes, invoice preferences
+
+A contact may later link to finance/Xero payers via `is_billing_contact` without putting payer PII on `clients`.
+
+### `episodes`
+Discrete periods of care. A returning client years later opens a **new** episode — never one continuous stream.
+
+- Queryable: `id`, `owner_id`, `client_id`, `episode_number` (per-client integer, starting at 1), `status` (`active`|`paused`|`discharged`), `referral_date`, `start_date`, `end_date`, timestamps
+- `encrypted_payload`: referral source detail, presenting issue, discharge summary, goals for this episode
+
+Invariant: at most one `active` episode per client (enforce in app + partial unique index). Opening episode N+2 requires N+1 closed/paused.
+
+## D. Scheduling
+
+### `appointments`
+Hybrid schedule row for the calendar.
+
+- Queryable: `id`, `owner_id`, `client_id` (nullable for admin/busy), `clinician_id`, `episode_id` (nullable but required for clinical client sessions), `service_id`, `appointment_type`, `starts_at`, `ends_at`, `attendance_status`, optional `series_id`, timestamps
+- `encrypted_payload`: location, session notes, other_info
+
+## E. Progress notes (within an episode)
+
+### `progress_notes`
+
+- Queryable metadata:
+  - `id`, `owner_id`, `client_id`, `episode_id` (**required**), `appointment_id` (nullable), `author_id`
+  - `note_number` — integer sequence **within the episode** (1, 2, 3…)
+  - `session_date` — date of the session this note is about
+  - `noted_at` — timestamptz when the note was captured/written (time of note)
+  - `status` (`draft`|`signed_off`), `signed_off_at`, `lock_until`
+  - optional `template_id`
+  - timestamps (`created_at` / `updated_at`)
+- `encrypted_payload`: title, rich content, modality_used, therapeutic_theme, artwork attachment metadata
+
+Rules:
+
+1. `session_date` may differ from `noted_at` (write-up after the session).
+2. Prefer linking `appointment_id`; when linked, default `session_date` from the appointment and inherit `episode_id`.
+3. `note_number` is allocated per `episode_id` on create (not global per client).
+4. Timeline and Reporting use queryable fields only; body stays encrypted.
+
+## F. Clinician-designed templates & forms
+
+Templates and forms are clinician-authored structures (not org/workplace libraries in Phase 1).
+
+### `templates`
+Unified template registry:
+
+- `id`, `owner_id`, `kind` (`progress_note`|`letter`|`report`|`working_document`), `name`, `description`, `is_active`, timestamps
+- `encrypted_payload` or structured `schema` jsonb for body/boilerplate (encrypt if content may include clinical examples)
+
+### `form_definitions`
+Clinician-designed intake / information-gathering forms (distinct from RTE “provide information” docs).
+
+- `id`, `owner_id`, `name`, `slug`, `description`, `status` (`draft`|`published`|`archived`), `version`, `is_onboarding` bool (submission may create a client), `schema` jsonb (field defs — structure is not clinical data), timestamps
+- Public/share token handling later; never put clinical answers in the definition row
+
+### `form_submissions`
+
+- Queryable: `id`, `owner_id`, `form_definition_id`, `form_version`, `client_id` (null until linked/created), `submitted_at`, `status` (`received`|`linked`|`rejected`)
+- `encrypted_payload`: answers
+- Onboarding flow: published form with `is_onboarding` → decrypt/map answers → create `clients` + `client_identities` (+ optional first `episodes` row) → set `client_id` → emit timeline + audit events
+
+Forms **collect** information; letters/reports/working docs/progress notes **produce** information. Keep those product paths separate in UI and schema (`form_*` vs `templates` + document tables).
+
+## G. Clinical documents (produced artefacts)
+
+Each: `id`, `owner_id`, `client_id`, optional `episode_id`, `author_id`, optional `template_id`, timestamps + `encrypted_payload`.
+
+- `letters` — plus queryable `letter_date`; recipient inside payload or encrypted
+- `working_documents`
+- `reports` — clinical/formulation reports generated for a client/episode (distinct from analytics Reporting page)
+- `journal_entries` — clinician’s private journal (`author_id`, `entry_date`, `somatic_state` queryable; body encrypted)
+
+## H. Client timeline (projection of care)
+
+### `timeline_events`
+First-class event log for the client profile timeline (not only derived at read time). Writers upsert an event whenever a care-relevant record is created/changed.
+
+- Queryable: `id`, `owner_id`, `client_id`, `episode_id` (nullable for pre-episode onboarding), `event_date` (date shown on timeline), `occurred_at` timestamptz, `event_type`, `ref_table`, `ref_id`, `actor_id`, timestamps
+- `encrypted_summary` optional short label ciphertext (prefer type + date in UI when enough)
+
+**`event_type` vocabulary (extensible):**
+
+| Type | Typical source |
+|---|---|
+| `client_created` / `onboarded` | client insert / onboarding form |
+| `episode_opened` / `episode_paused` / `episode_discharged` | episodes |
+| `appointment_scheduled` / `appointment_attended` / `appointment_dna` / `appointment_cancelled` | appointments |
+| `progress_note` | progress_notes |
+| `form_received` / `form_linked` | form_submissions |
+| `letter` / `report` / `working_document` | document tables |
+| `contact_added` | contacts |
+| `invoice_issued` / `payment_received` | finance (later) |
+| `offboarded` | client inactive / discharge pathway |
+
+UI lists by `event_date` / `occurred_at` and filters by `episode_id` so episodic care is obvious. Prefer writing timeline rows in the same mutation path as the source record (+ `audit_events`).
+
+## I. Reporting & outcomes
+
+Analytics Reporting is **practice-scoped** (not organisation-wide).
+
+### `report_definitions`
+Saved/system report configs: `key`, `name`, `params` jsonb, `is_system`, `owner_id`
+
+### `report_exports`
+Export runs: `report_key`/`definition_id`, `params`, `format` (`csv`|`pdf`), `status`, optional `storage_path`, `row_count`, timestamps — always paired with `audit_events` `report.exported`
+
+### `outcome_measure_defs` + `outcome_entries`
+Stub for completion-rate reports: defs hold measure structure; entries hold `client_id`, optional `appointment_id`/`episode_id`, `recorded_on`, `completion_status`, `encrypted_payload` (scores).
+
+Aggregations use queryable columns only (`appointments.starts_at`, `service_id`, `attendance_status`, `clients.status`, `audit_events`, outcome completion flags).
+
+## J. Relationship map
+
+```
+profiles
+  ├── services, availability_*, templates, form_definitions
+  ├── audit_events, report_*
+  └── clients
+        ├── client_identities, client_clinical_profiles
+        ├── contacts
+        ├── form_submissions → (onboarding may create client)
+        ├── episodes
+        │     ├── appointments → services
+        │     └── progress_notes (note_number per episode; session_date + noted_at)
+        ├── letters / reports / working_documents
+        └── timeline_events (points at any of the above)
+```
+
+## K. Suggested migration / build order
+
+1. `profiles` + crypto columns + `record_access_keys` + `audit_events`
+2. `services` + `availability_rules` + `availability_exceptions`
+3. `clients` + `client_identities` + `client_clinical_profiles` + `contacts`
+4. `episodes` + `timeline_events`
+5. `appointments`
+6. `templates` + `form_definitions` + `form_submissions`
+7. `progress_notes` + letters / working_documents / reports / journal
+8. `report_definitions` + `report_exports` + outcome stubs
+9. Wire Profile → Calendar → Clients/Episodes/Timeline → Forms onboarding → Notes → Reporting
+
+Every write path in stages 2–8 must emit `audit_events` and, when client-visible, `timeline_events`.
