@@ -57,6 +57,8 @@
   font-family: var(--font-head);
   font-size: 1.4rem;
   font-weight: 600;
+  font-variation-settings: var(--font-head-variation);
+  font-optical-sizing: auto;
   color: var(--txt-primary);
   line-height: 1.25;
 }

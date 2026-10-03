@@ -46,6 +46,9 @@
 
   --font-head: 'Fraunces', Georgia, serif;
   --font-body: 'Karla', system-ui, sans-serif;
+  /* Fraunces axes — WONK 1 flips on the quirky alternates */
+  --font-head-variation: "opsz" 72, "wght" 600, "SOFT" 35, "WONK" 1;
+  --font-head-variation-brand: "opsz" 96, "wght" 600, "SOFT" 50, "WONK" 1;
 
   --radius-sm: 3px;
   --radius-md: 4px;
