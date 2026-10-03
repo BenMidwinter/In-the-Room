@@ -4,6 +4,7 @@ import {
   ProfileAvailabilityBlock,
   ProfileLetterheadBlock,
 } from './ProfileBlocks'
+import CalendarIntegrationsBlock from './CalendarIntegrationsBlock'
 
 export default function ProfileDetails() {
   const { session, refreshClients } = useAppSession()
@@ -16,6 +17,7 @@ export default function ProfileDetails() {
     <div className="role-block-stack profile-hub">
       <ProfileIdentityBlock session={session} onSaved={refreshClients} />
       <ProfileAvailabilityBlock userId={session.user.id} onSaved={refreshClients} />
+      <CalendarIntegrationsBlock />
       <ProfileLetterheadBlock userId={session.user.id} />
     </div>
   )

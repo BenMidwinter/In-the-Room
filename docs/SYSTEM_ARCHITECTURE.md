@@ -61,20 +61,26 @@ To give individual clinicians complete privacy today while enabling workplace de
 ## 3. DATABASE & SUPABASE SECURITY RULES
 
 1. **Table Separation (Demographics vs. Clinical Records):**
-   - `clients`: Internal UUID, encrypted pseudonym, status, modality. Never store raw names, contact numbers, or addresses here.
-   - `client_identities`: Contains encrypted PII (full name, emergency contacts, DOB), stored in a separate table with strict access controls.
-   - `sessions`: `client_id`, `date`, `session_number`, `encrypted_payload` (JSONB).
+   - `clients`: Internal UUID, encrypted pseudonym, status. Never store raw names, contact numbers, or addresses here.
+   - `client_identities`: Encrypted PII (full name, emergency contacts, DOB), separate table with strict access controls.
+   - `contacts`: People linked to a client (parents, billing payers, referrers) with encrypted contact payload.
+   - `episodes`: Discrete periods of care per client; returning clients open a new episode.
+   - `appointments` / `progress_notes`: Queryable schedule and note metadata; clinical bodies in `encrypted_payload` JSONB.
+   - Full table list and column rules: see **SUPABASE DATA SCHEMA (FOUNDATION)** below.
 2. **Mandatory Row Level Security (RLS):**
    - Every single table MUST run `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`.
-   - Do not rely solely on client-side encryption. RLS policies must strictly verify `auth.uid() = user_id` or check authorized entries in `record_access_keys`.
+   - Do not rely solely on client-side encryption. RLS policies must strictly verify `auth.uid() = owner_id` (or `user_id` on access-key tables) or check authorized entries in `record_access_keys`.
    - Never write permissive `USING (true)` policies, even in local development or test migrations.
 3. **Prevent URL Query Parameter Leaks:**
    - PostgREST logs all URL query parameters by default.
    - NEVER filter or search across sensitive values via URL parameters (e.g., `?notes=eq.something` is prohibited).
    - Encrypted data must be sent and retrieved through request bodies or indexed primary key lookups (`?id=eq.<uuid>`).
 4. **Multi-Tenancy Preparation:**
-   - Include a nullable `organization_id` (UUID) column on `clients` and `sessions` from Day 1.
-   - In the Freelance tier, `organization_id` defaults to `NULL` (indicating individual practitioner ownership).
+   - Include a nullable `organization_id` (UUID) on caseload and clinical tables from Day 1.
+   - In the Freelance tier, `organization_id` defaults to `NULL` (individual practitioner ownership).
+5. **Audit + timeline:**
+   - `audit_events` is append-only and written for every meaningful mutation.
+   - `timeline_events` projects client-visible care events (onboarding, episodes, sessions, notes, forms, invoices, etc.) onto the profile timeline.
 
 ---
 
@@ -455,16 +461,44 @@ profiles
         └── timeline_events (points at any of the above)
 ```
 
-## K. Suggested migration / build order
+## K. Google Workspace / Calendar sync (Splose-style)
 
-1. `profiles` + crypto columns + `record_access_keys` + `audit_events`
-2. `services` + `availability_rules` + `availability_exceptions`
-3. `clients` + `client_identities` + `client_clinical_profiles` + `contacts`
-4. `episodes` + `timeline_events`
-5. `appointments`
-6. `templates` + `form_definitions` + `form_submissions`
-7. `progress_notes` + letters / working_documents / reports / journal
-8. `report_definitions` + `report_exports` + outcome stubs
-9. Wire Profile → Calendar → Clients/Episodes/Timeline → Forms onboarding → Notes → Reporting
+Splose combines two mechanisms; we mirror that hybrid:
 
-Every write path in stages 2–8 must emit `audit_events` and, when client-visible, `timeline_events`.
+1. **Outbound calendar feed (ICS / webcal)** — private token URL the clinician adds in Google/Apple/Outlook. Pushes appointments, admin/busy blocks, and travel-style holds outward. Not real-time (client refresh often 30–60 minutes) but simple and works without Google API review for the feed itself.
+2. **Google OAuth connection** — pull free/busy (and optionally event shells) into In the Room so personal Google events block double-booking; optionally push appointment updates via Calendar API; optionally create **Google Meet** links on telehealth services.
+
+### Privacy rules (non-negotiable)
+
+- Default `push_privacy = busy_only`: Google sees “Busy” (or service label), **never** decrypted client legal names from `client_identities`.
+- OAuth tokens live in `calendar_connections.encrypted_credentials` (ciphertext), never plaintext columns.
+- Prefer scopes `calendar.freebusy` + `calendar.events` (not full calendar ACL owner).
+- Inbound titles only when `pull_external_details` is explicitly enabled; store as `encrypted_title`.
+
+### Tables
+
+- `calendar_connections` — Google account link, sync flags, encrypted OAuth credentials
+- `calendar_feed_tokens` — hashed ICS feed secrets (`token_hash` only; raw token shown once)
+- `external_calendar_blocks` — cached inbound busy ranges for calendar overlay
+- `appointment_external_links` — map `appointments` ↔ Google `event_id` (+ optional `meet_url`)
+
+### Product UX
+
+- Profile → **Calendar sync** block: Connect Google, manage feed URL, privacy mode, Meet toggle
+- Calendar module overlays `external_calendar_blocks` under practice appointments
+- Appointment save path: write `appointments` → audit/timeline → enqueue push to linked Google calendar when `push_appointments`
+
+## L. Suggested migration / build order
+
+1. ~~`profiles` + crypto columns + `record_access_keys` + `audit_events`~~ (applied)
+2. ~~`services` + `availability_*`~~ (applied)
+3. ~~`clients` + identities/profiles + `contacts` + `episodes` + `timeline_events`~~ (applied)
+4. ~~`appointments` + templates/forms + clinical docs + reporting~~ (applied)
+5. ~~Google calendar sync tables~~ (applied)
+6. Wire auth + Profile (identity/services/availability) to Supabase
+7. Calendar reads `appointments` + overlays `external_calendar_blocks`
+8. ICS feed edge function + Google OAuth edge function
+9. Clients / episodes / timeline / forms onboarding / notes
+10. Reporting queries + exports
+
+Every write path must emit `audit_events` and, when client-visible, `timeline_events`.
