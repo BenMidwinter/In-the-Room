@@ -7,7 +7,6 @@ export default function ProfilePage() {
   const { session, refreshClients } = useAppSession()
   const [fullName, setFullName] = useState('')
   const [hcpcNumber, setHcpcNumber] = useState('')
-  const [jobTitle, setJobTitle] = useState('Creative Arts Therapist')
   const [signatureText, setSignatureText] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -16,7 +15,6 @@ export default function ProfilePage() {
     if (profile) {
       setFullName(profile.full_name || '')
       setHcpcNumber(profile.hcpc_number || '')
-      setJobTitle(profile.job_title || 'Creative Arts Therapist')
       setSignatureText(profile.signature_text || profile.full_name || '')
     }
   }, [session.user.id])
@@ -27,7 +25,6 @@ export default function ProfilePage() {
     updateProfile(session.user.id, {
       full_name: fullName,
       hcpc_number: hcpcNumber,
-      job_title: jobTitle,
       signature_text: signatureText,
     })
     refreshClients()
@@ -47,10 +44,6 @@ export default function ProfilePage() {
         <div className="form-group">
           <label>HCPC number</label>
           <input className="paper-input" value={hcpcNumber} onChange={e => setHcpcNumber(e.target.value)} />
-        </div>
-        <div className="form-group">
-          <label>Job title</label>
-          <input className="paper-input" value={jobTitle} onChange={e => setJobTitle(e.target.value)} />
         </div>
         <div className="form-group">
           <label>Signature line</label>

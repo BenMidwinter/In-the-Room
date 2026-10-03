@@ -27,7 +27,6 @@ function normalizeRegistrations(profile) {
 export function ProfileIdentityBlock({ session, onSaved }) {
   const [fullName, setFullName] = useState('')
   const [registrations, setRegistrations] = useState([{ ...EMPTY_REGISTRATION }])
-  const [jobTitle, setJobTitle] = useState('')
   const [professionalTitle, setProfessionalTitle] = useState('')
   const [signatureText, setSignatureText] = useState('')
   const [signatureImageUrl, setSignatureImageUrl] = useState('')
@@ -57,7 +56,6 @@ export function ProfileIdentityBlock({ session, onSaved }) {
       if (!profile) return
       setFullName(profile.full_name || profile.display_name || '')
       setRegistrations(normalizeRegistrations(profile))
-      setJobTitle(profile.job_title || '')
       setProfessionalTitle(profile.professional_title || '')
       setSignatureText(profile.signature_text || profile.full_name || profile.display_name || '')
       setSignatureImageUrl(profile.signature_image_url || '')
@@ -95,7 +93,6 @@ export function ProfileIdentityBlock({ session, onSaved }) {
       registration_numbers: cleaned,
       registration_number: cleaned[0]?.number || '',
       hcpc_number: cleaned.find((r) => r.body.toUpperCase() === 'HCPC')?.number || '',
-      job_title: jobTitle,
       professional_title: professionalTitle.trim(),
       signature_text: signatureText,
       signature_image_url: signatureImageUrl.trim() || null,
@@ -111,7 +108,6 @@ export function ProfileIdentityBlock({ session, onSaved }) {
           id: session.user.id,
           display_name: fullName,
           email: session.user.email || null,
-          job_title: jobTitle || null,
           professional_title: professionalTitle.trim() || null,
           registration_number: cleaned[0]?.number || null,
           registration_numbers: cleaned,
@@ -165,16 +161,6 @@ export function ProfileIdentityBlock({ session, onSaved }) {
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
                   required
-                />
-              </div>
-              <div className="form-group">
-                <label htmlFor="profile-job-title">Job title</label>
-                <input
-                  id="profile-job-title"
-                  className="paper-input"
-                  value={jobTitle}
-                  onChange={e => setJobTitle(e.target.value)}
-                  placeholder="e.g. Music Therapist"
                 />
               </div>
               <div className="form-group profile-identity__field--full">
