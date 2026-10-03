@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useClientSession } from '../../lib/useClientSession'
 import { useAppSession } from '../../lib/AppSessionContext'
 import {
@@ -20,12 +20,14 @@ import { DEMO_TODAY } from '../../lib/dateArchitecture'
  */
 export default function AppointmentEditor() {
   const { appointmentId } = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
   const { clientId, client, session } = useClientSession()
   const { myWorkplace } = useAppSession()
   const toast = useToast()
   const confirm = useConfirm()
-  const isNew = appointmentId === 'new'
+  // Nested route path="new" has no :appointmentId param — treat missing/`new` as create.
+  const isNew = !appointmentId || appointmentId === 'new' || /\/appointments\/new\/?$/.test(location.pathname)
   const appointmentQuery = useAppointmentQuery(appointmentId, { enabled: !isNew })
   const { data: allAppointments = [] } = useAllAppointmentsQuery()
   const saveAppointmentMutation = useSaveAppointmentMutation()

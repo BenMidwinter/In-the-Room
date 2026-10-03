@@ -889,8 +889,15 @@ export default function CalendarModule({ persona }) {
 
   const selectAppointment = (appt) => {
     if (appt?.is_external_busy) return
-    setScheduleDraft(null)
-    setSelectedAppointment(prev => (prev?.id === appt.id ? null : appt))
+    // Open the centred edit overlay directly — no right-rail drawer for sessions.
+    setSelectedAppointment(null)
+    setScheduleDraft({
+      mode: 'edit',
+      appointment: appt,
+      session_date: appt.session_date || appointmentSchedule(appt).session_date,
+      start_time: appt.start_time || appointmentSchedule(appt).start_time,
+      manual: true,
+    })
   }
 
   const openScheduleSlot = (sessionDate, startTime, manual = false) => {
@@ -955,9 +962,9 @@ export default function CalendarModule({ persona }) {
           allAppointments: filtered,
         })
         setScheduleDraft(null)
+        setSelectedAppointment(null)
         if (saved) {
           setActiveDate(saved.session_date)
-          setSelectedAppointment(saved)
           toast.saved(scope === 'this' ? 'Appointment updated' : 'Series updated')
         }
         return
@@ -998,11 +1005,11 @@ export default function CalendarModule({ persona }) {
         }
       }
       setScheduleDraft(null)
+      setSelectedAppointment(null)
       // Stay on the first occurrence — jumping to the series end is confusing.
       if (first) {
         setActiveDate(first.session_date)
         if (viewMode === 'month') setViewMode('day')
-        setSelectedAppointment(first)
         toast.saved(dates.length > 1 ? `Booked ${dates.length} sessions` : 'Appointment booked')
       }
     } finally {
@@ -1078,10 +1085,10 @@ export default function CalendarModule({ persona }) {
         if (!first) first = saved
       }
       setScheduleDraft(null)
+      setSelectedAppointment(null)
       if (first) {
         setActiveDate(first.session_date)
         if (viewMode === 'month') setViewMode('day')
-        setSelectedAppointment(first)
       }
     } finally {
       setScheduleSaving(false)
