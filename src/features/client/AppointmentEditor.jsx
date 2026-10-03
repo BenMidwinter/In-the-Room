@@ -9,14 +9,14 @@ import {
   useSaveAppointmentMutation,
 } from '../../lib/appointmentQueries'
 import { ScheduleSessionPanel } from '../../components/LayoutComponents'
+import FormOverlay from '../../components/FormOverlay'
 import { useConfirm, useToast } from '../../components/ui'
 import { appointmentBelongsToSeries, countSeriesScope } from '../../lib/appointmentSeries'
 import SeriesScopeDialog from '../../components/SeriesScopeDialog'
-import { formatSessionDateTime } from '../../lib/appointmentUtils'
 import { DEMO_TODAY } from '../../lib/dateArchitecture'
 
 /**
- * Client appointment route — opens the same centred overlay editor used on the calendar.
+ * Client appointment route — overlay only (list stays mounted underneath).
  */
 export default function AppointmentEditor() {
   const { appointmentId } = useParams()
@@ -59,7 +59,7 @@ export default function AppointmentEditor() {
           : undefined)
 
       if (payload.id && !payload.dates?.length) {
-        const saved = await saveAppointmentMutation.mutateAsync({
+        await saveAppointmentMutation.mutateAsync({
           payload: {
             ...payload,
             client_id: clientId,
@@ -71,14 +71,12 @@ export default function AppointmentEditor() {
           allAppointments: clientAppointments,
         })
         toast.saved(scope === 'this' ? 'Appointment updated' : 'Series updated')
-        navigate(`${base}/${saved.id}`, { replace: true })
         close()
         return
       }
 
-      let first = null
       for (const date of dates) {
-        const saved = await saveAppointmentMutation.mutateAsync({
+        await saveAppointmentMutation.mutateAsync({
           payload: {
             ...payload,
             client_id: clientId,
@@ -89,10 +87,8 @@ export default function AppointmentEditor() {
           },
           userId: session.user.id,
         })
-        if (!first) first = saved
       }
       toast.saved(dates.length > 1 ? `Booked ${dates.length} sessions` : 'Appointment booked')
-      if (first) navigate(`${base}/${first.id}`, { replace: true })
       close()
     } finally {
       setSaving(false)
@@ -138,39 +134,25 @@ export default function AppointmentEditor() {
 
   if (!isNew && appointmentQuery.isLoading) {
     return (
-      <div className="client-panel appointment-editor">
+      <FormOverlay title="Loading appointment…" eyebrow="Appointment" onClose={close} size="md">
         <p className="text-muted">Loading appointment…</p>
-      </div>
+      </FormOverlay>
     )
   }
 
   if (!isNew && !appointment) {
     return (
-      <div className="client-panel appointment-editor">
-        <p className="text-muted">Appointment not found.</p>
-        <button type="button" className="secondary" onClick={close}>Back to appointments</button>
-      </div>
+      <FormOverlay title="Appointment not found" eyebrow="Appointment" onClose={close} size="md">
+        <p className="text-muted">This appointment could not be loaded.</p>
+        <div className="form-actions">
+          <button type="button" className="secondary" onClick={close}>Back to appointments</button>
+        </div>
+      </FormOverlay>
     )
   }
 
-  const heading = isNew
-    ? 'New appointment'
-    : formatSessionDateTime(appointment)
-
   return (
-    <div className="client-panel appointment-editor">
-      <div className="record-module__header">
-        <div className="record-module__header-text">
-          <h2 className="record-module__title">{heading}</h2>
-          <p className="record-module__subtitle">
-            {isNew ? 'Schedule a session for this client.' : 'Edit in the overlay — same editor as the calendar.'}
-          </p>
-        </div>
-        <div className="record-module__actions">
-          <button type="button" className="secondary" onClick={close}>All appointments</button>
-        </div>
-      </div>
-
+    <>
       <ScheduleSessionPanel
         sessionDate={appointment?.session_date || DEMO_TODAY}
         startTime={appointment?.start_time || '09:00'}
@@ -198,6 +180,6 @@ export default function AppointmentEditor() {
           onSelect={(scope) => runDelete(scope)}
         />
       )}
-    </div>
+    </>
   )
 }

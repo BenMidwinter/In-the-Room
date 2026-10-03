@@ -38,7 +38,7 @@
 :root,
 [data-theme='practice'] {
   /* Layout & typography */
-  --nav-width: 11.25rem;
+  --nav-width: 12.5rem;
   --nav-height: 0px;
   --space-inline: 1.5rem;
   --space-block: 1.25rem;
@@ -73,7 +73,7 @@
   --paper-width-a4: 210mm;
   --paper-padding-x: 2.5rem;
   --paper-padding-y: 3rem;
-  --paper-prose-size: 15px;
+  --paper-prose-size: 16px;
   --paper-prose-leading: 1.75;
 
   --elevation-paper-0: none;

@@ -1,7 +1,7 @@
 import { db, uid } from '../data/collections'
 import { sortAppointmentsLatestFirst } from '../calendarAccess'
 import { appointmentSchedule, fromDatetimeLocalValue, type AppointmentLike } from '../appointmentUtils'
-import { DEMO_TODAY, addMinutesToTime } from '../dateArchitecture'
+import { todayYmd, addMinutesToTime } from '../dateArchitecture'
 import { parseOrThrow, appointmentInputSchema } from '../schemas'
 import { getClientsForUser } from './clientRecords'
 
@@ -24,13 +24,17 @@ export function getUpcomingAppointments(userId, myWorkplace, options: { organisa
   const clientIds = organisationWide
     ? new Set(db.clients.map(c => c.id))
     : new Set(getClientsForUser(userId, myWorkplace).map(c => c.id))
-  const today = DEMO_TODAY
+  const today = todayYmd()
   return sortAppointmentsLatestFirst(
     db.appointments.filter(a => {
-      if (!clientIds.has(String(a.client_id))) return false
       if (a.attendance_status === 'cancelled') return false
+      if ((a as { is_external_busy?: boolean }).is_external_busy) return false
+      const role = (a as { block_role?: string | null }).block_role
+      if (role && role !== 'appointment' && role !== 'primary') return false
       const { session_date } = appointmentSchedule(a as AppointmentLike)
-      return session_date >= today
+      if (!session_date || session_date < today) return false
+      if (!organisationWide && a.clinician_id && a.clinician_id === userId) return true
+      return clientIds.has(String(a.client_id))
     }),
   ).reverse()
 }

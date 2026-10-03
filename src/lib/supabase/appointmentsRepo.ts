@@ -9,7 +9,7 @@ import {
   getUpcomingAppointments as getLocalUpcoming,
   saveAppointment as saveLocalAppointment,
 } from '../store/scheduling'
-import { addMinutesToTime, DEMO_TODAY } from '../dateArchitecture'
+import { addMinutesToTime, todayYmd } from '../dateArchitecture'
 import { appointmentSchedule, fromDatetimeLocalValue, type AppointmentLike } from '../appointmentUtils'
 import { parseOrThrow, appointmentInputSchema } from '../schemas'
 import { sortAppointmentsLatestFirst } from '../calendarAccess'
@@ -221,13 +221,19 @@ export async function fetchUpcomingAppointments(
   const clientIds = organisationWide
     ? new Set(db.clients.map((c) => c.id))
     : new Set(getClientsForUser(userId, myWorkplace).map((c) => c.id))
-  const today = DEMO_TODAY
+  const today = todayYmd()
   return sortAppointmentsLatestFirst(
     all.filter((a) => {
-      if (!clientIds.has(String(a.client_id))) return false
       if (a.attendance_status === 'cancelled') return false
+      if ((a as { is_external_busy?: boolean }).is_external_busy) return false
+      const role = (a as { block_role?: string | null }).block_role
+      if (role && role !== 'appointment' && role !== 'primary') return false
       const { session_date } = appointmentSchedule(a as AppointmentLike)
-      return session_date >= today
+      if (!session_date || session_date < today) return false
+      // Prefer clinician assignment so upcoming still works before client cache hydrates.
+      if (!organisationWide && a.clinician_id && a.clinician_id === userId) return true
+      if (clientIds.size === 0) return !organisationWide && !a.clinician_id
+      return clientIds.has(String(a.client_id))
     }),
   ).reverse() as AppAppointment[]
 }

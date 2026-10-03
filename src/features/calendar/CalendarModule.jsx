@@ -34,7 +34,7 @@ import {
   filterAppointmentsForPersona,
   appointmentsForDate,
 } from '../../lib/calendarAccess'
-import { appointmentOtherInfo } from '../../lib/appointmentUtils'
+import { appointmentOtherInfo, appointmentSchedule } from '../../lib/appointmentUtils'
 import {
   getCalendarViewPreferences,
   saveCalendarViewPreferences,
@@ -895,7 +895,7 @@ export default function CalendarModule({ persona }) {
 
   const openScheduleSlot = (sessionDate, startTime, manual = false) => {
     setSelectedAppointment(null)
-    setScheduleDraft({ session_date: sessionDate, start_time: startTime, manual })
+    setScheduleDraft({ mode: 'create', session_date: sessionDate, start_time: startTime, manual })
   }
 
   const openAddAppointment = () => {
@@ -1089,12 +1089,14 @@ export default function CalendarModule({ persona }) {
   }
 
   const handleEditAppointment = (appt) => {
+    // Close the right-hand drawer first; edit always uses the centred overlay.
     setSelectedAppointment(null)
     setScheduleDraft({
       mode: 'edit',
       appointment: appt,
-      session_date: appt.session_date,
-      start_time: appt.start_time,
+      session_date: appt.session_date || appointmentSchedule(appt).session_date,
+      start_time: appt.start_time || appointmentSchedule(appt).start_time,
+      manual: true,
     })
   }
 

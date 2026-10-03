@@ -3,7 +3,7 @@
 .form-overlay {
   position: fixed;
   inset: 0;
-  z-index: 320;
+  z-index: 1400;
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -54,8 +54,9 @@
 
 .form-overlay__title {
   margin: 0;
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-family: var(--font-head);
+  font-size: 1.4rem;
+  font-weight: 600;
   color: var(--txt-primary);
   line-height: 1.25;
 }

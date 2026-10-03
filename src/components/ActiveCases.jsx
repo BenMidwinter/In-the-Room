@@ -10,7 +10,8 @@ const CLIENT_COLUMNS = [
   { key: 'name', label: 'Name', filter: { type: 'text', placeholder: 'Search name…' } },
   { key: 'context', label: 'Context', filter: { type: 'select', allLabel: 'All contexts' } },
   { key: 'dob', label: 'DOB' },
-  { key: 'status', label: 'Status', filter: { type: 'select', allLabel: 'All statuses' } },
+  // Status is always Active on this page — no status filter needed.
+  { key: 'status', label: 'Status' },
 ]
 
 export default function ActiveCases() {

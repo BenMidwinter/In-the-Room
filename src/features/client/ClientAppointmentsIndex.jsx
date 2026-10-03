@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Outlet, useNavigate, useParams } from 'react-router-dom'
 import { getProfile, getProgressNoteByAppointment } from '../../lib/store'
 import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
 import { modalityLabel } from '../../lib/calendarConstants'
@@ -67,18 +67,21 @@ export default function ClientAppointmentsIndex() {
   }, [appointments])
 
   return (
-    <RecordListLayout
-      title="Appointments"
-      subtitle="Scheduled sessions and attendance — open a row to view or edit."
-      newLabel="appointment"
-      onNew={() => navigate(`/clients/${clientId}/appointments/new`)}
-    >
-      <RecordTable
-        columns={APPT_COLUMNS}
-        rows={rows}
-        emptyMessage="No appointments recorded yet."
-        onRowClick={(row) => navigate(`/clients/${clientId}/appointments/${row.id}`)}
-      />
-    </RecordListLayout>
+    <>
+      <RecordListLayout
+        title="Appointments"
+        subtitle="Scheduled sessions and attendance — open a row to view or edit."
+        newLabel="appointment"
+        onNew={() => navigate(`/clients/${clientId}/appointments/new`)}
+      >
+        <RecordTable
+          columns={APPT_COLUMNS}
+          rows={rows}
+          emptyMessage="No appointments recorded yet."
+          onRowClick={(row) => navigate(`/clients/${clientId}/appointments/${row.id}`)}
+        />
+      </RecordListLayout>
+      <Outlet />
+    </>
   )
 }
