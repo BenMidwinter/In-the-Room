@@ -81,7 +81,7 @@ export default function PrivatePracticeBrandingPanel({ userId }) {
         onCountryChange={setCountry}
         previewBranding={previewBranding}
         error={error}
-        savedMessage={saved ? 'Private practice letterhead saved.' : ''}
+        savedMessage=""
         saving={saving}
         saveLabel="Save letterhead"
         onSubmit={handleSave}
