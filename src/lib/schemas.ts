@@ -128,7 +128,7 @@ export const workplaceBrandingUpdateSchema = z.object({
 export const practiceBrandingUpdateSchema = z.object({
   practice_name: optionalText,
   practice_logo_url: optionalText,
-  practice_address_line1: requiredText('Address line 1'),
+  practice_address_line1: optionalText,
   practice_address_line2: optionalText,
   practice_address_line3: optionalText,
   practice_postcode: optionalText,

@@ -987,6 +987,7 @@ export type Database = {
           professional_title: string | null
           public_key: string | null
           registration_number: string | null
+          registration_numbers: Json
           timezone: string
           updated_at: string
         }
@@ -1011,6 +1012,7 @@ export type Database = {
           professional_title?: string | null
           public_key?: string | null
           registration_number?: string | null
+          registration_numbers?: Json
           timezone?: string
           updated_at?: string
         }
@@ -1035,6 +1037,7 @@ export type Database = {
           professional_title?: string | null
           public_key?: string | null
           registration_number?: string | null
+          registration_numbers?: Json
           timezone?: string
           updated_at?: string
         }

@@ -39,8 +39,11 @@ const DOCUMENT_PRINT_STYLES = `
 
 function buildLetterheadHtml(branding: WorkplaceBranding) {
   const address = formatWorkplaceAddress(branding)
+  const logo = branding.logo_url
+    ? `<img class="letterhead__logo" src="${branding.logo_url}" alt="${escapeHtml(branding.name)} logo" />`
+    : ''
   return `<header class="letterhead">
-    <img class="letterhead__logo" src="${branding.logo_url}" alt="${escapeHtml(branding.name)} logo" />
+    ${logo}
     <div class="letterhead__org">
       <strong>${escapeHtml(branding.name)}</strong>
       <address>${escapeHtml(address)}</address>

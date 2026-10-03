@@ -25,14 +25,20 @@ export default function LetterheadBrandingForm({
   return (
     <div className="letterhead-branding">
       <div className="letterhead-branding__preview" aria-label="Letterhead preview">
-        <img
-          className="letterhead-branding__logo"
-          src={previewBranding.logo_url}
-          alt={`${displayName} logo`}
-        />
+        {previewBranding.logo_url ? (
+          <img
+            className="letterhead-branding__logo"
+            src={previewBranding.logo_url}
+            alt={`${displayName} logo`}
+          />
+        ) : (
+          <div className="letterhead-branding__logo letterhead-branding__logo--empty" aria-hidden>
+            No logo
+          </div>
+        )}
         <div className="letterhead-branding__preview-text">
           <strong>{previewBranding.name}</strong>
-          <span>{formatWorkplaceAddress(previewBranding)}</span>
+          <span>{formatWorkplaceAddress(previewBranding) || 'Add your practice address below'}</span>
         </div>
       </div>
 
@@ -60,7 +66,6 @@ export default function LetterheadBrandingForm({
             <input
               type="text"
               className="paper-input"
-              required
               value={addressLine1}
               onChange={e => onAddressLine1Change(e.target.value)}
             />

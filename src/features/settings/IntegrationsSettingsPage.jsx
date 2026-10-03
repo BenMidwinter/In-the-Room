@@ -120,8 +120,9 @@ export default function IntegrationsSettingsPage() {
     <div className="role-block-stack">
       <SettingsSectionCard blockId="settings_integrations_google" title="Google Workspace">
         <p className="text-muted" style={{ marginTop: 0 }}>
-          Connect Google Calendar to pull personal busy time into In the Room, push practice
-          blocks outward, and create Meet links on appointment types that opt in.
+          Every clinician links their own Google account with Connect below — no one pastes API keys.
+          In the Room uses one shared Google Cloud OAuth app (configured once by us as project secrets);
+          each user then authorises their Workspace/Calendar through Google’s normal consent screen.
         </p>
 
         {!isSupabaseConfigured() && (
@@ -173,9 +174,9 @@ export default function IntegrationsSettingsPage() {
         ) : (
           <div className="settings-integration">
             <p className="text-muted">
-              No Google account linked. You will need Google OAuth client credentials set as
-              Supabase secrets (<code>GOOGLE_OAUTH_CLIENT_ID</code>, <code>GOOGLE_OAUTH_CLIENT_SECRET</code>,
-              <code>SITE_URL</code>, <code>CREDENTIALS_ENCRYPTION_KEY</code>).
+              No Google account linked yet. Click Connect to open Google and choose the calendar
+              account for this practice. (App-level OAuth client secrets are already held by In the Room —
+              users only complete the Google login/consent step.)
             </p>
             <button type="button" className="btn btn-primary" onClick={connectGoogle} disabled={busy || !isSupabaseConfigured()}>
               {busy ? 'Redirecting…' : 'Connect Google Calendar'}

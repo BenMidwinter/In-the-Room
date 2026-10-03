@@ -4,10 +4,29 @@ import { getProfile, updateProfile } from '../../lib/store'
 import { profileInitials } from '../../lib/clinicianAvailability'
 import PrivatePracticeBrandingPanel from './PrivatePracticeBrandingPanel'
 import ProfileAvailabilityPanel from './ProfileAvailabilityPanel'
+import { getSupabase } from '../../lib/supabase/client'
+
+const EMPTY_REGISTRATION = { body: '', number: '' }
+
+function normalizeRegistrations(profile) {
+  if (Array.isArray(profile?.registration_numbers) && profile.registration_numbers.length) {
+    return profile.registration_numbers.map((row) => ({
+      body: row.body || '',
+      number: row.number || '',
+    }))
+  }
+  if (profile?.hcpc_number || profile?.registration_number) {
+    return [{
+      body: profile.hcpc_number ? 'HCPC' : '',
+      number: profile.hcpc_number || profile.registration_number || '',
+    }]
+  }
+  return [{ ...EMPTY_REGISTRATION }]
+}
 
 export function ProfileIdentityBlock({ session, onSaved }) {
   const [fullName, setFullName] = useState('')
-  const [hcpcNumber, setHcpcNumber] = useState('')
+  const [registrations, setRegistrations] = useState([{ ...EMPTY_REGISTRATION }])
   const [jobTitle, setJobTitle] = useState('')
   const [professionalTitle, setProfessionalTitle] = useState('')
   const [signatureText, setSignatureText] = useState('')
@@ -15,43 +34,104 @@ export function ProfileIdentityBlock({ session, onSaved }) {
   const [bio, setBio] = useState('')
   const [photoUrl, setPhotoUrl] = useState('')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     if (!session) return
-    const profile = getProfile(session.user.id)
-    if (profile) {
-      setFullName(profile.full_name || '')
-      setHcpcNumber(profile.hcpc_number || '')
+    let cancelled = false
+
+    async function load() {
+      const local = getProfile(session.user.id)
+      const supabase = getSupabase()
+      let remote = null
+      if (supabase) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle()
+        remote = data
+      }
+      if (cancelled) return
+      const profile = remote || local
+      if (!profile) return
+      setFullName(profile.full_name || profile.display_name || '')
+      setRegistrations(normalizeRegistrations(profile))
       setJobTitle(profile.job_title || '')
       setProfessionalTitle(profile.professional_title || '')
-      setSignatureText(profile.signature_text || profile.full_name || '')
+      setSignatureText(profile.signature_text || profile.full_name || profile.display_name || '')
       setSignatureImageUrl(profile.signature_image_url || '')
       setBio(profile.bio || '')
       setPhotoUrl(profile.photo_url || '')
     }
+
+    load()
+    return () => { cancelled = true }
   }, [session])
 
-  const handleSave = (e) => {
+  const updateRegistration = (index, patch) => {
+    setRegistrations((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+  }
+
+  const addRegistration = () => {
+    setRegistrations((rows) => [...rows, { ...EMPTY_REGISTRATION }])
+  }
+
+  const removeRegistration = (index) => {
+    setRegistrations((rows) => (rows.length <= 1 ? [{ ...EMPTY_REGISTRATION }] : rows.filter((_, i) => i !== index)))
+  }
+
+  const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
-    updateProfile(session.user.id, {
+    setError(null)
+    const cleaned = registrations
+      .map((row) => ({ body: row.body.trim(), number: row.number.trim() }))
+      .filter((row) => row.body || row.number)
+
+    const updates = {
       full_name: fullName,
-      hcpc_number: hcpcNumber,
+      display_name: fullName,
+      registration_numbers: cleaned,
+      registration_number: cleaned[0]?.number || '',
+      hcpc_number: cleaned.find((r) => r.body.toUpperCase() === 'HCPC')?.number || '',
       job_title: jobTitle,
       professional_title: professionalTitle.trim(),
       signature_text: signatureText,
       signature_image_url: signatureImageUrl.trim() || null,
       bio: bio.trim(),
       photo_url: photoUrl.trim() || null,
-    })
-    onSaved?.()
-    setSaving(false)
+    }
+
+    try {
+      updateProfile(session.user.id, updates)
+      const supabase = getSupabase()
+      if (supabase) {
+        const { error: saveError } = await supabase.from('profiles').upsert({
+          id: session.user.id,
+          display_name: fullName,
+          email: session.user.email || null,
+          job_title: jobTitle || null,
+          professional_title: professionalTitle.trim() || null,
+          registration_number: cleaned[0]?.number || null,
+          registration_numbers: cleaned,
+          bio: bio.trim() || null,
+          photo_url: photoUrl.trim() || null,
+        })
+        if (saveError) throw saveError
+      }
+      onSaved?.()
+    } catch (err) {
+      setError(err.message || 'Could not save profile')
+    } finally {
+      setSaving(false)
+    }
   }
 
   const initials = profileInitials(fullName)
 
   return (
-    <RoleBlockShell blockId="profile_identity">
+    <RoleBlockShell blockId="profile_identity" title="Account details">
       <form onSubmit={handleSave} className="role-block__panel">
         <div className="profile-identity__layout">
           <div className="profile-identity__photo">
@@ -73,9 +153,6 @@ export function ProfileIdentityBlock({ session, onSaved }) {
                 placeholder="Paste an image link"
               />
             </label>
-            <p className="text-small text-muted profile-identity__photo-hint">
-              Shown on your clinician profile. Leave blank to use initials.
-            </p>
           </div>
 
           <div className="profile-identity__fields">
@@ -87,29 +164,18 @@ export function ProfileIdentityBlock({ session, onSaved }) {
                   className="paper-input"
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
+                  required
                 />
               </div>
               <div className="form-group">
-                <label htmlFor="profile-hcpc">HCPC number</label>
-                <input
-                  id="profile-hcpc"
-                  className="paper-input"
-                  value={hcpcNumber}
-                  onChange={e => setHcpcNumber(e.target.value)}
-                />
-              </div>
-              <div className="form-group profile-identity__field--full">
                 <label htmlFor="profile-job-title">Job title</label>
                 <input
                   id="profile-job-title"
                   className="paper-input"
                   value={jobTitle}
                   onChange={e => setJobTitle(e.target.value)}
-                  placeholder="e.g. Clinical Lead"
+                  placeholder="e.g. Music Therapist"
                 />
-                <p className="text-small text-muted role-block__intro">
-                  Your organisational role — how you appear on the team roster.
-                </p>
               </div>
               <div className="form-group profile-identity__field--full">
                 <label htmlFor="profile-professional-title">Professional title</label>
@@ -118,12 +184,48 @@ export function ProfileIdentityBlock({ session, onSaved }) {
                   className="paper-input"
                   value={professionalTitle}
                   onChange={e => setProfessionalTitle(e.target.value)}
-                  placeholder="e.g. Music Therapist, Integrative Psychotherapist"
+                  placeholder="e.g. Integrative Psychotherapist"
                 />
-                <p className="text-small text-muted role-block__intro">
-                  Your clinical or professional qualifications — shown on signatures and letters.
-                </p>
               </div>
+
+              <div className="form-group profile-identity__field--full">
+                <span className="profile-identity__photo-label">Registration numbers</span>
+                <p className="text-small text-muted role-block__intro" style={{ marginTop: '0.35rem' }}>
+                  Add each register you hold (HCPC, BACP, UKCP, NMC, etc.) with its number.
+                </p>
+                <div className="registration-list">
+                  {registrations.map((row, index) => (
+                    <div key={`reg-${index}`} className="registration-list__row">
+                      <input
+                        className="paper-input"
+                        placeholder="Body (e.g. HCPC)"
+                        value={row.body}
+                        onChange={(e) => updateRegistration(index, { body: e.target.value })}
+                        aria-label={`Registration body ${index + 1}`}
+                      />
+                      <input
+                        className="paper-input"
+                        placeholder="Registration number"
+                        value={row.number}
+                        onChange={(e) => updateRegistration(index, { number: e.target.value })}
+                        aria-label={`Registration number ${index + 1}`}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => removeRegistration(index)}
+                        aria-label={`Remove registration ${index + 1}`}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" className="btn btn-secondary" onClick={addRegistration} style={{ marginTop: '0.5rem' }}>
+                  Add registration
+                </button>
+              </div>
+
               <div className="form-group profile-identity__field--full">
                 <label htmlFor="profile-bio">Biography</label>
                 <textarea
@@ -134,54 +236,6 @@ export function ProfileIdentityBlock({ session, onSaved }) {
                   onChange={e => setBio(e.target.value)}
                   placeholder="A short professional biography — your approach, settings, and interests."
                 />
-                <p className="text-small text-muted role-block__intro">
-                  Shown on your clinician profile and letterhead.
-                </p>
-              </div>
-              <div className="form-group profile-identity__field--full">
-                <label htmlFor="profile-signature-upload">Handwritten signature</label>
-                <div className="profile-identity__signature">
-                  {signatureImageUrl ? (
-                    <img
-                      src={signatureImageUrl}
-                      alt="Your handwritten signature"
-                      className="profile-identity__signature-preview"
-                    />
-                  ) : (
-                    <p className="text-small text-muted profile-identity__signature-empty">
-                      No signature uploaded yet.
-                    </p>
-                  )}
-                  <label className="profile-identity__signature-upload">
-                    <span className="secondary profile-identity__signature-upload-btn">Upload image</span>
-                    <input
-                      id="profile-signature-upload"
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (!file || !file.type.startsWith('image/')) return
-                        const reader = new FileReader()
-                        reader.onload = () => setSignatureImageUrl(String(reader.result || ''))
-                        reader.readAsDataURL(file)
-                        e.target.value = ''
-                      }}
-                    />
-                  </label>
-                  {signatureImageUrl && (
-                    <button
-                      type="button"
-                      className="text-small profile-identity__signature-remove"
-                      onClick={() => setSignatureImageUrl('')}
-                    >
-                      Remove signature
-                    </button>
-                  )}
-                </div>
-                <p className="text-small text-muted role-block__intro">
-                  Used when you insert your account signature in progress notes. PNG or JPG recommended.
-                </p>
               </div>
               <div className="form-group profile-identity__field--full">
                 <label htmlFor="profile-signature">Printed name</label>
@@ -192,13 +246,22 @@ export function ProfileIdentityBlock({ session, onSaved }) {
                   onChange={e => setSignatureText(e.target.value)}
                   placeholder="Printed name for progress notes"
                 />
-                <p className="text-small text-muted role-block__intro">
-                  Fallback sign-off when no handwritten image is stored — also used for the script-font signature option.
-                </p>
+              </div>
+              <div className="form-group profile-identity__field--full">
+                <label htmlFor="profile-signature-image">Signature image URL</label>
+                <input
+                  id="profile-signature-image"
+                  type="url"
+                  className="paper-input"
+                  value={signatureImageUrl}
+                  onChange={e => setSignatureImageUrl(e.target.value)}
+                  placeholder="Optional handwritten signature image"
+                />
               </div>
             </div>
           </div>
         </div>
+        {error && <p className="auth-page__alert" role="alert">{error}</p>}
         <div className="form-actions">
           <button type="submit" className="primary" disabled={saving}>
             {saving ? 'Saving…' : 'Save profile'}
@@ -211,7 +274,7 @@ export function ProfileIdentityBlock({ session, onSaved }) {
 
 export function ProfileAvailabilityBlock({ userId, onSaved }) {
   return (
-    <RoleBlockShell blockId="profile_availability">
+    <RoleBlockShell blockId="profile_availability" title="Availability & services">
       <div className="role-block__panel">
         <ProfileAvailabilityPanel userId={userId} onSaved={onSaved} />
       </div>
@@ -221,7 +284,7 @@ export function ProfileAvailabilityBlock({ userId, onSaved }) {
 
 export function ProfileLetterheadBlock({ userId }) {
   return (
-    <RoleBlockShell blockId="profile_letterhead">
+    <RoleBlockShell blockId="profile_letterhead" title="Private practice letterhead">
       <PrivatePracticeBrandingPanel userId={userId} />
     </RoleBlockShell>
   )

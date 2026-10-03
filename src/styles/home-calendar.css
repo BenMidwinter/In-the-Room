@@ -562,16 +562,7 @@
 }
 
 .role-block__badge {
-  display: inline-flex;
-  margin-bottom: 0.35rem;
-  padding: 0.15rem 0.5rem;
-  font-size: 0.62rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--col-primary-dark);
-  background: var(--col-primary-light);
-  border-radius: 999px;
+  display: none;
 }
 
 .role-block--administrator .role-block__badge,

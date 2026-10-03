@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { resetStore, getWorkplaceRecord, updateWorkplaceBranding, updatePrivatePracticeBranding, getProfile } from './store'
+import { resetStore, updatePrivatePracticeBranding, getProfile } from './store'
 import {
   DEFAULT_PRACTICE_LOGO_URL,
   DEFAULT_WORKPLACE_BRANDING,
   formatWorkplaceAddress,
-  getClinicalExportBranding,
-  getWorkplaceBranding,
   resolvePracticeBranding,
   resolveWorkplaceBranding,
 } from './workplaceBranding'
@@ -15,24 +13,17 @@ describe('workplaceBranding', () => {
     resetStore()
   })
 
-  it('defaults to ChromatiK logo when workplace has no logo_url', () => {
-    const branding = getWorkplaceBranding('wp-chroma')
-    expect(branding.logo_url).toBe(DEFAULT_PRACTICE_LOGO_URL)
-    expect(branding.name).toBe('Chroma Main HQ')
-    expect(branding.address_line1).toBe('Chroma Main HQ')
-    expect(branding.postcode).toBe('SE1 4AA')
+  it('does not inject a default practice logo', () => {
+    expect(DEFAULT_PRACTICE_LOGO_URL).toBe('')
+    const branding = resolvePracticeBranding({ full_name: 'Test Clinician' })
+    expect(branding.logo_url).toBe('')
+    expect(branding.name).toBe('Test Clinician')
   })
 
-  it('uses distinct addresses per workplace', () => {
-    const east = getWorkplaceBranding('wp-east')
-    expect(east.address_line2).toBe('18 Riverside Studios')
-    expect(east.postcode).toBe('E15 2GW')
-  })
-
-  it('falls back to ChromatiK branding for private clients', () => {
-    const branding = getWorkplaceBranding(null)
-    expect(branding.logo_url).toBe(DEFAULT_PRACTICE_LOGO_URL)
-    expect(branding.address_line1).toBe('ChromatiK')
+  it('uses an empty logo when workplace has none', () => {
+    const branding = resolveWorkplaceBranding({ name: 'Practice A' })
+    expect(branding.logo_url).toBe('')
+    expect(branding.name).toBe('Practice A')
   })
 
   it('formats a single-line postal address', () => {
@@ -46,60 +37,23 @@ describe('workplaceBranding', () => {
     }))
     expect(line).toContain('1 High Street')
     expect(line).toContain('LS1 1AA')
-    expect(line).not.toContain(DEFAULT_WORKPLACE_BRANDING.address_line2)
+    expect(line).toContain('United Kingdom')
   })
 
-  it('lets clinical leads update workplace branding for exports', () => {
-    const myWorkplace = { id: 'wp-chroma', name: 'Chroma Main HQ', role: 'clinical_lead' }
-    expect(getWorkplaceRecord('wp-chroma', myWorkplace)?.name).toBe('Chroma Main HQ')
-
-    updateWorkplaceBranding('wp-chroma', {
-      logo_url: 'https://example.com/logo.png',
-      address_line1: 'North Wing',
-      address_line2: '9 Market Street',
-      address_line3: 'Manchester',
-      postcode: 'M1 1AA',
-      country: 'United Kingdom',
-    }, 'user-ben', myWorkplace)
-
-    const branding = getWorkplaceBranding('wp-chroma')
-    expect(branding.logo_url).toBe('https://example.com/logo.png')
-    expect(branding.address_line2).toBe('9 Market Street')
-    expect(branding.postcode).toBe('M1 1AA')
-  })
-
-  it('rejects branding updates from clinicians', () => {
-    const myWorkplace = { id: 'wp-chroma', name: 'Chroma Main HQ', role: 'clinician' }
-    expect(getWorkplaceRecord('wp-chroma', myWorkplace)).toBeNull()
-    expect(() => updateWorkplaceBranding('wp-chroma', {
-      address_line1: 'Blocked',
-    }, 'user-sarah', myWorkplace)).toThrow(/clinical lead/)
-  })
-
-  it('uses private practice branding for clients without a workplace', () => {
-    updatePrivatePracticeBranding('user-sarah', {
-      practice_name: 'Sarah Rivera Music Therapy',
-      practice_address_line1: 'Studio 4, Market Lane',
-      practice_address_line2: 'Brighton',
-      practice_postcode: 'BN1 1AA',
+  it('stores private practice branding without inventing a logo', () => {
+    updatePrivatePracticeBranding('user-local', {
+      practice_name: 'Quiet Room Practice',
+      practice_logo_url: '',
+      practice_address_line1: '12 Studio Lane',
+      practice_address_line2: '',
+      practice_address_line3: 'Bristol',
+      practice_postcode: 'BS1 1AA',
       practice_country: 'United Kingdom',
     })
-
-    const branding = getClinicalExportBranding(null, 'user-sarah')
-    expect(branding.name).toBe('Sarah Rivera Music Therapy')
-    expect(branding.address_line1).toBe('Studio 4, Market Lane')
-    expect(branding.postcode).toBe('BN1 1AA')
-  })
-
-  it('prefers workplace branding when a workplace is linked', () => {
-    const workplaceBranding = getClinicalExportBranding('wp-east', 'user-sarah')
-    expect(workplaceBranding.name).toBe('Chroma East Hub')
-    expect(workplaceBranding.address_line2).toBe('18 Riverside Studios')
-  })
-
-  it('defaults private practice name to clinician full name', () => {
-    const profile = getProfile('user-sarah')
+    const profile = getProfile('user-local')
     const branding = resolvePracticeBranding(profile)
-    expect(branding.name).toBe(profile.full_name)
+    expect(branding.name).toBe('Quiet Room Practice')
+    expect(branding.logo_url).toBe('')
+    expect(branding.address_line1).toBe('12 Studio Lane')
   })
 })

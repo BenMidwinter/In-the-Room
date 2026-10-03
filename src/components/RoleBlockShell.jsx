@@ -11,7 +11,6 @@ export default function RoleBlockShell({ blockId, title, description, children, 
     <section className={`role-block role-block--${blockId}`} aria-labelledby={`role-block-${blockId}`}>
       <header className="role-block__header">
         <div className="role-block__heading">
-          <span className="role-block__badge">{meta.label || blockId}</span>
           <h2 id={`role-block-${blockId}`} className="role-block__title">
             {heading}
           </h2>
