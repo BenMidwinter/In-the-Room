@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import {
+  deleteAppointmentsByIds,
   fetchAllAppointments,
   fetchAppointment,
   fetchAppointmentsForClient,
   fetchUpcomingAppointments,
   saveAppointmentForUser,
+  updateAppointmentsInScope,
 } from './supabase/appointmentsRepo'
+import { resolveSeriesScopeIds, type SeriesScope } from './appointmentSeries'
 
 export const appointmentQueryKeys = {
   appointments: ['appointments'],
@@ -51,16 +54,65 @@ export function useAppointmentQuery(appointmentId, { enabled = true } = {}) {
   })
 }
 
+function invalidateAppointmentLists(queryClient) {
+  queryClient.invalidateQueries({ queryKey: appointmentQueryKeys.appointments })
+  queryClient.invalidateQueries({ queryKey: appointmentQueryKeys.all })
+}
+
 export function useSaveAppointmentMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ payload, userId }: { payload: Record<string, unknown>; userId: string }) =>
-      saveAppointmentForUser(payload, userId),
+    mutationFn: async ({
+      payload,
+      userId,
+      scope = 'this',
+      allAppointments = [],
+    }: {
+      payload: Record<string, unknown>
+      userId: string
+      scope?: SeriesScope
+      allAppointments?: { id: string; session_date?: string; series_id?: string | null }[]
+    }) => {
+      if (scope === 'this' || !payload.id) {
+        return saveAppointmentForUser(payload, userId)
+      }
+      const ids = resolveSeriesScopeIds(
+        {
+          id: String(payload.id),
+          session_date: String(payload.session_date || ''),
+          series_id: payload.series_id ? String(payload.series_id) : null,
+        },
+        allAppointments,
+        scope,
+      )
+      return updateAppointmentsInScope(ids, payload, userId, String(payload.id))
+    },
     onSuccess: (saved) => {
-      // Refetch the full diary so follow-on blocks created server-side appear too.
-      queryClient.invalidateQueries({ queryKey: appointmentQueryKeys.appointments })
-      queryClient.invalidateQueries({ queryKey: appointmentQueryKeys.all })
-      queryClient.setQueryData(appointmentQueryKeys.detail(String(saved.id)), saved)
+      invalidateAppointmentLists(queryClient)
+      if (saved?.id) {
+        queryClient.setQueryData(appointmentQueryKeys.detail(String(saved.id)), saved)
+      }
+    },
+  })
+}
+
+export function useDeleteAppointmentsMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      appointment,
+      scope = 'this',
+      allAppointments = [],
+    }: {
+      appointment: { id: string; session_date?: string; series_id?: string | null }
+      scope?: SeriesScope
+      allAppointments?: { id: string; session_date?: string; series_id?: string | null }[]
+    }) => {
+      const ids = resolveSeriesScopeIds(appointment, allAppointments, scope)
+      return deleteAppointmentsByIds(ids)
+    },
+    onSuccess: () => {
+      invalidateAppointmentLists(queryClient)
     },
   })
 }

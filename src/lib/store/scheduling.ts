@@ -1,7 +1,7 @@
 import { db, uid } from '../data/collections'
 import { sortAppointmentsLatestFirst } from '../calendarAccess'
 import { appointmentSchedule, fromDatetimeLocalValue, type AppointmentLike } from '../appointmentUtils'
-import { DEMO_TODAY, addMinutesToTime } from '../dateArchitecture'
+import { todayYmd, addMinutesToTime } from '../dateArchitecture'
 import { parseOrThrow, appointmentInputSchema } from '../schemas'
 import { getClientsForUser } from './clientRecords'
 
@@ -24,13 +24,17 @@ export function getUpcomingAppointments(userId, myWorkplace, options: { organisa
   const clientIds = organisationWide
     ? new Set(db.clients.map(c => c.id))
     : new Set(getClientsForUser(userId, myWorkplace).map(c => c.id))
-  const today = DEMO_TODAY
+  const today = todayYmd()
   return sortAppointmentsLatestFirst(
     db.appointments.filter(a => {
-      if (!clientIds.has(String(a.client_id))) return false
-      if (a.attendance_status === 'cancelled') return false
+      if (a.attendance_status === 'cancelled' || a.attendance_status === 'attended') return false
+      if ((a as { is_external_busy?: boolean }).is_external_busy) return false
+      const role = (a as { block_role?: string | null }).block_role
+      if (role === 'support' || role === 'admin' || role === 'busy') return false
       const { session_date } = appointmentSchedule(a as AppointmentLike)
-      return session_date >= today
+      if (!session_date || session_date < today) return false
+      if (!organisationWide && a.clinician_id && a.clinician_id === userId) return true
+      return clientIds.has(String(a.client_id))
     }),
   ).reverse()
 }
@@ -53,8 +57,11 @@ export function saveAppointment(payload, userId) {
     const startTime = schedule.start_time || prev.start_time
     db.appointments[idx] = {
       ...prev,
+      client_id: payload.client_id !== undefined ? (payload.client_id || null) : prev.client_id,
       episode_id: payload.episode_id ?? prev.episode_id,
       clinician_id: payload.clinician_id ?? prev.clinician_id,
+      service_id: payload.service_id !== undefined ? payload.service_id : prev.service_id,
+      service_name: payload.service_name !== undefined ? payload.service_name : prev.service_name,
       session_date: schedule.session_date || prev.session_date,
       start_time: startTime,
       end_time: payload.end_time ?? addMinutesToTime(startTime, durationMinutes),
@@ -67,6 +74,7 @@ export function saveAppointment(payload, userId) {
       location: payload.location ?? prev.location ?? '',
       notes: payload.notes !== undefined ? payload.notes : prev.notes,
       other_info: payload.other_info !== undefined ? payload.other_info : prev.other_info ?? '',
+      block_role: payload.block_role ?? prev.block_role,
       client_name: client?.real_name ?? prev.client_name,
       assigned_therapist: String(clinicianProfile?.full_name || '').split(' ')[0]
         || prev.assigned_therapist,
@@ -78,10 +86,14 @@ export function saveAppointment(payload, userId) {
   const startTime = schedule.start_time
   const created = {
     id: uid('appt'),
-    client_id: payload.client_id,
-    client_name: client?.real_name || `${client?.first_name || ''} ${client?.surname || ''}`.trim() || 'Client',
+    client_id: payload.client_id || null,
+    client_name: client?.real_name
+      || `${client?.first_name || ''} ${client?.surname || ''}`.trim()
+      || (payload.client_id ? 'Client' : 'No client'),
     episode_id: payload.episode_id || null,
     clinician_id: payload.clinician_id || userId,
+    service_id: payload.service_id || null,
+    service_name: payload.service_name || undefined,
     assigned_therapist: String(clinicianProfile?.full_name || '').split(' ')[0] || 'Clinician',
     session_date: schedule.session_date,
     start_time: startTime,
@@ -93,6 +105,8 @@ export function saveAppointment(payload, userId) {
     location: payload.location ?? '',
     notes: payload.notes || '',
     other_info: payload.other_info?.trim() || '',
+    block_role: payload.block_role || 'client_session',
+    series_id: payload.series_id || null,
     created_at: now,
     updated_at: now,
   }

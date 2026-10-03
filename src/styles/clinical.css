@@ -195,16 +195,22 @@ button, .btn {
 }
 
 .secondary, .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--bg-surface);
   color: var(--col-accent);
   border: 1px solid var(--border-color);
   padding: 0.5rem 1rem;
   font-size: 0.9375rem;
+  text-decoration: none;
+  cursor: pointer;
 }
 
 .secondary:hover, .btn-secondary:hover {
   background: var(--bg-page);
   border-color: var(--col-accent);
+  text-decoration: none;
 }
 
 button:disabled { opacity: 0.55; cursor: not-allowed; }

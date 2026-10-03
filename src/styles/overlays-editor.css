@@ -1,3 +1,124 @@
+/* ── Shared central form overlay (services, appointments, …) ── */
+
+.form-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1400;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.form-overlay__backdrop {
+  position: fixed;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 42, 0.55);
+  cursor: pointer;
+}
+
+.form-overlay__panel {
+  position: relative;
+  z-index: 1;
+  width: min(40rem, 100%);
+  margin: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-md), 0 24px 48px rgba(0, 0, 0, 0.18);
+}
+
+.form-overlay__panel--sm { width: min(28rem, 100%); }
+.form-overlay__panel--md { width: min(40rem, 100%); }
+.form-overlay__panel--lg { width: min(56rem, 100%); }
+
+.form-overlay__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.35rem 1.75rem;
+  border-bottom: 2px solid var(--col-primary);
+  background: var(--bg-surface);
+}
+
+.form-overlay__eyebrow {
+  margin: 0 0 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--txt-muted);
+}
+
+.form-overlay__title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 1.4rem;
+  font-weight: 600;
+  font-variation-settings: var(--font-head-variation);
+  font-optical-sizing: auto;
+  color: var(--txt-primary);
+  line-height: 1.25;
+}
+
+.form-overlay__meta {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--txt-muted);
+}
+
+.form-overlay__close {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.form-overlay__body {
+  padding: 1.5rem 1.75rem 1.75rem;
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+}
+
+.form-overlay__footer {
+  padding: 1rem 1.75rem 1.35rem;
+  border-top: 1px solid var(--border-light);
+}
+
+.series-scope {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.series-scope__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  text-align: left;
+  border: 1px solid var(--border-color);
+  background: var(--bg-page);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+
+.series-scope__option:hover {
+  border-color: var(--col-primary);
+  background: color-mix(in srgb, var(--col-primary) 6%, var(--bg-surface));
+}
+
+.series-scope__title {
+  font-weight: 700;
+  color: var(--txt-primary);
+}
+
+.series-scope__desc {
+  margin: 0;
+}
+
 /* ── Client profile overlay ── */
 
 .client-profile-overlay {

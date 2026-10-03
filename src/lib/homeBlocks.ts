@@ -1,10 +1,11 @@
-import { getAllAppointments, getAllProgressNotes, getAllMemberships } from './store'
+import { getAllAppointments, getAllProgressNotes, getAllMemberships, getProgressNoteByAppointment } from './store'
 import { db } from './data/collections'
-import { sortLatestFirst, compareYmd, DEMO_TODAY } from './dateArchitecture'
+import { sortLatestFirst, compareYmd, DEMO_TODAY, todayYmd } from './dateArchitecture'
 import { appointmentSchedule } from './appointmentUtils'
 import { buildLeadDashboard } from './leadDashboard'
 import { ROLES, normalizeRole } from './permissions'
 import { getFinanceMockForWorkplace } from './financeMock'
+import { isProgressNoteSignedOff } from './progressNoteLifecycle'
 
 /** Workplaces where the user has team-operations / oversight home blocks. */
 export function filterHomeOversightWorkplaces(workplaces: Array<{ role?: string }> = []) {
@@ -38,17 +39,49 @@ function clientAtWorkplace(client, workplaceId) {
 }
 
 export function getPersonalUpcomingAppointments(userId, clinicianName, workplaceId = null) {
-  const today = DEMO_TODAY
+  const today = todayYmd()
   return sortUpcomingSoonestFirst(
     getAllAppointments().filter((appt) => {
       if (!appointmentAssignedToClinician(appt, userId, clinicianName)) return false
-      if (appt.attendance_status === 'cancelled') return false
+      if (appt.attendance_status === 'cancelled' || appt.attendance_status === 'attended') return false
+      if (appt.is_external_busy) return false
+      const role = appt.block_role
+      if (role === 'support' || role === 'admin' || role === 'busy') return false
       const { session_date } = appointmentSchedule(appt)
       if (compareYmd(session_date, today) < 0) return false
       const client = db.clients.find(c => c.id === appt.client_id)
       return clientAtWorkplace(client, workplaceId)
     }),
   ).slice(0, 8)
+}
+
+/**
+ * Next progress note that still needs completing — oldest incomplete first.
+ * Includes draft notes and past/attended sessions with no note yet.
+ */
+export function getNextProgressNoteTask(
+  appointments = [],
+  {
+    getNote = getProgressNoteByAppointment,
+    today = todayYmd(),
+  } = {},
+) {
+  const candidates = appointments.filter((appt) => {
+    if (!appt?.id || appt.is_external_busy) return false
+    if (appt.attendance_status === 'cancelled' || appt.attendance_status === 'did_not_attend') return false
+    const role = appt.block_role
+    if (role === 'support' || role === 'admin' || role === 'busy') return false
+
+    const note = getNote(appt.id)
+    if (note && isProgressNoteSignedOff(note)) return false
+    if (note) return true
+
+    const { session_date } = appointmentSchedule(appt)
+    if (appt.attendance_status === 'attended') return true
+    return compareYmd(session_date, today) < 0
+  })
+
+  return sortUpcomingSoonestFirst(candidates)[0] || null
 }
 
 export function getPersonalActiveCases(userId, workplaceId = null) {
@@ -66,7 +99,7 @@ export function getWorkplaceUpcomingAppointments(workplaceId) {
   const clientIds = new Set(
     db.clients.filter(c => c.workplace_id === workplaceId).map(c => c.id),
   )
-  const today = DEMO_TODAY
+  const today = todayYmd()
   return sortUpcomingSoonestFirst(
     getAllAppointments().filter((appt) => {
       if (!clientIds.has(appt.client_id)) return false

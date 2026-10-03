@@ -28,6 +28,39 @@ describe('getClientTimeline', () => {
       expect(noteEvent.summary).not.toMatch(/<[^>]+>/)
     }
   })
+
+  it('includes support/admin appointments and keeps service titles when attended', () => {
+    const events = getClientTimeline('client-1', {
+      appointments: [
+        {
+          id: 'appt-support-1',
+          client_id: 'client-1',
+          block_role: 'admin',
+          service_name: 'Notes',
+          session_date: '2026-10-01',
+          start_time: '10:00',
+          attendance_status: null,
+          clinician_id: 'u1',
+        },
+        {
+          id: 'appt-attended-1',
+          client_id: 'client-1',
+          block_role: 'client_session',
+          service_name: 'Music Therapy',
+          therapy_modality: 't',
+          session_date: '2026-10-02',
+          start_time: '11:00',
+          attendance_status: 'attended',
+          clinician_id: 'u1',
+        },
+      ],
+    })
+    const support = events.find((e) => e.ref_id === 'appt-support-1')
+    const attended = events.find((e) => e.ref_id === 'appt-attended-1')
+    expect(support?.type).toBe('support')
+    expect(support?.title).toBe('Notes')
+    expect(attended?.title).toBe('Music Therapy')
+  })
 })
 
 describe('updateClientClinicalProfile', () => {

@@ -6,8 +6,12 @@ import { useAppClients } from '../../lib/queries'
 import {
   appointmentQueryKeys,
   useAllAppointmentsQuery,
+  useDeleteAppointmentsMutation,
   useSaveAppointmentMutation,
 } from '../../lib/appointmentQueries'
+import { useConfirm, useToast } from '../../components/ui'
+import { appointmentBelongsToSeries, countSeriesScope } from '../../lib/appointmentSeries'
+import SeriesScopeDialog from '../../components/SeriesScopeDialog'
 import {
   externalBlocksAsAppointments,
   listCalendarConnections,
@@ -30,7 +34,7 @@ import {
   filterAppointmentsForPersona,
   appointmentsForDate,
 } from '../../lib/calendarAccess'
-import { appointmentOtherInfo } from '../../lib/appointmentUtils'
+import { appointmentOtherInfo, appointmentSchedule } from '../../lib/appointmentUtils'
 import {
   getCalendarViewPreferences,
   saveCalendarViewPreferences,
@@ -720,8 +724,14 @@ export default function CalendarModule({ persona }) {
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const { data: appointments = [] } = useAllAppointmentsQuery()
   const saveAppointmentMutation = useSaveAppointmentMutation()
+  const deleteAppointmentsMutation = useDeleteAppointmentsMutation()
+  const confirm = useConfirm()
+  const toast = useToast()
   const [viewPrefs, setViewPrefs] = useState(() => getCalendarViewPreferences())
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false)
+  const [deleteScopeFor, setDeleteScopeFor] = useState(null)
+  const [scheduleDeleting, setScheduleDeleting] = useState(false)
+  const [rescheduleTarget, setRescheduleTarget] = useState(null)
 
   const [availabilitySettings, setAvailabilitySettings] = useState(() => (
     getClinicianWorkplaceSettings(session.user.id)
@@ -880,16 +890,46 @@ export default function CalendarModule({ persona }) {
 
   const selectAppointment = (appt) => {
     if (appt?.is_external_busy) return
+    // Leave reschedule mode if the clinician picks another event.
+    if (rescheduleTarget) setRescheduleTarget(null)
+    // View overlay (attendance / details). Edit is a separate overlay from there.
     setScheduleDraft(null)
-    setSelectedAppointment(prev => (prev?.id === appt.id ? null : appt))
+    setSelectedAppointment((prev) => (prev?.id === appt.id ? null : appt))
   }
 
   const openScheduleSlot = (sessionDate, startTime, manual = false) => {
+    if (rescheduleTarget) {
+      const duration = Math.max(
+        0,
+        parseMinutes(rescheduleTarget.end_time) - parseMinutes(rescheduleTarget.start_time),
+      ) || 60
+      const endTime = hhmm(
+        Math.floor((parseMinutes(startTime) + duration) / 60),
+        (parseMinutes(startTime) + duration) % 60,
+      )
+      const moved = {
+        ...rescheduleTarget,
+        session_date: sessionDate,
+        start_time: startTime,
+        end_time: endTime,
+      }
+      setRescheduleTarget(null)
+      setSelectedAppointment(null)
+      setScheduleDraft({
+        mode: 'edit',
+        appointment: moved,
+        session_date: sessionDate,
+        start_time: startTime,
+        manual: true,
+      })
+      return
+    }
     setSelectedAppointment(null)
-    setScheduleDraft({ session_date: sessionDate, start_time: startTime, manual })
+    setScheduleDraft({ mode: 'create', session_date: sessionDate, start_time: startTime, manual })
   }
 
   const openAddAppointment = () => {
+    setRescheduleTarget(null)
     openScheduleSlot(activeDate, hhmm(viewPrefs.startHour, 0), true)
   }
 
@@ -897,6 +937,17 @@ export default function CalendarModule({ persona }) {
     setSelectedAppointment(null)
     setScheduleDraft(null)
   }
+
+  const cancelReschedule = () => setRescheduleTarget(null)
+
+  useEffect(() => {
+    if (!rescheduleTarget) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') setRescheduleTarget(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [rescheduleTarget])
 
   const handleViewPrefsChange = (patch) => {
     setViewPrefs(prev => saveCalendarViewPreferences({ ...prev, ...patch }))
@@ -913,7 +964,12 @@ export default function CalendarModule({ persona }) {
         end_time: selectedAppointment.end_time,
         appointment_type: selectedAppointment.appointment_type,
         therapy_modality: selectedAppointment.therapy_modality,
+        service_id: selectedAppointment.service_id,
+        service_name: selectedAppointment.service_name,
         location: selectedAppointment.location,
+        other_info: selectedAppointment.other_info,
+        block_role: selectedAppointment.block_role || 'client_session',
+        clinician_id: selectedAppointment.clinician_id,
         attendance_status: status,
       },
       userId: session.user.id,
@@ -921,10 +977,41 @@ export default function CalendarModule({ persona }) {
     setSelectedAppointment(saved)
   }
 
-  const handleScheduleSave = async (payload) => {
+  const handleScheduleSave = async (payload, scope = 'this') => {
     setScheduleSaving(true)
     try {
       const dates = payload.dates?.length ? payload.dates : [payload.session_date]
+      const seriesId = payload.series_id
+        || (dates.length > 1
+          ? (typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `series-${Date.now()}`)
+          : undefined)
+
+      // Editing an existing session (possibly a series scope).
+      if (payload.id && !payload.dates?.length) {
+        const saved = await saveAppointmentMutation.mutateAsync({
+          payload: {
+            ...payload,
+            dates: undefined,
+            series_id: payload.series_id || undefined,
+            clinician_id: payload.clinician_id || session.user.id,
+          },
+          userId: session.user.id,
+          scope,
+          allAppointments: filtered,
+        })
+        setScheduleDraft(null)
+        if (saved) {
+          setActiveDate(saved.session_date)
+          setSelectedAppointment(saved) // return to view overlay
+          toast.saved(scope === 'this' ? 'Appointment updated' : 'Series updated')
+        } else {
+          setSelectedAppointment(null)
+        }
+        return
+      }
+
       let first = null
       let last = null
       for (const date of dates) {
@@ -933,6 +1020,7 @@ export default function CalendarModule({ persona }) {
             ...payload,
             session_date: date,
             dates: undefined,
+            series_id: seriesId,
             clinician_id: payload.clinician_id || session.user.id,
           },
           userId: session.user.id,
@@ -959,20 +1047,64 @@ export default function CalendarModule({ persona }) {
         }
       }
       setScheduleDraft(null)
+      setSelectedAppointment(null)
       // Stay on the first occurrence — jumping to the series end is confusing.
       if (first) {
         setActiveDate(first.session_date)
         if (viewMode === 'month') setViewMode('day')
-        setSelectedAppointment(first)
+        toast.saved(dates.length > 1 ? `Booked ${dates.length} sessions` : 'Appointment booked')
       }
     } finally {
       setScheduleSaving(false)
     }
   }
 
+  const runDelete = async (appointment, scope = 'this') => {
+    setScheduleDeleting(true)
+    try {
+      await deleteAppointmentsMutation.mutateAsync({
+        appointment,
+        scope,
+        allAppointments: filtered,
+      })
+      setScheduleDraft(null)
+      setSelectedAppointment(null)
+      setDeleteScopeFor(null)
+      toast.saved(scope === 'this' ? 'Appointment deleted' : 'Appointments deleted')
+    } finally {
+      setScheduleDeleting(false)
+    }
+  }
+
+  const handleDeleteAppointment = async (appointment, scope) => {
+    if (!appointment) return
+    if (scope) {
+      await runDelete(appointment, scope)
+      return
+    }
+    if (appointmentBelongsToSeries(appointment, filtered)) {
+      setDeleteScopeFor(appointment)
+      return
+    }
+    const ok = await confirm({
+      title: 'Delete appointment?',
+      message: `Remove the session on ${appointment.session_date} at ${appointment.start_time}?`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    await runDelete(appointment, 'this')
+  }
+
   const handleRecurringSave = async (payload) => {
     setScheduleSaving(true)
     try {
+      const seriesId = payload.series_id
+        || (payload.dates?.length > 1
+          ? (typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `series-${Date.now()}`)
+          : undefined)
       let first = null
       for (const date of payload.dates) {
         const saved = await saveAppointmentMutation.mutateAsync({
@@ -984,20 +1116,23 @@ export default function CalendarModule({ persona }) {
             duration_minutes: payload.duration_minutes,
             therapy_modality: payload.therapy_modality,
             service_id: payload.service_id,
+            service_name: payload.service_name,
+            series_id: seriesId,
             location: payload.location,
             other_info: payload.other_info,
             appointment_type: payload.appointment_type,
             clinician_id: payload.clinician_id || session.user.id,
+            block_role: payload.block_role || 'client_session',
           },
           userId: session.user.id,
         })
         if (!first) first = saved
       }
       setScheduleDraft(null)
+      setSelectedAppointment(null)
       if (first) {
         setActiveDate(first.session_date)
         if (viewMode === 'month') setViewMode('day')
-        setSelectedAppointment(first)
       }
     } finally {
       setScheduleSaving(false)
@@ -1005,16 +1140,20 @@ export default function CalendarModule({ persona }) {
   }
 
   const handleEditAppointment = (appt) => {
+    // Close the right-hand drawer first; edit always uses the centred overlay.
+    setRescheduleTarget(null)
     setSelectedAppointment(null)
     setScheduleDraft({
       mode: 'edit',
       appointment: appt,
-      session_date: appt.session_date,
-      start_time: appt.start_time,
+      session_date: appt.session_date || appointmentSchedule(appt).session_date,
+      start_time: appt.start_time || appointmentSchedule(appt).start_time,
+      manual: true,
     })
   }
 
   const handleBookAnother = (appt) => {
+    setRescheduleTarget(null)
     setSelectedAppointment(null)
     setScheduleDraft({
       mode: 'book_another',
@@ -1026,14 +1165,24 @@ export default function CalendarModule({ persona }) {
   }
 
   const handleRecurring = (appt) => {
+    setRescheduleTarget(null)
     setSelectedAppointment(null)
     setScheduleDraft({ mode: 'recurring', source: appt })
+  }
+
+  const handleReschedule = (appt) => {
+    setSelectedAppointment(null)
+    setScheduleDraft(null)
+    setRescheduleTarget(appt)
+    if (appt?.session_date) setActiveDate(appt.session_date)
+    if (viewMode === 'month') setViewMode('week')
   }
 
   const gridHandlers = {
     blurNames,
     onSelectAppointment: selectAppointment,
-    selectedAppointmentId: selectedAppointment?.id,
+    selectedAppointmentId: selectedAppointment?.id
+      || (scheduleDraft?.mode === 'edit' ? scheduleDraft.appointment?.id : undefined),
     hours,
     subSlotMinutes,
     dayStartMin,
@@ -1082,10 +1231,36 @@ export default function CalendarModule({ persona }) {
     </>
   )
 
-  const paneOpen = Boolean(selectedAppointment || scheduleDraft)
+  // Side pane only for recurring helper — view + edit/create use centred overlays.
+  const showRecurringOverlay = scheduleDraft?.mode === 'recurring'
+  const showScheduleOverlay = Boolean(scheduleDraft && scheduleDraft.mode !== 'recurring')
+  const showViewOverlay = Boolean(selectedAppointment && !showScheduleOverlay && !showRecurringOverlay)
+
+  const closeScheduleOverlay = () => {
+    if (scheduleDraft?.mode === 'edit' && scheduleDraft.appointment) {
+      setSelectedAppointment(scheduleDraft.appointment)
+      setScheduleDraft(null)
+      return
+    }
+    closeSidePane()
+  }
 
   return (
-    <div className="calendar-module" data-service-catalog={serviceCatalogVersion}>
+    <div
+      className={`calendar-module${rescheduleTarget ? ' calendar-module--reschedule' : ''}`}
+      data-service-catalog={serviceCatalogVersion}
+    >
+      {rescheduleTarget && (
+        <div className="calendar-reschedule-banner" role="status">
+          <p>
+            Rescheduling <strong>{rescheduleTarget.client_name || rescheduleTarget.service_name || 'session'}</strong>
+            {' — '}click a calendar slot, then fine-tune in the edit panel.
+          </p>
+          <button type="button" className="secondary" onClick={cancelReschedule}>
+            Cancel
+          </button>
+        </div>
+      )}
       <header className="page-header page-header--with-toolbar page-header--calendar">
         <div className="page-header__text">
           <h1 className="page-header__title">Calendar</h1>
@@ -1123,53 +1298,76 @@ export default function CalendarModule({ persona }) {
       </header>
 
       <CalendarWorkspaceFrame
-        paneOpen={paneOpen}
+        paneOpen={false}
         grid={(
           <ErrorBoundary label="calendar-grid">
             <div className="calendar-module__body">{calendarGrid}</div>
           </ErrorBoundary>
         )}
-        accessory={(
-          <ErrorBoundary label="calendar-pane">
-            {scheduleDraft?.mode === 'recurring' ? (
-              <RecurringSchedulePanel
-                key={scheduleDraft.source.id}
-                source={scheduleDraft.source}
-                onSave={handleRecurringSave}
-                onCancel={closeSidePane}
-                saving={scheduleSaving}
-              />
-            ) : scheduleDraft ? (
-              <ScheduleSessionPanel
-                key={scheduleDraft.appointment?.id || scheduleDraft.prefill?.id || `${scheduleDraft.mode}-${scheduleDraft.session_date}-${scheduleDraft.start_time}`}
-                sessionDate={scheduleDraft.session_date}
-                startTime={scheduleDraft.start_time}
-                appointment={scheduleDraft.mode === 'edit' ? scheduleDraft.appointment : null}
-                prefill={scheduleDraft.mode === 'book_another' ? scheduleDraft.prefill : null}
-                clients={assignedClients}
-                allAppointments={filtered}
-                sessionUserId={session.user.id}
-                myWorkplace={myWorkplace}
-                calendarOwner={calendarOwner}
-                showDateField={Boolean(scheduleDraft.manual) || scheduleDraft.mode === 'book_another'}
-                onSave={handleScheduleSave}
-                onCancel={closeSidePane}
-                saving={scheduleSaving}
-              />
-            ) : selectedAppointment ? (
-              <EventDrawer
-                appointment={selectedAppointment}
-                allAppointments={filtered}
-                onClose={closeSidePane}
-                onAttendanceChange={handleAttendanceChange}
-                onEdit={handleEditAppointment}
-                onBookAnother={handleBookAnother}
-                onRecurring={handleRecurring}
-              />
-            ) : null}
-          </ErrorBoundary>
-        )}
       />
+
+      {showViewOverlay && (
+        <ErrorBoundary label="calendar-view-overlay">
+          <EventDrawer
+            appointment={selectedAppointment}
+            allAppointments={filtered}
+            presentation="overlay"
+            onClose={closeSidePane}
+            onAttendanceChange={handleAttendanceChange}
+            onEdit={handleEditAppointment}
+            onBookAnother={handleBookAnother}
+            onRecurring={handleRecurring}
+            onReschedule={handleReschedule}
+            onDelete={handleDeleteAppointment}
+          />
+        </ErrorBoundary>
+      )}
+
+      {showRecurringOverlay && (
+        <ErrorBoundary label="calendar-recurring-overlay">
+          <RecurringSchedulePanel
+            key={scheduleDraft.source.id}
+            source={scheduleDraft.source}
+            onSave={handleRecurringSave}
+            onCancel={closeSidePane}
+            saving={scheduleSaving}
+            presentation="overlay"
+          />
+        </ErrorBoundary>
+      )}
+
+      {showScheduleOverlay && (
+        <ErrorBoundary label="calendar-schedule-overlay">
+          <ScheduleSessionPanel
+            key={scheduleDraft.appointment?.id || scheduleDraft.prefill?.id || `${scheduleDraft.mode}-${scheduleDraft.session_date}-${scheduleDraft.start_time}`}
+            sessionDate={scheduleDraft.session_date}
+            startTime={scheduleDraft.start_time}
+            appointment={scheduleDraft.mode === 'edit' ? scheduleDraft.appointment : null}
+            prefill={scheduleDraft.mode === 'book_another' ? scheduleDraft.prefill : null}
+            clients={assignedClients}
+            allAppointments={filtered}
+            sessionUserId={session.user.id}
+            myWorkplace={myWorkplace}
+            calendarOwner={calendarOwner}
+            showDateField={Boolean(scheduleDraft.manual) || scheduleDraft.mode === 'book_another' || scheduleDraft.mode === 'edit'}
+            presentation="overlay"
+            onSave={handleScheduleSave}
+            onDelete={handleDeleteAppointment}
+            onCancel={closeScheduleOverlay}
+            saving={scheduleSaving}
+            deleting={scheduleDeleting}
+          />
+        </ErrorBoundary>
+      )}
+
+      {deleteScopeFor && (
+        <SeriesScopeDialog
+          action="delete"
+          onCancel={() => setDeleteScopeFor(null)}
+          countForScope={(scope) => countSeriesScope(deleteScopeFor, filtered, scope)}
+          onSelect={(scope) => runDelete(deleteScopeFor, scope)}
+        />
+      )}
     </div>
   )
 }

@@ -13,13 +13,19 @@ import {
 } from '../lib/appointmentUtils'
 import { modalityLabel } from '../lib/calendarConstants'
 import { appointmentServiceLabel } from '../lib/calendarServiceStyles'
-import { getAppointmentOrgServices } from '../lib/store'
+import { getBookableOrgServices } from '../lib/store'
 import { db } from '../lib/data/collections'
 import { addDaysYmd } from '../lib/dateArchitecture'
 import { canAssignAppointmentClinician } from '../lib/permissions'
 import { CALENDAR_OWNER_ALL, CALENDAR_OWNER_ALL_TEAM } from '../lib/calendarOwners'
 import { listServices } from '../lib/supabase/servicesRepo'
 import { isSupabaseConfigured } from '../lib/supabase/client'
+import FormOverlay from './FormOverlay'
+import SeriesScopeDialog from './SeriesScopeDialog'
+import {
+  appointmentBelongsToSeries,
+  countSeriesScope,
+} from '../lib/appointmentSeries'
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ')
@@ -433,13 +439,31 @@ function invoiceTag(status) {
   return <DataTag variant="draft">Draft</DataTag>
 }
 
-function EventDrawerActions({ onEdit, onBookAnother, onRecurring, locked = false, kind = 'standard' }) {
+function EventDrawerActions({
+  onEdit,
+  onBookAnother,
+  onRecurring,
+  onReschedule,
+  onDelete,
+  locked = false,
+  kind = 'standard',
+}) {
   if (kind === 'busy' || kind === 'support') {
     return (
       <section className="ck-event-drawer__actions">
         <button type="button" className="secondary" onClick={onEdit} disabled={locked}>
           Edit block
         </button>
+        {onReschedule && (
+          <button type="button" className="secondary" onClick={onReschedule} disabled={locked}>
+            Reschedule
+          </button>
+        )}
+        {onDelete && (
+          <button type="button" className="secondary" onClick={onDelete} disabled={locked}>
+            Delete
+          </button>
+        )}
       </section>
     )
   }
@@ -449,12 +473,22 @@ function EventDrawerActions({ onEdit, onBookAnother, onRecurring, locked = false
       <button type="button" className="primary" onClick={onEdit} disabled={locked}>
         Edit
       </button>
+      {onReschedule && (
+        <button type="button" className="secondary" onClick={onReschedule} disabled={locked}>
+          Reschedule
+        </button>
+      )}
       <button type="button" className="secondary" onClick={onBookAnother}>
         Book another
       </button>
       <button type="button" className="secondary" onClick={onRecurring}>
         Recurring
       </button>
+      {onDelete && (
+        <button type="button" className="secondary" onClick={onDelete} disabled={locked}>
+          Delete
+        </button>
+      )}
     </section>
   )
 }
@@ -717,8 +751,9 @@ function BusyEventBody({ appointment, locked }) {
 }
 
 /**
- * Polymorphic appointment drawer — standard, group, or busy practitioner blocks.
- * Embeds conflict/waitlist/financial banners and safety locks inline.
+ * Polymorphic appointment viewer — standard, group, or busy practitioner blocks.
+ * `presentation="overlay"` (default for calendar) shows a centred view modal;
+ * `presentation="pane"` keeps the legacy right-rail accessory.
  */
 export function EventDrawer({
   appointment,
@@ -728,10 +763,13 @@ export function EventDrawer({
   onEdit,
   onBookAnother,
   onRecurring,
+  onReschedule,
+  onDelete,
   locked: lockedProp,
   waitlistSuggestion,
   fundingWarning,
   className,
+  presentation = 'overlay',
 }) {
   const kind = resolveEventKind(appointment)
   const conflicts = useMemo(
@@ -760,17 +798,11 @@ export function EventDrawer({
   const subtitle = kind === 'busy'
     ? APPOINTMENT_TYPES[appointment.appointment_type] || 'Practitioner unavailable'
     : kind === 'support'
-      ? `${appointment.client_name || 'Client'} · follow-on`
+      ? `${appointment.client_name || 'No client'} · follow-on`
       : `${serviceLabel} · ${appointment.assigned_therapist}`
 
-  return (
-    <AccessoryPane
-      title={title}
-      subtitle={subtitle}
-      onClose={onClose}
-      className={cx('ck-event-drawer', className)}
-      bodyClassName="ck-event-drawer__body"
-    >
+  const body = (
+    <>
       {conflicts.length > 0 && (
         <ContextBanner variant="conflict" title="Schedule conflict">
           Overlaps with {conflicts.length} other booking{conflicts.length === 1 ? '' : 's'} at this time
@@ -804,6 +836,8 @@ export function EventDrawer({
         onEdit={() => onEdit?.(appointment)}
         onBookAnother={() => onBookAnother?.(appointment)}
         onRecurring={() => onRecurring?.(appointment)}
+        onReschedule={onReschedule ? () => onReschedule?.(appointment) : undefined}
+        onDelete={onDelete ? () => onDelete?.(appointment) : undefined}
       />
 
       {kind === 'group' && (
@@ -820,6 +854,34 @@ export function EventDrawer({
           showAttendance={kind === 'standard'}
         />
       )}
+    </>
+  )
+
+  if (presentation === 'overlay') {
+    return (
+      <FormOverlay
+        title={title}
+        eyebrow="Appointment"
+        meta={subtitle}
+        onClose={onClose}
+        size="md"
+      >
+        <div className={cx('ck-event-drawer', 'ck-event-drawer--overlay', className)}>
+          {body}
+        </div>
+      </FormOverlay>
+    )
+  }
+
+  return (
+    <AccessoryPane
+      title={title}
+      subtitle={subtitle}
+      onClose={onClose}
+      className={cx('ck-event-drawer', className)}
+      bodyClassName="ck-event-drawer__body"
+    >
+      {body}
     </AccessoryPane>
   )
 }
@@ -837,11 +899,19 @@ export function ScheduleSessionPanel({
   calendarOwner = null,
   onSave,
   onCancel,
+  onDelete,
   saving = false,
+  deleting = false,
   showDateField = false,
+  /** `pane` = calendar side accessory; `overlay` = centred modal editor */
+  presentation = 'pane',
+  lockedClient = false,
 }) {
   const seed = appointmentFormSeed(appointment) || appointmentFormSeed(prefill)
   const isEdit = Boolean(appointment?.id)
+  const inSeries = isEdit && appointmentBelongsToSeries(appointment, allAppointments)
+  const [pendingPayload, setPendingPayload] = useState(null)
+  const [scopeAction, setScopeAction] = useState(null) // 'edit' | 'delete' | null
 
   const workplaceClinicians = useMemo(
     () => (myWorkplace?.id ? getWorkplaceClinicians(myWorkplace.id) : []),
@@ -862,28 +932,30 @@ export function ScheduleSessionPanel({
   const [recurringWeekly, setRecurringWeekly] = useState(false)
   const [recurWeeks, setRecurWeeks] = useState(4)
   const [createMeetLink, setCreateMeetLink] = useState(Boolean(seed?.createMeetLink))
-  const [services, setServices] = useState(() => getAppointmentOrgServices())
+  const [services, setServices] = useState(() => getBookableOrgServices())
   const [servicesError, setServicesError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     async function loadServices() {
       if (!isSupabaseConfigured()) {
-        setServices(getAppointmentOrgServices())
+        setServices(getBookableOrgServices())
         return
       }
       try {
         const remote = await listServices()
         if (cancelled) return
-        const bookable = remote.filter(
-          (s) => (s.service_type === 'appointment' || !s.service_type) && s.is_active !== false,
-        )
+        const bookable = remote.filter((s) => {
+          if (s.is_active === false) return false
+          const type = s.service_type || 'appointment'
+          return type === 'appointment' || type === 'support' || type === 'admin' || !s.service_type
+        })
         hydrateOrgServices(remote)
         setServices(bookable)
         setServicesError(null)
       } catch (err) {
         if (!cancelled) {
-          setServices(getAppointmentOrgServices())
+          setServices(getBookableOrgServices())
           setServicesError(err.message || 'Could not load services')
         }
       }
@@ -915,6 +987,16 @@ export function ScheduleSessionPanel({
     () => services.find((s) => s.id === serviceId) || null,
     [services, serviceId],
   )
+
+  const serviceType = selectedService?.service_type || 'appointment'
+  const clientRequired = serviceType === 'appointment' || !selectedService?.service_type
+  const blockRole = serviceType === 'admin'
+    ? 'admin'
+    : serviceType === 'support'
+      ? 'support'
+      : serviceType === 'busy'
+        ? 'busy'
+        : 'client_session'
 
   const applyService = (nextId) => {
     const next = services.find((s) => s.id === nextId)
@@ -1005,41 +1087,62 @@ export function ScheduleSessionPanel({
     [draftAppointment, conflictPool],
   )
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!clientId || !serviceId || finalDuration <= 0) return
+  const buildPayload = () => {
     const bookDates = recurringWeekly && !isEdit
       ? Array.from({ length: recurWeeks }, (_, i) => addDaysYmd(sessionDate, i * 7))
       : undefined
-    onSave?.({
+    const seriesId = bookDates?.length > 1
+      ? (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `series-${Date.now()}`)
+      : (appointment?.series_id || undefined)
+    return {
       ...(appointment?.id ? { id: appointment.id } : {}),
-      client_id: clientId,
+      client_id: clientId || null,
       session_date: sessionDate,
       start_time: start,
       end_time: computedEnd,
       duration_minutes: finalDuration,
       therapy_modality: selectedService?.slug || modality || 'music_therapy',
       service_id: serviceId || null,
+      service_name: selectedService?.name || undefined,
+      series_id: seriesId || undefined,
       location: location.trim(),
       other_info: otherInfo.trim(),
       clinician_id: showClinicianPicker ? clinicianId : sessionUserId,
       appointment_type: appointment?.appointment_type || prefill?.appointment_type || 'one_to_one',
       create_meet_link: Boolean(createMeetLink && selectedService?.create_meet_link),
+      block_role: blockRole,
       dates: bookDates,
-    })
+    }
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if ((clientRequired && !clientId) || !serviceId || finalDuration <= 0) return
+    const payload = buildPayload()
+    if (isEdit && inSeries) {
+      setPendingPayload(payload)
+      setScopeAction('edit')
+      return
+    }
+    onSave?.(payload, 'this')
+  }
+
+  const handleDeleteClick = () => {
+    if (!isEdit || !onDelete) return
+    if (inSeries) {
+      setPendingPayload(null)
+      setScopeAction('delete')
+      return
+    }
+    onDelete?.(appointment, 'this')
   }
 
   const panelTitle = isEdit ? 'Edit appointment' : prefill ? 'Book another session' : 'Schedule session'
   const showDate = showDateField || isEdit || Boolean(prefill)
   const sessionCount = recurringWeekly && !isEdit ? recurWeeks : 1
-
-  return (
-    <AccessoryPane
-      title={panelTitle}
-      subtitle={`${sessionDate} · ${start}–${computedEnd}`}
-      onClose={onCancel}
-      bodyClassName="ck-schedule-panel"
-    >
+  const formBody = (
       <form className="ck-schedule-form" onSubmit={handleSubmit}>
         {showDate && (
           <div className="form-group">
@@ -1055,43 +1158,63 @@ export function ScheduleSessionPanel({
           </div>
         )}
 
-        <div className="form-group">
-          <label htmlFor="schedule-client-search">Find client</label>
-          <input
-            id="schedule-client-search"
-            type="search"
-            className="paper-input"
-            placeholder="Search your caseload…"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            autoComplete="off"
-          />
-        </div>
+        {!lockedClient && (
+          <>
+            <div className="form-group">
+              <label htmlFor="schedule-client-search">
+                Find client{clientRequired ? '' : ' (optional)'}
+              </label>
+              <input
+                id="schedule-client-search"
+                type="search"
+                className="paper-input"
+                placeholder={clientRequired ? 'Search your caseload…' : 'Optional — search caseload…'}
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
 
-        <div className="ck-schedule-client-list" role="listbox" aria-label="Assigned clients">
-          {filteredClients.length === 0 && (
-            <p className="text-small text-muted">No clients match — try another name or school.</p>
-          )}
-          {filteredClients.map(client => (
-            <button
-              key={client.id}
-              type="button"
-              role="option"
-              aria-selected={clientId === client.id}
-              className={`ck-schedule-client${clientId === client.id ? ' ck-schedule-client--active' : ''}`}
-              onClick={() => setClientId(client.id)}
-            >
-              <span className="ck-schedule-client__name">{client.real_name}</span>
-              <span className="ck-schedule-client__meta">
-                {client.school || client.workplace_name || 'Caseload'}
-              </span>
-            </button>
-          ))}
-        </div>
+            <div className="ck-schedule-client-list" role="listbox" aria-label="Assigned clients">
+              {filteredClients.length === 0 && (
+                <p className="text-small text-muted">No clients match — try another name or school.</p>
+              )}
+              {filteredClients.map(client => (
+                <button
+                  key={client.id}
+                  type="button"
+                  role="option"
+                  aria-selected={clientId === client.id}
+                  className={`ck-schedule-client${clientId === client.id ? ' ck-schedule-client--active' : ''}`}
+                  onClick={() => setClientId(client.id)}
+                >
+                  <span className="ck-schedule-client__name">{client.real_name}</span>
+                  <span className="ck-schedule-client__meta">
+                    {client.school || client.workplace_name || 'Caseload'}
+                  </span>
+                </button>
+              ))}
+            </div>
+            {!clientRequired && clientId && (
+              <button
+                type="button"
+                className="secondary ck-schedule-clear-client"
+                onClick={() => setClientId('')}
+              >
+                Clear client
+              </button>
+            )}
+          </>
+        )}
 
         {selectedClient && (
           <p className="text-small ck-schedule-selected">
-            Selected: <strong>{selectedClient.real_name}</strong>
+            {lockedClient ? 'Client' : 'Selected'}: <strong>{selectedClient.real_name}</strong>
+          </p>
+        )}
+        {!clientRequired && !selectedClient && (
+          <p className="text-small text-muted ck-schedule-selected">
+            No client linked — this {serviceType === 'admin' ? 'admin' : 'support'} block can stand alone.
           </p>
         )}
 
@@ -1108,7 +1231,9 @@ export function ScheduleSessionPanel({
             {!services.length && <option value="">No services configured</option>}
             {services.map(svc => (
               <option key={svc.id} value={svc.id}>
-                {svc.name} ({svc.default_duration_minutes || 50} min)
+                {svc.name}
+                {svc.service_type && svc.service_type !== 'appointment' ? ` · ${svc.service_type}` : ''}
+                {' '}({svc.default_duration_minutes || 50} min)
               </option>
             ))}
           </select>
@@ -1235,13 +1360,78 @@ export function ScheduleSessionPanel({
         )}
 
         <div className="form-actions">
-          <button type="submit" className="primary" disabled={!clientId || !serviceId || saving || finalDuration <= 0}>
-            {saving ? 'Saving…' : conflicts.length > 0 && !isEdit ? `Book ${sessionCount} anyway` : isEdit ? 'Save changes' : sessionCount > 1 ? `Book ${sessionCount} sessions` : 'Book session'}
+          <button
+            type="submit"
+            className="primary"
+            disabled={(clientRequired && !clientId) || !serviceId || saving || deleting || finalDuration <= 0}
+          >
+            {saving
+              ? 'Saving…'
+              : conflicts.length > 0 && !isEdit
+                ? `Book ${sessionCount} anyway`
+                : isEdit
+                  ? 'Save changes'
+                  : sessionCount > 1
+                    ? `Book ${sessionCount} sessions`
+                    : clientRequired
+                      ? 'Book session'
+                      : 'Book block'}
           </button>
+          {isEdit && onDelete && (
+            <button type="button" className="secondary" onClick={handleDeleteClick} disabled={saving || deleting}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          )}
           <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
         </div>
       </form>
-    </AccessoryPane>
+  )
+
+  const scopeDialog = scopeAction ? (
+    <SeriesScopeDialog
+      action={scopeAction}
+      onCancel={() => { setScopeAction(null); setPendingPayload(null) }}
+      countForScope={(scope) => countSeriesScope(appointment, allAppointments, scope)}
+      onSelect={(scope) => {
+        const action = scopeAction
+        const payload = pendingPayload
+        setScopeAction(null)
+        setPendingPayload(null)
+        if (action === 'delete') onDelete?.(appointment, scope)
+        else if (payload) onSave?.(payload, scope)
+      }}
+    />
+  ) : null
+
+  if (presentation === 'overlay') {
+    return (
+      <>
+        <FormOverlay
+          title={panelTitle}
+          eyebrow="Appointment"
+          meta={`${sessionDate} · ${start}–${computedEnd}`}
+          onClose={onCancel}
+          size="md"
+        >
+          <div className="ck-schedule-panel">{formBody}</div>
+        </FormOverlay>
+        {scopeDialog}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <AccessoryPane
+        title={panelTitle}
+        subtitle={`${sessionDate} · ${start}–${computedEnd}`}
+        onClose={onCancel}
+        bodyClassName="ck-schedule-panel"
+      >
+        {formBody}
+      </AccessoryPane>
+      {scopeDialog}
+    </>
   )
 }
 
@@ -1251,6 +1441,7 @@ export function RecurringSchedulePanel({
   onSave,
   onCancel,
   saving = false,
+  presentation = 'overlay',
 }) {
   const [pattern, setPattern] = useState('once')
   const [sessionDate, setSessionDate] = useState(() => addDaysYmd(source.session_date, 7))
@@ -1266,6 +1457,11 @@ export function RecurringSchedulePanel({
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    const seriesId = dates.length > 1
+      ? (source.series_id || (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `series-${Date.now()}`))
+      : source.series_id || undefined
     onSave?.({
       dates,
       pattern,
@@ -1275,11 +1471,103 @@ export function RecurringSchedulePanel({
       duration_minutes: duration,
       therapy_modality: source.therapy_modality,
       service_id: source.service_id,
+      service_name: source.service_name,
+      series_id: seriesId,
       location: source.location || '',
       other_info: source.other_info || appointmentOtherInfo(source),
       appointment_type: source.appointment_type || 'one_to_one',
       clinician_id: source.clinician_id,
+      block_role: source.block_role || 'client_session',
     })
+  }
+
+  const formBody = (
+    <form className="ck-schedule-form" onSubmit={handleSubmit}>
+      <p className="text-small text-muted ck-recurring-intro">
+        Create additional sessions using the same client, time, and duration as this appointment.
+      </p>
+
+      <div className="ck-recurring-pattern" role="radiogroup" aria-label="Recurrence pattern">
+        <label className={`ck-recurring-option${pattern === 'once' ? ' ck-recurring-option--active' : ''}`}>
+          <input
+            type="radio"
+            name="recurrence"
+            value="once"
+            checked={pattern === 'once'}
+            onChange={() => setPattern('once')}
+          />
+          <span className="ck-recurring-option__title">One-off future date</span>
+          <span className="ck-recurring-option__desc text-small text-muted">Book a single session on a chosen date</span>
+        </label>
+        <label className={`ck-recurring-option${pattern === 'weekly' ? ' ck-recurring-option--active' : ''}`}>
+          <input
+            type="radio"
+            name="recurrence"
+            value="weekly"
+            checked={pattern === 'weekly'}
+            onChange={() => setPattern('weekly')}
+          />
+          <span className="ck-recurring-option__title">Weekly</span>
+          <span className="ck-recurring-option__desc text-small text-muted">Same day and time each week</span>
+        </label>
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="recurring-start-date">{pattern === 'weekly' ? 'First session date' : 'Session date'}</label>
+        <input
+          id="recurring-start-date"
+          type="date"
+          className="paper-input"
+          value={sessionDate}
+          onChange={e => setSessionDate(e.target.value)}
+          required
+        />
+      </div>
+
+      {pattern === 'weekly' && (
+        <div className="form-group">
+          <label htmlFor="recurring-weeks">Number of weeks</label>
+          <input
+            id="recurring-weeks"
+            type="number"
+            min={2}
+            max={52}
+            className="paper-input"
+            value={weeks}
+            onChange={e => setWeeks(Math.min(52, Math.max(2, Number(e.target.value) || 2)))}
+          />
+        </div>
+      )}
+
+      <div className="ck-recurring-preview">
+        <span className="ck-recurring-preview__label">Will create</span>
+        <strong>{dates.length} session{dates.length === 1 ? '' : 's'}</strong>
+        {dates.length <= 6 && (
+          <span className="text-small text-muted"> — {dates.join(', ')}</span>
+        )}
+      </div>
+
+      <div className="form-actions">
+        <button type="submit" className="primary" disabled={saving || dates.length === 0}>
+          {saving ? 'Booking…' : `Book ${dates.length} session${dates.length === 1 ? '' : 's'}`}
+        </button>
+        <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
+      </div>
+    </form>
+  )
+
+  if (presentation === 'overlay') {
+    return (
+      <FormOverlay
+        title="Recurring session"
+        eyebrow="Appointment"
+        meta={`${source.client_name || 'Client'} · ${timeLabel}`}
+        onClose={onCancel}
+        size="md"
+      >
+        <div className="ck-schedule-panel">{formBody}</div>
+      </FormOverlay>
+    )
   }
 
   return (
@@ -1289,78 +1577,7 @@ export function RecurringSchedulePanel({
       onClose={onCancel}
       bodyClassName="ck-schedule-panel"
     >
-      <form className="ck-schedule-form" onSubmit={handleSubmit}>
-        <p className="text-small text-muted ck-recurring-intro">
-          Create additional sessions using the same client, time, and duration as this appointment.
-        </p>
-
-        <div className="ck-recurring-pattern" role="radiogroup" aria-label="Recurrence pattern">
-          <label className={`ck-recurring-option${pattern === 'once' ? ' ck-recurring-option--active' : ''}`}>
-            <input
-              type="radio"
-              name="recurrence"
-              value="once"
-              checked={pattern === 'once'}
-              onChange={() => setPattern('once')}
-            />
-            <span className="ck-recurring-option__title">One-off future date</span>
-            <span className="ck-recurring-option__desc text-small text-muted">Book a single session on a chosen date</span>
-          </label>
-          <label className={`ck-recurring-option${pattern === 'weekly' ? ' ck-recurring-option--active' : ''}`}>
-            <input
-              type="radio"
-              name="recurrence"
-              value="weekly"
-              checked={pattern === 'weekly'}
-              onChange={() => setPattern('weekly')}
-            />
-            <span className="ck-recurring-option__title">Weekly</span>
-            <span className="ck-recurring-option__desc text-small text-muted">Same day and time each week</span>
-          </label>
-        </div>
-
-        <div className="form-group">
-          <label htmlFor="recurring-start-date">{pattern === 'weekly' ? 'First session date' : 'Session date'}</label>
-          <input
-            id="recurring-start-date"
-            type="date"
-            className="paper-input"
-            value={sessionDate}
-            onChange={e => setSessionDate(e.target.value)}
-            required
-          />
-        </div>
-
-        {pattern === 'weekly' && (
-          <div className="form-group">
-            <label htmlFor="recurring-weeks">Number of weeks</label>
-            <input
-              id="recurring-weeks"
-              type="number"
-              min={2}
-              max={52}
-              className="paper-input"
-              value={weeks}
-              onChange={e => setWeeks(Math.min(52, Math.max(2, Number(e.target.value) || 2)))}
-            />
-          </div>
-        )}
-
-        <div className="ck-recurring-preview">
-          <span className="ck-recurring-preview__label">Will create</span>
-          <strong>{dates.length} session{dates.length === 1 ? '' : 's'}</strong>
-          {dates.length <= 6 && (
-            <span className="text-small text-muted"> — {dates.join(', ')}</span>
-          )}
-        </div>
-
-        <div className="form-actions">
-          <button type="submit" className="primary" disabled={saving || dates.length === 0}>
-            {saving ? 'Booking…' : `Book ${dates.length} session${dates.length === 1 ? '' : 's'}`}
-          </button>
-          <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
-        </div>
-      </form>
+      {formBody}
     </AccessoryPane>
   )
 }

@@ -1,8 +1,10 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 import { decryptJson, encryptJson } from '../_shared/crypto.ts'
-import { ITR_GOOGLE_SOURCE } from '../_shared/googleBusyPull.ts'
 import { credentialsKey } from '../_shared/secrets.ts'
 import { userClient, adminClient } from '../_shared/supabaseAdmin.ts'
+
+/** Private extended property written onto Google events created by In the Room. */
+const ITR_GOOGLE_SOURCE = 'in_the_room'
 
 type Creds = {
   access_token: string
@@ -32,6 +34,40 @@ async function refreshAccessToken(creds: Creds): Promise<Creds> {
   }
 }
 
+async function loadGoogleConnection(supabase: ReturnType<typeof userClient>) {
+  const { data: connection } = await supabase
+    .from('calendar_connections')
+    .select('*')
+    .eq('provider', 'google')
+    .eq('status', 'connected')
+    .maybeSingle()
+  return connection
+}
+
+async function withFreshCreds(connection: {
+  id: string
+  encrypted_credentials: Record<string, string>
+}) {
+  const encKey = credentialsKey()
+  if (!encKey) throw new Error('Missing CREDENTIALS_ENCRYPTION_KEY')
+  let creds = await decryptJson<Creds>(encKey, connection.encrypted_credentials)
+  creds = await refreshAccessToken(creds)
+  return { encKey, creds }
+}
+
+async function persistCreds(
+  connectionId: string,
+  encKey: string,
+  creds: Creds,
+) {
+  const admin = adminClient()
+  const encrypted = await encryptJson(encKey, creds)
+  await admin.from('calendar_connections').update({
+    encrypted_credentials: encrypted,
+    last_error: null,
+  }).eq('id', connectionId)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   try {
@@ -42,29 +78,74 @@ Deno.serve(async (req) => {
     if (!user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
     const body = await req.json()
+    const action = body.action || 'create'
+
+    if (action === 'delete') {
+      const appointmentIds: string[] = Array.isArray(body.appointmentIds)
+        ? body.appointmentIds.map(String)
+        : body.appointmentId
+          ? [String(body.appointmentId)]
+          : []
+      if (!appointmentIds.length) {
+        return jsonResponse({ error: 'appointmentIds required' }, 400)
+      }
+
+      const connection = await loadGoogleConnection(supabase)
+      if (!connection) {
+        return jsonResponse({ deleted: 0, skipped: true, reason: 'not_connected' })
+      }
+
+      const { data: links } = await supabase
+        .from('appointment_external_links')
+        .select('id, appointment_id, external_event_id, connection_id')
+        .in('appointment_id', appointmentIds)
+
+      if (!links?.length) {
+        return jsonResponse({ deleted: 0, skipped: true, reason: 'no_links' })
+      }
+
+      const { encKey, creds } = await withFreshCreds(connection)
+      const calendarId = connection.google_calendar_id || 'primary'
+      let deleted = 0
+      const errors: string[] = []
+
+      for (const link of links) {
+        if (!link.external_event_id) continue
+        const delRes = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(link.external_event_id)}`,
+          {
+            method: 'DELETE',
+            headers: { Authorization: `Bearer ${creds.access_token}` },
+          },
+        )
+        // 404/410 = already gone on Google — treat as success
+        if (delRes.ok || delRes.status === 404 || delRes.status === 410) {
+          deleted += 1
+        } else {
+          const errBody = await delRes.json().catch(() => ({}))
+          errors.push(errBody?.error?.message || `HTTP ${delRes.status}`)
+        }
+      }
+
+      await persistCreds(connection.id, encKey, creds)
+      return jsonResponse({
+        deleted,
+        errors: errors.length ? errors : undefined,
+      })
+    }
+
+    // Default: create Meet event + link
     const { appointmentId, startsAt, endsAt, summary } = body
     if (!appointmentId || !startsAt || !endsAt) {
       return jsonResponse({ error: 'appointmentId, startsAt, endsAt required' }, 400)
     }
 
-    const { data: connection } = await supabase
-      .from('calendar_connections')
-      .select('*')
-      .eq('provider', 'google')
-      .eq('status', 'connected')
-      .maybeSingle()
+    const connection = await loadGoogleConnection(supabase)
     if (!connection?.create_meet_links) {
       return jsonResponse({ error: 'Google Meet not enabled on connection' }, 400)
     }
 
-    const encKey = credentialsKey()
-    if (!encKey) return jsonResponse({ error: 'Missing CREDENTIALS_ENCRYPTION_KEY' }, 500)
-
-    let creds = await decryptJson<Creds>(
-      encKey,
-      connection.encrypted_credentials as Record<string, string>,
-    )
-    creds = await refreshAccessToken(creds)
+    const { encKey, creds } = await withFreshCreds(connection)
 
     const requestId = crypto.randomUUID()
     const eventRes = await fetch(
@@ -79,8 +160,6 @@ Deno.serve(async (req) => {
           summary: summary || 'In the Room session',
           start: { dateTime: startsAt },
           end: { dateTime: endsAt },
-          // Stay opaque on Google so external booking sees you as busy —
-          // busy pull filters these out via extendedProperties / link table.
           transparency: 'opaque',
           extendedProperties: {
             private: {
@@ -116,11 +195,7 @@ Deno.serve(async (req) => {
       last_pushed_at: new Date().toISOString(),
     }, { onConflict: 'appointment_id,connection_id' })
 
-    const encrypted = await encryptJson(encKey, creds)
-    await admin.from('calendar_connections').update({
-      encrypted_credentials: encrypted,
-      last_error: null,
-    }).eq('id', connection.id)
+    await persistCreds(connection.id, encKey, creds)
 
     return jsonResponse({ meetUrl, externalEventId: event.id })
   } catch (error) {

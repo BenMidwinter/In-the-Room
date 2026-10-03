@@ -1,20 +1,31 @@
 import { useMemo, useRef, useEffect } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { getProfile } from '../../lib/store'
 
 const TYPE_LABELS = {
   created: 'Record',
   session: 'Session',
+  support: 'Support / admin',
   referral: 'Referral',
   note: 'Progress note',
   document: 'Document',
+  letter: 'Letter',
+  report: 'Report',
+  form: 'Form',
+  event: 'Activity',
 }
 
 const TYPE_COLORS = {
   created: 'badge-blue',
   session: 'badge-green',
+  support: 'badge-grey',
   referral: 'badge-grey',
   note: 'badge-blue',
   document: 'badge-grey',
+  letter: 'badge-blue',
+  report: 'badge-green',
+  form: 'badge-blue',
+  event: 'badge-grey',
 }
 
 function formatDate(iso) {
@@ -26,8 +37,21 @@ function formatDate(iso) {
 }
 
 export default function ClientTimeline({ events, orientation = 'vertical' }) {
+  const { id: routeClientId } = useParams()
   const scrollRef = useRef(null)
   const isHorizontal = orientation === 'horizontal'
+
+  const eventHref = (event) => {
+    const clientId = event.client_id || routeClientId
+    if (!clientId || !event.ref_id) return null
+    if (event.type === 'session' || event.type === 'support') {
+      return `/clients/${clientId}/appointments/${event.ref_id}`
+    }
+    if (event.type === 'note') return `/clients/${clientId}/notes-history`
+    if (event.type === 'letter') return `/clients/${clientId}/letters`
+    if (event.type === 'document') return `/clients/${clientId}/documents`
+    return null
+  }
 
   const displayEvents = useMemo(() => {
     const sorted = [...events].sort(
@@ -82,17 +106,26 @@ export default function ClientTimeline({ events, orientation = 'vertical' }) {
                     {!isLast && <div className="timeline__line" aria-hidden />}
                   </>
                 )}
-                <div className="timeline__body">
-                  <div className="timeline__meta">
-                    <span className={`badge ${TYPE_COLORS[event.type] || 'badge-grey'}`}>
-                      {TYPE_LABELS[event.type] || event.type}
-                    </span>
-                    <time className="text-small text-muted">{formatDate(event.created_at)}</time>
-                  </div>
-                  <p className="timeline__title">{event.title}</p>
-                  {event.summary && <p className="timeline__summary text-muted">{event.summary}</p>}
-                  {author && <p className="text-small text-muted">{author.full_name}</p>}
-                </div>
+                {(() => {
+                  const href = eventHref(event)
+                  const Body = href ? Link : 'div'
+                  const bodyProps = href
+                    ? { to: href, className: 'timeline__body timeline__body--link' }
+                    : { className: 'timeline__body' }
+                  return (
+                    <Body {...bodyProps}>
+                      <div className="timeline__meta">
+                        <span className={`badge ${TYPE_COLORS[event.type] || 'badge-grey'}`}>
+                          {TYPE_LABELS[event.type] || event.type}
+                        </span>
+                        <time className="text-small text-muted">{formatDate(event.created_at)}</time>
+                      </div>
+                      <p className="timeline__title">{event.title}</p>
+                      {event.summary && <p className="timeline__summary text-muted">{event.summary}</p>}
+                      {author && <p className="text-small text-muted">{author.full_name}</p>}
+                    </Body>
+                  )
+                })()}
               </li>
             )
           })}

@@ -73,9 +73,10 @@ export default function App() {
 
         <Route path="clients/:id" element={<PatientProfileWrapper />}>
           <Route index element={<ClientPanelEmpty />} />
-          <Route path="appointments" element={<ClientAppointmentsIndex />} />
-          <Route path="appointments/new" element={<AppointmentEditor />} />
-          <Route path="appointments/:appointmentId" element={<AppointmentEditor />} />
+          <Route path="appointments" element={<ClientAppointmentsIndex />}>
+            <Route path="new" element={<AppointmentEditor />} />
+            <Route path=":appointmentId" element={<AppointmentEditor />} />
+          </Route>
           <Route path="notes-history" element={<NotesHistoryPanel />} />
           <Route path="case-history" element={<CaseHistoryPanel />} />
           <Route path="letters" element={<LettersPanel />} />

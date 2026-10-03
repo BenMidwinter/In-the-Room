@@ -38,7 +38,7 @@
 :root,
 [data-theme='practice'] {
   /* Layout & typography */
-  --nav-width: 11.25rem;
+  --nav-width: 13.75rem;
   --nav-height: 0px;
   --space-inline: 1.5rem;
   --space-block: 1.25rem;
@@ -46,6 +46,9 @@
 
   --font-head: 'Fraunces', Georgia, serif;
   --font-body: 'Karla', system-ui, sans-serif;
+  /* Fraunces axes — WONK 1 flips on the quirky alternates */
+  --font-head-variation: "opsz" 72, "wght" 600, "SOFT" 35, "WONK" 1;
+  --font-head-variation-brand: "opsz" 96, "wght" 600, "SOFT" 50, "WONK" 1;
 
   --radius-sm: 3px;
   --radius-md: 4px;
@@ -73,7 +76,7 @@
   --paper-width-a4: 210mm;
   --paper-padding-x: 2.5rem;
   --paper-padding-y: 3rem;
-  --paper-prose-size: 15px;
+  --paper-prose-size: 16px;
   --paper-prose-leading: 1.75;
 
   --elevation-paper-0: none;

@@ -78,13 +78,16 @@ export const letterInputSchema = z
     path: ['client_id'],
   })
 
+const optionalClientBlockRoles = new Set(['support', 'admin', 'busy'])
+
 export const appointmentInputSchema = z
   .object({
     id: z.string().optional(),
-    client_id: z.string().optional(),
+    client_id: z.string().nullish(),
     episode_id: z.string().nullish(),
     clinician_id: z.string().nullish(),
     service_id: z.string().nullish(),
+    series_id: z.string().nullish(),
     session_date: dateString.optional(),
     start_time: timeString.optional(),
     end_time: timeString.optional(),
@@ -97,8 +100,13 @@ export const appointmentInputSchema = z
     notes: z.string().optional(),
     other_info: z.string().optional(),
     create_meet_link: z.boolean().optional(),
+    /** support/admin/busy blocks may be booked without a client */
+    block_role: z.enum(['client_session', 'support', 'admin', 'busy', 'primary', 'appointment']).optional(),
   })
-  .refine((p) => Boolean(p.id || p.client_id), {
+  .refine((p) => {
+    if (p.id || p.client_id) return true
+    return Boolean(p.block_role && optionalClientBlockRoles.has(p.block_role))
+  }, {
     message: 'A client is required to schedule an appointment.',
     path: ['client_id'],
   })
