@@ -889,15 +889,9 @@ export default function CalendarModule({ persona }) {
 
   const selectAppointment = (appt) => {
     if (appt?.is_external_busy) return
-    // Open the centred edit overlay directly — no right-rail drawer for sessions.
-    setSelectedAppointment(null)
-    setScheduleDraft({
-      mode: 'edit',
-      appointment: appt,
-      session_date: appt.session_date || appointmentSchedule(appt).session_date,
-      start_time: appt.start_time || appointmentSchedule(appt).start_time,
-      manual: true,
-    })
+    // View overlay (attendance / details). Edit is a separate overlay from there.
+    setScheduleDraft(null)
+    setSelectedAppointment((prev) => (prev?.id === appt.id ? null : appt))
   }
 
   const openScheduleSlot = (sessionDate, startTime, manual = false) => {
@@ -962,10 +956,12 @@ export default function CalendarModule({ persona }) {
           allAppointments: filtered,
         })
         setScheduleDraft(null)
-        setSelectedAppointment(null)
         if (saved) {
           setActiveDate(saved.session_date)
+          setSelectedAppointment(saved) // return to view overlay
           toast.saved(scope === 'this' ? 'Appointment updated' : 'Series updated')
+        } else {
+          setSelectedAppointment(null)
         }
         return
       }
@@ -1126,7 +1122,8 @@ export default function CalendarModule({ persona }) {
   const gridHandlers = {
     blurNames,
     onSelectAppointment: selectAppointment,
-    selectedAppointmentId: selectedAppointment?.id,
+    selectedAppointmentId: selectedAppointment?.id
+      || (scheduleDraft?.mode === 'edit' ? scheduleDraft.appointment?.id : undefined),
     hours,
     subSlotMinutes,
     dayStartMin,
@@ -1175,12 +1172,19 @@ export default function CalendarModule({ persona }) {
     </>
   )
 
-  // Side pane only for the event drawer / recurring helper — edit/create use overlay.
-  const paneOpen = Boolean(
-    selectedAppointment
-    || scheduleDraft?.mode === 'recurring',
-  )
+  // Side pane only for recurring helper — view + edit/create use centred overlays.
+  const paneOpen = scheduleDraft?.mode === 'recurring'
   const showScheduleOverlay = Boolean(scheduleDraft && scheduleDraft.mode !== 'recurring')
+  const showViewOverlay = Boolean(selectedAppointment && !showScheduleOverlay)
+
+  const closeScheduleOverlay = () => {
+    if (scheduleDraft?.mode === 'edit' && scheduleDraft.appointment) {
+      setSelectedAppointment(scheduleDraft.appointment)
+      setScheduleDraft(null)
+      return
+    }
+    closeSidePane()
+  }
 
   return (
     <div className="calendar-module" data-service-catalog={serviceCatalogVersion}>
@@ -1237,21 +1241,26 @@ export default function CalendarModule({ persona }) {
                 onCancel={closeSidePane}
                 saving={scheduleSaving}
               />
-            ) : selectedAppointment && !showScheduleOverlay ? (
-              <EventDrawer
-                appointment={selectedAppointment}
-                allAppointments={filtered}
-                onClose={closeSidePane}
-                onAttendanceChange={handleAttendanceChange}
-                onEdit={handleEditAppointment}
-                onBookAnother={handleBookAnother}
-                onRecurring={handleRecurring}
-                onDelete={handleDeleteAppointment}
-              />
             ) : null}
           </ErrorBoundary>
         )}
       />
+
+      {showViewOverlay && (
+        <ErrorBoundary label="calendar-view-overlay">
+          <EventDrawer
+            appointment={selectedAppointment}
+            allAppointments={filtered}
+            presentation="overlay"
+            onClose={closeSidePane}
+            onAttendanceChange={handleAttendanceChange}
+            onEdit={handleEditAppointment}
+            onBookAnother={handleBookAnother}
+            onRecurring={handleRecurring}
+            onDelete={handleDeleteAppointment}
+          />
+        </ErrorBoundary>
+      )}
 
       {showScheduleOverlay && (
         <ErrorBoundary label="calendar-schedule-overlay">
@@ -1270,7 +1279,7 @@ export default function CalendarModule({ persona }) {
             presentation="overlay"
             onSave={handleScheduleSave}
             onDelete={handleDeleteAppointment}
-            onCancel={closeSidePane}
+            onCancel={closeScheduleOverlay}
             saving={scheduleSaving}
             deleting={scheduleDeleting}
           />

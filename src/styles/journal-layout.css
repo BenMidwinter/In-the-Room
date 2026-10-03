@@ -828,6 +828,14 @@
   padding-top: 0.25rem;
 }
 
+.ck-event-drawer--overlay {
+  padding-top: 0.15rem;
+}
+
+.ck-event-drawer--overlay .ck-event-drawer__actions {
+  margin-top: 0.15rem;
+}
+
 .ck-event-drawer__section--compact {
   margin-bottom: var(--layout-space-sm);
 }

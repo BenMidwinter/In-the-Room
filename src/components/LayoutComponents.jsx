@@ -740,8 +740,9 @@ function BusyEventBody({ appointment, locked }) {
 }
 
 /**
- * Polymorphic appointment drawer — standard, group, or busy practitioner blocks.
- * Embeds conflict/waitlist/financial banners and safety locks inline.
+ * Polymorphic appointment viewer — standard, group, or busy practitioner blocks.
+ * `presentation="overlay"` (default for calendar) shows a centred view modal;
+ * `presentation="pane"` keeps the legacy right-rail accessory.
  */
 export function EventDrawer({
   appointment,
@@ -756,6 +757,7 @@ export function EventDrawer({
   waitlistSuggestion,
   fundingWarning,
   className,
+  presentation = 'overlay',
 }) {
   const kind = resolveEventKind(appointment)
   const conflicts = useMemo(
@@ -787,14 +789,8 @@ export function EventDrawer({
       ? `${appointment.client_name || 'Client'} · follow-on`
       : `${serviceLabel} · ${appointment.assigned_therapist}`
 
-  return (
-    <AccessoryPane
-      title={title}
-      subtitle={subtitle}
-      onClose={onClose}
-      className={cx('ck-event-drawer', className)}
-      bodyClassName="ck-event-drawer__body"
-    >
+  const body = (
+    <>
       {conflicts.length > 0 && (
         <ContextBanner variant="conflict" title="Schedule conflict">
           Overlaps with {conflicts.length} other booking{conflicts.length === 1 ? '' : 's'} at this time
@@ -845,6 +841,34 @@ export function EventDrawer({
           showAttendance={kind === 'standard'}
         />
       )}
+    </>
+  )
+
+  if (presentation === 'overlay') {
+    return (
+      <FormOverlay
+        title={title}
+        eyebrow="Appointment"
+        meta={subtitle}
+        onClose={onClose}
+        size="md"
+      >
+        <div className={cx('ck-event-drawer', 'ck-event-drawer--overlay', className)}>
+          {body}
+        </div>
+      </FormOverlay>
+    )
+  }
+
+  return (
+    <AccessoryPane
+      title={title}
+      subtitle={subtitle}
+      onClose={onClose}
+      className={cx('ck-event-drawer', className)}
+      bodyClassName="ck-event-drawer__body"
+    >
+      {body}
     </AccessoryPane>
   )
 }

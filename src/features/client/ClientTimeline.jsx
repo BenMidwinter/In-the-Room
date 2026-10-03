@@ -1,4 +1,5 @@
 import { useMemo, useRef, useEffect } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import { getProfile } from '../../lib/store'
 
 const TYPE_LABELS = {
@@ -26,8 +27,17 @@ function formatDate(iso) {
 }
 
 export default function ClientTimeline({ events, orientation = 'vertical' }) {
+  const { id: routeClientId } = useParams()
   const scrollRef = useRef(null)
   const isHorizontal = orientation === 'horizontal'
+
+  const eventHref = (event) => {
+    const clientId = event.client_id || routeClientId
+    if (!clientId || !event.ref_id) return null
+    if (event.type === 'session') return `/clients/${clientId}/appointments/${event.ref_id}`
+    if (event.type === 'note') return `/clients/${clientId}/notes-history`
+    return null
+  }
 
   const displayEvents = useMemo(() => {
     const sorted = [...events].sort(
@@ -82,17 +92,26 @@ export default function ClientTimeline({ events, orientation = 'vertical' }) {
                     {!isLast && <div className="timeline__line" aria-hidden />}
                   </>
                 )}
-                <div className="timeline__body">
-                  <div className="timeline__meta">
-                    <span className={`badge ${TYPE_COLORS[event.type] || 'badge-grey'}`}>
-                      {TYPE_LABELS[event.type] || event.type}
-                    </span>
-                    <time className="text-small text-muted">{formatDate(event.created_at)}</time>
-                  </div>
-                  <p className="timeline__title">{event.title}</p>
-                  {event.summary && <p className="timeline__summary text-muted">{event.summary}</p>}
-                  {author && <p className="text-small text-muted">{author.full_name}</p>}
-                </div>
+                {(() => {
+                  const href = eventHref(event)
+                  const Body = href ? Link : 'div'
+                  const bodyProps = href
+                    ? { to: href, className: 'timeline__body timeline__body--link' }
+                    : { className: 'timeline__body' }
+                  return (
+                    <Body {...bodyProps}>
+                      <div className="timeline__meta">
+                        <span className={`badge ${TYPE_COLORS[event.type] || 'badge-grey'}`}>
+                          {TYPE_LABELS[event.type] || event.type}
+                        </span>
+                        <time className="text-small text-muted">{formatDate(event.created_at)}</time>
+                      </div>
+                      <p className="timeline__title">{event.title}</p>
+                      {event.summary && <p className="timeline__summary text-muted">{event.summary}</p>}
+                      {author && <p className="text-small text-muted">{author.full_name}</p>}
+                    </Body>
+                  )
+                })()}
               </li>
             )
           })}

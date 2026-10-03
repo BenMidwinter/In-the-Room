@@ -109,7 +109,11 @@ function stripHtml(html) {
   return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-export function getClientTimeline(clientId) {
+/**
+ * Client overview timeline — sessions, notes, documents, and legacy seed events.
+ * Pass `appointments` when the Supabase query has loaded so live bookings appear.
+ */
+export function getClientTimeline(clientId, { appointments } = {}) {
   const events = db.timelineEvents.filter(e => e.client_id === clientId)
   const noteEvents = db.progressNotes
     .filter(n => n.client_id === clientId)
@@ -136,7 +140,39 @@ export function getClientTimeline(clientId) {
       ref_id: d.id,
     }))
 
-  return [...events, ...noteEvents, ...docEvents].sort(
+  const apptSource = Array.isArray(appointments)
+    ? appointments
+    : db.appointments.filter((a) => a.client_id === clientId)
+
+  const sessionEvents = apptSource
+    .filter((a) => {
+      if (a.attendance_status === 'cancelled') return false
+      const role = a.block_role
+      // Primary clinical sessions only — skip Notes/admin follow-ons and busy blocks.
+      return !role || role === 'client_session' || role === 'primary' || role === 'appointment'
+    })
+    .map((a) => {
+      const sessionDate = a.session_date || String(a.scheduled_at || '').slice(0, 10)
+      const startTime = a.start_time || String(a.scheduled_at || '').slice(11, 16)
+      const title = a.service_name
+        || (a.therapy_modality && a.therapy_modality !== 't' ? String(a.therapy_modality).replace(/_/g, ' ') : null)
+        || 'Session'
+      const when = [sessionDate, startTime].filter(Boolean).join(' · ')
+      return {
+        id: `timeline-appt-${a.id}`,
+        client_id: clientId,
+        type: 'session',
+        title,
+        summary: [when, a.location].filter(Boolean).join(' · '),
+        created_at: sessionDate
+          ? `${sessionDate}T${startTime || '00:00'}:00`
+          : (a.created_at || a.starts_at || new Date().toISOString()),
+        author_id: a.clinician_id,
+        ref_id: a.id,
+      }
+    })
+
+  return [...events, ...noteEvents, ...docEvents, ...sessionEvents].sort(
     (a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime(),
   )
 }

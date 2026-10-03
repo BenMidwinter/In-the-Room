@@ -478,6 +478,14 @@ export async function deleteAppointmentsByIds(ids: string[]): Promise<number> {
     return before - db.appointments.length
   }
 
+  // Remove linked Google Calendar events before the DB rows (and their link cascade) go away.
+  try {
+    const { deleteGoogleEventsForAppointments } = await import('./googleMeet')
+    await deleteGoogleEventsForAppointments(unique)
+  } catch {
+    // Best-effort — local delete must still succeed.
+  }
+
   const supabase = getSupabase()
   if (!supabase) return 0
   const { error, count } = await supabase

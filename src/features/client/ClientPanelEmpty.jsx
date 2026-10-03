@@ -1,13 +1,20 @@
+import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useClientSession } from '../../lib/useClientSession'
 import ClientTimeline from './ClientTimeline'
 import ClientClinicalProfileSummary from './ClientClinicalProfileSummary'
 import { getClientTimeline } from '../../lib/store'
+import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
 
 export default function ClientPanelEmpty() {
   const { id: clientId } = useParams()
   const { client } = useClientSession()
-  const timeline = getClientTimeline(clientId)
+  const { data: appointments = [] } = useClientAppointmentsQuery(clientId)
+
+  const timeline = useMemo(
+    () => getClientTimeline(clientId, { appointments }),
+    [clientId, appointments],
+  )
 
   return (
     <div className="client-overview">
