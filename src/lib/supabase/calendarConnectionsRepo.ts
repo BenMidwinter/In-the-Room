@@ -106,7 +106,7 @@ export function externalBlocksAsAppointments(
       return {
         id: `ext-${block.id}`,
         client_id: null,
-        client_name: 'Google Calendar',
+        client_name: 'Busy',
         episode_id: null,
         clinician_id: ownerId,
         assigned_therapist: 'External',
@@ -119,7 +119,7 @@ export function externalBlocksAsAppointments(
         attendance_status: null,
         location: '',
         notes: '',
-        other_info: 'Busy (Google)',
+        other_info: '',
         created_at: block.created_at.slice(0, 10),
         updated_at: block.updated_at.slice(0, 10),
         is_external_busy: true as const,

@@ -17,6 +17,20 @@ export async function listServices(): Promise<ServiceRow[]> {
   return data ?? []
 }
 
+export async function getServiceById(id: string): Promise<ServiceRow | null> {
+  const supabase = getSupabase()
+  if (!supabase || !id) return null
+
+  const { data, error } = await supabase
+    .from('services')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+
+  if (error) throw error
+  return data ?? null
+}
+
 export async function upsertService(
   input: Omit<TablesInsert<'services'>, 'owner_id'> & { id?: string },
 ): Promise<ServiceRow> {

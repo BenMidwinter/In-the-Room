@@ -12,6 +12,7 @@ import {
   appointmentOtherInfo,
 } from '../lib/appointmentUtils'
 import { modalityLabel } from '../lib/calendarConstants'
+import { appointmentServiceLabel } from '../lib/calendarServiceStyles'
 import { getAppointmentOrgServices } from '../lib/store'
 import { db } from '../lib/data/collections'
 import { addDaysYmd } from '../lib/dateArchitecture'
@@ -393,7 +394,13 @@ function timesOverlap(aStart, aEnd, bStart, bEnd) {
 
 export function resolveEventKind(appointment) {
   if (!appointment) return 'standard'
-  if (appointment.is_busy || appointment.appointment_type === 'busy') return 'busy'
+  if (
+    appointment.is_busy
+    || appointment.appointment_type === 'busy'
+    || appointment.block_role === 'busy'
+    || appointment.is_external_busy
+  ) return 'busy'
+  if (appointment.block_role === 'support' || appointment.block_role === 'admin') return 'support'
   if (appointment.appointment_type === 'group') return 'group'
   return 'standard'
 }
@@ -538,8 +545,8 @@ function StandardEventBody({ appointment, locked, onAttendanceChange }) {
           />
           <StackedDataRow
             icon="🎨"
-            label="Modality"
-            value={modalityLabel(appointment.therapy_modality)}
+            label="Service"
+            value={appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)}
             meta={appointmentTypeLabel(appointment.appointment_type)}
             tags={invoiceTag(appointment.invoice_status || 'draft')}
           />
@@ -732,15 +739,20 @@ export function EventDrawer({
 
   if (!appointment) return null
 
+  const serviceLabel = appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)
   const title = kind === 'busy'
     ? 'Busy block'
-    : kind === 'group'
-      ? 'Group session'
-      : appointment.client_name
+    : kind === 'support'
+      ? serviceLabel
+      : kind === 'group'
+        ? 'Group session'
+        : appointment.client_name
 
   const subtitle = kind === 'busy'
     ? APPOINTMENT_TYPES[appointment.appointment_type] || 'Practitioner unavailable'
-    : `${modalityLabel(appointment.therapy_modality)} · ${appointment.assigned_therapist}`
+    : kind === 'support'
+      ? `${appointment.client_name || 'Client'} · follow-on`
+      : `${serviceLabel} · ${appointment.assigned_therapist}`
 
   return (
     <AccessoryPane

@@ -210,3 +210,57 @@
   padding-top: 0.75rem;
   border-top: 1px solid var(--border-color);
 }
+
+.settings-service-list__label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.settings-service-list__swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  margin-top: 0.25rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  border: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.settings-service-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.settings-service-colors__swatch {
+  width: 1.55rem;
+  height: 1.55rem;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+
+.settings-service-colors__swatch--active {
+  border-color: var(--col-primary-dark, #1f4d3a);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--col-primary) 35%, transparent);
+}
+
+.settings-service-colors__custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: 0.25rem;
+}
+
+.settings-service-colors__custom input[type='color'] {
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 0.35rem;
+  background: transparent;
+  cursor: pointer;
+}

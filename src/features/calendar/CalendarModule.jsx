@@ -54,13 +54,14 @@ import {
   getCalendarOwnerOptions,
   getDefaultCalendarOwner,
 } from '../../lib/calendarOwners'
-import { modalityLabel } from '../../lib/calendarConstants'
 import {
-  calendarEventStyle,
+  appointmentChipLabel,
   calendarDotStyle,
+  calendarEventStyleForAppointment,
 } from '../../lib/calendarServiceStyles'
+import { listServices } from '../../lib/supabase/servicesRepo'
+import { db } from '../../lib/data/collections'
 import { shouldBlurClientIdentity } from '../../lib/demoPersonas'
-import BlurredName from '../../components/BlurredName'
 import { CalendarWorkspaceFrame, CalendarTimeSlot, EventDrawer, ScheduleSessionPanel, RecurringSchedulePanel } from '../../components/LayoutComponents'
 
 const VIEW_MODES = [
@@ -164,6 +165,7 @@ function EventChip({ appointment, compact = false, blurNames = false, onSelect, 
     ? `${appointment.start_time}–${appointment.end_time}`
     : appointment.start_time
   const otherInfo = appointmentOtherInfo(appointment)
+  const chipLabel = appointmentChipLabel(appointment, { blurNames })
 
   const className = [
     'calendar-event',
@@ -172,41 +174,32 @@ function EventChip({ appointment, compact = false, blurNames = false, onSelect, 
     'calendar-event--service',
     externalBusy && 'calendar-event--external-busy',
     compact && 'calendar-event--compact',
-    otherInfo && 'calendar-event--has-info',
+    otherInfo && !externalBusy && 'calendar-event--has-info',
     selected && 'calendar-event--selected',
     cancelled && 'calendar-event--cancelled',
   ].filter(Boolean).join(' ')
 
   const title = externalBusy
-    ? `Google Calendar · Busy · ${timeRange}`
-    : blurNames
-      ? `${modalityLabel(appointment.therapy_modality)} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
-      : `${appointment.client_name} · ${modalityLabel(appointment.therapy_modality)} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
+    ? `Busy · ${timeRange}`
+    : `${chipLabel} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
 
   const Tag = externalBusy ? 'div' : 'button'
   return (
     <Tag
       type={externalBusy ? undefined : 'button'}
       className={className}
-      style={{ ...calendarEventStyle(appointment.therapy_modality), ...style }}
+      style={{ ...calendarEventStyleForAppointment(appointment), ...style }}
       title={title}
       onClick={externalBusy ? undefined : (e) => {
+        e.preventDefault()
         e.stopPropagation()
         onSelect?.(appointment)
       }}
     >
       <span className="calendar-event__time">{timeRange}</span>
-      <BlurredName as="span" name={appointment.client_name} blur={blurNames && !externalBusy} className="calendar-event__client" />
-      {!compact && (
-        <span className="calendar-event__meta">
-          {externalBusy ? 'Busy' : modalityLabel(appointment.therapy_modality)}
-        </span>
-      )}
-      {otherInfo && !externalBusy && (
+      <span className="calendar-event__client">{chipLabel}</span>
+      {otherInfo && !externalBusy && !compact && (
         <span className="calendar-event__info">{otherInfo}</span>
-      )}
-      {!compact && !otherInfo && !externalBusy && (
-        <BlurredName as="span" name={appointment.assigned_therapist} blur={blurNames} className="calendar-event__therapist" />
       )}
     </Tag>
   )
@@ -448,10 +441,10 @@ function MonthView({ activeDate, appointments, onSelectDate, blurNames = false, 
                           onSelectAppointment?.(appt)
                         }}
                       >
-                        <span className="calendar-month__dot" style={calendarDotStyle(appt.therapy_modality)} />
+                        <span className="calendar-month__dot" style={calendarDotStyle(appt.service_id || appt.therapy_modality)} />
                         <span className="calendar-month__event-text">
                           {appt.start_time}{' '}
-                          <BlurredName name={appt.client_name.split(' ')[0]} blur={blurNames} className="inline" />
+                          {appointmentChipLabel(appt, { blurNames })}
                         </span>
                       </button>
                     ))}
@@ -755,7 +748,34 @@ export default function CalendarModule({ persona }) {
         if (!cancelled) setAvailabilitySettings(local)
       }
     }
+    async function hydrateServices() {
+      if (!isSupabaseConfigured()) return
+      try {
+        const services = await listServices()
+        if (cancelled || !services.length) return
+        for (const service of services) {
+          const idx = db.orgServices.findIndex((row) => row.id === service.id || row.slug === service.slug)
+          const mapped = {
+            id: service.id,
+            name: service.name,
+            slug: service.slug,
+            service_type: service.service_type || 'appointment',
+            color: service.color,
+            default_duration_minutes: service.default_duration_minutes,
+            create_meet_link: Boolean(service.create_meet_link),
+            follow_on_service_id: service.follow_on_service_id,
+            follow_on_duration_minutes: service.follow_on_duration_minutes,
+            is_active: service.is_active !== false,
+          }
+          if (idx === -1) db.orgServices.push(mapped)
+          else db.orgServices[idx] = { ...db.orgServices[idx], ...mapped }
+        }
+      } catch {
+        /* labels fall back to slug */
+      }
+    }
     loadAvailability()
+    hydrateServices()
     return () => { cancelled = true }
   }, [session.user.id])
 
@@ -813,26 +833,6 @@ export default function CalendarModule({ persona }) {
 
   const weekDates = weekDatesYmd(activeDate)
   const workingDates = workingWeekDatesYmd(activeDate)
-
-  const visibleDates = useMemo(() => {
-    if (viewMode === 'month') return new Set(monthGridDays(activeDate).map((c) => c.ymd).filter(Boolean))
-    if (viewMode === 'working-week') return new Set(workingDates)
-    if (viewMode === 'day') return new Set([activeDate])
-    return new Set(weekDates)
-  }, [viewMode, activeDate, weekDates, workingDates])
-
-  const googleBusyInView = useMemo(
-    () => googleBusy.filter((block) => visibleDates.has(block.session_date)).length,
-    [googleBusy, visibleDates],
-  )
-
-  const nextGoogleBusyDate = useMemo(() => {
-    const upcoming = googleBusy
-      .map((block) => block.session_date)
-      .filter((ymd) => ymd >= DEMO_TODAY)
-      .sort()
-    return upcoming[0] || googleBusy.map((b) => b.session_date).sort()[0] || null
-  }, [googleBusy])
 
   const navigateDate = (deltaDays) => {
     setActiveDate(prev => addDaysYmd(prev, deltaDays))
@@ -1090,32 +1090,6 @@ export default function CalendarModule({ persona }) {
           </div>
         </div>
       </header>
-
-      {googleBusy.length > 0 && (
-        <p className="calendar-google-sync-note">
-          Google busy: {googleBusy.length} block{googleBusy.length === 1 ? '' : 's'} synced
-          {googleBusyInView > 0
-            ? ` · ${googleBusyInView} in this view`
-            : nextGoogleBusyDate
-              ? ' · none in this view'
-              : ''}
-          {nextGoogleBusyDate && googleBusyInView === 0 && (
-            <>
-              {' · '}
-              <button
-                type="button"
-                className="calendar-google-sync-note__jump"
-                onClick={() => {
-                  setActiveDate(nextGoogleBusyDate)
-                  if (viewMode === 'month') setViewMode('week')
-                }}
-              >
-                Jump to {formatDisplayDate(nextGoogleBusyDate)}
-              </button>
-            </>
-          )}
-        </p>
-      )}
 
       <CalendarWorkspaceFrame
         paneOpen={paneOpen}

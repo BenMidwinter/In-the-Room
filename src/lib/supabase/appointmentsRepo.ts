@@ -14,6 +14,7 @@ import { appointmentSchedule, fromDatetimeLocalValue, type AppointmentLike } fro
 import { parseOrThrow, appointmentInputSchema } from '../schemas'
 import { sortAppointmentsLatestFirst } from '../calendarAccess'
 import { getClientsForUser } from '../store/clientRecords'
+import { getServiceById } from './servicesRepo'
 
 type AppointmentExtras = {
   v: 0
@@ -286,7 +287,100 @@ export async function upsertAppointmentRemote(
   if (error) throw error
   const mapped = toAppAppointment(data)
   db.appointments.push(mapped as unknown as StoreRecord)
+
+  // Auto-create linked follow-on support/admin block from service settings.
+  if (serviceId && row.block_role === 'client_session') {
+    try {
+      await createFollowOnBlock({
+        parent: mapped,
+        parentRow: data,
+        ownerId: userId,
+        clinicianId,
+        organizationId: row.organization_id,
+        clientName,
+        assignedTherapist,
+      })
+    } catch {
+      /* follow-on is best-effort; primary booking already succeeded */
+    }
+  }
+
   return mapped
+}
+
+async function createFollowOnBlock(opts: {
+  parent: AppAppointment
+  parentRow: { id: string; service_id?: string | null }
+  ownerId: string
+  clinicianId: string
+  organizationId: string | null
+  clientName: string
+  assignedTherapist: string
+}) {
+  const supabase = getSupabase()
+  if (!supabase || !opts.parentRow.service_id) return
+
+  const primary = await getServiceById(opts.parentRow.service_id)
+  if (!primary?.follow_on_service_id) return
+
+  const followOn = await getServiceById(primary.follow_on_service_id)
+  if (!followOn || followOn.is_active === false) return
+
+  const duration = Number(
+    primary.follow_on_duration_minutes
+    || followOn.default_duration_minutes
+    || 10,
+  )
+  if (!Number.isFinite(duration) || duration <= 0) return
+
+  const startTime = opts.parent.end_time
+  const endTime = addMinutesToTime(startTime, duration)
+  const sessionDate = opts.parent.session_date
+  const startsAt = new Date(`${sessionDate}T${startTime}:00`).toISOString()
+  const endsAt = new Date(`${sessionDate}T${endTime}:00`).toISOString()
+
+  const blockRole = followOn.service_type === 'admin'
+    ? 'admin'
+    : followOn.service_type === 'busy'
+      ? 'busy'
+      : 'support'
+
+  const extras: AppointmentExtras = {
+    v: 0,
+    client_name: opts.clientName,
+    assigned_therapist: opts.assignedTherapist,
+    therapy_modality: followOn.slug,
+    location: opts.parent.location || '',
+    notes: '',
+    other_info: followOn.name,
+    session_date: sessionDate,
+    start_time: startTime,
+    end_time: endTime,
+  }
+
+  const { data, error } = await supabase
+    .from('appointments')
+    .insert({
+      owner_id: opts.ownerId,
+      organization_id: opts.organizationId,
+      client_id: opts.parent.client_id,
+      clinician_id: opts.clinicianId,
+      episode_id: opts.parent.episode_id,
+      service_id: followOn.id,
+      parent_appointment_id: opts.parent.id,
+      appointment_type: 'one_to_one',
+      starts_at: startsAt,
+      ends_at: endsAt,
+      attendance_status: null,
+      encrypted_payload: extras as unknown as Json,
+      block_role: blockRole,
+    })
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+    .single()
+
+  if (error) throw error
+  const mapped = toAppAppointment(data)
+  db.appointments.push(mapped as unknown as StoreRecord)
 }
 
 export async function saveAppointmentForUser(

@@ -13,7 +13,7 @@ const MODALITY_FALLBACK_LABELS = {
   music_therapy: 'Music Therapy',
   clay_work: 'Clay Work',
   somatic_expression: 'Somatic Expression',
-  external_busy: 'Google busy',
+  external_busy: 'Busy',
 }
 
 function hexToRgb(hex) {
@@ -38,8 +38,31 @@ export function appointmentServiceLabel(modalityId) {
   return MODALITY_FALLBACK_LABELS[String(modalityId)] || modalityId
 }
 
-export function calendarEventStyle(modalityId) {
-  const color = appointmentServiceColor(modalityId)
+/** Client initials for compact calendar chips, e.g. "Selena Gauche" → "SG". */
+export function clientInitials(name) {
+  const parts = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (!parts.length) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+}
+
+/** Calendar chip title: "SG: Music Therapy". */
+export function appointmentChipLabel(appointment, { blurNames = false } = {}) {
+  if (appointment?.is_external_busy) return 'Busy'
+  const service = appointmentServiceLabel(
+    appointment?.service_id || appointment?.therapy_modality,
+  )
+  if (blurNames) return service
+  const initials = clientInitials(appointment?.client_name)
+  return `${initials}: ${service}`
+}
+
+export function calendarEventStyle(modalityId, appointment) {
+  const key = appointment?.service_id || appointment?.therapy_modality || modalityId
+  const color = appointmentServiceColor(key)
   const { r, g, b } = hexToRgb(color)
   const textR = Math.max(0, Math.round(r * 0.35))
   const textG = Math.max(0, Math.round(g * 0.35))
@@ -52,6 +75,10 @@ export function calendarEventStyle(modalityId) {
     borderLeftStyle: 'solid',
     color: `rgb(${textR}, ${textG}, ${textB})`,
   }
+}
+
+export function calendarEventStyleForAppointment(appointment) {
+  return calendarEventStyle(appointment?.therapy_modality, appointment)
 }
 
 export function calendarLegendStyle(modalityId) {

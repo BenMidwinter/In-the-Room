@@ -1343,27 +1343,6 @@ button.calendar-event {
   white-space: nowrap;
 }
 
-.calendar-google-sync-note {
-  margin: 0 0 0.65rem;
-  padding: 0.45rem 0.75rem;
-  font-size: 0.85rem;
-  color: var(--txt-muted);
-  background: var(--bg-page);
-  border: 1px solid var(--border-color);
-  border-radius: 0.4rem;
-}
-
-.calendar-google-sync-note__jump {
-  border: 0;
-  background: none;
-  padding: 0;
-  color: var(--col-primary-dark, #1f4d3a);
-  font: inherit;
-  font-weight: 650;
-  text-decoration: underline;
-  cursor: pointer;
-}
-
 /* Google Calendar busy overlay — non-interactive hatch. */
 .calendar-event--external-busy {
   background-image: repeating-linear-gradient(
@@ -1375,6 +1354,7 @@ button.calendar-event {
   );
   cursor: default;
   pointer-events: none;
+  z-index: 1;
   box-shadow: none;
 }
 
@@ -1766,6 +1746,14 @@ button.calendar-event {
   inset: 0;
   pointer-events: none;
   z-index: 2;
+}
+
+/* Parent layer ignores clicks; interactive session chips must opt back in
+   so bookings stay selectable above empty-slot hit targets. */
+.calendar-col__events .calendar-event--interactive {
+  pointer-events: auto;
+  z-index: 3;
+  cursor: pointer;
 }
 
 .ck-time-slot[title] {
