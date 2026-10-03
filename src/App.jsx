@@ -26,6 +26,7 @@ import About from './components/About'
 import NotesHistoryPanel from './features/client/NotesHistoryPanel'
 import Reporting from './components/Reporting'
 import FinancePage from './features/finance/FinancePage'
+import ProgressNoteLabPage from './features/lab/ProgressNoteLabPage'
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="calendar" element={<Calendar />} />
         <Route path="reporting" element={<Reporting />} />
         <Route path="finance" element={<FinancePage />} />
+        <Route path="lab/progress-note" element={<ProgressNoteLabPage />} />
         <Route path="upcoming-appointments" element={<UpcomingAppointments />} />
         <Route path="active-cases" element={<ActiveCases />} />
         <Route path="clients" element={<AllClients />} />

@@ -17,7 +17,7 @@ describe('workplaceBranding', () => {
 
   it('defaults to ChromatiK logo when workplace has no logo_url', () => {
     const branding = getWorkplaceBranding('wp-chroma')
-    expect(branding.logo_url).toBe(CHROMATIK_DEFAULT_LOGO_URL)
+    expect(branding.logo_url).toBe(DEFAULT_PRACTICE_LOGO_URL)
     expect(branding.name).toBe('Chroma Main HQ')
     expect(branding.address_line1).toBe('Chroma Main HQ')
     expect(branding.postcode).toBe('SE1 4AA')
@@ -31,7 +31,7 @@ describe('workplaceBranding', () => {
 
   it('falls back to ChromatiK branding for private clients', () => {
     const branding = getWorkplaceBranding(null)
-    expect(branding.logo_url).toBe(CHROMATIK_DEFAULT_LOGO_URL)
+    expect(branding.logo_url).toBe(DEFAULT_PRACTICE_LOGO_URL)
     expect(branding.address_line1).toBe('ChromatiK')
   })
 

@@ -2,13 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import {
   THEME_GROUPS,
   applyTheme,
-  applyExpressiveAccent,
   getStoredThemeId,
-  getStoredExpressiveHue,
   getThemeGroupId,
-  isExpressiveTheme,
 } from '../lib/themeEngine'
-import ExpressiveColorWheel from './ExpressiveColorWheel'
 
 function PaintbrushIcon() {
   return (
@@ -38,7 +34,6 @@ function ChevronIcon({ open }) {
 
 export default function ThemeToggle() {
   const [themeId, setThemeId] = useState(getStoredThemeId)
-  const [wheelHue, setWheelHue] = useState(() => getStoredExpressiveHue() ?? 320)
   const [open, setOpen] = useState(false)
   const [expandedGroupId, setExpandedGroupId] = useState(() => getThemeGroupId(getStoredThemeId()))
   const rootRef = useRef(null)
@@ -56,16 +51,6 @@ export default function ThemeToggle() {
     const applied = applyTheme(id)
     setThemeId(applied)
     setExpandedGroupId(getThemeGroupId(applied))
-    if (isExpressiveTheme(applied)) {
-      applyExpressiveAccent(wheelHue, applied)
-    }
-  }
-
-  const handleWheelChange = (hue) => {
-    setWheelHue(hue)
-    if (isExpressiveTheme(themeId)) {
-      applyExpressiveAccent(hue, themeId)
-    }
   }
 
   const toggleMenu = () => {
@@ -81,7 +66,6 @@ export default function ThemeToggle() {
   }
 
   const active = THEME_GROUPS.flatMap(g => g.themes).find(t => t.id === themeId)
-  const showWheel = isExpressiveTheme(themeId)
 
   return (
     <div className="theme-toggle" ref={rootRef}>
@@ -89,9 +73,9 @@ export default function ThemeToggle() {
         type="button"
         className="top-nav__utility-btn theme-toggle__trigger"
         onClick={toggleMenu}
-        aria-label={`App theme: ${active?.label || 'Light Clinical'}`}
+        aria-label={`App theme: ${active?.label || 'Practice linen'}`}
         aria-expanded={open}
-        title={`App theme: ${active?.label || 'Light Clinical'}`}
+        title={`App theme: ${active?.label || 'Practice linen'}`}
       >
         <PaintbrushIcon />
       </button>
@@ -137,9 +121,6 @@ export default function ThemeToggle() {
               </div>
             )
           })}
-          {showWheel && (
-            <ExpressiveColorWheel hue={wheelHue} onChange={handleWheelChange} />
-          )}
         </div>
       )}
     </div>

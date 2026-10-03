@@ -264,58 +264,14 @@
   color: var(--txt-muted);
 }
 
-.theme-toggle__option[data-theme-preview='light-clinical'] .theme-toggle__option-label::before {
+.theme-toggle__option[data-theme-preview='practice'] .theme-toggle__option-label::before {
   content: '';
   display: inline-block;
   width: 0.55rem;
   height: 0.55rem;
   margin-right: 0.4rem;
   border-radius: 50%;
-  background: conic-gradient(from 120deg, #ee4e14, #58c2d5, #e22a85, #ee4e14);
-  vertical-align: middle;
-}
-
-.theme-toggle__option[data-theme-preview='dark-studio'] .theme-toggle__option-label::before {
-  content: '';
-  display: inline-block;
-  width: 0.55rem;
-  height: 0.55rem;
-  margin-right: 0.4rem;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ee4e14, #14151c);
-  vertical-align: middle;
-}
-
-.theme-toggle__option[data-theme-preview='muted-somatic'] .theme-toggle__option-label::before {
-  content: '';
-  display: inline-block;
-  width: 0.55rem;
-  height: 0.55rem;
-  margin-right: 0.4rem;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #c67b5c, #8a9a7b);
-  vertical-align: middle;
-}
-
-.theme-toggle__option[data-theme-preview='vibrant-expressive'] .theme-toggle__option-label::before {
-  content: '';
-  display: inline-block;
-  width: 0.55rem;
-  height: 0.55rem;
-  margin-right: 0.4rem;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ff4fd8, #b8ff3c);
-  vertical-align: middle;
-}
-
-.theme-toggle__option[data-theme-preview='neon-signal'] .theme-toggle__option-label::before {
-  content: '';
-  display: inline-block;
-  width: 0.55rem;
-  height: 0.55rem;
-  margin-right: 0.4rem;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #00f5ff, #39ff14);
+  background: linear-gradient(135deg, #263e34, #fbf9f5);
   vertical-align: middle;
 }
 

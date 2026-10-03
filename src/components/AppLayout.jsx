@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/clients', label: 'All Clients' },
   { to: '/finance', label: 'Finance' },
   { to: '/reporting', label: 'Reporting' },
+  { to: '/lab/progress-note', label: 'Note lab' },
 ]
 
 export default function AppLayout() {
@@ -71,7 +72,6 @@ export default function AppLayout() {
         <div className="top-nav__inner">
           <div className="top-nav__brand-row">
             <NavLink to="/home" className="top-nav__brand">
-              <span className="top-nav__brand-mark" aria-hidden="true" />
               <span className="top-nav__brand-text">
                 <span className="top-nav__brand-name">In the Room</span>
               </span>
@@ -130,7 +130,6 @@ export default function AppLayout() {
       <main className={`main-content${isProgressNotes ? ' main-content--progress-notes' : ''}`}>
         <div className="top-nav__mobile-bar">
           <NavLink to="/home" className="top-nav__brand top-nav__brand--compact">
-            <span className="top-nav__brand-mark" aria-hidden="true" />
             <span className="top-nav__brand-text">
               <span className="top-nav__brand-name">In the Room</span>
             </span>

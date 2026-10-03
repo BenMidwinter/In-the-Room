@@ -1,15 +1,11 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   Foundation: Tailwind token bridge + design tokens (all themes) + base globals.
-   Imported first so every other stylesheet and Tailwind utility can rely on it.
+   In the Room — design tokens + Tailwind @theme bridge.
    ───────────────────────────────────────────────────────────────────────── */
 
 @theme {
   --font-sans: "Karla", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Fraunces", Georgia, serif;
 
-  /* Bridge the runtime design tokens into Tailwind so utilities stay
-     theme-aware. Each maps to a CSS variable redefined per [data-theme] below,
-     so `bg-surface`, `text-primary`, `border-line`, etc. follow the active
-     theme automatically instead of hard-coding colours. */
   --color-primary: var(--col-primary);
   --color-primary-dark: var(--col-primary-dark);
   --color-primary-light: var(--col-primary-light);
@@ -29,41 +25,35 @@
   --color-line-light: var(--border-light);
   --color-line-strong: var(--border-strong);
 
-  /* Named `ink`/`subtle` (not `body`/`muted`) to avoid colliding with the
-     existing global `.text-muted` utility class. */
   --color-ink: var(--txt-body);
   --color-subtle: var(--txt-muted);
   --color-inverse: var(--txt-inverse);
 
-  /* Document editor surfaces — per-theme legibility tokens in :root / [data-theme]. */
   --color-editor-chrome: var(--editor-chrome-bg);
   --color-editor-canvas: var(--editor-canvas-bg);
   --color-editor-sheet: var(--editor-sheet-bg);
   --color-editor-prose: var(--editor-prose-color);
 }
 
-/* In the Room — clinical theme */
-
-:root {
-  /* Layout & typography (theme-agnostic) */
-  /* prototype-B: primary chrome is a left rail; top bar only on narrow viewports */
-  --nav-width: 13.75rem;
+:root,
+[data-theme='practice'] {
+  /* Layout & typography */
+  --nav-width: 14.5rem;
   --nav-height: 0px;
-  --space-inline: 1.75rem;
+  --space-inline: 1.5rem;
   --space-block: 1.25rem;
-  --section-gap: 2rem;
+  --section-gap: 1.75rem;
 
   --font-head: 'Fraunces', Georgia, serif;
   --font-body: 'Karla', system-ui, sans-serif;
 
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 4px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
 
   --shadow-sm: none;
-  --shadow-md: 0 1px 3px rgba(45, 52, 57, 0.06);
+  --shadow-md: 0 1px 3px rgba(35, 34, 32, 0.06);
 
-  /* ── Clinical layout engine ── */
   --layout-space-2xs: 0.25rem;
   --layout-space-xs: 0.5rem;
   --layout-space-sm: 0.75rem;
@@ -87,315 +77,161 @@
   --paper-prose-leading: 1.75;
 
   --elevation-paper-0: none;
-  --elevation-paper-1: 0 1px 3px rgba(45, 52, 57, 0.06);
-  --elevation-paper-2: 0 2px 8px rgba(45, 52, 57, 0.08), 0 1px 2px rgba(45, 52, 57, 0.04);
-  --elevation-paper-3: 0 8px 28px rgba(45, 52, 57, 0.12), 0 2px 8px rgba(45, 52, 57, 0.06);
-  --elevation-paper-4: 0 16px 48px rgba(45, 52, 57, 0.14), 0 4px 12px rgba(45, 52, 57, 0.08);
+  --elevation-paper-1: 0 1px 3px rgba(35, 34, 32, 0.06);
+  --elevation-paper-2: 0 2px 8px rgba(35, 34, 32, 0.08), 0 1px 2px rgba(35, 34, 32, 0.04);
+  --elevation-paper-3: 0 8px 28px rgba(35, 34, 32, 0.1), 0 2px 8px rgba(35, 34, 32, 0.05);
+  --elevation-paper-4: 0 16px 48px rgba(35, 34, 32, 0.12), 0 4px 12px rgba(35, 34, 32, 0.06);
 
-  --brand-charcoal: #1a1818;
-  --brand-warm-grey: #7a756f;
+  /* Canvas & Surfaces */
+  --bg-canvas: #fbf9f5;
+  --bg-surface: #ffffff;
+  --bg-muted: #f3efea;
+  --bg-subtle: #eae5de;
 
-  /* Logo blues — available on every theme for somatic + clinical tokens */
-  --brand-blue: #58c2d5;
-  --brand-blue-dark: #3fb0d6;
-  --brand-blue-light: #a9dde7;
-  --brand-blue-muted: #e8f4f8;
-  --brand-teal: var(--brand-blue);
-  --brand-teal-dark: var(--brand-blue-dark);
-  --brand-teal-light: var(--brand-blue-light);
-  --brand-teal-muted: var(--brand-blue-muted);
+  /* Borders & Dividers */
+  --border-subtle: #e5e0d8;
+  --border-strong: #c8c2b7;
 
-  /* Somatic state badge palettes (fixed — independent of active theme) */
+  /* Typography */
+  --text-primary: #232220;
+  --text-secondary: #66625d;
+  --text-tertiary: #96918a;
+
+  /* Interactive / Brand */
+  --accent-primary: #263e34;
+  --accent-primary-hover: #1b2d26;
+  --accent-tint: #edf3f0;
+
+  /* Creative Arts Therapy Modality Pigments */
+  --pigment-music: #3a4d6b;
+  --pigment-music-bg: #eef2f7;
+  --pigment-art: #9e4d3b;
+  --pigment-art-bg: #fbf1ee;
+  --pigment-drama: #8e6332;
+  --pigment-drama-bg: #faf4eb;
+  --pigment-movement: #4a654c;
+  --pigment-movement-bg: #eff5f0;
+
+  /* Governance & Clinical Indicators */
+  --status-safeguard: #9b2c2c;
+  --status-safeguard-bg: #fdf2f2;
+  --status-verified: #2a6041;
+  --status-verified-bg: #eef7f2;
+
+  /* Legacy semantic bridges (used across existing stylesheets) */
+  --bg-page: var(--bg-canvas);
+  --bg-zone: var(--bg-surface);
+  --bg-zone-muted: var(--bg-muted);
+  --bg-zone-accent: var(--accent-tint);
+  --bg-nav: var(--bg-surface);
+  --bg-nav-edge: var(--bg-canvas);
+
+  --border-color: var(--border-subtle);
+  --border-light: var(--border-subtle);
+
+  --txt-body: var(--text-primary);
+  --txt-muted: var(--text-secondary);
+  --txt-inverse: #ffffff;
+
+  --col-primary: var(--accent-primary);
+  --col-primary-dark: var(--accent-primary-hover);
+  --col-primary-light: var(--accent-tint);
+  --col-secondary: var(--pigment-art);
+  --col-secondary-dark: var(--pigment-art);
+  --col-accent: var(--text-primary);
+  --col-accent-dark: var(--text-primary);
+
+  --brand-teal: var(--accent-primary);
+  --brand-teal-dark: var(--accent-primary-hover);
+  --brand-teal-light: var(--accent-tint);
+  --brand-teal-muted: var(--accent-tint);
+  --brand-charcoal: var(--text-primary);
+  --brand-warm-grey: var(--text-secondary);
+
+  --editor-chrome-bg: var(--bg-surface);
+  --editor-canvas-bg: var(--bg-canvas);
+  --editor-sheet-bg: var(--bg-surface);
+  --editor-prose-color: var(--text-primary);
+
+  --expr-gradient-a: linear-gradient(120deg, var(--accent-primary) 0%, var(--pigment-movement) 55%, var(--pigment-music) 100%);
+  --expr-gradient-b: linear-gradient(120deg, var(--pigment-art) 0%, var(--accent-primary) 100%);
+
+  /* Fixed somatic badge chips (independent of active theme) */
   --somatic-grounded-bg: #eef2ed;
   --somatic-grounded-border: #557a61;
   --somatic-grounded-txt: #2d4234;
 
   --somatic-activated-bg: #fdf2f0;
-  --somatic-activated-border: #e04f36;
-  --somatic-activated-txt: #802213;
+  --somatic-activated-border: #9e4d3b;
+  --somatic-activated-txt: #6b3428;
 
   --somatic-fatigued-bg: #f1f3f5;
   --somatic-fatigued-border: #7b8a99;
   --somatic-fatigued-txt: #404b54;
 
   --somatic-open-bg: #e8f4fd;
-  --somatic-open-border: #3a9fbf;
-  --somatic-open-txt: #164e63;
+  --somatic-open-border: #3a4d6b;
+  --somatic-open-txt: #243247;
 
   --somatic-constricted-bg: #f4effa;
   --somatic-constricted-border: #7c4daf;
   --somatic-constricted-txt: #3b1e59;
 
   --somatic-settled-bg: #ffffff;
-  --somatic-settled-border: #2d3439;
-  --somatic-settled-txt: #1f2528;
+  --somatic-settled-border: #66625d;
+  --somatic-settled-txt: #232220;
 }
 
-/* ── Semantic theme tokens (default: light-clinical) ── */
-
-:root,
-[data-theme='light-clinical'] {
-  /* Clinical logo palette — in-the-room/choma-logo.svg */
-  --brand-blue: #58c2d5;
-  --brand-blue-dark: #3fb0d6;
-  --brand-blue-light: #a9dde7;
-  --brand-blue-muted: #e8f4f8;
-
-  --brand-red: #ee4e14;
-  --brand-red-dark: #c94110;
-  --brand-red-muted: #fdeee8;
-
-  --brand-magenta: #e22a85;
-
-  /* Legacy token aliases (used across clinical UI) */
-  --brand-teal: var(--brand-blue);
-  --brand-teal-dark: var(--brand-blue-dark);
-  --brand-teal-light: var(--brand-blue-light);
-  --brand-teal-muted: var(--brand-blue-muted);
-
-  --col-primary: var(--brand-blue);
-  --col-primary-dark: var(--brand-blue-dark);
-  --col-primary-light: var(--brand-blue-light);
-  --col-secondary: var(--brand-red);
-  --col-secondary-dark: var(--brand-red-dark);
-  --col-accent: #1a1818;
-  --col-accent-dark: #0f0e0e;
-
-  --bg-page: #ffffff;
-  --bg-surface: #ffffff;
-  --bg-zone: #ffffff;
-  --bg-zone-muted: #fafcfd;
-  --bg-zone-accent: var(--brand-blue-muted);
-  --bg-nav: #ffffff;
-  --bg-nav-edge: #ffffff;
-
-  --editor-chrome-bg: #ffffff;
-  --editor-canvas-bg: #fafcfd;
-  --editor-sheet-bg: #ffffff;
-  --editor-prose-color: #1a1818;
-
-  --border-color: #d4e8ee;
-  --border-light: #e8f2f5;
-  --border-strong: #a9dde7;
-
-  --txt-body: #1a1818;
-  --txt-muted: #5c6670;
-  --txt-inverse: #ffffff;
-
-  --expr-gradient-a: linear-gradient(120deg, #58c2d5 0%, #ee4e14 55%, #e22a85 100%);
-  --expr-gradient-b: linear-gradient(120deg, #3fb0d6 0%, #ee4e14 100%);
-}
-
-[data-theme='dark-studio'] {
-  --col-primary: #ee4e14;
-  --col-primary-dark: #ff6b3d;
-  --col-primary-light: rgba(238, 78, 20, 0.22);
-  --col-accent: #ececef;
-  --col-accent-dark: #ffffff;
-
-  --bg-page: #14151c;
-  --bg-surface: #1a1b24;
-  --bg-zone: #1a1b24;
-  --bg-zone-muted: #22232e;
-  --bg-zone-accent: rgba(238, 78, 20, 0.12);
-  --bg-nav: #1a1b24;
-  --bg-nav-edge: #14151c;
-
-  --editor-chrome-bg: #1a1b24;
-  --editor-canvas-bg: #14151c;
-  --editor-sheet-bg: #22232e;
-  --editor-prose-color: #ececef;
-
-  --border-color: #343648;
-  --border-light: #2a2c3a;
-  --border-strong: #4a4d62;
-
-  --txt-body: #ececef;
-  --txt-muted: #a8abb8;
-  --txt-inverse: #14151c;
-
-  --alert-sensory-text: #dcc4f5;
-  --alert-sensory-bg: rgba(107, 76, 154, 0.28);
-  --alert-sensory-border: rgba(180, 150, 220, 0.4);
-  --alert-watch-text: #f5c878;
-  --alert-watch-bg: rgba(154, 91, 0, 0.22);
-  --alert-watch-border: rgba(240, 180, 80, 0.35);
-  --alert-critical-text: #f5a8a8;
-  --alert-critical-bg: rgba(155, 28, 28, 0.25);
-  --alert-critical-border: rgba(240, 140, 140, 0.35);
-  --alert-info-text: #9dd4ef;
-  --alert-info-bg: rgba(30, 90, 122, 0.28);
-  --alert-info-border: rgba(120, 190, 220, 0.35);
-
-  --expr-gradient-a: linear-gradient(120deg, #ee4e14 0%, #4a4568 100%);
-  --expr-gradient-b: linear-gradient(120deg, #ee4e14 0%, #58c2d5 100%);
-}
-
-[data-theme='muted-somatic'] {
-  --col-primary: #8a9a7b;
-  --col-primary-dark: #6b7a5e;
-  --col-primary-light: #dfe8d6;
-  --col-accent: #4a4038;
-  --col-accent-dark: #2f2822;
-
-  --bg-page: #f7f2ea;
-  --bg-surface: #faf6ef;
-  --bg-zone: #faf6ef;
-  --bg-zone-muted: #f0e8dc;
-  --bg-zone-accent: #e8ddd0;
-  --bg-nav: #faf6ef;
-  --bg-nav-edge: #f7f2ea;
-
-  --editor-chrome-bg: #faf6ef;
-  --editor-canvas-bg: #f7f2ea;
-  --editor-sheet-bg: #fffdf8;
-  --editor-prose-color: #4a4038;
-
-  --border-color: #d8cbb8;
-  --border-light: #e6ddd0;
-  --border-strong: #c4b49c;
-
-  --txt-body: #4a4038;
-  --txt-muted: #7a6f62;
-  --txt-inverse: #fffdf8;
-
-  --expr-gradient-a: linear-gradient(120deg, #c67b5c 0%, #dfe8d6 100%);
-  --expr-gradient-b: linear-gradient(120deg, #8a9a7b 0%, #e8ddd0 100%);
-}
-
-[data-theme='vibrant-expressive'] {
-  --col-primary: #ff4fd8;
-  --col-primary-dark: #d926b8;
-  --col-primary-light: rgba(255, 79, 216, 0.18);
-  --col-accent: #1a1033;
-  --col-accent-dark: #0d0820;
-
-  --bg-page: #fff7ff;
-  --bg-surface: #ffffff;
-  --bg-zone: #ffffff;
-  --bg-zone-muted: #fff0fb;
-  --bg-zone-accent: linear-gradient(135deg, #fff0fb 0%, #e8fbff 100%);
-  --bg-nav: #ffffff;
-  --bg-nav-edge: #fff7ff;
-
-  --editor-chrome-bg: #ffffff;
-  --editor-canvas-bg: #fff7ff;
-  --editor-sheet-bg: #ffffff;
-  --editor-prose-color: #1a1033;
-
-  --border-color: #e8c8f0;
-  --border-light: #f0d8f8;
-  --border-strong: #d0a0e0;
-
-  --txt-body: #1a1033;
-  --txt-muted: #6a5080;
-  --txt-inverse: #ffffff;
-
-  --expr-gradient-a: linear-gradient(120deg, #ff4fd8 0%, #63bde0 50%, #b8ff3c 100%);
-  --expr-gradient-b: linear-gradient(120deg, #7c3aed 0%, #ff4fd8 100%);
-}
-
-[data-theme='neon-signal'] {
-  --col-primary: #00f5ff;
-  --col-primary-dark: #00c4cc;
-  --col-primary-light: rgba(0, 245, 255, 0.2);
-  --col-accent: #e8fbff;
-  --col-accent-dark: #ffffff;
-
-  --bg-page: #0a0f14;
-  --bg-surface: #101820;
-  --bg-zone: #101820;
-  --bg-zone-muted: #141e28;
-  --bg-zone-accent: linear-gradient(135deg, #101820 0%, #0f1a24 100%);
-  --bg-nav: #101820;
-  --bg-nav-edge: #0a0f14;
-
-  --editor-chrome-bg: #101820;
-  --editor-canvas-bg: #0a0f14;
-  --editor-sheet-bg: #141e28;
-  --editor-prose-color: #e8fbff;
-
-  --border-color: #1e3a48;
-  --border-light: #162832;
-  --border-strong: #2a5060;
-
-  --txt-body: #e8fbff;
-  --txt-muted: #7eb8c8;
-  --txt-inverse: #0a0f14;
-
-  --expr-gradient-a: linear-gradient(120deg, #00f5ff 0%, #39ff14 50%, #bf00ff 100%);
-  --expr-gradient-b: linear-gradient(120deg, #39ff14 0%, #00f5ff 100%);
-  --badge-accent: #39ff14;
-  --highlight-soft: linear-gradient(120deg, rgba(0, 245, 255, 0.2) 0%, rgba(57, 255, 20, 0.25) 100%);
-  --highlight-glow: #39ff14;
-}
+/* ── Optional somatic theme accents (practice canvas preserved) ── */
 
 [data-theme='somatic-grounded'] {
   --col-primary: #557a61;
   --col-primary-dark: #2d4234;
   --col-primary-light: #eef2ed;
-  --col-secondary: #c45c3e;
-  --col-secondary-dark: #8f3d24;
   --col-accent: #2d4234;
   --col-accent-dark: #1a2820;
-
   --bg-page: #eef2ed;
+  --bg-canvas: #eef2ed;
   --bg-surface: #f7faf6;
   --bg-zone: #f7faf6;
   --bg-zone-muted: #e3ebe4;
   --bg-zone-accent: #dce6de;
   --bg-nav: #f7faf6;
   --bg-nav-edge: #eef2ed;
-
   --editor-chrome-bg: #f7faf6;
   --editor-canvas-bg: #eef2ed;
   --editor-sheet-bg: #f7faf6;
   --editor-prose-color: #2d4234;
-
   --border-color: #8fa896;
   --border-light: #c5d4c8;
   --border-strong: #557a61;
-
   --txt-body: #2d4234;
   --txt-muted: #4a6352;
-  --txt-inverse: #f7faf6;
-
-  --expr-gradient-a: linear-gradient(120deg, #557a61 0%, #c45c3e 55%, #2d4234 100%);
-  --expr-gradient-b: linear-gradient(120deg, #8fa896 0%, #557a61 100%);
 }
 
 [data-theme='somatic-activated'] {
-  --col-primary: #e04f36;
-  --col-primary-dark: #802213;
-  --col-primary-light: #fdf2f0;
-  --col-secondary: #f4a024;
-  --col-secondary-dark: #b86a08;
-  --col-accent: #802213;
+  --col-primary: #9e4d3b;
+  --col-primary-dark: #6b3428;
+  --col-primary-light: #fbf1ee;
+  --col-accent: #6b3428;
   --col-accent-dark: #4a0a06;
-
-  --bg-page: #fdf2f0;
+  --bg-page: #fbf1ee;
+  --bg-canvas: #fbf1ee;
   --bg-surface: #fff8f6;
   --bg-zone: #fff8f6;
   --bg-zone-muted: #fce4df;
   --bg-zone-accent: #fad4cc;
   --bg-nav: #fff8f6;
-  --bg-nav-edge: #fdf2f0;
-
+  --bg-nav-edge: #fbf1ee;
   --editor-chrome-bg: #fff8f6;
-  --editor-canvas-bg: #fdf2f0;
+  --editor-canvas-bg: #fbf1ee;
   --editor-sheet-bg: #fff8f6;
-  --editor-prose-color: #802213;
-
-  --border-color: #e88778;
+  --editor-prose-color: #6b3428;
+  --border-color: #e0b0a4;
   --border-light: #f5c4ba;
-  --border-strong: #e04f36;
-
-  --txt-body: #802213;
-  --txt-muted: #a84838;
-  --txt-inverse: #fff8f6;
-
-  --expr-gradient-a: linear-gradient(120deg, #e04f36 0%, #f4a024 50%, #802213 100%);
-  --expr-gradient-b: linear-gradient(120deg, #f4a024 0%, #e04f36 100%);
+  --border-strong: #9e4d3b;
+  --txt-body: #6b3428;
+  --txt-muted: #8a5244;
 }
 
 [data-theme='somatic-fatigued'] {
@@ -404,129 +240,96 @@
   --col-primary-light: #f1f3f5;
   --col-accent: #404b54;
   --col-accent-dark: #2a3238;
-
   --bg-page: #f1f3f5;
+  --bg-canvas: #f1f3f5;
   --bg-surface: #f8f9fa;
   --bg-zone: #f8f9fa;
   --bg-zone-muted: #e4e8ec;
   --bg-zone-accent: #d8dde2;
   --bg-nav: #f8f9fa;
   --bg-nav-edge: #f1f3f5;
-
   --editor-chrome-bg: #f8f9fa;
   --editor-canvas-bg: #f1f3f5;
   --editor-sheet-bg: #f8f9fa;
   --editor-prose-color: #404b54;
-
   --border-color: #a8b4be;
   --border-light: #ccd4da;
   --border-strong: #7b8a99;
-
   --txt-body: #404b54;
   --txt-muted: #5c6872;
-  --txt-inverse: #f8f9fa;
-
-  --expr-gradient-a: linear-gradient(120deg, #7b8a99 0%, #a8b4be 50%, #404b54 100%);
-  --expr-gradient-b: linear-gradient(120deg, #a8b4be 0%, #7b8a99 100%);
 }
 
 [data-theme='somatic-open'] {
-  --col-primary: #3a9fbf;
-  --col-primary-dark: #164e63;
-  --col-primary-light: #e8f4fd;
-  --col-secondary: #5ec4e8;
-  --col-secondary-dark: #1a7a9a;
-  --col-accent: #164e63;
-  --col-accent-dark: #0c3240;
-
-  --bg-page: #e8f4fd;
-  --bg-surface: #f4faff;
-  --bg-zone: #f4faff;
-  --bg-zone-muted: #cceaf8;
-  --bg-zone-accent: #b8e2f5;
-  --bg-nav: #f4faff;
-  --bg-nav-edge: #e8f4fd;
-
-  --editor-chrome-bg: #f4faff;
-  --editor-canvas-bg: #e8f4fd;
-  --editor-sheet-bg: #f4faff;
-  --editor-prose-color: #164e63;
-
-  --border-color: #5ec4e8;
-  --border-light: #a8dff2;
-  --border-strong: #3a9fbf;
-
-  --txt-body: #164e63;
-  --txt-muted: #2a7a94;
-  --txt-inverse: #f4faff;
-
-  --expr-gradient-a: linear-gradient(120deg, #3a9fbf 0%, #5ec4e8 50%, #164e63 100%);
-  --expr-gradient-b: linear-gradient(120deg, #5ec4e8 0%, #3a9fbf 100%);
+  --col-primary: #3a4d6b;
+  --col-primary-dark: #243247;
+  --col-primary-light: #eef2f7;
+  --col-accent: #243247;
+  --col-accent-dark: #162032;
+  --bg-page: #eef2f7;
+  --bg-canvas: #eef2f7;
+  --bg-surface: #f6f8fb;
+  --bg-zone: #f6f8fb;
+  --bg-zone-muted: #dde5f0;
+  --bg-zone-accent: #cfdbee;
+  --bg-nav: #f6f8fb;
+  --bg-nav-edge: #eef2f7;
+  --editor-chrome-bg: #f6f8fb;
+  --editor-canvas-bg: #eef2f7;
+  --editor-sheet-bg: #f6f8fb;
+  --editor-prose-color: #243247;
+  --border-color: #9aadc8;
+  --border-light: #c5d2e4;
+  --border-strong: #3a4d6b;
+  --txt-body: #243247;
+  --txt-muted: #4a5f7a;
 }
 
 [data-theme='somatic-constricted'] {
   --col-primary: #7c4daf;
   --col-primary-dark: #3b1e59;
   --col-primary-light: #f4effa;
-  --col-secondary: #9b6fd4;
-  --col-secondary-dark: #4a2870;
   --col-accent: #3b1e59;
   --col-accent-dark: #241038;
-
   --bg-page: #f4effa;
+  --bg-canvas: #f4effa;
   --bg-surface: #faf7fd;
   --bg-zone: #faf7fd;
   --bg-zone-muted: #e8dcf5;
   --bg-zone-accent: #ddd0f0;
   --bg-nav: #faf7fd;
   --bg-nav-edge: #f4effa;
-
   --editor-chrome-bg: #faf7fd;
   --editor-canvas-bg: #f4effa;
   --editor-sheet-bg: #faf7fd;
   --editor-prose-color: #3b1e59;
-
   --border-color: #a882cc;
   --border-light: #cbb8e4;
   --border-strong: #7c4daf;
-
   --txt-body: #3b1e59;
   --txt-muted: #5c3880;
-  --txt-inverse: #faf7fd;
-
-  --expr-gradient-a: linear-gradient(120deg, #7c4daf 0%, #9b6fd4 50%, #3b1e59 100%);
-  --expr-gradient-b: linear-gradient(120deg, #9b6fd4 0%, #7c4daf 100%);
 }
 
 [data-theme='somatic-settled'] {
-  --col-primary: #2d3439;
-  --col-primary-dark: #1f2528;
+  --col-primary: #232220;
+  --col-primary-dark: #161513;
   --col-primary-light: #ffffff;
-  --col-accent: #1f2528;
-  --col-accent-dark: #121618;
-
+  --col-accent: #232220;
+  --col-accent-dark: #161513;
   --bg-page: #ffffff;
+  --bg-canvas: #ffffff;
   --bg-surface: #ffffff;
   --bg-zone: #ffffff;
-  --bg-zone-muted: #f4f5f6;
-  --bg-zone-accent: #eceef0;
+  --bg-zone-muted: #f3efea;
+  --bg-zone-accent: #eae5de;
   --bg-nav: #ffffff;
   --bg-nav-edge: #ffffff;
-
   --editor-chrome-bg: #ffffff;
-  --editor-canvas-bg: #f8f9fa;
+  --editor-canvas-bg: #fbf9f5;
   --editor-sheet-bg: #ffffff;
-  --editor-prose-color: #1f2528;
-
-  --border-color: #5c6670;
-  --border-light: #d4d8db;
-  --border-strong: #2d3439;
-
-  --txt-body: #1f2528;
-  --txt-muted: #5c6670;
-  --txt-inverse: #ffffff;
-
-  --expr-gradient-a: linear-gradient(120deg, #ffffff 0%, #d4d8db 50%, #2d3439 100%);
-  --expr-gradient-b: linear-gradient(120deg, #eceef0 0%, #2d3439 100%);
+  --editor-prose-color: #232220;
+  --border-color: #c8c2b7;
+  --border-light: #e5e0d8;
+  --border-strong: #66625d;
+  --txt-body: #232220;
+  --txt-muted: #66625d;
 }
-

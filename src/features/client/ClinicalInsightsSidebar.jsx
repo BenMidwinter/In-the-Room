@@ -75,7 +75,7 @@ export default function ClinicalInsightsSidebar({ clientId, client, onInsert, em
         <div className="clinical-insights__body">
           {!hasProfile && !hasIntake ? (
             <p className="text-muted text-small">
-              No clinical profile or intake on file. Edit the client profile to add themes, sensory tags, and goals — they will appear here for insert into notes.
+              No clinical profile or intake on file. Edit the client profile to add diagnosis and formulation — they will appear here for insert into notes.
             </p>
           ) : (
             <>

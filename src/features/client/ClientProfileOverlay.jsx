@@ -1,31 +1,7 @@
 import { useState, useEffect } from 'react'
 import DiagnosisPicker from '../../components/DiagnosisPicker'
-import CommaTagInput from '../../components/CommaTagInput'
 import { updateClientClinicalDetails, updateClientClinicalProfile } from '../../lib/store'
 import { useToast } from '../../components/ui'
-
-const TAG_PROFILE_FIELDS = [
-  {
-    key: 'recurring_themes',
-    label: 'Recurring themes & metaphors',
-    placeholder: 'e.g. Fortress / safe place, Bridge / transition',
-  },
-  {
-    key: 'sensory_considerations',
-    label: 'Sensory profile & considerations',
-    placeholder: 'e.g. High sensory sensitivity, Auditory sensitivity, Fluorescent lighting',
-  },
-  {
-    key: 'preferred_modalities_notes',
-    label: 'Preferred modalities & creative media',
-    placeholder: 'e.g. Clay, digital art, movement, music',
-  },
-  {
-    key: 'clinical_goals',
-    label: 'Current clinical goals',
-    placeholder: 'e.g. Tolerate transition cues, Initiate interaction within 10 minutes',
-  },
-]
 
 const TEXT_PROFILE_FIELDS = [
   {
@@ -94,7 +70,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
             <p className="client-profile-overlay__eyebrow">Client clinical profile</p>
             <h2 id="client-profile-overlay-title" className="client-profile-overlay__title">{client.real_name}</h2>
             <p className="client-profile-overlay__meta">
-              DOB {client.dob} · {client.workplace_name || 'Private practice'}
+              DOB {client.dob} · Private practice
             </p>
           </div>
           <button type="button" className="client-profile-overlay__close secondary" onClick={onClose} aria-label="Close">
@@ -135,22 +111,11 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
           </section>
 
           <section className="client-profile-overlay__section client-profile-overlay__section--clinical">
-            <h3 className="client-profile-overlay__section-title">Creative care profile</h3>
+            <h3 className="client-profile-overlay__section-title">Formulation</h3>
             <p className="client-profile-overlay__section-lead">
-              Recurring clinical themes, formulation notes, and sensory considerations for creative sessions.
+              Working formulation notes for this client. Keep identifying detail encrypted before save in production.
             </p>
             <div className="client-profile-overlay__grid client-profile-overlay__grid--clinical">
-              {TAG_PROFILE_FIELDS.map(({ key, label, placeholder }) => (
-                <div key={key} className="form-group client-profile-overlay__field client-profile-overlay__field--wide">
-                  <label htmlFor={`client-profile-${key}`}>{label}</label>
-                  <CommaTagInput
-                    id={`client-profile-${key}`}
-                    value={profile[key] || ''}
-                    onChange={value => setProfileField(key, value)}
-                    placeholder={placeholder}
-                  />
-                </div>
-              ))}
               {TEXT_PROFILE_FIELDS.map(({ key, label, placeholder, size }) => (
                 <div key={key} className="form-group client-profile-overlay__field client-profile-overlay__field--wide">
                   <label htmlFor={`client-profile-${key}`}>{label}</label>
