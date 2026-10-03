@@ -6,12 +6,14 @@ const MODALITY_FALLBACK_COLORS = {
   music_therapy: '#557a61',
   clay_work: '#8b5a7a',
   somatic_expression: '#7c6b9e',
+  external_busy: '#6b7280',
 }
 
 const MODALITY_FALLBACK_LABELS = {
   music_therapy: 'Music Therapy',
   clay_work: 'Clay Work',
   somatic_expression: 'Somatic Expression',
+  external_busy: 'Google busy',
 }
 
 function hexToRgb(hex) {

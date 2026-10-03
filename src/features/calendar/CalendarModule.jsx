@@ -1,11 +1,19 @@
 import { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAppSession } from '../../lib/AppSessionContext'
-import { getClientsForUser } from '../../lib/store'
+import { useAppClients } from '../../lib/queries'
 import {
+  appointmentQueryKeys,
   useAllAppointmentsQuery,
   useSaveAppointmentMutation,
 } from '../../lib/appointmentQueries'
+import {
+  externalBlocksAsAppointments,
+  listCalendarConnections,
+  listExternalCalendarBlocks,
+} from '../../lib/supabase/calendarConnectionsRepo'
+import { invokeFunction } from '../../lib/supabase/invokeFunction'
 import ErrorBoundary from '../../components/ErrorBoundary'
 import {
   DEMO_TODAY,
@@ -151,6 +159,7 @@ function layoutDayEvents(appts, dayStartMin, dayEndMin) {
 
 function EventChip({ appointment, compact = false, blurNames = false, onSelect, selected = false, style }) {
   const cancelled = isCancelled(appointment)
+  const externalBusy = Boolean(appointment.is_external_busy)
   const timeRange = appointment.end_time
     ? `${appointment.start_time}–${appointment.end_time}`
     : appointment.start_time
@@ -158,42 +167,48 @@ function EventChip({ appointment, compact = false, blurNames = false, onSelect, 
 
   const className = [
     'calendar-event',
-    'calendar-event--interactive',
+    !externalBusy && 'calendar-event--interactive',
     'calendar-event--block',
     'calendar-event--service',
+    externalBusy && 'calendar-event--external-busy',
     compact && 'calendar-event--compact',
     otherInfo && 'calendar-event--has-info',
     selected && 'calendar-event--selected',
     cancelled && 'calendar-event--cancelled',
   ].filter(Boolean).join(' ')
 
-  const title = blurNames
-    ? `${modalityLabel(appointment.therapy_modality)} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
-    : `${appointment.client_name} · ${modalityLabel(appointment.therapy_modality)} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
+  const title = externalBusy
+    ? `Google Calendar · Busy · ${timeRange}`
+    : blurNames
+      ? `${modalityLabel(appointment.therapy_modality)} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
+      : `${appointment.client_name} · ${modalityLabel(appointment.therapy_modality)} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
 
+  const Tag = externalBusy ? 'div' : 'button'
   return (
-    <button
-      type="button"
+    <Tag
+      type={externalBusy ? undefined : 'button'}
       className={className}
       style={{ ...calendarEventStyle(appointment.therapy_modality), ...style }}
       title={title}
-      onClick={(e) => {
+      onClick={externalBusy ? undefined : (e) => {
         e.stopPropagation()
         onSelect?.(appointment)
       }}
     >
       <span className="calendar-event__time">{timeRange}</span>
-      <BlurredName as="span" name={appointment.client_name} blur={blurNames} className="calendar-event__client" />
+      <BlurredName as="span" name={appointment.client_name} blur={blurNames && !externalBusy} className="calendar-event__client" />
       {!compact && (
-        <span className="calendar-event__meta">{modalityLabel(appointment.therapy_modality)}</span>
+        <span className="calendar-event__meta">
+          {externalBusy ? 'Busy' : modalityLabel(appointment.therapy_modality)}
+        </span>
       )}
-      {otherInfo && (
+      {otherInfo && !externalBusy && (
         <span className="calendar-event__info">{otherInfo}</span>
       )}
-      {!compact && !otherInfo && (
+      {!compact && !otherInfo && !externalBusy && (
         <BlurredName as="span" name={appointment.assigned_therapist} blur={blurNames} className="calendar-event__therapist" />
       )}
-    </button>
+    </Tag>
   )
 }
 
@@ -685,6 +700,7 @@ function DayView({
 
 export default function CalendarModule({ persona }) {
   const { myWorkplace, session } = useAppSession()
+  const { clients: remoteClients = [] } = useAppClients()
   const [viewMode, setViewMode] = useState('week')
   const [activeDate, setActiveDate] = useState(DEMO_TODAY)
   const [selectedAppointment, setSelectedAppointment] = useState(null)
@@ -698,6 +714,31 @@ export default function CalendarModule({ persona }) {
   const [availabilitySettings, setAvailabilitySettings] = useState(() => (
     getClinicianWorkplaceSettings(session.user.id)
   ))
+
+  const externalBusyQuery = useQuery({
+    queryKey: appointmentQueryKeys.externalBusy,
+    enabled: isSupabaseConfigured(),
+    queryFn: async () => {
+      const connections = await listCalendarConnections()
+      const google = connections.find((row) => row.provider === 'google' && row.status === 'connected')
+      if (!google?.pull_external_busy) return []
+      // Refresh Google busy in the background when the calendar opens.
+      try {
+        await invokeFunction('google-calendar-sync', { method: 'POST', body: {} })
+      } catch {
+        // Still show any cached blocks if sync fails (e.g. offline).
+      }
+      const fromIso = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString()
+      const toIso = new Date(Date.now() + 60 * 24 * 60 * 60_000).toISOString()
+      return listExternalCalendarBlocks({ fromIso, toIso })
+    },
+    staleTime: 5 * 60_000,
+  })
+
+  const googleBusy = useMemo(
+    () => externalBlocksAsAppointments(externalBusyQuery.data || [], session.user.id),
+    [externalBusyQuery.data, session.user.id],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -758,18 +799,15 @@ export default function CalendarModule({ persona }) {
   const dayEndMin = viewPrefs.endHour * 60
 
   const assignedClients = useMemo(
-    () => getClientsForUser(session.user.id, myWorkplace).filter(c => c.is_active !== false),
-    [session.user.id, myWorkplace],
+    () => remoteClients.filter(c => c.is_active !== false),
+    [remoteClients],
   )
 
-  const roleFiltered = useMemo(
-    () => filterAppointmentsForPersona(appointments, persona),
-    [appointments, persona],
-  )
-  const filtered = useMemo(
-    () => filterAppointmentsByCalendarOwner(appointments, calendarOwner, persona),
-    [appointments, calendarOwner, persona],
-  )
+  const filtered = useMemo(() => {
+    const roleScoped = filterAppointmentsForPersona(appointments, persona)
+    const owned = filterAppointmentsByCalendarOwner(roleScoped, calendarOwner, persona)
+    return [...owned, ...googleBusy]
+  }, [appointments, calendarOwner, persona, googleBusy])
 
   const blurNames = shouldBlurClientIdentity(persona)
 
@@ -796,6 +834,7 @@ export default function CalendarModule({ persona }) {
   }, [viewMode, activeDate, weekDates, workingDates])
 
   const selectAppointment = (appt) => {
+    if (appt?.is_external_busy) return
     setScheduleDraft(null)
     setSelectedAppointment(prev => (prev?.id === appt.id ? null : appt))
   }

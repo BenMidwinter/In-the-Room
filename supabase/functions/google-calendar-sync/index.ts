@@ -1,5 +1,6 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 import { decryptJson, encryptJson } from '../_shared/crypto.ts'
+import { credentialsKey } from '../_shared/secrets.ts'
 import { userClient, adminClient } from '../_shared/supabaseAdmin.ts'
 
 type Creds = {
@@ -39,7 +40,9 @@ Deno.serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
-    const encKey = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY')!
+    const encKey = credentialsKey()
+    if (!encKey) return jsonResponse({ error: 'Missing CREDENTIALS_ENCRYPTION_KEY' }, 500)
+
     const { data: connection, error } = await supabase
       .from('calendar_connections')
       .select('*')
@@ -49,7 +52,10 @@ Deno.serve(async (req) => {
     if (error || !connection) return jsonResponse({ error: 'Google not connected' }, 400)
     if (!connection.pull_external_busy) return jsonResponse({ pulled: 0, skipped: true })
 
-    let creds = await decryptJson<Creds>(encKey, connection.encrypted_credentials)
+    let creds = await decryptJson<Creds>(
+      encKey,
+      connection.encrypted_credentials as Record<string, string>,
+    )
     creds = await refreshAccessToken(creds)
 
     const timeMin = new Date().toISOString()
@@ -103,6 +109,17 @@ Deno.serve(async (req) => {
 
     return jsonResponse({ pulled: rows.length })
   } catch (error) {
+    try {
+      const authHeader = req.headers.get('Authorization')
+      if (authHeader) {
+        const supabase = userClient(authHeader)
+        await supabase.from('calendar_connections').update({
+          last_error: error?.message || 'Sync failed',
+        }).eq('provider', 'google')
+      }
+    } catch {
+      /* best-effort */
+    }
     return jsonResponse({ error: error?.message || 'Sync failed' }, 500)
   }
 })

@@ -1343,6 +1343,25 @@ button.calendar-event {
   white-space: nowrap;
 }
 
+/* Google Calendar busy overlay — non-interactive hatch. */
+.calendar-event--external-busy {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(107, 114, 128, 0.14),
+    rgba(107, 114, 128, 0.14) 4px,
+    rgba(107, 114, 128, 0.05) 4px,
+    rgba(107, 114, 128, 0.05) 8px
+  );
+  cursor: default;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+.calendar-event--external-busy .calendar-event__client,
+.calendar-event--external-busy .calendar-event__meta {
+  font-weight: 600;
+}
+
 /* Cancelled — faded and struck through. */
 .calendar-event--cancelled {
   opacity: 0.5;

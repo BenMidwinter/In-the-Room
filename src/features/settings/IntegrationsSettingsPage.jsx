@@ -11,7 +11,7 @@ import { useToast } from '../../components/ui'
 
 export default function IntegrationsSettingsPage() {
   const toast = useToast()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const [connections, setConnections] = useState([])
   const [feeds, setFeeds] = useState([])
   const [error, setError] = useState(null)
@@ -19,7 +19,8 @@ export default function IntegrationsSettingsPage() {
   const [busy, setBusy] = useState(false)
   const [feedUrl, setFeedUrl] = useState(null)
 
-  const google = connections.find((row) => row.provider === 'google')
+  const google = connections.find((row) => row.provider === 'google' && row.status === 'connected')
+    || connections.find((row) => row.provider === 'google')
 
   const reload = async () => {
     const [nextConnections, nextFeeds] = await Promise.all([
@@ -28,6 +29,7 @@ export default function IntegrationsSettingsPage() {
     ])
     setConnections(nextConnections)
     setFeeds(nextFeeds)
+    return nextConnections
   }
 
   useEffect(() => {
@@ -36,15 +38,46 @@ export default function IntegrationsSettingsPage() {
   }, [])
 
   useEffect(() => {
-    if (params.get('google') === 'connected') {
-      setInfo('Google Calendar connected.')
+    const status = params.get('google')
+    if (!status) return
+
+    const message = params.get('message')
+    const pulled = params.get('pulled')
+    const email = params.get('email')
+
+    // Clear OAuth query params so refresh does not re-toast.
+    const next = new URLSearchParams(params)
+    ;['google', 'message', 'pulled', 'email'].forEach((key) => next.delete(key))
+    setParams(next, { replace: true })
+
+    if (status === 'connected') {
+      const label = email ? `Google connected (${email}).` : 'Google Calendar connected.'
+      const syncNote = pulled != null ? ` Pulled ${pulled} busy block${pulled === '1' ? '' : 's'}.` : ''
+      setInfo(`${label}${syncNote}`)
       toast.saved('Google connected')
-      reload().catch(() => {})
+      reload()
+        .then(async (rows) => {
+          const linked = rows.find((row) => row.provider === 'google' && row.status === 'connected')
+          if (!linked || pulled != null) return
+          // Callback may have skipped sync; pull now from the browser session.
+          try {
+            const data = await invokeFunction('google-calendar-sync', { method: 'POST', body: {} })
+            setInfo(`Google Calendar connected. Pulled ${data?.pulled ?? 0} busy blocks.`)
+            await reload()
+          } catch (err) {
+            setError(err.message || 'Connected, but sync failed. Try Sync now.')
+          }
+        })
+        .catch(() => {})
+      return
     }
-    if (params.get('google') === 'error') {
-      setError(params.get('message') || 'Google connection failed.')
+
+    if (status === 'error') {
+      const detail = message || 'Google connection failed.'
+      setError(detail)
+      toast.error(detail)
     }
-  }, [params])
+  }, [params, setParams, toast])
 
   const connectGoogle = async () => {
     setBusy(true)
@@ -104,7 +137,7 @@ export default function IntegrationsSettingsPage() {
     setError(null)
     try {
       const data = await invokeFunction('google-calendar-sync', { method: 'POST', body: {} })
-      setInfo(`Sync complete. Pulled ${data?.pulled ?? 0} busy blocks.`)
+      setInfo(`Sync complete. Pulled ${data?.pulled ?? 0} busy blocks into your calendar.`)
       await reload()
       toast.saved('Synced')
     } catch (err) {
@@ -121,18 +154,25 @@ export default function IntegrationsSettingsPage() {
           Every clinician links their own Google account with Connect below — no one pastes API keys.
           In the Room uses one shared Google Cloud OAuth app (configured once by us as project secrets);
           each user then authorises their Workspace/Calendar through Google’s normal consent screen.
+          After connect, busy time is pulled into the calendar automatically.
         </p>
 
         {!isSupabaseConfigured() && (
           <p className="auth-page__alert">Supabase env vars required.</p>
         )}
 
-        {google ? (
+        {google?.status === 'connected' ? (
           <div className="settings-integration">
             <p>
               Status: <strong>{google.status}</strong>
               {google.account_email ? ` · ${google.account_email}` : ''}
+              {google.last_synced_at ? ` · last sync ${new Date(google.last_synced_at).toLocaleString()}` : ''}
             </p>
+            {google.last_error && (
+              <p className="auth-page__alert" role="alert">
+                Last sync error: {google.last_error}
+              </p>
+            )}
             <label className="settings-service-list__meet">
               <input
                 type="checkbox"
@@ -185,10 +225,11 @@ export default function IntegrationsSettingsPage() {
         {error && (
           <p className="auth-page__alert" role="alert">
             {error}
-            {/GOOGLE_OAUTH|SITE_URL|CREDENTIALS_ENCRYPTION/i.test(error) && (
+            {/GOOGLE_OAUTH|SITE_URL|CREDENTIALS_ENCRYPTION|refresh token|Invalid state|Token exchange/i.test(error) && (
               <>
-                {' '}Set these as Supabase Edge Function secrets, and register the redirect URI
-                {' '}<code>…/functions/v1/google-oauth-callback</code> in Google Cloud.
+                {' '}Check Supabase Edge Function secrets and that Google Cloud has redirect URI
+                {' '}<code>…/functions/v1/google-oauth-callback</code>.
+                {' '}SITE_URL must match the origin you are using now (e.g. http://localhost:5173).
               </>
             )}
           </p>
