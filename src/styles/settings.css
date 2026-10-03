@@ -102,6 +102,13 @@
   margin: 0.35rem 0;
 }
 
+.settings-service-list__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 .settings-integration {
   display: flex;
   flex-direction: column;

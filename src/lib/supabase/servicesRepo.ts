@@ -74,3 +74,21 @@ export async function updateService(
 
   return data
 }
+
+export async function deleteService(id: string): Promise<void> {
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+
+  const { error } = await supabase
+    .from('services')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+
+  await writeAuditEvent({
+    action: 'service.deleted',
+    entityType: 'service',
+    entityId: id,
+  })
+}

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import LetterheadBrandingForm from '../../components/LetterheadBrandingForm'
 import { getProfile, updatePrivatePracticeBranding } from '../../lib/store'
 import { resolvePracticeBranding } from '../../lib/workplaceBranding'
+import { useToast } from '../../components/ui'
 
 export default function PrivatePracticeBrandingPanel({ userId }) {
+  const toast = useToast()
   const [practiceName, setPracticeName] = useState('')
   const [logoUrl, setLogoUrl] = useState('')
   const [addressLine1, setAddressLine1] = useState('')
@@ -12,7 +14,6 @@ export default function PrivatePracticeBrandingPanel({ userId }) {
   const [postcode, setPostcode] = useState('')
   const [country, setCountry] = useState('')
   const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -43,7 +44,6 @@ export default function PrivatePracticeBrandingPanel({ userId }) {
   const handleSave = async (event) => {
     event.preventDefault()
     setError('')
-    setSaved(false)
     setSaving(true)
     try {
       updatePrivatePracticeBranding(userId, {
@@ -55,7 +55,7 @@ export default function PrivatePracticeBrandingPanel({ userId }) {
         practice_postcode: postcode,
         practice_country: country,
       })
-      setSaved(true)
+      toast.saved()
     } catch (err) {
       setError(err.message)
     } finally {

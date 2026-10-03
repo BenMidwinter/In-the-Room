@@ -26,10 +26,10 @@ import ServicesSettingsPage from './features/settings/ServicesSettingsPage'
 import IntegrationsSettingsPage from './features/settings/IntegrationsSettingsPage'
 import {
   FormsSettingsPage,
-  PasswordSettingsPage,
   TemplateKindPage,
   TwoFactorSettingsPage,
 } from './features/settings/SettingsPlaceholders'
+import LoginSettingsPage from './features/settings/LoginSettingsPage'
 import JournalPage from './features/journal/JournalPage'
 import Resources from './components/Resources'
 import About from './components/About'
@@ -169,7 +169,8 @@ export default function App() {
             />
           } />
           <Route path="forms" element={<FormsSettingsPage />} />
-          <Route path="password" element={<PasswordSettingsPage />} />
+          <Route path="login" element={<LoginSettingsPage />} />
+          <Route path="password" element={<Navigate to="/settings/login" replace />} />
           <Route path="2fa" element={<TwoFactorSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
         </Route>

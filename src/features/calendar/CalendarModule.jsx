@@ -26,11 +26,18 @@ import { appointmentOtherInfo } from '../../lib/appointmentUtils'
 import {
   getCalendarViewPreferences,
   saveCalendarViewPreferences,
+  syncCalendarPrefsFromAvailability,
   CALENDAR_START_HOUR_OPTIONS,
   CALENDAR_END_HOUR_OPTIONS,
   MIN_CALENDAR_INTERVAL,
   MAX_CALENDAR_INTERVAL,
 } from '../../lib/calendarPreferences'
+import { getClinicianWorkplaceSettings } from '../../lib/store'
+import {
+  getAvailabilityBounds,
+  isMinutesWithinAvailability,
+  unionWeeklyHours,
+} from '../../lib/clinicianAvailability'
 import {
   canPickCalendarOwner,
   filterAppointmentsByCalendarOwner,
@@ -458,6 +465,8 @@ function DayColumn({
   onSelectAppointment,
   selectedAppointmentId,
   onEmptySlotClick,
+  weeklyHours,
+  intervalMinutes,
   className,
   style,
 }) {
@@ -467,6 +476,7 @@ function DayColumn({
   )
 
   const slotsPerHour = subSlotMinutes.length || 1
+  const slotSpan = intervalMinutes || 30
 
   return (
     <div
@@ -477,12 +487,14 @@ function DayColumn({
         <div key={hour} className="calendar-col__hour">
           {subSlotMinutes.map((minute) => {
             const slot = hhmm(hour, minute)
+            const startMin = hour * 60 + minute
+            const available = isMinutesWithinAvailability(weeklyHours, ymd, startMin, startMin + slotSpan)
             return (
               <CalendarTimeSlot
                 key={slot}
-                className="calendar-col__slot"
+                className={`calendar-col__slot${available ? '' : ' calendar-col__slot--unavailable'}`}
                 onClick={() => onEmptySlotClick?.(ymd, slot)}
-                title={`Book ${ymd} at ${slot}`}
+                title={available ? `Book ${ymd} at ${slot}` : `Outside availability · ${ymd} at ${slot}`}
               />
             )
           })}
@@ -523,6 +535,8 @@ function TimeGridView({
   dayStartMin,
   dayEndMin,
   onEmptySlotClick,
+  weeklyHours,
+  intervalMinutes,
   showDayHeaders = true,
 }) {
   const byDate = useMemo(() => {
@@ -607,6 +621,8 @@ function TimeGridView({
               onSelectAppointment={onSelectAppointment}
               selectedAppointmentId={selectedAppointmentId}
               onEmptySlotClick={onEmptySlotClick}
+              weeklyHours={weeklyHours}
+              intervalMinutes={intervalMinutes}
               style={{
                 gridColumn: colIdx + 2,
                 gridRow: `${firstHourRow} / ${dayColSpanEnd}`,
@@ -630,6 +646,8 @@ function DayView({
   dayStartMin,
   dayEndMin,
   onEmptySlotClick,
+  weeklyHours,
+  intervalMinutes,
 }) {
   const dayAppts = useMemo(
     () => appointmentsForDate(appointments, activeDate),
@@ -655,6 +673,8 @@ function DayView({
         dayStartMin={dayStartMin}
         dayEndMin={dayEndMin}
         onEmptySlotClick={onEmptySlotClick}
+        weeklyHours={weeklyHours}
+        intervalMinutes={intervalMinutes}
         showDayHeaders={false}
       />
     </div>
@@ -672,6 +692,17 @@ export default function CalendarModule({ persona }) {
   const saveAppointmentMutation = useSaveAppointmentMutation()
   const [viewPrefs, setViewPrefs] = useState(() => getCalendarViewPreferences())
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false)
+
+  const weeklyHours = useMemo(() => {
+    const settings = getClinicianWorkplaceSettings(session.user.id)
+    return unionWeeklyHours(settings)
+  }, [session.user.id])
+
+  useEffect(() => {
+    const bounds = getAvailabilityBounds(weeklyHours)
+    if (!bounds) return
+    setViewPrefs(syncCalendarPrefsFromAvailability(bounds))
+  }, [weeklyHours])
 
   const ownerOptions = useMemo(
     () => getCalendarOwnerOptions(persona, myWorkplace),
@@ -894,6 +925,8 @@ export default function CalendarModule({ persona }) {
     dayStartMin,
     dayEndMin,
     onEmptySlotClick: openScheduleSlot,
+    weeklyHours,
+    intervalMinutes: viewPrefs.intervalMinutes,
   }
 
   const calendarGrid = (

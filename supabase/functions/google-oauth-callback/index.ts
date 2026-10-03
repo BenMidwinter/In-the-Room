@@ -17,9 +17,15 @@ Deno.serve(async (req) => {
     if (oauthError) return redirect(siteUrl, { google: 'error', message: oauthError })
     if (!code || !state) return redirect(siteUrl, { google: 'error', message: 'Missing code/state' })
 
-    const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')!
-    const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')!
-    const encKey = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY')!
+    const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')
+    const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')
+    const encKey = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!clientId || !clientSecret || !encKey) {
+      return redirect(siteUrl, {
+        google: 'error',
+        message: 'Missing GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, or CREDENTIALS_ENCRYPTION_KEY secrets',
+      })
+    }
     const [stateBody, sig] = state.split('.')
     const expected = await hmacSign(encKey, stateBody)
     if (sig !== expected) return redirect(siteUrl, { google: 'error', message: 'Invalid state' })

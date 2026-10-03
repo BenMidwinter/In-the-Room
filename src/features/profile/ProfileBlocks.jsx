@@ -5,6 +5,7 @@ import { profileInitials } from '../../lib/clinicianAvailability'
 import PrivatePracticeBrandingPanel from './PrivatePracticeBrandingPanel'
 import ProfileAvailabilityPanel from './ProfileAvailabilityPanel'
 import { getSupabase } from '../../lib/supabase/client'
+import { useToast } from '../../components/ui'
 
 const EMPTY_REGISTRATION = { body: '', number: '' }
 
@@ -25,6 +26,7 @@ function normalizeRegistrations(profile) {
 }
 
 export function ProfileIdentityBlock({ session, onSaved }) {
+  const toast = useToast()
   const [fullName, setFullName] = useState('')
   const [registrations, setRegistrations] = useState([{ ...EMPTY_REGISTRATION }])
   const [professionalTitle, setProfessionalTitle] = useState('')
@@ -116,6 +118,7 @@ export function ProfileIdentityBlock({ session, onSaved }) {
         })
         if (saveError) throw saveError
       }
+      toast.saved()
       onSaved?.()
     } catch (err) {
       setError(err.message || 'Could not save profile')

@@ -11,6 +11,7 @@ import {
   getSettingsForLocation,
   mergeSettingsForLocations,
 } from '../../lib/clinicianAvailability'
+import { useToast } from '../../components/ui'
 function formatMemberRole(role) {
   return String(role || '').replace(/_/g, ' ')
 }
@@ -97,6 +98,7 @@ function LocationAvailabilityEditor({
 }
 
 export default function ProfileAvailabilityPanel({ userId, onSaved }) {
+  const toast = useToast()
   const locations = useMemo(() => getClinicianLocationsForUser(userId), [userId])
   const services = useMemo(() => getAppointmentOrgServices(), [])
   const locationIds = useMemo(() => locations.map(loc => loc.id), [locations])
@@ -109,7 +111,6 @@ export default function ProfileAvailabilityPanel({ userId, onSaved }) {
   const [activeLocationId, setActiveLocationId] = useState('')
   const [overlapNote, setOverlapNote] = useState('')
   const [error, setError] = useState('')
-  const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -129,7 +130,6 @@ export default function ProfileAvailabilityPanel({ userId, onSaved }) {
     setSettings(prev => prev.map(setting => (
       setting.workplace_id === workplaceId ? updater(setting) : setting
     )))
-    setSaved(false)
   }
 
   const handleDayChange = (dayKey, patch) => {
@@ -141,7 +141,6 @@ export default function ProfileAvailabilityPanel({ userId, onSaved }) {
       patch,
     )
     setSettings(resolved)
-    setSaved(false)
     if (cleared.length) {
       const dayLabel = WEEKDAYS.find(d => d.key === dayKey)?.label || dayKey
       const clearedNames = [...new Set(cleared.map(c => locationNameById[c.workplace_id]))]
@@ -172,8 +171,8 @@ export default function ProfileAvailabilityPanel({ userId, onSaved }) {
     setSaving(true)
     try {
       updateClinicianWorkplaceSettings(userId, settings, locationIds)
-      setSaved(true)
       setOverlapNote('')
+      toast.saved()
       onSaved?.()
     } catch (err) {
       setError(err.message)
@@ -228,7 +227,6 @@ export default function ProfileAvailabilityPanel({ userId, onSaved }) {
         </p>
       )}
       {error && <p className="form-error">{error}</p>}
-      {saved && <p className="text-small text-muted">Availability and services saved.</p>}
 
       <div className="form-actions">
         <button type="submit" className="primary" disabled={saving}>

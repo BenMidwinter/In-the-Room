@@ -5,9 +5,12 @@ import {
   buildClinicianLocations,
   defaultWeeklyHours,
   formatWeeklyHoursSummary,
+  getAvailabilityBounds,
+  isMinutesWithinAvailability,
   mergeSettingsForLocations,
   normalizeWorkplaceSettings,
   resolveOfferedServiceNames,
+  unionWeeklyHours,
 } from './clinicianAvailability'
 
 describe('clinicianAvailability', () => {
@@ -78,5 +81,27 @@ describe('clinicianAvailability', () => {
     expect(cleared).toHaveLength(1)
     expect(cleared[0].workplace_id).toBe('wp-east')
     expect(settings.find(s => s.workplace_id === 'wp-east')?.weekly_hours.tue.enabled).toBe(false)
+  })
+
+  it('unions hours across locations and derives calendar bounds from earliest start', () => {
+    const union = unionWeeklyHours([
+      {
+        workplace_id: 'private',
+        weekly_hours: {
+          ...defaultWeeklyHours(),
+          mon: { enabled: true, start: '10:00', end: '16:00' },
+          wed: { enabled: true, start: '08:00', end: '12:00' },
+          sat: { enabled: false, start: '09:00', end: '17:00' },
+          sun: { enabled: false, start: '09:00', end: '17:00' },
+        },
+        service_ids: [],
+      },
+    ])
+    const bounds = getAvailabilityBounds(union)
+    expect(bounds?.startHour).toBe(8)
+    expect(bounds?.endHour).toBe(17)
+    expect(isMinutesWithinAvailability(union, '2026-10-07', 8 * 60)).toBe(true) // Wed
+    expect(isMinutesWithinAvailability(union, '2026-10-07', 13 * 60)).toBe(false)
+    expect(isMinutesWithinAvailability(union, '2026-10-05', 9 * 60)).toBe(false) // Mon before 10
   })
 })

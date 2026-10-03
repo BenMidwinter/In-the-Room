@@ -222,3 +222,95 @@ export function profileInitials(fullName: string | null | undefined): string {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
+
+const YMD_DAY_KEYS: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+/** Local calendar day key for an ISO `YYYY-MM-DD` date string. */
+export function dayKeyFromYmd(ymd: string): DayKey {
+  const [y, m, d] = String(ymd).split('-').map(Number)
+  const date = new Date(y, (m || 1) - 1, d || 1)
+  return YMD_DAY_KEYS[date.getDay()] || 'mon'
+}
+
+/**
+ * Union of working hours across locations: a day is enabled if any location
+ * is open; start/end span the earliest open and latest close that day.
+ */
+export function unionWeeklyHours(
+  settings: WorkplaceClinicianSetting[],
+): Record<DayKey, DayHours> {
+  const result = defaultWeeklyHours()
+  for (const day of WEEKDAYS) {
+    let enabled = false
+    let startMin = Number.POSITIVE_INFINITY
+    let endMin = Number.NEGATIVE_INFINITY
+    for (const setting of settings) {
+      const hours = setting.weekly_hours?.[day.key]
+      if (!hours?.enabled) continue
+      enabled = true
+      startMin = Math.min(startMin, timeToMinutes(hours.start))
+      endMin = Math.max(endMin, timeToMinutes(hours.end))
+    }
+    if (!enabled || !Number.isFinite(startMin) || !Number.isFinite(endMin) || endMin <= startMin) {
+      result[day.key] = defaultDayHours(false)
+      continue
+    }
+    result[day.key] = {
+      enabled: true,
+      start: `${String(Math.floor(startMin / 60)).padStart(2, '0')}:${String(startMin % 60).padStart(2, '0')}`,
+      end: `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`,
+    }
+  }
+  return result
+}
+
+export interface AvailabilityBounds {
+  startHour: number
+  endHour: number
+  earliestStartMin: number
+  latestEndMin: number
+}
+
+/**
+ * Calendar window from the earliest start / latest end across all enabled days
+ * (e.g. one Wednesday 08:00 start pulls the grid from 8am).
+ */
+export function getAvailabilityBounds(
+  weeklyHours: Record<DayKey, DayHours> | null | undefined,
+): AvailabilityBounds | null {
+  if (!weeklyHours) return null
+  let earliest = Number.POSITIVE_INFINITY
+  let latest = Number.NEGATIVE_INFINITY
+  for (const day of WEEKDAYS) {
+    const hours = weeklyHours[day.key]
+    if (!hours?.enabled) continue
+    const start = timeToMinutes(hours.start)
+    const end = timeToMinutes(hours.end)
+    if (end <= start) continue
+    earliest = Math.min(earliest, start)
+    latest = Math.max(latest, end)
+  }
+  if (!Number.isFinite(earliest) || !Number.isFinite(latest) || latest <= earliest) return null
+  return {
+    earliestStartMin: earliest,
+    latestEndMin: latest,
+    startHour: Math.floor(earliest / 60),
+    endHour: Math.max(Math.floor(earliest / 60) + 1, Math.ceil(latest / 60)),
+  }
+}
+
+/** True when `slotStartMin` falls inside union hours for that calendar day. */
+export function isMinutesWithinAvailability(
+  weeklyHours: Record<DayKey, DayHours> | null | undefined,
+  ymd: string,
+  slotStartMin: number,
+  slotEndMin = slotStartMin + 1,
+): boolean {
+  if (!weeklyHours) return true
+  const hours = weeklyHours[dayKeyFromYmd(ymd)]
+  if (!hours?.enabled) return false
+  const start = timeToMinutes(hours.start)
+  const end = timeToMinutes(hours.end)
+  if (end <= start) return false
+  return slotStartMin >= start && slotEndMin <= end
+}

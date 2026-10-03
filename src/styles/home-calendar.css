@@ -1665,6 +1665,17 @@ button.calendar-event {
   transform: none;
 }
 
+.calendar-col__slot--unavailable,
+.calendar-col__slot--unavailable.ck-time-slot {
+  background: color-mix(in srgb, var(--txt-muted) 10%, var(--bg-zone-muted, var(--bg-zone)));
+  opacity: 0.72;
+}
+
+.calendar-col__slot--unavailable.ck-time-slot:hover {
+  background: color-mix(in srgb, var(--col-primary) 8%, var(--bg-zone-muted, var(--bg-zone)));
+  opacity: 0.9;
+}
+
 .calendar-col__events {
   position: absolute;
   inset: 0;

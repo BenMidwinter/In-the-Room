@@ -6,16 +6,11 @@ import {
   listCalendarConnections,
   listCalendarFeedTokens,
 } from '../../lib/supabase/calendarConnectionsRepo'
-
-async function invokeFunction(name, options = {}) {
-  const supabase = getSupabase()
-  if (!supabase) throw new Error('Supabase is not configured')
-  const { data, error } = await supabase.functions.invoke(name, options)
-  if (error) throw error
-  return data
-}
+import { invokeFunction } from '../../lib/supabase/invokeFunction'
+import { useToast } from '../../components/ui'
 
 export default function IntegrationsSettingsPage() {
+  const toast = useToast()
   const [params] = useSearchParams()
   const [connections, setConnections] = useState([])
   const [feeds, setFeeds] = useState([])
@@ -43,6 +38,7 @@ export default function IntegrationsSettingsPage() {
   useEffect(() => {
     if (params.get('google') === 'connected') {
       setInfo('Google Calendar connected.')
+      toast.saved('Google connected')
       reload().catch(() => {})
     }
     if (params.get('google') === 'error') {
@@ -77,7 +73,7 @@ export default function IntegrationsSettingsPage() {
         .eq('id', google.id)
       if (updateError) throw updateError
       await reload()
-      setInfo('Integration settings saved.')
+      toast.saved()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -95,6 +91,7 @@ export default function IntegrationsSettingsPage() {
       setFeedUrl(data.url)
       setInfo('Private calendar feed created. Add this URL in Google Calendar → From URL.')
       await reload()
+      toast.saved()
     } catch (err) {
       setError(err.message)
     } finally {
@@ -109,6 +106,7 @@ export default function IntegrationsSettingsPage() {
       const data = await invokeFunction('google-calendar-sync', { method: 'POST', body: {} })
       setInfo(`Sync complete. Pulled ${data?.pulled ?? 0} busy blocks.`)
       await reload()
+      toast.saved('Synced')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -184,7 +182,17 @@ export default function IntegrationsSettingsPage() {
           </div>
         )}
 
-        {error && <p className="auth-page__alert" role="alert">{error}</p>}
+        {error && (
+          <p className="auth-page__alert" role="alert">
+            {error}
+            {/GOOGLE_OAUTH|SITE_URL|CREDENTIALS_ENCRYPTION/i.test(error) && (
+              <>
+                {' '}Set these as Supabase Edge Function secrets, and register the redirect URI
+                {' '}<code>…/functions/v1/google-oauth-callback</code> in Google Cloud.
+              </>
+            )}
+          </p>
+        )}
         {info && <p className="auth-page__info">{info}</p>}
       </SettingsSectionCard>
 

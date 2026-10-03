@@ -20,11 +20,19 @@ Deno.serve(async (req) => {
     if (error || !user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
     const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')
-    const siteUrl = Deno.env.get('SITE_URL')
-    const encKey = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY')
-    if (!clientId || !siteUrl || !encKey) {
+    const siteUrl = Deno.env.get('SITE_URL') || req.headers.get('origin') || ''
+    const encKey = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+
+    const missing: string[] = []
+    if (!clientId) missing.push('GOOGLE_OAUTH_CLIENT_ID')
+    if (!Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')) missing.push('GOOGLE_OAUTH_CLIENT_SECRET')
+    if (!siteUrl) missing.push('SITE_URL')
+    if (!Deno.env.get('CREDENTIALS_ENCRYPTION_KEY') && !Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+      missing.push('CREDENTIALS_ENCRYPTION_KEY')
+    }
+    if (missing.length) {
       return jsonResponse({
-        error: 'Missing GOOGLE_OAUTH_CLIENT_ID, SITE_URL, or CREDENTIALS_ENCRYPTION_KEY secrets',
+        error: `Missing Edge Function secrets: ${missing.join(', ')}. Set them in the Supabase dashboard (Project Settings → Edge Functions → Secrets).`,
       }, 500)
     }
 
@@ -39,7 +47,7 @@ Deno.serve(async (req) => {
     const state = `${stateBody}.${sig}`
 
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
-    url.searchParams.set('client_id', clientId)
+    url.searchParams.set('client_id', clientId!)
     url.searchParams.set('redirect_uri', redirectUri)
     url.searchParams.set('response_type', 'code')
     url.searchParams.set('scope', SCOPES)

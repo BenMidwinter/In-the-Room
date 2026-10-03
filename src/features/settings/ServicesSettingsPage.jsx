@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { SettingsSectionCard } from './SettingsPlaceholders'
-import { listServices, upsertService } from '../../lib/supabase/servicesRepo'
+import { deleteService, listServices, upsertService } from '../../lib/supabase/servicesRepo'
 import { isSupabaseConfigured } from '../../lib/supabase/client'
 import { writeAuditEvent } from '../../lib/supabase/audit'
+import { useConfirm, useToast } from '../../components/ui'
 
 const EMPTY_FORM = {
+  id: '',
   name: '',
   slug: '',
   service_type: 'appointment',
@@ -25,11 +27,30 @@ function slugify(value) {
     .replace(/^_|_$/g, '')
 }
 
+function toForm(service) {
+  return {
+    id: service.id,
+    name: service.name || '',
+    slug: service.slug || '',
+    service_type: service.service_type || 'appointment',
+    default_duration_minutes: service.default_duration_minutes ?? 50,
+    follow_on_service_id: service.follow_on_service_id || '',
+    follow_on_duration_minutes: service.follow_on_duration_minutes ?? 10,
+    buffer_minutes: service.buffer_minutes ?? 0,
+    color: service.color || '#263e34',
+    create_meet_link: Boolean(service.create_meet_link),
+    is_active: service.is_active !== false,
+  }
+}
+
 export default function ServicesSettingsPage() {
+  const toast = useToast()
+  const confirm = useConfirm()
   const [services, setServices] = useState([])
   const [form, setForm] = useState(EMPTY_FORM)
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
+  const editing = Boolean(form.id)
 
   const reload = async () => {
     if (!isSupabaseConfigured()) return
@@ -40,7 +61,9 @@ export default function ServicesSettingsPage() {
     reload().catch((err) => setError(err.message))
   }, [])
 
-  const supportServices = services.filter((s) => s.service_type === 'support' || s.service_type === 'admin')
+  const supportServices = services.filter(
+    (s) => (s.service_type === 'support' || s.service_type === 'admin') && s.id !== form.id,
+  )
 
   const onSubmit = async (event) => {
     event.preventDefault()
@@ -49,6 +72,7 @@ export default function ServicesSettingsPage() {
     try {
       const slug = form.slug || slugify(form.name)
       await upsertService({
+        ...(form.id ? { id: form.id } : {}),
         name: form.name.trim(),
         slug,
         service_type: form.service_type,
@@ -60,10 +84,43 @@ export default function ServicesSettingsPage() {
         buffer_minutes: Number(form.buffer_minutes) || 0,
         color: form.color || null,
         create_meet_link: Boolean(form.create_meet_link),
-        is_active: true,
+        is_active: form.is_active !== false,
       })
       setForm(EMPTY_FORM)
       await reload()
+      toast.saved()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const startEdit = (service) => {
+    setForm(toForm(service))
+    setError(null)
+  }
+
+  const cancelEdit = () => {
+    setForm(EMPTY_FORM)
+    setError(null)
+  }
+
+  const removeService = async (service) => {
+    const ok = await confirm({
+      title: 'Delete service?',
+      message: `Remove “${service.name}”? Existing appointments keep their times; this only removes the service type.`,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    setBusy(true)
+    setError(null)
+    try {
+      await deleteService(service.id)
+      if (form.id === service.id) setForm(EMPTY_FORM)
+      await reload()
+      toast.saved('Deleted')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -93,6 +150,7 @@ export default function ServicesSettingsPage() {
         metadata: { create_meet_link: !service.create_meet_link },
       })
       await reload()
+      toast.saved()
     } catch (err) {
       setError(err.message)
     }
@@ -121,16 +179,24 @@ export default function ServicesSettingsPage() {
                   {service.follow_on_service_id ? ` + follow-on ${service.follow_on_duration_minutes || '?'}m` : ''}
                 </span>
               </div>
-              {service.service_type === 'appointment' && (
-                <label className="settings-service-list__meet">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(service.create_meet_link)}
-                    onChange={() => toggleMeet(service)}
-                  />
-                  Google Meet when booked
-                </label>
-              )}
+              <div className="settings-service-list__actions">
+                {service.service_type === 'appointment' && (
+                  <label className="settings-service-list__meet">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(service.create_meet_link)}
+                      onChange={() => toggleMeet(service)}
+                    />
+                    Google Meet when booked
+                  </label>
+                )}
+                <button type="button" className="btn btn-secondary" onClick={() => startEdit(service)} disabled={busy}>
+                  Edit
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => removeService(service)} disabled={busy}>
+                  Delete
+                </button>
+              </div>
             </li>
           ))}
           {services.length === 0 && (
@@ -139,7 +205,10 @@ export default function ServicesSettingsPage() {
         </ul>
       </SettingsSectionCard>
 
-      <SettingsSectionCard blockId="settings_services_add" title="Add service">
+      <SettingsSectionCard
+        blockId="settings_services_add"
+        title={editing ? 'Edit service' : 'Add service'}
+      >
         <form className="settings-form" onSubmit={onSubmit}>
           <label className="settings-form__field">
             <span>Name</span>
@@ -149,7 +218,7 @@ export default function ServicesSettingsPage() {
               onChange={(e) => setForm((f) => ({
                 ...f,
                 name: e.target.value,
-                slug: f.slug || slugify(e.target.value),
+                slug: editing ? f.slug : (f.slug || slugify(e.target.value)),
               }))}
               required
             />
@@ -216,9 +285,16 @@ export default function ServicesSettingsPage() {
             </>
           )}
           {error && <p className="auth-page__alert" role="alert">{error}</p>}
-          <button type="submit" className="btn btn-primary" disabled={busy || !isSupabaseConfigured()}>
-            {busy ? 'Saving…' : 'Add service'}
-          </button>
+          <div className="settings-form__actions">
+            {editing && (
+              <button type="button" className="btn btn-secondary" onClick={cancelEdit} disabled={busy}>
+                Cancel
+              </button>
+            )}
+            <button type="submit" className="btn btn-primary" disabled={busy || !isSupabaseConfigured()}>
+              {busy ? 'Saving…' : editing ? 'Save service' : 'Add service'}
+            </button>
+          </div>
         </form>
       </SettingsSectionCard>
     </div>

@@ -430,3 +430,76 @@ a:hover { text-decoration: underline; }
   }
 }
 
+/* ── App toasts (useToast) ─────────────────────────────────────────────── */
+
+.app-toast-region {
+  pointer-events: none;
+  position: fixed;
+  right: 1rem;
+  top: 1rem;
+  z-index: 1000;
+  display: flex;
+  width: min(22rem, calc(100vw - 2rem));
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.app-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-left-width: 4px;
+  background: var(--bg-surface);
+  padding: 0.85rem 1rem;
+  color: var(--txt-body);
+  box-shadow: var(--shadow-md);
+}
+
+.app-toast--info {
+  border-left-color: var(--col-primary);
+}
+
+.app-toast--success {
+  border-left-color: var(--col-primary-dark);
+}
+
+.app-toast--saved {
+  border-left-color: var(--col-accent);
+}
+
+.app-toast--error {
+  border-left-color: var(--col-secondary);
+}
+
+.app-toast__message {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.app-toast--saved .app-toast__message {
+  font-family: var(--font-head);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--col-accent);
+  line-height: 1.25;
+}
+
+.app-toast__dismiss {
+  margin: -0.25rem -0.25rem -0.25rem 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  padding: 0.15rem 0.35rem;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--txt-muted);
+}
+
+.app-toast__dismiss:hover {
+  color: var(--txt-body);
+}
+

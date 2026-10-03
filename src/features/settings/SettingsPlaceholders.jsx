@@ -1,6 +1,4 @@
-import { useState } from 'react'
 import RoleBlockShell from '../../components/RoleBlockShell'
-import { getSupabase } from '../../lib/supabase/client'
 
 export function SettingsSectionCard({ blockId, title, children }) {
   return (
@@ -42,81 +40,6 @@ export function TemplateKindPage({ kind, title, blurb }) {
         <p className="text-small text-muted" style={{ marginBottom: 0 }}>
           Templates persist to <code>templates</code> (<code>kind = {kind}</code>). Editor UX ships with the RTE workstream.
         </p>
-      </SettingsSectionCard>
-    </div>
-  )
-}
-
-export function PasswordSettingsPage() {
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [message, setMessage] = useState(null)
-  const [error, setError] = useState(null)
-  const [busy, setBusy] = useState(false)
-
-  const onSubmit = async (event) => {
-    event.preventDefault()
-    setMessage(null)
-    setError(null)
-    if (password.length < 8) {
-      setError('Use at least 8 characters.')
-      return
-    }
-    if (password !== confirm) {
-      setError('Passwords do not match.')
-      return
-    }
-    const supabase = getSupabase()
-    if (!supabase) {
-      setError('Supabase is not configured.')
-      return
-    }
-    setBusy(true)
-    const { error: updateError } = await supabase.auth.updateUser({ password })
-    setBusy(false)
-    if (updateError) {
-      setError(updateError.message)
-      return
-    }
-    setPassword('')
-    setConfirm('')
-    setMessage('Password updated.')
-  }
-
-  return (
-    <div className="role-block-stack">
-      <SettingsSectionCard blockId="settings_password" title="Password">
-        <form className="settings-form" onSubmit={onSubmit}>
-          <label className="settings-form__field">
-            <span>New password</span>
-            <input
-              className="paper-input"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-            />
-          </label>
-          <label className="settings-form__field">
-            <span>Confirm password</span>
-            <input
-              className="paper-input"
-              type="password"
-              autoComplete="new-password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              minLength={8}
-            />
-          </label>
-          {error && <p className="auth-page__alert" role="alert">{error}</p>}
-          {message && <p className="auth-page__info">{message}</p>}
-          <button type="submit" className="btn btn-primary" disabled={busy}>
-            {busy ? 'Saving…' : 'Update password'}
-          </button>
-        </form>
       </SettingsSectionCard>
     </div>
   )
