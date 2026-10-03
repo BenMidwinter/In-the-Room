@@ -51,6 +51,7 @@ export type AppAppointment = {
   other_info: string
   block_role?: string
   parent_appointment_id?: string | null
+  series_id?: string | null
   created_at: string
   updated_at: string
   meet_url?: string
@@ -91,6 +92,7 @@ function toAppAppointment(row: {
   ends_at: string
   block_role?: string
   parent_appointment_id?: string | null
+  series_id?: string | null
   encrypted_payload: Json | null
   created_at: string
   updated_at: string
@@ -122,6 +124,7 @@ function toAppAppointment(row: {
     other_info: extras.other_info || '',
     block_role: row.block_role,
     parent_appointment_id: row.parent_appointment_id ?? null,
+    series_id: row.series_id ?? null,
     created_at: row.created_at.slice(0, 10),
     updated_at: row.updated_at.slice(0, 10),
   }
@@ -166,7 +169,7 @@ export async function listAppointmentsFromSupabase(): Promise<AppAppointment[]> 
 
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
     .order('starts_at', { ascending: false })
 
   if (error) throw error
@@ -198,7 +201,7 @@ export async function fetchAppointment(appointmentId: string): Promise<AppAppoin
   if (!supabase) return null
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
     .eq('id', appointmentId)
     .maybeSingle()
   if (error) throw error
@@ -293,7 +296,11 @@ export async function upsertAppointmentRemote(
     end_time: endTime,
   }
 
-  const selectCols = 'id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, encrypted_payload, created_at, updated_at'
+  const selectCols = 'id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at'
+
+  const seriesId = payload.series_id && /^[0-9a-f-]{36}$/i.test(String(payload.series_id))
+    ? String(payload.series_id)
+    : undefined
 
   const row = {
     owner_id: userId,
@@ -307,7 +314,8 @@ export async function upsertAppointmentRemote(
     ends_at: endsAt,
     attendance_status: (payload.attendance_status as string | null | undefined) ?? null,
     encrypted_payload: extras as unknown as Json,
-    block_role: 'client_session',
+    block_role: 'client_session' as const,
+    ...(seriesId ? { series_id: seriesId } : {}),
   }
 
   if (payload.id && /^[0-9a-f-]{36}$/i.test(String(payload.id))) {
@@ -422,7 +430,7 @@ async function createFollowOnBlock(opts: {
       encrypted_payload: extras as unknown as Json,
       block_role: blockRole,
     })
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
     .single()
 
   if (error) throw error
@@ -438,4 +446,65 @@ export async function saveAppointmentForUser(
     return saveLocalAppointment(payload, userId) as AppAppointment
   }
   return upsertAppointmentRemote(payload, userId)
+}
+
+/** Delete primary appointments by id (follow-on children cascade via FK). */
+export async function deleteAppointmentsByIds(ids: string[]): Promise<number> {
+  const unique = [...new Set(ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id)))]
+  if (!unique.length) return 0
+
+  const purgeLocal = (ids: string[]) => {
+    const remove = new Set(ids)
+    for (const row of [...db.appointments]) {
+      const parentId = String((row as { parent_appointment_id?: string }).parent_appointment_id || '')
+      if (remove.has(String(row.id)) || remove.has(parentId)) remove.add(String(row.id))
+    }
+    const kept = db.appointments.filter((a) => !remove.has(String(a.id)))
+    db.appointments.length = 0
+    for (const row of kept) db.appointments.push(row)
+    return remove.size
+  }
+
+  if (!isSupabaseConfigured()) {
+    const before = db.appointments.length
+    purgeLocal(unique)
+    return before - db.appointments.length
+  }
+
+  const supabase = getSupabase()
+  if (!supabase) return 0
+  const { error, count } = await supabase
+    .from('appointments')
+    .delete({ count: 'exact' })
+    .in('id', unique)
+  if (error) throw error
+
+  purgeLocal(unique)
+  return count ?? unique.length
+}
+
+/**
+ * Apply schedule/service fields from `payload` onto many primary appointments,
+ * keeping each row's own session_date (except the anchor id, which can move).
+ */
+export async function updateAppointmentsInScope(
+  ids: string[],
+  payload: Record<string, unknown>,
+  userId: string,
+  anchorId: string,
+): Promise<AppAppointment | null> {
+  let last: AppAppointment | null = null
+  for (const id of ids) {
+    const existing = db.appointments.find((a) => a.id === id) as AppAppointment | undefined
+    const sessionDate = id === anchorId
+      ? String(payload.session_date || existing?.session_date || '')
+      : String(existing?.session_date || payload.session_date || '')
+    last = await saveAppointmentForUser({
+      ...payload,
+      id,
+      session_date: sessionDate,
+      dates: undefined,
+    }, userId)
+  }
+  return last
 }

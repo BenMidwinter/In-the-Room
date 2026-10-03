@@ -20,6 +20,12 @@ import { canAssignAppointmentClinician } from '../lib/permissions'
 import { CALENDAR_OWNER_ALL, CALENDAR_OWNER_ALL_TEAM } from '../lib/calendarOwners'
 import { listServices } from '../lib/supabase/servicesRepo'
 import { isSupabaseConfigured } from '../lib/supabase/client'
+import FormOverlay from './FormOverlay'
+import SeriesScopeDialog from './SeriesScopeDialog'
+import {
+  appointmentBelongsToSeries,
+  countSeriesScope,
+} from '../lib/appointmentSeries'
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ')
@@ -433,13 +439,25 @@ function invoiceTag(status) {
   return <DataTag variant="draft">Draft</DataTag>
 }
 
-function EventDrawerActions({ onEdit, onBookAnother, onRecurring, locked = false, kind = 'standard' }) {
+function EventDrawerActions({
+  onEdit,
+  onBookAnother,
+  onRecurring,
+  onDelete,
+  locked = false,
+  kind = 'standard',
+}) {
   if (kind === 'busy' || kind === 'support') {
     return (
       <section className="ck-event-drawer__actions">
         <button type="button" className="secondary" onClick={onEdit} disabled={locked}>
           Edit block
         </button>
+        {onDelete && (
+          <button type="button" className="secondary" onClick={onDelete} disabled={locked}>
+            Delete
+          </button>
+        )}
       </section>
     )
   }
@@ -455,6 +473,11 @@ function EventDrawerActions({ onEdit, onBookAnother, onRecurring, locked = false
       <button type="button" className="secondary" onClick={onRecurring}>
         Recurring
       </button>
+      {onDelete && (
+        <button type="button" className="secondary" onClick={onDelete} disabled={locked}>
+          Delete
+        </button>
+      )}
     </section>
   )
 }
@@ -728,6 +751,7 @@ export function EventDrawer({
   onEdit,
   onBookAnother,
   onRecurring,
+  onDelete,
   locked: lockedProp,
   waitlistSuggestion,
   fundingWarning,
@@ -804,6 +828,7 @@ export function EventDrawer({
         onEdit={() => onEdit?.(appointment)}
         onBookAnother={() => onBookAnother?.(appointment)}
         onRecurring={() => onRecurring?.(appointment)}
+        onDelete={onDelete ? () => onDelete?.(appointment) : undefined}
       />
 
       {kind === 'group' && (
@@ -837,11 +862,19 @@ export function ScheduleSessionPanel({
   calendarOwner = null,
   onSave,
   onCancel,
+  onDelete,
   saving = false,
+  deleting = false,
   showDateField = false,
+  /** `pane` = calendar side accessory; `overlay` = centred modal editor */
+  presentation = 'pane',
+  lockedClient = false,
 }) {
   const seed = appointmentFormSeed(appointment) || appointmentFormSeed(prefill)
   const isEdit = Boolean(appointment?.id)
+  const inSeries = isEdit && appointmentBelongsToSeries(appointment, allAppointments)
+  const [pendingPayload, setPendingPayload] = useState(null)
+  const [scopeAction, setScopeAction] = useState(null) // 'edit' | 'delete' | null
 
   const workplaceClinicians = useMemo(
     () => (myWorkplace?.id ? getWorkplaceClinicians(myWorkplace.id) : []),
@@ -1005,13 +1038,16 @@ export function ScheduleSessionPanel({
     [draftAppointment, conflictPool],
   )
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    if (!clientId || !serviceId || finalDuration <= 0) return
+  const buildPayload = () => {
     const bookDates = recurringWeekly && !isEdit
       ? Array.from({ length: recurWeeks }, (_, i) => addDaysYmd(sessionDate, i * 7))
       : undefined
-    onSave?.({
+    const seriesId = bookDates?.length > 1
+      ? (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `series-${Date.now()}`)
+      : (appointment?.series_id || undefined)
+    return {
       ...(appointment?.id ? { id: appointment.id } : {}),
       client_id: clientId,
       session_date: sessionDate,
@@ -1020,26 +1056,42 @@ export function ScheduleSessionPanel({
       duration_minutes: finalDuration,
       therapy_modality: selectedService?.slug || modality || 'music_therapy',
       service_id: serviceId || null,
+      series_id: seriesId || undefined,
       location: location.trim(),
       other_info: otherInfo.trim(),
       clinician_id: showClinicianPicker ? clinicianId : sessionUserId,
       appointment_type: appointment?.appointment_type || prefill?.appointment_type || 'one_to_one',
       create_meet_link: Boolean(createMeetLink && selectedService?.create_meet_link),
       dates: bookDates,
-    })
+    }
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!clientId || !serviceId || finalDuration <= 0) return
+    const payload = buildPayload()
+    if (isEdit && inSeries) {
+      setPendingPayload(payload)
+      setScopeAction('edit')
+      return
+    }
+    onSave?.(payload, 'this')
+  }
+
+  const handleDeleteClick = () => {
+    if (!isEdit || !onDelete) return
+    if (inSeries) {
+      setPendingPayload(null)
+      setScopeAction('delete')
+      return
+    }
+    onDelete?.(appointment, 'this')
   }
 
   const panelTitle = isEdit ? 'Edit appointment' : prefill ? 'Book another session' : 'Schedule session'
   const showDate = showDateField || isEdit || Boolean(prefill)
   const sessionCount = recurringWeekly && !isEdit ? recurWeeks : 1
-
-  return (
-    <AccessoryPane
-      title={panelTitle}
-      subtitle={`${sessionDate} · ${start}–${computedEnd}`}
-      onClose={onCancel}
-      bodyClassName="ck-schedule-panel"
-    >
+  const formBody = (
       <form className="ck-schedule-form" onSubmit={handleSubmit}>
         {showDate && (
           <div className="form-group">
@@ -1055,43 +1107,47 @@ export function ScheduleSessionPanel({
           </div>
         )}
 
-        <div className="form-group">
-          <label htmlFor="schedule-client-search">Find client</label>
-          <input
-            id="schedule-client-search"
-            type="search"
-            className="paper-input"
-            placeholder="Search your caseload…"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            autoComplete="off"
-          />
-        </div>
+        {!lockedClient && (
+          <>
+            <div className="form-group">
+              <label htmlFor="schedule-client-search">Find client</label>
+              <input
+                id="schedule-client-search"
+                type="search"
+                className="paper-input"
+                placeholder="Search your caseload…"
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                autoComplete="off"
+              />
+            </div>
 
-        <div className="ck-schedule-client-list" role="listbox" aria-label="Assigned clients">
-          {filteredClients.length === 0 && (
-            <p className="text-small text-muted">No clients match — try another name or school.</p>
-          )}
-          {filteredClients.map(client => (
-            <button
-              key={client.id}
-              type="button"
-              role="option"
-              aria-selected={clientId === client.id}
-              className={`ck-schedule-client${clientId === client.id ? ' ck-schedule-client--active' : ''}`}
-              onClick={() => setClientId(client.id)}
-            >
-              <span className="ck-schedule-client__name">{client.real_name}</span>
-              <span className="ck-schedule-client__meta">
-                {client.school || client.workplace_name || 'Caseload'}
-              </span>
-            </button>
-          ))}
-        </div>
+            <div className="ck-schedule-client-list" role="listbox" aria-label="Assigned clients">
+              {filteredClients.length === 0 && (
+                <p className="text-small text-muted">No clients match — try another name or school.</p>
+              )}
+              {filteredClients.map(client => (
+                <button
+                  key={client.id}
+                  type="button"
+                  role="option"
+                  aria-selected={clientId === client.id}
+                  className={`ck-schedule-client${clientId === client.id ? ' ck-schedule-client--active' : ''}`}
+                  onClick={() => setClientId(client.id)}
+                >
+                  <span className="ck-schedule-client__name">{client.real_name}</span>
+                  <span className="ck-schedule-client__meta">
+                    {client.school || client.workplace_name || 'Caseload'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {selectedClient && (
           <p className="text-small ck-schedule-selected">
-            Selected: <strong>{selectedClient.real_name}</strong>
+            {lockedClient ? 'Client' : 'Selected'}: <strong>{selectedClient.real_name}</strong>
           </p>
         )}
 
@@ -1235,13 +1291,64 @@ export function ScheduleSessionPanel({
         )}
 
         <div className="form-actions">
-          <button type="submit" className="primary" disabled={!clientId || !serviceId || saving || finalDuration <= 0}>
+          <button type="submit" className="primary" disabled={!clientId || !serviceId || saving || deleting || finalDuration <= 0}>
             {saving ? 'Saving…' : conflicts.length > 0 && !isEdit ? `Book ${sessionCount} anyway` : isEdit ? 'Save changes' : sessionCount > 1 ? `Book ${sessionCount} sessions` : 'Book session'}
           </button>
+          {isEdit && onDelete && (
+            <button type="button" className="secondary" onClick={handleDeleteClick} disabled={saving || deleting}>
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          )}
           <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
         </div>
       </form>
-    </AccessoryPane>
+  )
+
+  const scopeDialog = scopeAction ? (
+    <SeriesScopeDialog
+      action={scopeAction}
+      onCancel={() => { setScopeAction(null); setPendingPayload(null) }}
+      countForScope={(scope) => countSeriesScope(appointment, allAppointments, scope)}
+      onSelect={(scope) => {
+        const action = scopeAction
+        const payload = pendingPayload
+        setScopeAction(null)
+        setPendingPayload(null)
+        if (action === 'delete') onDelete?.(appointment, scope)
+        else if (payload) onSave?.(payload, scope)
+      }}
+    />
+  ) : null
+
+  if (presentation === 'overlay') {
+    return (
+      <>
+        <FormOverlay
+          title={panelTitle}
+          eyebrow="Appointment"
+          meta={`${sessionDate} · ${start}–${computedEnd}`}
+          onClose={onCancel}
+          size="md"
+        >
+          <div className="ck-schedule-panel">{formBody}</div>
+        </FormOverlay>
+        {scopeDialog}
+      </>
+    )
+  }
+
+  return (
+    <>
+      <AccessoryPane
+        title={panelTitle}
+        subtitle={`${sessionDate} · ${start}–${computedEnd}`}
+        onClose={onCancel}
+        bodyClassName="ck-schedule-panel"
+      >
+        {formBody}
+      </AccessoryPane>
+      {scopeDialog}
+    </>
   )
 }
 
@@ -1266,6 +1373,11 @@ export function RecurringSchedulePanel({
 
   const handleSubmit = (e) => {
     e.preventDefault()
+    const seriesId = dates.length > 1
+      ? (source.series_id || (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `series-${Date.now()}`))
+      : source.series_id || undefined
     onSave?.({
       dates,
       pattern,
@@ -1275,6 +1387,7 @@ export function RecurringSchedulePanel({
       duration_minutes: duration,
       therapy_modality: source.therapy_modality,
       service_id: source.service_id,
+      series_id: seriesId,
       location: source.location || '',
       other_info: source.other_info || appointmentOtherInfo(source),
       appointment_type: source.appointment_type || 'one_to_one',

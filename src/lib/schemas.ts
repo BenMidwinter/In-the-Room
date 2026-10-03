@@ -85,6 +85,7 @@ export const appointmentInputSchema = z
     episode_id: z.string().nullish(),
     clinician_id: z.string().nullish(),
     service_id: z.string().nullish(),
+    series_id: z.string().nullish(),
     session_date: dateString.optional(),
     start_time: timeString.optional(),
     end_time: timeString.optional(),

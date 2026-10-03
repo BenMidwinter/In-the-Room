@@ -71,6 +71,20 @@
   line-height: 1.55;
 }
 
+.settings-services-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.settings-services-toolbar .text-muted {
+  flex: 1 1 16rem;
+  max-width: 40rem;
+}
+
 .settings-service-list {
   list-style: none;
   margin: 0 0 0.5rem;
