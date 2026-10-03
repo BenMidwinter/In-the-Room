@@ -300,9 +300,13 @@ Never store names, note bodies, DOB, or decrypted clinical text in `metadata`.
 ## B. Clinician offers & calendar availability
 
 ### `services`
-What the clinician offers (appointment / admin / busy). Drives calendar colours and bookable modalities.
+What the clinician offers. Drives calendar colours, bookable modalities, and Google/ICS mapping.
 
-- `id`, `owner_id`, `organization_id` null, `service_type`, `name`, `slug`, `description`, `color`, `default_duration_minutes`, `buffer_minutes`, `is_active`, timestamps
+- `service_type`: `appointment` | `support` | `admin` | `busy`
+- `default_duration_minutes` — **client-facing** session length (e.g. 50)
+- `follow_on_service_id` + `follow_on_duration_minutes` — optional auto-attached support activity after the session (e.g. 10 minutes report writing). Client confirms 50; clinician calendar + Google hold 50 + 10.
+- `buffer_minutes` — optional gap after the full pair before the next bookable slot
+- Also: `id`, `owner_id`, `name`, `slug`, `description`, `color`, `is_active`, timestamps
 
 ### `availability_rules`
 Weekly hours + which `service_ids` apply (replaces nested workplace settings for freelance).
@@ -348,8 +352,9 @@ Invariant: at most one `active` episode per client (enforce in app + partial uni
 ### `appointments`
 Hybrid schedule row for the calendar.
 
-- Queryable: `id`, `owner_id`, `client_id` (nullable for admin/busy), `clinician_id`, `episode_id` (nullable but required for clinical client sessions), `service_id`, `appointment_type`, `starts_at`, `ends_at`, `attendance_status`, optional `series_id`, timestamps
+- Queryable: `id`, `owner_id`, `client_id` (nullable for admin/busy/support), `clinician_id`, `episode_id`, `service_id`, `appointment_type`, `starts_at`, `ends_at`, `attendance_status`, `block_role` (`client_session`|`support`|`admin`|`busy`), `parent_appointment_id` (support child → session), optional `series_id`, timestamps
 - `encrypted_payload`: location, session notes, other_info
+- Booking an `appointment` service with `follow_on_service_id` creates two rows: client session + support block.
 
 ## E. Progress notes (within an episode)
 
@@ -487,6 +492,24 @@ Splose combines two mechanisms; we mirror that hybrid:
 - Profile → **Calendar sync** block: Connect Google, manage feed URL, privacy mode, Meet toggle
 - Calendar module overlays `external_calendar_blocks` under practice appointments
 - Appointment save path: write `appointments` → audit/timeline → enqueue push to linked Google calendar when `push_appointments`
+
+### Edge functions (planned)
+
+1. **`calendar-ics-feed`** — public GET `?token=…` validates `calendar_feed_tokens.token_hash`, emits ICS of the clinician’s future `appointments` (+ support/admin/busy) using `push_privacy` / feed `privacy_mode` (default busy-only). No auth cookie; token is the secret.
+2. **`google-oauth-start` / `google-oauth-callback`** — OAuth code flow; stores encrypted refresh token on `calendar_connections`.
+3. **`google-calendar-sync`** — cron/queue worker: pull freeBusy → `external_calendar_blocks`; push `client_session` + `support` (+ admin/busy) as separate Google events (or one busy span) per `appointment_external_links`; optional Meet link when `create_meet_links`.
+
+### Service types → Google mapping
+
+| In the Room `service_type` / `block_role` | Client sees | Clinician calendar | Google (default privacy) |
+|---|---|---|---|
+| `appointment` / `client_session` | 50m session | 50m coloured event | Busy (or service label) |
+| follow-on `support` | nothing extra | 10m support after | Busy immediately after |
+| `admin` | — | admin block | Busy |
+| `busy` | — | personal hold | Busy |
+| inbound Google | — | overlay from `external_calendar_blocks` | source |
+
+Total bookable occupancy for a 50+10 service = 60 minutes (+ `buffer_minutes` before next slot).
 
 ## L. Suggested migration / build order
 

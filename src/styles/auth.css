@@ -1,0 +1,97 @@
+.auth-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1.25rem;
+  background:
+    radial-gradient(ellipse at 20% 0%, color-mix(in srgb, var(--col-primary) 12%, transparent), transparent 55%),
+    linear-gradient(180deg, var(--bg-page), color-mix(in srgb, var(--bg-muted) 70%, var(--bg-page)));
+}
+
+.auth-page__card {
+  width: min(28rem, 100%);
+  padding: 2rem 1.75rem 1.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--elevation-paper-1, none);
+}
+
+.auth-page__brand {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-head);
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--col-accent);
+}
+
+.auth-page__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.45rem;
+}
+
+.auth-page__lead {
+  margin: 0 0 1.5rem;
+  color: var(--txt-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.auth-page__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.auth-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--col-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.auth-page__submit {
+  margin-top: 0.35rem;
+  width: 100%;
+  padding: 0.65rem 1rem;
+}
+
+.auth-page__alert {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-left: 3px solid #b45309;
+  background: color-mix(in srgb, #b45309 8%, var(--bg-surface));
+  color: var(--txt-body);
+  font-size: 0.875rem;
+}
+
+.auth-page__info {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-left: 3px solid var(--col-primary);
+  background: var(--col-primary-light);
+  color: var(--txt-body);
+  font-size: 0.875rem;
+}
+
+.auth-page__switch {
+  margin: 1.25rem 0 0;
+  font-size: 0.875rem;
+  color: var(--txt-muted);
+}
+
+.auth-page__link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--col-primary-dark);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}

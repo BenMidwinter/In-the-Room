@@ -75,6 +75,7 @@ export type Database = {
         Row: {
           appointment_type: string
           attendance_status: string | null
+          block_role: string
           client_id: string | null
           clinician_id: string
           created_at: string
@@ -84,6 +85,7 @@ export type Database = {
           id: string
           organization_id: string | null
           owner_id: string
+          parent_appointment_id: string | null
           series_id: string | null
           service_id: string | null
           starts_at: string
@@ -92,6 +94,7 @@ export type Database = {
         Insert: {
           appointment_type?: string
           attendance_status?: string | null
+          block_role?: string
           client_id?: string | null
           clinician_id: string
           created_at?: string
@@ -101,6 +104,7 @@ export type Database = {
           id?: string
           organization_id?: string | null
           owner_id: string
+          parent_appointment_id?: string | null
           series_id?: string | null
           service_id?: string | null
           starts_at: string
@@ -109,6 +113,7 @@ export type Database = {
         Update: {
           appointment_type?: string
           attendance_status?: string | null
+          block_role?: string
           client_id?: string | null
           clinician_id?: string
           created_at?: string
@@ -118,6 +123,7 @@ export type Database = {
           id?: string
           organization_id?: string | null
           owner_id?: string
+          parent_appointment_id?: string | null
           series_id?: string | null
           service_id?: string | null
           starts_at?: string
@@ -143,6 +149,13 @@ export type Database = {
             columns: ["episode_id"]
             isOneToOne: false
             referencedRelation: "episodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_parent_appointment_id_fkey"
+            columns: ["parent_appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
             referencedColumns: ["id"]
           },
           {
@@ -1309,6 +1322,8 @@ export type Database = {
           created_at: string
           default_duration_minutes: number
           description: string | null
+          follow_on_duration_minutes: number | null
+          follow_on_service_id: string | null
           id: string
           is_active: boolean
           name: string
@@ -1324,6 +1339,8 @@ export type Database = {
           created_at?: string
           default_duration_minutes?: number
           description?: string | null
+          follow_on_duration_minutes?: number | null
+          follow_on_service_id?: string | null
           id?: string
           is_active?: boolean
           name: string
@@ -1339,6 +1356,8 @@ export type Database = {
           created_at?: string
           default_duration_minutes?: number
           description?: string | null
+          follow_on_duration_minutes?: number | null
+          follow_on_service_id?: string | null
           id?: string
           is_active?: boolean
           name?: string
@@ -1348,7 +1367,15 @@ export type Database = {
           slug?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "services_follow_on_service_id_fkey"
+            columns: ["follow_on_service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       templates: {
         Row: {

@@ -2,6 +2,7 @@ import { Routes, Route, Navigate, useParams, Outlet, useSearchParams } from 'rea
 import { useAppClients } from './lib/queries'
 
 import AppLayout from './components/AppLayout'
+import AuthPage from './features/auth/AuthPage'
 import Home from './features/home/HomePage'
 import Calendar from './features/calendar/CalendarPage'
 import ActiveCases from './components/ActiveCases'
@@ -31,6 +32,7 @@ import ProgressNoteLabPage from './features/lab/ProgressNoteLabPage'
 export default function App() {
   return (
     <Routes>
+      <Route path="/login" element={<AuthPage />} />
       <Route path="/" element={<Navigate to="/home" replace />} />
       <Route path="/dashboard" element={<Navigate to="/home" replace />} />
       <Route path="/settings" element={<Navigate to="/profile" replace />} />

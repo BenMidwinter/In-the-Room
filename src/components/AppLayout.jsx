@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { CLINICIAN_PROFILES, CURRENT_USER } from '../lib/mockData'
 import { useStoreRefreshers } from '../lib/queries'
 import { ROLES } from '../lib/permissions'
-import { DEFAULT_PERSONA_ID, getPersonaById } from '../lib/demoPersonas'
 import ThemeToggle from './ThemeToggle'
 import { RouteErrorBoundary } from './ErrorBoundary'
 import { AppSessionProvider } from '../lib/AppSessionContext'
+import { useAuth } from '../lib/auth/AuthProvider'
+import RequireAuth from './RequireAuth'
 
 const NAV_ITEMS = [
   { to: '/home', label: 'Home', end: true },
@@ -18,53 +18,66 @@ const NAV_ITEMS = [
   { to: '/lab/progress-note', label: 'Note lab' },
 ]
 
-export default function AppLayout() {
+function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
-  const personaId = DEFAULT_PERSONA_ID
-  const activePersona = useMemo(() => getPersonaById(personaId), [personaId])
-  const demoRole = ROLES.CLINICIAN
-
-  const session = useMemo(() => {
-    const profile = CLINICIAN_PROFILES.find(p => p.id === activePersona.userId)
-    return {
-      user: {
-        id: activePersona.userId || CURRENT_USER.id,
-        email: CURRENT_USER.email,
-        name: activePersona.name,
-        full_name: profile?.full_name || activePersona.name,
-        isAdmin: false,
-        isServiceLead: false,
-      },
-    }
-  }, [activePersona])
-
+  const { user, profile, signOut, refreshProfile } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const { refreshClients, refreshMemberships } = useStoreRefreshers()
 
   useEffect(() => { setMenuOpen(false) }, [location.pathname])
 
-  const isProgressNotes = location.pathname.includes('/progress-notes')
+  const displayName = profile?.display_name
+    || user?.user_metadata?.full_name
+    || user?.email
+    || 'Clinician'
+
+  const session = useMemo(() => ({
+    user: {
+      id: user.id,
+      email: user.email,
+      name: displayName,
+      full_name: displayName,
+      isAdmin: false,
+      isServiceLead: false,
+    },
+  }), [user, displayName])
+
+  const activePersona = useMemo(() => ({
+    id: 'clinician',
+    userId: user.id,
+    name: displayName,
+    role: ROLES.CLINICIAN,
+  }), [user.id, displayName])
 
   const appSession = useMemo(() => ({
     session,
     activePersona,
-    personaId,
-    demoRole,
+    personaId: 'clinician',
+    demoRole: ROLES.CLINICIAN,
     myWorkplace: null,
     myWorkplaces: [],
     activeWorkplaceId: null,
     setActiveWorkplaceId: () => {},
-    refreshClients,
+    refreshClients: () => {
+      refreshClients()
+      refreshProfile()
+    },
     refreshMemberships,
   }), [
     session,
     activePersona,
-    personaId,
-    demoRole,
     refreshClients,
     refreshMemberships,
+    refreshProfile,
   ])
+
+  const isProgressNotes = location.pathname.includes('/progress-notes')
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <div className={`app-shell${menuOpen ? ' app-shell--nav-open' : ''}`}>
@@ -113,6 +126,13 @@ export default function AppLayout() {
               >
                 Profile
               </button>
+              <button
+                type="button"
+                className="top-nav__profile-btn"
+                onClick={handleSignOut}
+              >
+                Sign out
+              </button>
             </div>
           </div>
         </div>
@@ -151,5 +171,13 @@ export default function AppLayout() {
         </RouteErrorBoundary>
       </main>
     </div>
+  )
+}
+
+export default function AppLayout() {
+  return (
+    <RequireAuth>
+      <AppShell />
+    </RequireAuth>
   )
 }

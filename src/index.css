@@ -8,6 +8,7 @@
    migrate a component to Tailwind utilities and have them win over the old
    bespoke CSS, incrementally, without !important. */
 @import "./styles/base.css" layer(components);
+@import "./styles/auth.css" layer(components);
 @import "./styles/clinical.css" layer(components);
 @import "./styles/rbac-workspace.css" layer(components);
 @import "./styles/dashboards.css" layer(components);
