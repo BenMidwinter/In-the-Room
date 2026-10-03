@@ -796,6 +796,25 @@ export default function CalendarModule({ persona }) {
           },
           userId: session.user.id,
         })
+        // Google Meet for opted-in services once appointments persist as UUIDs in Supabase.
+        if (last?.id && /^[0-9a-f-]{36}$/i.test(last.id) && payload.create_meet_link !== false) {
+          try {
+            const { createMeetForAppointment } = await import('../../lib/supabase/googleMeet')
+            const startsAt = `${last.session_date}T${last.start_time}:00`
+            const endsAt = `${last.session_date}T${last.end_time}:00`
+            const meet = await createMeetForAppointment({
+              appointmentId: last.id,
+              startsAt: new Date(startsAt).toISOString(),
+              endsAt: new Date(endsAt).toISOString(),
+              summary: 'In the Room session',
+            })
+            if (meet.meetUrl) {
+              last = { ...last, meet_url: meet.meetUrl }
+            }
+          } catch {
+            // Meet is best-effort; booking still succeeds.
+          }
+        }
       }
       setScheduleDraft(null)
       if (last) {

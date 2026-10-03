@@ -1,0 +1,133 @@
+.settings-tabs,
+.settings-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0 0 0.75rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.settings-subtabs {
+  margin-top: -0.35rem;
+  border-bottom-style: dashed;
+}
+
+.settings-tabs__link,
+.settings-subtabs__link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--txt-muted);
+  text-decoration: none;
+  padding: 0.25rem 0;
+  border-bottom: 2px solid transparent;
+}
+
+.settings-tabs__link:hover,
+.settings-subtabs__link:hover {
+  color: var(--col-accent);
+  text-decoration: none;
+}
+
+.settings-tabs__link--active,
+.settings-subtabs__link--active {
+  color: var(--col-primary);
+  border-bottom-color: var(--col-primary);
+}
+
+.settings-panel {
+  min-width: 0;
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  max-width: 28rem;
+}
+
+.settings-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--col-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.settings-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.settings-roadmap {
+  margin: 0 0 1rem;
+  padding-left: 1.15rem;
+  color: var(--txt-body);
+  line-height: 1.55;
+}
+
+.settings-service-list {
+  list-style: none;
+  margin: 0 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.settings-service-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.settings-service-list__meet {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--txt-body);
+  text-transform: none;
+  letter-spacing: normal;
+  margin: 0.35rem 0;
+}
+
+.settings-integration {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.settings-feed-url {
+  margin: 0.85rem 0 0;
+  padding: 0.65rem 0.75rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-light);
+  word-break: break-all;
+  font-size: 0.8125rem;
+}
+
+.role-block--settings_coming_soon,
+.role-block--settings_forms,
+.role-block--settings_password,
+.role-block--settings_2fa,
+.role-block--settings_services,
+.role-block--settings_services_add,
+.role-block--settings_integrations_google,
+.role-block--settings_integrations_feed,
+.role-block--settings_templates_progress_note,
+.role-block--settings_templates_letter,
+.role-block--settings_templates_report,
+.role-block--settings_templates_working_document {
+  border-left: 4px solid var(--col-primary);
+}

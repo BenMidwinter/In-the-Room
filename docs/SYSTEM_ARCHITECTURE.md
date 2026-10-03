@@ -511,7 +511,13 @@ Splose combines two mechanisms; we mirror that hybrid:
 
 Total bookable occupancy for a 50+10 service = 60 minutes (+ `buffer_minutes` before next slot).
 
-## L. Suggested migration / build order
+## L. Near-term product workstreams
+
+1. **Forms builder + submissions** (next larger piece) — clinician-designed forms on `form_definitions` / `form_submissions`, including onboarding that creates clients.
+2. **Rich Text Editor usability** — progress notes / letters / reports / working documents templates and editing UX (paired with Forms).
+3. Wire Calendar module persistence to Supabase `appointments` (so Meet + ICS push use real UUIDs end-to-end).
+
+## M. Suggested migration / build order
 
 1. ~~`profiles` + crypto columns + `record_access_keys` + `audit_events`~~ (applied)
 2. ~~`services` + `availability_*`~~ (applied)

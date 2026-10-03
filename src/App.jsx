@@ -19,9 +19,18 @@ import UpcomingAppointments from './components/UpcomingAppointments'
 import ClientAppointmentsIndex from './features/client/ClientAppointmentsIndex'
 import AppointmentEditor from './features/client/AppointmentEditor'
 import ClientSectionPlaceholder from './features/client/ClientSectionPlaceholder'
-import ProfileLayout from './features/profile/ProfileLayout'
-import ProfileDetails from './features/profile/ProfileDetails'
-import ClinicianJournal from './features/profile/ClinicianJournal'
+import SettingsLayout from './features/settings/SettingsLayout'
+import AccountSettingsPage from './features/settings/AccountSettingsPage'
+import AvailabilitySettingsPage from './features/settings/AvailabilitySettingsPage'
+import ServicesSettingsPage from './features/settings/ServicesSettingsPage'
+import IntegrationsSettingsPage from './features/settings/IntegrationsSettingsPage'
+import {
+  FormsSettingsPage,
+  PasswordSettingsPage,
+  TemplateKindPage,
+  TwoFactorSettingsPage,
+} from './features/settings/SettingsPlaceholders'
+import JournalPage from './features/journal/JournalPage'
 import Resources from './components/Resources'
 import About from './components/About'
 import NotesHistoryPanel from './features/client/NotesHistoryPanel'
@@ -35,7 +44,8 @@ export default function App() {
       <Route path="/login" element={<AuthPage />} />
       <Route path="/" element={<Navigate to="/home" replace />} />
       <Route path="/dashboard" element={<Navigate to="/home" replace />} />
-      <Route path="/settings" element={<Navigate to="/profile" replace />} />
+      <Route path="/profile" element={<Navigate to="/settings/account" replace />} />
+      <Route path="/profile/*" element={<Navigate to="/settings/account" replace />} />
       <Route path="/workplace" element={<Navigate to="/home" replace />} />
       <Route path="/service-lead/*" element={<Navigate to="/home" replace />} />
 
@@ -44,6 +54,7 @@ export default function App() {
         <Route path="calendar" element={<Calendar />} />
         <Route path="reporting" element={<Reporting />} />
         <Route path="finance" element={<FinancePage />} />
+        <Route path="journal" element={<JournalPage />} />
         <Route path="lab/progress-note" element={<ProgressNoteLabPage />} />
         <Route path="upcoming-appointments" element={<UpcomingAppointments />} />
         <Route path="active-cases" element={<ActiveCases />} />
@@ -123,9 +134,44 @@ export default function App() {
           } />
         </Route>
 
-        <Route path="profile" element={<ProfileLayout />}>
-          <Route index element={<ProfileDetails />} />
-          <Route path="journal" element={<ClinicianJournal />} />
+        <Route path="settings" element={<SettingsLayout />}>
+          <Route index element={<Navigate to="account" replace />} />
+          <Route path="account" element={<AccountSettingsPage />} />
+          <Route path="availability" element={<AvailabilitySettingsPage />} />
+          <Route path="services" element={<ServicesSettingsPage />} />
+          <Route path="templates" element={<Navigate to="progress-notes" replace />} />
+          <Route path="templates/progress-notes" element={
+            <TemplateKindPage
+              kind="progress_note"
+              title="Progress note templates"
+              blurb="Reusable structures for session notes. Full builder arrives with the RTE workstream."
+            />
+          } />
+          <Route path="templates/letters" element={
+            <TemplateKindPage
+              kind="letter"
+              title="Letter templates"
+              blurb="Letterhead-aware clinical letter templates for your practice."
+            />
+          } />
+          <Route path="templates/reports" element={
+            <TemplateKindPage
+              kind="report"
+              title="Report templates"
+              blurb="Formulation and assessment report templates."
+            />
+          } />
+          <Route path="templates/working-documents" element={
+            <TemplateKindPage
+              kind="working_document"
+              title="Working document templates"
+              blurb="Working notes and collaborative document templates."
+            />
+          } />
+          <Route path="forms" element={<FormsSettingsPage />} />
+          <Route path="password" element={<PasswordSettingsPage />} />
+          <Route path="2fa" element={<TwoFactorSettingsPage />} />
+          <Route path="integrations" element={<IntegrationsSettingsPage />} />
         </Route>
         <Route path="resources" element={<Resources />} />
         <Route path="about" element={<About />} />

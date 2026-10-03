@@ -1319,6 +1319,7 @@ export type Database = {
         Row: {
           buffer_minutes: number
           color: string | null
+          create_meet_link: boolean
           created_at: string
           default_duration_minutes: number
           description: string | null
@@ -1336,6 +1337,7 @@ export type Database = {
         Insert: {
           buffer_minutes?: number
           color?: string | null
+          create_meet_link?: boolean
           created_at?: string
           default_duration_minutes?: number
           description?: string | null
@@ -1353,6 +1355,7 @@ export type Database = {
         Update: {
           buffer_minutes?: number
           color?: string | null
+          create_meet_link?: boolean
           created_at?: string
           default_duration_minutes?: number
           description?: string | null
