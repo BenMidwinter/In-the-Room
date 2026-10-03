@@ -40,14 +40,13 @@ a:hover { text-decoration: underline; }
   position: sticky;
   top: 0;
   z-index: 100;
-  order: 2;
   width: var(--nav-width);
   flex: 0 0 var(--nav-width);
   height: 100vh;
   height: 100dvh;
   background: var(--bg-nav);
-  border-left: 1px solid var(--border-color);
-  border-right: none;
+  border-right: 1px solid var(--border-color);
+  border-left: none;
   box-shadow: none;
   overflow: visible;
 }
@@ -267,7 +266,6 @@ a:hover { text-decoration: underline; }
 }
 
 .main-content {
-  order: 1;
   flex: 1;
   width: 100%;
   max-width: none;

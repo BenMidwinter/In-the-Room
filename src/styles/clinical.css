@@ -98,18 +98,17 @@
   .top-nav {
     position: fixed;
     top: 0;
-    right: 0;
-    left: auto;
+    left: 0;
+    right: auto;
     bottom: 0;
-    order: 0;
     width: min(14rem, 86vw);
     flex: none;
     height: 100vh;
     height: 100dvh;
-    transform: translateX(105%);
+    transform: translateX(-105%);
     transition: transform 0.2s ease;
-    border-left: 2px solid var(--col-primary);
-    border-right: none;
+    border-right: 2px solid var(--col-primary);
+    border-left: none;
     box-shadow: var(--shadow-md);
   }
 
@@ -167,10 +166,6 @@
 
   .top-nav__link {
     padding: 0.5rem 0.65rem;
-  }
-
-  .main-content {
-    order: 0;
   }
 }
 

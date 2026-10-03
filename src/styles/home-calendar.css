@@ -1010,6 +1010,8 @@
 }
 
 .page-header--calendar {
+  /* page--calendar zeros top padding; cancel the shared negative header pull */
+  margin-top: 0;
   margin-bottom: 0.65rem;
   overflow: visible;
   flex-shrink: 0;
