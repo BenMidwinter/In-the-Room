@@ -814,6 +814,26 @@ export default function CalendarModule({ persona }) {
   const weekDates = weekDatesYmd(activeDate)
   const workingDates = workingWeekDatesYmd(activeDate)
 
+  const visibleDates = useMemo(() => {
+    if (viewMode === 'month') return new Set(monthGridDays(activeDate).map((c) => c.ymd).filter(Boolean))
+    if (viewMode === 'working-week') return new Set(workingDates)
+    if (viewMode === 'day') return new Set([activeDate])
+    return new Set(weekDates)
+  }, [viewMode, activeDate, weekDates, workingDates])
+
+  const googleBusyInView = useMemo(
+    () => googleBusy.filter((block) => visibleDates.has(block.session_date)).length,
+    [googleBusy, visibleDates],
+  )
+
+  const nextGoogleBusyDate = useMemo(() => {
+    const upcoming = googleBusy
+      .map((block) => block.session_date)
+      .filter((ymd) => ymd >= DEMO_TODAY)
+      .sort()
+    return upcoming[0] || googleBusy.map((b) => b.session_date).sort()[0] || null
+  }, [googleBusy])
+
   const navigateDate = (deltaDays) => {
     setActiveDate(prev => addDaysYmd(prev, deltaDays))
   }
@@ -1070,6 +1090,32 @@ export default function CalendarModule({ persona }) {
           </div>
         </div>
       </header>
+
+      {googleBusy.length > 0 && (
+        <p className="calendar-google-sync-note">
+          Google busy: {googleBusy.length} block{googleBusy.length === 1 ? '' : 's'} synced
+          {googleBusyInView > 0
+            ? ` · ${googleBusyInView} in this view`
+            : nextGoogleBusyDate
+              ? ' · none in this view'
+              : ''}
+          {nextGoogleBusyDate && googleBusyInView === 0 && (
+            <>
+              {' · '}
+              <button
+                type="button"
+                className="calendar-google-sync-note__jump"
+                onClick={() => {
+                  setActiveDate(nextGoogleBusyDate)
+                  if (viewMode === 'month') setViewMode('week')
+                }}
+              >
+                Jump to {formatDisplayDate(nextGoogleBusyDate)}
+              </button>
+            </>
+          )}
+        </p>
+      )}
 
       <CalendarWorkspaceFrame
         paneOpen={paneOpen}
