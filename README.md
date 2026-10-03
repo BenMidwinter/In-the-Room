@@ -2,25 +2,29 @@
 
 Spend more time in the work, and less time on the admin.
 
+Clinical documentation for creative arts therapists. Client-side encryption, thin page shells, and encapsulated feature modules.
+
 ## Supabase
 
-This repository is linked to the **In the Room** Supabase project.
+Linked to the **In the Room** Supabase project (`wejnkrjrhzzztrrizxai`).
 
 | | |
 | --- | --- |
 | Project | [In the Room](https://supabase.com/dashboard/project/wejnkrjrhzzztrrizxai) |
-| Ref | `wejnkrjrhzzztrrizxai` |
-| Region | `eu-west-2` |
 | API URL | `https://wejnkrjrhzzztrrizxai.supabase.co` |
-
-### Setup
 
 ```bash
 cp .env.example .env
 ```
 
-`.env.example` already includes the project URL and publishable keys for this project.
+See `docs/SYSTEM_ARCHITECTURE.md` for security and frontend architecture directives.
 
-- Cursor / agents: `.mcp.json` scopes the Supabase MCP server to `project_ref=wejnkrjrhzzztrrizxai`
-- CLI project id: `supabase/config.toml` (`project_id = "in-the-room"`)
-- Project ref file: `supabase/.project-ref` (used when the CLI is not logged in)
+## App
+
+```bash
+npm install
+npm run dev
+```
+
+- Headers: **Fraunces**
+- Body: **Karla**

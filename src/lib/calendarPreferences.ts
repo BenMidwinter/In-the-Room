@@ -1,0 +1,108 @@
+/** Persisted calendar view preferences (localStorage). */
+
+export const DEFAULT_CALENDAR_START_HOUR = 8
+export const DEFAULT_CALENDAR_END_HOUR = 17
+export const DEFAULT_CALENDAR_INTERVAL = 15
+
+export const MIN_CALENDAR_INTERVAL = 5
+export const MAX_CALENDAR_INTERVAL = 120
+
+export const CALENDAR_START_HOUR_OPTIONS = [
+  { value: 6, label: '6:00 am' },
+  { value: 7, label: '7:00 am' },
+  { value: 8, label: '8:00 am' },
+  { value: 9, label: '9:00 am' },
+  { value: 10, label: '10:00 am' },
+  { value: 11, label: '11:00 am' },
+]
+
+export const CALENDAR_END_HOUR_OPTIONS = [
+  { value: 15, label: '3:00 pm' },
+  { value: 16, label: '4:00 pm' },
+  { value: 17, label: '5:00 pm' },
+  { value: 18, label: '6:00 pm' },
+  { value: 19, label: '7:00 pm' },
+  { value: 20, label: '8:00 pm' },
+]
+
+const START_KEY = 'in-the-room-calendar-start-hour'
+const END_KEY = 'in-the-room-calendar-end-hour'
+const INTERVAL_KEY = 'in-the-room-calendar-interval'
+
+const ALLOWED_START_HOURS = CALENDAR_START_HOUR_OPTIONS.map(o => o.value)
+const ALLOWED_END_HOURS = CALENDAR_END_HOUR_OPTIONS.map(o => o.value)
+
+function toNumber(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback
+  const n = Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function clampInterval(value) {
+  const n = toNumber(value, DEFAULT_CALENDAR_INTERVAL)
+  return Math.min(MAX_CALENDAR_INTERVAL, Math.max(MIN_CALENDAR_INTERVAL, Math.round(n)))
+}
+
+function snapToAllowed(value, allowed, fallback) {
+  const n = toNumber(value, fallback)
+  return allowed.includes(n) ? n : fallback
+}
+
+export function normalizeCalendarViewPreferences({ startHour, endHour, intervalMinutes }) {
+  let start = snapToAllowed(startHour, ALLOWED_START_HOURS, DEFAULT_CALENDAR_START_HOUR)
+  let end = snapToAllowed(endHour, ALLOWED_END_HOURS, DEFAULT_CALENDAR_END_HOUR)
+
+  if (start >= end) {
+    start = DEFAULT_CALENDAR_START_HOUR
+    end = DEFAULT_CALENDAR_END_HOUR
+  }
+
+  return {
+    startHour: start,
+    endHour: end,
+    intervalMinutes: clampInterval(intervalMinutes),
+  }
+}
+
+export function getDefaultCalendarViewPreferences() {
+  return normalizeCalendarViewPreferences({
+    startHour: DEFAULT_CALENDAR_START_HOUR,
+    endHour: DEFAULT_CALENDAR_END_HOUR,
+    intervalMinutes: DEFAULT_CALENDAR_INTERVAL,
+  })
+}
+
+export function getCalendarViewPreferences() {
+  try {
+    const raw = {
+      startHour: localStorage.getItem(START_KEY),
+      endHour: localStorage.getItem(END_KEY),
+      intervalMinutes: localStorage.getItem(INTERVAL_KEY),
+    }
+    const normalized = normalizeCalendarViewPreferences(raw)
+
+    if (
+      String(normalized.startHour) !== raw.startHour
+      || String(normalized.endHour) !== raw.endHour
+      || String(normalized.intervalMinutes) !== raw.intervalMinutes
+    ) {
+      saveCalendarViewPreferences(normalized)
+    }
+
+    return normalized
+  } catch {
+    return getDefaultCalendarViewPreferences()
+  }
+}
+
+export function saveCalendarViewPreferences(next) {
+  const normalized = normalizeCalendarViewPreferences(next)
+  try {
+    localStorage.setItem(START_KEY, String(normalized.startHour))
+    localStorage.setItem(END_KEY, String(normalized.endHour))
+    localStorage.setItem(INTERVAL_KEY, String(normalized.intervalMinutes))
+  } catch {
+    /* ignore */
+  }
+  return normalized
+}

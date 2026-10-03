@@ -1,0 +1,290 @@
+/**
+ * Universal record-list layout — overlays main stylesheet for tabular data modules.
+ */
+
+.record-module {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.record-module__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid var(--border-light);
+  margin-bottom: 0;
+}
+
+.record-module__header-text {
+  min-width: 0;
+}
+
+.record-module__title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--col-accent);
+  line-height: 1.25;
+}
+
+.record-module__subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--txt-muted);
+  line-height: 1.5;
+  max-width: 36rem;
+}
+
+.record-module__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.record-module__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  align-items: flex-end;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.record-module__body {
+  padding-top: 0;
+}
+
+.record-module__editor {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-light);
+}
+
+/* ── Record table ── */
+
+.record-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.record-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.record-table thead tr {
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.record-table th {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--txt-muted);
+  white-space: nowrap;
+}
+
+.record-table td {
+  padding: 0.65rem 0.75rem;
+  vertical-align: middle;
+  color: var(--txt-body);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.record-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.record-table tbody tr:nth-child(even) {
+  background: var(--bg-zone-muted);
+}
+
+.record-table tbody tr.record-table__row--clickable {
+  cursor: pointer;
+}
+
+.record-table tbody tr.record-table__row--clickable:hover {
+  background: var(--col-primary-light);
+}
+
+.record-table tbody tr.record-table__row--selected {
+  background: var(--col-primary-light);
+  box-shadow: inset 3px 0 0 var(--col-primary);
+}
+
+.record-table tbody tr.record-table__row--muted {
+  opacity: 0.65;
+}
+
+.record-table__primary {
+  font-weight: 600;
+  color: var(--col-accent);
+}
+
+.record-table__cell-muted {
+  color: var(--txt-muted);
+  font-size: 0.8125rem;
+}
+
+.note-status-tag {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.record-table__empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--txt-muted);
+  font-size: 0.9375rem;
+  border-bottom: none;
+}
+
+.record-table__filter-row th {
+  padding: 0.35rem 0.5rem 0.55rem;
+  border-bottom: 1px solid var(--border-light);
+  vertical-align: bottom;
+}
+
+.record-table__filter {
+  display: block;
+  min-width: 0;
+}
+
+.record-table__filter-input {
+  width: 100%;
+  min-width: 4.5rem;
+  padding: 0.3rem 0.45rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--txt-body);
+  background: var(--bg-page);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+}
+
+.record-table__filter-input:focus {
+  outline: none;
+  border-color: var(--col-primary);
+  box-shadow: 0 0 0 2px var(--col-primary-light);
+}
+
+.record-table__actions-cell {
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* Page-level caseload lists reuse record table inside page content */
+.page .record-module {
+  margin-top: 0;
+}
+
+.page .record-table-wrap {
+  margin: 0 calc(-1 * var(--space-inline));
+  padding: 0 var(--space-inline);
+  width: auto;
+}
+
+@media (max-width: 768px) {
+  .record-table th,
+  .record-table td {
+    padding: 0.5rem 0.55rem;
+  }
+
+  .record-module__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .record-module__actions {
+    width: 100%;
+  }
+
+  .record-module__actions .primary,
+  .record-module__actions .secondary {
+    flex: 1 1 auto;
+  }
+}
+
+/* ── Appointment editor (compact) ── */
+
+.appointment-editor {
+  max-width: 34rem;
+}
+
+.appointment-editor .record-module__header {
+  padding-bottom: 0.85rem;
+}
+
+.appointment-editor .appointment-form {
+  padding: 1rem 1.1rem;
+  margin-top: 0;
+}
+
+.appointment-editor .appointment-form__grid {
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.appointment-editor .form-group {
+  margin-bottom: 0.55rem;
+}
+
+.appointment-editor .form-group label {
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.appointment-editor .ck-schedule-times {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem 0.65rem;
+  margin-bottom: 0.5rem;
+}
+
+.appointment-editor .ck-schedule-times .form-group {
+  margin-bottom: 0;
+}
+
+.appointment-editor .appointment-form__attendance {
+  max-width: none;
+  margin-bottom: 0;
+}
+
+.appointment-editor .appointment-note-link {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+}
+
+@media (max-width: 540px) {
+  .appointment-editor .ck-schedule-times {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Record editor (letters / documents) ── */
+
+.record-editor {
+  max-width: 52rem;
+}
+
+.record-module__editor .record-editor {
+  margin-top: 0;
+}
+

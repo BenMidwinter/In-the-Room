@@ -102,9 +102,18 @@ Before producing any database migration, API route, or frontend component, verif
 
 ---
 
+# IN THE ROOM — PRODUCT SCOPE (FREELANCE FIRST)
+
+- **Primary market:** private / freelance creative arts therapists.
+- **Phase 1:** individual practitioner tooling (clients, sessions, notes, calendar, profile, finance placeholders for Xero).
+- **Later:** workplace contracts, multi-user delegation, and org features — do not build these ahead of the freelance core.
+- **Out of scope for now:** workplace team admin, service-lead org consoles, and safeguarding workflows.
+
+---
+
 # IN THE ROOM — FRONTEND & MODULAR ARCHITECTURE DIRECTIVES
 
-You are building "In the Room" following a strict **Thin-Page / Encapsulated-Module** pattern (the ChromatiK architectural model). Every page route acts solely as a structural shell, while all business logic, editor states, cryptographic binds, and complex interactions live inside isolated, composable modules.
+You are building "In the Room" following a strict **Thin-Page / Encapsulated-Module** pattern. Every page route acts solely as a structural shell, while all business logic, editor states, cryptographic binds, and complex interactions live inside isolated, composable modules.
 
 ---
 

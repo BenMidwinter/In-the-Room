@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* Design tokens + Tailwind @theme bridge (custom properties — unlayered). */
+@import "./styles/tokens.css";
+
+/* Legacy component/base styles live in Tailwind's `components` layer so that
+   `utilities` (a later layer) reliably override them. This is what lets us
+   migrate a component to Tailwind utilities and have them win over the old
+   bespoke CSS, incrementally, without !important. */
+@import "./styles/base.css" layer(components);
+@import "./styles/clinical.css" layer(components);
+@import "./styles/rbac-workspace.css" layer(components);
+@import "./styles/dashboards.css" layer(components);
+@import "./styles/home-calendar.css" layer(components);
+@import "./styles/overlays-editor.css" layer(components);
+@import "./styles/journal-layout.css" layer(components);
+@import "./styles/data-lists.css" layer(components);
