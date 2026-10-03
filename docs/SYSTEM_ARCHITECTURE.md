@@ -99,3 +99,152 @@ Before producing any database migration, API route, or frontend component, verif
 - [ ] Is RLS enabled with explicit restrictive policies?
 - [ ] Is the DEK stored separately in an encrypted format per authorized user?
 - [ ] Does the cryptographic implementation use standard WebCrypto (`window.crypto.subtle`) primitives exclusively?
+
+---
+
+# IN THE ROOM — FRONTEND & MODULAR ARCHITECTURE DIRECTIVES
+
+You are building "In the Room" following a strict **Thin-Page / Encapsulated-Module** pattern (the ChromatiK architectural model). Every page route acts solely as a structural shell, while all business logic, editor states, cryptographic binds, and complex interactions live inside isolated, composable modules.
+
+---
+
+## 1. THE THIN-PAGE / BLOCKED-MODULE PRINCIPLE
+
+### A. Route Pages Must Be "Anemic" Layout Shells
+
+- Page files (`src/app/**/page.tsx` or `src/pages/**`) MUST NOT contain complex business logic, raw Supabase fetches, state machines, or extensive DOM trees.
+- Page responsibilities are strictly limited to:
+  1. Reading route parameters and search query params.
+  2. Verifying master-key session unlocking (redirecting/blocking if keys are locked).
+  3. Composing layout grids (e.g., header, breadcrumb, split-pane) and mounting one or more Module Blocks.
+- Maximum page file target: under 60–80 lines of code.
+
+### B. Module Blocks Are Self-Contained Features
+
+- Complex functionality lives in `src/modules/<ModuleName>/`.
+- Each Module Block owns its:
+  - Internal state management (e.g., form inputs, active toolbars, view toggles).
+  - Cryptographic read/write cycle (fetching ciphertext via hooks, decrypting in-memory, encrypting before dispatch).
+  - Autosave debounce triggers and error boundaries.
+  - Standardized header/toolbar and body layout.
+
+---
+
+## 2. MODULAR REUSE & THE UNIFIED RICH-TEXT ENGINE
+
+The core of the clinical workflow is narrative documentation (letters, progress notes, formulation reports, supervision records).
+
+1. **The Core Document Module (`EditorModule`):**
+   - Must be decoupled from any specific clinical table.
+   - Accepts generic input contracts:
+
+     ```typescript
+     interface DocumentEditorProps {
+       recordId: string;
+       initialEncryptedPayload?: EncryptedPayload;
+       onSave: (encryptedPayload: EncryptedPayload) => Promise<void>;
+       mode: 'session_note' | 'clinical_letter' | 'assessment_report';
+       metadataHeader?: React.ReactNode;
+       readOnly?: boolean;
+     }
+     ```
+
+   - Standardized formatting plugins: Prose/markdown blocks, qualitative tags (affect, modality, medium), and collapsible evaluative sections.
+2. **Specialized Wrappers:**
+   - Pages do not instantiate the raw editor engine directly; they instantiate domain-specific wrappers:
+     - `<SessionNoteBlock sessionId={id} />`
+     - `<ClientLetterBlock letterId={id} recipientType={type} />`
+     - `<ReportBuilderBlock reportId={id} />`
+   - These wrappers configure the `EditorModule` with specific schemas and handle their respective cryptographic keys.
+
+---
+
+## 3. STYLESHEET & CSS ARCHITECTURE RULES
+
+Because modules (editor, calendar, metric sliders) will be embedded inside different page shells, split views, drawers, and modal sheets, styling must obey strict isolation rules:
+
+1. **Token Foundation Before Module Styling:**
+   - All styling must reference core design tokens (CSS variables defined in `globals.css` or Tailwind theme).
+   - Never use arbitrary inline color/spacing hex values or pixel heights (e.g., avoid `h-[642px]`, `bg-[#242b35]`).
+2. **Container Query & Fluid Sizing:**
+   - Modules must adapt to their container, not the viewport. Use `@container` queries or fluid flex/grid layouts so the `CalendarModule` or `EditorModule` renders seamlessly whether occupying a full-width page, a 50% split pane, or an off-canvas drawer.
+3. **Editor Typography Scoping:**
+   - Rich-text editor styles must be strictly scoped to a `.clinical-prose` wrapper.
+   - Styling inside `.clinical-prose` must not leak to surrounding module buttons, toolbars, or page chrome.
+   - Modifiers for print/PDF export styles must be isolated via `@media print` rules within the document module.
+
+---
+
+## 4. STRICT BUILD ORDER (DEPENDENCY SEQUENCE)
+
+Do NOT generate higher-tier features out of order. Development must follow this exact sequential pipeline:
+
+```text
+Phase 1: Crypto & Key Store  ──▶  Phase 2: Theme Tokens & Typography
+           │                                 │
+           ▼                                 ▼
+Phase 3: Base Primitives UI  ──▶  Phase 4: Independent Engine Modules (Editor / Calendar)
+           │                                 │
+           ▼                                 ▼
+Phase 5: Domain Feature Blocks ─▶ Phase 6: Thin Page Routes & Routing Shells
+```
+
+### Stage Breakdown
+
+1. **Stage 1 — Cryptographic Primitives & Key Context (`src/lib/crypto/*`, `src/context/KeyContext`):**
+   - Implement WebCrypto primitives (AES-GCM, PBKDF2, RSA/ECDH key wrapping).
+   - Setup in-memory key state (unlocked private key held in React Context; never disk/localStorage).
+2. **Stage 2 — Design Tokens & Base Styles (`src/styles/*`, `tailwind.config.ts`):**
+   - Palette (clinical, low-contrast, calming, high-readability).
+   - Typography scales, spacing tokens, container query plugin setup.
+3. **Stage 3 — Atomic UI Primitives (`src/components/ui/*`):**
+   - Buttons, Inputs, Dialogs, Toolbars, Dropdowns, Badges, Tabs.
+   - Zero business logic, purely presentational with keyboard accessibility.
+4. **Stage 4 — Independent Engine Modules (`src/modules/editor/*`, `src/modules/calendar/*`):**
+   - Build the standalone Rich Text Editor engine with local dummy state.
+   - Build the standalone Calendar/Timeline engine.
+   - Ensure these render cleanly in isolation.
+5. **Stage 5 — Domain Feature Blocks (`src/modules/sessions/*`, `src/modules/clients/*`):**
+   - Connect the Stage 4 engines with the Stage 1 encryption hooks.
+   - Create the domain-specific data blocks (`SessionNoteBlock`, `ClientSummaryBlock`).
+6. **Stage 6 — Thin Page Routes (`src/app/*`):**
+   - Assemble pages by composing the domain blocks into layouts.
+
+---
+
+## 5. DIRECTORY STRUCTURE CONVENTION
+
+```text
+src/
+├── app/                        # Next.js App Router (Anemic Page Shells)
+│   ├── (auth)/                 # Login, Setup Keyring, Recovery
+│   ├── (dashboard)/
+│   │   ├── clients/
+│   │   │   ├── [id]/page.tsx   # Shell: mounts ClientSummaryBlock & SessionHistoryBlock
+│   │   ├── sessions/
+│   │   │   ├── [id]/page.tsx   # Shell: mounts SessionNoteBlock
+│   │   └── calendar/page.tsx   # Shell: mounts CalendarScheduleBlock
+├── modules/                    # Self-contained feature blocks
+│   ├── editor/                 # The reusable Rich-Text Engine
+│   │   ├── components/         # Toolbars, floating formatting menus
+│   │   ├── plugins/            # Modality tags, timestamps, evaluative markers
+│   │   └── EditorModule.tsx    # Core export
+│   ├── sessions/               # Domain block: Session notes & evaluations
+│   ├── clients/                # Domain block: Client identities & portfolios
+│   └── calendar/               # Domain block: Booking, schedule, rhythms
+├── components/
+│   └── ui/                     # Design-system atomic primitives (Buttons, Modals)
+├── hooks/                      # Custom hooks (e.g., useEncryptedRecord, useAutosave)
+├── lib/
+│   ├── crypto/                 # WebCrypto implementations (Zero-knowledge engine)
+│   └── supabase/               # Typed Supabase client (Row-Level Security)
+└── context/                    # InMemory Keyring Provider & Session Auth
+```
+
+---
+
+## 6. CODE QUALITY & IMPLEMENTATION INVARIANTS
+
+- **No Premature Monoliths:** Never build a page that includes its own input handlers and raw fetch requests. Break them immediately into `modules/`.
+- **Encrypted-At-Rest Verification:** Any module initiating an API mutation must pass data through the client encryption hook before invoking the Supabase client.
+- **Fail Gracefully on Locked Keys:** If a module mounts and finds the user's master key is not in memory (e.g., user refreshed tab), it must render an inline `<UnlockKeyringNotice />` instead of throwing an unhandled decrypt error.
