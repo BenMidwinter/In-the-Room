@@ -1,4 +1,5 @@
 import { hmacSign, encryptJson, decryptJson } from '../_shared/crypto.ts'
+import { pullExternalBusyBlocks } from '../_shared/googleBusyPull.ts'
 import { credentialsKey, secret } from '../_shared/secrets.ts'
 import { adminClient } from '../_shared/supabaseAdmin.ts'
 
@@ -33,56 +34,6 @@ async function fetchGoogleEmail(accessToken: string): Promise<string | null> {
   } catch {
     return null
   }
-}
-
-async function pullBusyBlocks(opts: {
-  accessToken: string
-  ownerId: string
-  connectionId: string
-  calendarId: string
-}) {
-  const timeMin = new Date().toISOString()
-  const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60_000).toISOString()
-  const freeBusyRes = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${opts.accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      timeMin,
-      timeMax,
-      items: [{ id: opts.calendarId }],
-    }),
-  })
-  const freeBusy = await freeBusyRes.json()
-  if (!freeBusyRes.ok) {
-    throw new Error(freeBusy.error?.message || 'freeBusy failed during connect')
-  }
-
-  const busy = freeBusy.calendars?.[opts.calendarId]?.busy || []
-  const admin = adminClient()
-  await admin.from('external_calendar_blocks')
-    .delete()
-    .eq('connection_id', opts.connectionId)
-    .gte('starts_at', timeMin)
-
-  const rows = busy.map((slot: { start: string; end: string }, idx: number) => ({
-    owner_id: opts.ownerId,
-    connection_id: opts.connectionId,
-    external_event_id: `busy-${slot.start}-${idx}`,
-    starts_at: slot.start,
-    ends_at: slot.end,
-    is_all_day: false,
-    busy_status: 'busy',
-    synced_at: new Date().toISOString(),
-  }))
-
-  if (rows.length) {
-    const { error } = await admin.from('external_calendar_blocks').insert(rows)
-    if (error) throw error
-  }
-  return rows.length
 }
 
 Deno.serve(async (req) => {
@@ -244,7 +195,7 @@ Deno.serve(async (req) => {
 
     let pulled = 0
     try {
-      pulled = await pullBusyBlocks({
+      pulled = await pullExternalBusyBlocks({
         accessToken: tokens.access_token,
         ownerId: parsed.uid,
         connectionId: saved.id,

@@ -434,7 +434,7 @@ function invoiceTag(status) {
 }
 
 function EventDrawerActions({ onEdit, onBookAnother, onRecurring, locked = false, kind = 'standard' }) {
-  if (kind === 'busy') {
+  if (kind === 'busy' || kind === 'support') {
     return (
       <section className="ck-event-drawer__actions">
         <button type="button" className="secondary" onClick={onEdit} disabled={locked}>
@@ -510,12 +510,12 @@ export function AttendanceMarking({ value, onChange, locked = false, compact = f
   )
 }
 
-function StandardEventBody({ appointment, locked, onAttendanceChange }) {
-  const linkedNote = getProgressNoteByAppointment(appointment.id)
-  const noteHref = appointment.client_id
+function StandardEventBody({ appointment, locked, onAttendanceChange, showAttendance = true }) {
+  const linkedNote = showAttendance ? getProgressNoteByAppointment(appointment.id) : null
+  const noteHref = showAttendance && appointment.client_id
     ? `/clients/${appointment.client_id}/progress-notes?appointment=${appointment.id}`
     : null
-  const apptHref = appointment.client_id
+  const apptHref = showAttendance && appointment.client_id
     ? `/clients/${appointment.client_id}/appointments/${appointment.id}`
     : null
   const timeRange = appointment.end_time
@@ -524,6 +524,8 @@ function StandardEventBody({ appointment, locked, onAttendanceChange }) {
   const duration = appointment.end_time
     ? `${Math.max(0, parseMinutes(appointment.end_time) - parseMinutes(appointment.start_time))} min`
     : null
+  const serviceLabel = appointment.service_name
+    || appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)
 
   return (
     <SafetyLock
@@ -532,25 +534,27 @@ function StandardEventBody({ appointment, locked, onAttendanceChange }) {
     >
       <section className="ck-event-drawer__section ck-event-drawer__section--compact">
         <StackedDataList className="ck-stacked-list--compact">
-          <StackedDataRow
-            icon="👤"
-            label="Client"
-            value={appointment.client_name}
-            href={appointment.client_id ? `/clients/${appointment.client_id}` : undefined}
-          />
+          {showAttendance && (
+            <StackedDataRow
+              icon="👤"
+              label="Client"
+              value={appointment.client_name}
+              href={appointment.client_id ? `/clients/${appointment.client_id}` : undefined}
+            />
+          )}
           <StackedDataRow
             icon="🕐"
             label="When"
             value={`${appointment.session_date} · ${timeRange}`}
             meta={[duration, appointment.location].filter(Boolean).join(' · ')}
-            href={apptHref}
+            href={apptHref || undefined}
           />
           <StackedDataRow
             icon="🎨"
             label="Service"
-            value={appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)}
-            meta={appointmentTypeLabel(appointment.appointment_type)}
-            tags={invoiceTag(appointment.invoice_status || 'draft')}
+            value={serviceLabel}
+            meta={showAttendance ? appointmentTypeLabel(appointment.appointment_type) : 'Follow-on block'}
+            tags={showAttendance ? invoiceTag(appointment.invoice_status || 'draft') : null}
           />
           {appointmentOtherInfo(appointment) && (
             <StackedDataRow
@@ -562,14 +566,16 @@ function StandardEventBody({ appointment, locked, onAttendanceChange }) {
         </StackedDataList>
       </section>
 
-      <AttendanceMarking
-        value={appointment.attendance_status}
-        onChange={onAttendanceChange}
-        locked={locked}
-        compact
-      />
+      {showAttendance && (
+        <AttendanceMarking
+          value={appointment.attendance_status}
+          onChange={onAttendanceChange}
+          locked={locked}
+          compact
+        />
+      )}
 
-      {linkedNote || noteHref ? (
+      {showAttendance && (linkedNote || noteHref) ? (
         <section className="ck-event-drawer__section ck-event-drawer__section--compact">
           <StackedDataList className="ck-stacked-list--compact">
             <StackedDataRow
@@ -811,6 +817,7 @@ export function EventDrawer({
           appointment={appointment}
           locked={locked}
           onAttendanceChange={onAttendanceChange}
+          showAttendance={kind === 'standard'}
         />
       )}
     </AccessoryPane>

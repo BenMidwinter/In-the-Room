@@ -1,5 +1,7 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 import { decryptJson, encryptJson } from '../_shared/crypto.ts'
+import { ITR_GOOGLE_SOURCE } from '../_shared/googleBusyPull.ts'
+import { credentialsKey } from '../_shared/secrets.ts'
 import { userClient, adminClient } from '../_shared/supabaseAdmin.ts'
 
 type Creds = {
@@ -55,8 +57,13 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Google Meet not enabled on connection' }, 400)
     }
 
-    const encKey = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY')!
-    let creds = await decryptJson<Creds>(encKey, connection.encrypted_credentials)
+    const encKey = credentialsKey()
+    if (!encKey) return jsonResponse({ error: 'Missing CREDENTIALS_ENCRYPTION_KEY' }, 500)
+
+    let creds = await decryptJson<Creds>(
+      encKey,
+      connection.encrypted_credentials as Record<string, string>,
+    )
     creds = await refreshAccessToken(creds)
 
     const requestId = crypto.randomUUID()
@@ -72,6 +79,16 @@ Deno.serve(async (req) => {
           summary: summary || 'In the Room session',
           start: { dateTime: startsAt },
           end: { dateTime: endsAt },
+          // Stay opaque on Google so external booking sees you as busy —
+          // busy pull filters these out via extendedProperties / link table.
+          transparency: 'opaque',
+          extendedProperties: {
+            private: {
+              source: ITR_GOOGLE_SOURCE,
+              in_the_room: '1',
+              appointment_id: String(appointmentId),
+            },
+          },
           conferenceData: {
             createRequest: {
               requestId,

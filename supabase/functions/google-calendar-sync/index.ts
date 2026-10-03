@@ -1,5 +1,6 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 import { decryptJson, encryptJson } from '../_shared/crypto.ts'
+import { pullExternalBusyBlocks } from '../_shared/googleBusyPull.ts'
 import { credentialsKey } from '../_shared/secrets.ts'
 import { userClient, adminClient } from '../_shared/supabaseAdmin.ts'
 
@@ -58,48 +59,14 @@ Deno.serve(async (req) => {
     )
     creds = await refreshAccessToken(creds)
 
-    const timeMin = new Date().toISOString()
-    const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60_000).toISOString()
-    const freeBusyRes = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${creds.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        timeMin,
-        timeMax,
-        items: [{ id: connection.google_calendar_id || 'primary' }],
-      }),
+    const pulled = await pullExternalBusyBlocks({
+      accessToken: creds.access_token,
+      ownerId: user.id,
+      connectionId: connection.id,
+      calendarId: connection.google_calendar_id || 'primary',
     })
-    const freeBusy = await freeBusyRes.json()
-    if (!freeBusyRes.ok) throw new Error(freeBusy.error?.message || 'freeBusy failed')
 
-    const calId = connection.google_calendar_id || 'primary'
-    const busy = freeBusy.calendars?.[calId]?.busy || []
     const admin = adminClient()
-
-    await admin.from('external_calendar_blocks')
-      .delete()
-      .eq('connection_id', connection.id)
-      .gte('starts_at', timeMin)
-
-    const rows = busy.map((slot: { start: string; end: string }, idx: number) => ({
-      owner_id: user.id,
-      connection_id: connection.id,
-      external_event_id: `busy-${slot.start}-${idx}`,
-      starts_at: slot.start,
-      ends_at: slot.end,
-      is_all_day: false,
-      busy_status: 'busy',
-      synced_at: new Date().toISOString(),
-    }))
-
-    if (rows.length) {
-      const { error: insertError } = await admin.from('external_calendar_blocks').insert(rows)
-      if (insertError) throw insertError
-    }
-
     const encrypted = await encryptJson(encKey, creds)
     await admin.from('calendar_connections').update({
       encrypted_credentials: encrypted,
@@ -107,7 +74,7 @@ Deno.serve(async (req) => {
       last_error: null,
     }).eq('id', connection.id)
 
-    return jsonResponse({ pulled: rows.length })
+    return jsonResponse({ pulled })
   } catch (error) {
     try {
       const authHeader = req.headers.get('Authorization')
