@@ -4,6 +4,7 @@ import { deleteService, listServices, upsertService } from '../../lib/supabase/s
 import { isSupabaseConfigured } from '../../lib/supabase/client'
 import { writeAuditEvent } from '../../lib/supabase/audit'
 import { useConfirm, useToast } from '../../components/ui'
+import { SERVICE_COLOR_PRESETS, normalizeServiceColor } from '../../lib/serviceColors'
 
 const EMPTY_FORM = {
   id: '',
@@ -20,11 +21,13 @@ const EMPTY_FORM = {
 }
 
 function slugify(value) {
-  return value
+  const slug = value
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_|_$/g, '')
+  // Guard against empty / single-letter slugs from short names or bad edits.
+  return slug.length >= 2 ? slug : `service_${Date.now().toString(36)}`
 }
 
 function toForm(service) {
@@ -82,7 +85,7 @@ export default function ServicesSettingsPage() {
           ? Number(form.follow_on_duration_minutes) || null
           : null,
         buffer_minutes: Number(form.buffer_minutes) || 0,
-        color: form.color || null,
+        color: normalizeServiceColor(form.color, form.service_type),
         create_meet_link: Boolean(form.create_meet_link),
         is_active: form.is_active !== false,
       })
@@ -172,12 +175,19 @@ export default function ServicesSettingsPage() {
         <ul className="settings-service-list">
           {services.map((service) => (
             <li key={service.id} className="settings-service-list__item">
-              <div>
-                <strong>{service.name}</strong>
-                <span className="text-small text-muted">
-                  {' '}· {service.service_type} · {service.default_duration_minutes}m
-                  {service.follow_on_service_id ? ` + follow-on ${service.follow_on_duration_minutes || '?'}m` : ''}
-                </span>
+              <div className="settings-service-list__label">
+                <span
+                  className="settings-service-list__swatch"
+                  style={{ background: service.color || '#557a61' }}
+                  aria-hidden
+                />
+                <div>
+                  <strong>{service.name}</strong>
+                  <span className="text-small text-muted">
+                    {' '}· {service.service_type} · {service.default_duration_minutes}m
+                    {service.follow_on_service_id ? ` + follow-on ${service.follow_on_duration_minutes || '?'}m` : ''}
+                  </span>
+                </div>
               </div>
               <div className="settings-service-list__actions">
                 {service.service_type === 'appointment' && (
@@ -247,6 +257,30 @@ export default function ServicesSettingsPage() {
               required
             />
           </label>
+          <div className="settings-form__field">
+            <span>Colour</span>
+            <div className="settings-service-colors">
+              {SERVICE_COLOR_PRESETS.map((hex) => (
+                <button
+                  key={hex}
+                  type="button"
+                  className={`settings-service-colors__swatch${form.color === hex ? ' settings-service-colors__swatch--active' : ''}`}
+                  style={{ background: hex }}
+                  aria-label={`Use colour ${hex}`}
+                  aria-pressed={form.color === hex}
+                  onClick={() => setForm((f) => ({ ...f, color: hex }))}
+                />
+              ))}
+              <label className="settings-service-colors__custom">
+                <span className="text-small text-muted">Custom</span>
+                <input
+                  type="color"
+                  value={normalizeServiceColor(form.color, form.service_type)}
+                  onChange={(e) => setForm((f) => ({ ...f, color: e.target.value }))}
+                />
+              </label>
+            </div>
+          </div>
           {form.service_type === 'appointment' && (
             <>
               <label className="settings-form__field">

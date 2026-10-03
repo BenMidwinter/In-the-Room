@@ -1343,6 +1343,26 @@ button.calendar-event {
   white-space: nowrap;
 }
 
+/* Google Calendar busy overlay — non-interactive hatch. */
+.calendar-event--external-busy {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgba(107, 114, 128, 0.14),
+    rgba(107, 114, 128, 0.14) 4px,
+    rgba(107, 114, 128, 0.05) 4px,
+    rgba(107, 114, 128, 0.05) 8px
+  );
+  cursor: default;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: none;
+}
+
+.calendar-event--external-busy .calendar-event__client,
+.calendar-event--external-busy .calendar-event__meta {
+  font-weight: 600;
+}
+
 /* Cancelled — faded and struck through. */
 .calendar-event--cancelled {
   opacity: 0.5;
@@ -1721,11 +1741,28 @@ button.calendar-event {
   opacity: 0.9;
 }
 
+/* Busy overlays sit under session chips and never capture clicks. */
+.calendar-col__busy {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .calendar-col__events {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
+}
+
+/* Parent layer ignores clicks; interactive session chips must opt back in
+   so bookings stay selectable above empty-slot hit targets. */
+.calendar-col__events .calendar-event--interactive {
+  pointer-events: auto;
+  z-index: 4;
+  cursor: pointer;
+  position: absolute;
 }
 
 .ck-time-slot[title] {
@@ -1782,8 +1819,35 @@ button.calendar-event {
   gap: 0.65rem;
 }
 
+.ck-schedule-times--start-only {
+  grid-template-columns: minmax(8rem, 11rem) 1fr;
+  align-items: end;
+}
+
 .ck-schedule-times .form-group {
   margin-bottom: 0.85rem;
+}
+
+.ck-schedule-derived {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  background: var(--bg-page);
+  font-size: 0.9rem;
+}
+
+.ck-schedule-meet {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.ck-schedule-meet input {
+  margin-top: 0.2rem;
 }
 
 .ck-schedule-warning {

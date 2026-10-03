@@ -1,11 +1,19 @@
 import { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useAppSession } from '../../lib/AppSessionContext'
-import { getClientsForUser } from '../../lib/store'
+import { useAppClients } from '../../lib/queries'
 import {
+  appointmentQueryKeys,
   useAllAppointmentsQuery,
   useSaveAppointmentMutation,
 } from '../../lib/appointmentQueries'
+import {
+  externalBlocksAsAppointments,
+  listCalendarConnections,
+  listExternalCalendarBlocks,
+} from '../../lib/supabase/calendarConnectionsRepo'
+import { invokeFunction } from '../../lib/supabase/invokeFunction'
 import ErrorBoundary from '../../components/ErrorBoundary'
 import {
   DEMO_TODAY,
@@ -46,13 +54,14 @@ import {
   getCalendarOwnerOptions,
   getDefaultCalendarOwner,
 } from '../../lib/calendarOwners'
-import { modalityLabel } from '../../lib/calendarConstants'
 import {
-  calendarEventStyle,
+  appointmentChipLabel,
   calendarDotStyle,
+  calendarEventStyleForAppointment,
 } from '../../lib/calendarServiceStyles'
+import { listServices } from '../../lib/supabase/servicesRepo'
+import { db } from '../../lib/data/collections'
 import { shouldBlurClientIdentity } from '../../lib/demoPersonas'
-import BlurredName from '../../components/BlurredName'
 import { CalendarWorkspaceFrame, CalendarTimeSlot, EventDrawer, ScheduleSessionPanel, RecurringSchedulePanel } from '../../components/LayoutComponents'
 
 const VIEW_MODES = [
@@ -99,6 +108,8 @@ function clamp(value, min, max) {
  */
 function layoutDayEvents(appts, dayStartMin, dayEndMin) {
   const total = Math.max(1, dayEndMin - dayStartMin)
+  // Keep short follow-on blocks tall enough to see a label (~12 minutes of day height).
+  const minHeightPct = Math.min(8, (12 / total) * 100)
   const items = appts
     .map(appt => ({
       appt,
@@ -127,10 +138,11 @@ function layoutDayEvents(appts, dayStartMin, dayEndMin) {
     const laneCount = laneEnds.length || 1
     cluster.forEach(it => {
       const width = 100 / laneCount
+      const naturalHeight = ((it.end - it.start) / total) * 100
       result.push({
         appt: it.appt,
         top: ((it.start - dayStartMin) / total) * 100,
-        height: ((it.end - it.start) / total) * 100,
+        height: Math.max(naturalHeight, minHeightPct),
         left: it.lane * width,
         width,
       })
@@ -151,49 +163,48 @@ function layoutDayEvents(appts, dayStartMin, dayEndMin) {
 
 function EventChip({ appointment, compact = false, blurNames = false, onSelect, selected = false, style }) {
   const cancelled = isCancelled(appointment)
+  const externalBusy = Boolean(appointment.is_external_busy)
   const timeRange = appointment.end_time
     ? `${appointment.start_time}–${appointment.end_time}`
     : appointment.start_time
   const otherInfo = appointmentOtherInfo(appointment)
+  const chipLabel = appointmentChipLabel(appointment, { blurNames })
 
   const className = [
     'calendar-event',
-    'calendar-event--interactive',
+    !externalBusy && 'calendar-event--interactive',
     'calendar-event--block',
     'calendar-event--service',
+    externalBusy && 'calendar-event--external-busy',
     compact && 'calendar-event--compact',
-    otherInfo && 'calendar-event--has-info',
+    otherInfo && !externalBusy && 'calendar-event--has-info',
     selected && 'calendar-event--selected',
     cancelled && 'calendar-event--cancelled',
   ].filter(Boolean).join(' ')
 
-  const title = blurNames
-    ? `${modalityLabel(appointment.therapy_modality)} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
-    : `${appointment.client_name} · ${modalityLabel(appointment.therapy_modality)} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
+  const title = externalBusy
+    ? `Busy · ${timeRange}`
+    : `${chipLabel} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
 
+  const Tag = externalBusy ? 'div' : 'button'
   return (
-    <button
-      type="button"
+    <Tag
+      type={externalBusy ? undefined : 'button'}
       className={className}
-      style={{ ...calendarEventStyle(appointment.therapy_modality), ...style }}
+      style={{ ...calendarEventStyleForAppointment(appointment), ...style }}
       title={title}
-      onClick={(e) => {
+      onClick={externalBusy ? undefined : (e) => {
+        e.preventDefault()
         e.stopPropagation()
         onSelect?.(appointment)
       }}
     >
       <span className="calendar-event__time">{timeRange}</span>
-      <BlurredName as="span" name={appointment.client_name} blur={blurNames} className="calendar-event__client" />
-      {!compact && (
-        <span className="calendar-event__meta">{modalityLabel(appointment.therapy_modality)}</span>
-      )}
-      {otherInfo && (
+      <span className="calendar-event__client">{chipLabel}</span>
+      {otherInfo && !externalBusy && !compact && (
         <span className="calendar-event__info">{otherInfo}</span>
       )}
-      {!compact && !otherInfo && (
-        <BlurredName as="span" name={appointment.assigned_therapist} blur={blurNames} className="calendar-event__therapist" />
-      )}
-    </button>
+    </Tag>
   )
 }
 
@@ -433,10 +444,10 @@ function MonthView({ activeDate, appointments, onSelectDate, blurNames = false, 
                           onSelectAppointment?.(appt)
                         }}
                       >
-                        <span className="calendar-month__dot" style={calendarDotStyle(appt.therapy_modality)} />
+                        <span className="calendar-month__dot" style={calendarDotStyle(appt.service_id || appt.therapy_modality)} />
                         <span className="calendar-month__event-text">
                           {appt.start_time}{' '}
-                          <BlurredName name={appt.client_name.split(' ')[0]} blur={blurNames} className="inline" />
+                          {appointmentChipLabel(appt, { blurNames })}
                         </span>
                       </button>
                     ))}
@@ -502,8 +513,24 @@ function DayColumn({
           })}
         </div>
       ))}
+      <div className="calendar-col__busy" aria-hidden="true">
+        {laidOut.filter((item) => item.appt.is_external_busy).map((item) => (
+          <EventChip
+            key={item.appt.id}
+            appointment={item.appt}
+            compact={compact}
+            blurNames={blurNames}
+            style={{
+              top: `${item.top}%`,
+              height: `${item.height}%`,
+              left: `calc(${item.left}% + 2px)`,
+              width: `calc(${item.width}% - 4px)`,
+            }}
+          />
+        ))}
+      </div>
       <div className="calendar-col__events">
-        {laidOut.map(item => (
+        {laidOut.filter((item) => !item.appt.is_external_busy).map((item) => (
           <EventChip
             key={item.appt.id}
             appointment={item.appt}
@@ -685,6 +712,7 @@ function DayView({
 
 export default function CalendarModule({ persona }) {
   const { myWorkplace, session } = useAppSession()
+  const { clients: remoteClients = [] } = useAppClients()
   const [viewMode, setViewMode] = useState('week')
   const [activeDate, setActiveDate] = useState(DEMO_TODAY)
   const [selectedAppointment, setSelectedAppointment] = useState(null)
@@ -698,6 +726,64 @@ export default function CalendarModule({ persona }) {
   const [availabilitySettings, setAvailabilitySettings] = useState(() => (
     getClinicianWorkplaceSettings(session.user.id)
   ))
+
+  const externalBusyQuery = useQuery({
+    queryKey: appointmentQueryKeys.externalBusy,
+    enabled: isSupabaseConfigured(),
+    queryFn: async () => {
+      const connections = await listCalendarConnections()
+      const google = connections.find((row) => row.provider === 'google' && row.status === 'connected')
+      if (!google?.pull_external_busy) return []
+      // Refresh Google busy in the background when the calendar opens.
+      try {
+        await invokeFunction('google-calendar-sync', { method: 'POST', body: {} })
+      } catch {
+        // Still show any cached blocks if sync fails (e.g. offline).
+      }
+      const fromIso = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString()
+      const toIso = new Date(Date.now() + 60 * 24 * 60 * 60_000).toISOString()
+      return listExternalCalendarBlocks({ fromIso, toIso })
+    },
+    staleTime: 5 * 60_000,
+  })
+
+  const googleBusy = useMemo(
+    () => externalBlocksAsAppointments(externalBusyQuery.data || [], session.user.id),
+    [externalBusyQuery.data, session.user.id],
+  )
+
+  const servicesQuery = useQuery({
+    queryKey: ['services', 'calendar-catalog'],
+    enabled: isSupabaseConfigured(),
+    queryFn: listServices,
+    staleTime: 60_000,
+  })
+
+  // Keep a React-state catalogue so chip labels/colours re-render after hydrate
+  // (mutating db.orgServices alone does not trigger a paint).
+  const [serviceCatalogVersion, setServiceCatalogVersion] = useState(0)
+  useEffect(() => {
+    const services = servicesQuery.data
+    if (!services?.length) return
+    for (const service of services) {
+      const idx = db.orgServices.findIndex((row) => row.id === service.id || row.slug === service.slug)
+      const mapped = {
+        id: service.id,
+        name: service.name,
+        slug: service.slug,
+        service_type: service.service_type || 'appointment',
+        color: service.color,
+        default_duration_minutes: service.default_duration_minutes,
+        create_meet_link: Boolean(service.create_meet_link),
+        follow_on_service_id: service.follow_on_service_id,
+        follow_on_duration_minutes: service.follow_on_duration_minutes,
+        is_active: service.is_active !== false,
+      }
+      if (idx === -1) db.orgServices.push(mapped)
+      else db.orgServices[idx] = { ...db.orgServices[idx], ...mapped }
+    }
+    setServiceCatalogVersion((v) => v + 1)
+  }, [servicesQuery.data])
 
   useEffect(() => {
     let cancelled = false
@@ -758,18 +844,15 @@ export default function CalendarModule({ persona }) {
   const dayEndMin = viewPrefs.endHour * 60
 
   const assignedClients = useMemo(
-    () => getClientsForUser(session.user.id, myWorkplace).filter(c => c.is_active !== false),
-    [session.user.id, myWorkplace],
+    () => remoteClients.filter(c => c.is_active !== false),
+    [remoteClients],
   )
 
-  const roleFiltered = useMemo(
-    () => filterAppointmentsForPersona(appointments, persona),
-    [appointments, persona],
-  )
-  const filtered = useMemo(
-    () => filterAppointmentsByCalendarOwner(appointments, calendarOwner, persona),
-    [appointments, calendarOwner, persona],
-  )
+  const filtered = useMemo(() => {
+    const roleScoped = filterAppointmentsForPersona(appointments, persona)
+    const owned = filterAppointmentsByCalendarOwner(roleScoped, calendarOwner, persona)
+    return [...owned, ...googleBusy]
+  }, [appointments, calendarOwner, persona, googleBusy])
 
   const blurNames = shouldBlurClientIdentity(persona)
 
@@ -796,6 +879,7 @@ export default function CalendarModule({ persona }) {
   }, [viewMode, activeDate, weekDates, workingDates])
 
   const selectAppointment = (appt) => {
+    if (appt?.is_external_busy) return
     setScheduleDraft(null)
     setSelectedAppointment(prev => (prev?.id === appt.id ? null : appt))
   }
@@ -841,6 +925,7 @@ export default function CalendarModule({ persona }) {
     setScheduleSaving(true)
     try {
       const dates = payload.dates?.length ? payload.dates : [payload.session_date]
+      let first = null
       let last = null
       for (const date of dates) {
         last = await saveAppointmentMutation.mutateAsync({
@@ -852,8 +937,8 @@ export default function CalendarModule({ persona }) {
           },
           userId: session.user.id,
         })
-        // Google Meet for opted-in services once appointments persist as UUIDs in Supabase.
-        if (last?.id && /^[0-9a-f-]{36}$/i.test(last.id) && payload.create_meet_link !== false) {
+        if (!first) first = last
+        if (last?.id && /^[0-9a-f-]{36}$/i.test(last.id) && payload.create_meet_link) {
           try {
             const { createMeetForAppointment } = await import('../../lib/supabase/googleMeet')
             const startsAt = `${last.session_date}T${last.start_time}:00`
@@ -866,6 +951,7 @@ export default function CalendarModule({ persona }) {
             })
             if (meet.meetUrl) {
               last = { ...last, meet_url: meet.meetUrl }
+              if (first?.id === last.id) first = last
             }
           } catch {
             // Meet is best-effort; booking still succeeds.
@@ -873,10 +959,11 @@ export default function CalendarModule({ persona }) {
         }
       }
       setScheduleDraft(null)
-      if (last) {
-        setActiveDate(last.session_date)
+      // Stay on the first occurrence — jumping to the series end is confusing.
+      if (first) {
+        setActiveDate(first.session_date)
         if (viewMode === 'month') setViewMode('day')
-        setSelectedAppointment(last)
+        setSelectedAppointment(first)
       }
     } finally {
       setScheduleSaving(false)
@@ -886,9 +973,9 @@ export default function CalendarModule({ persona }) {
   const handleRecurringSave = async (payload) => {
     setScheduleSaving(true)
     try {
-      let last = null
+      let first = null
       for (const date of payload.dates) {
-        last = await saveAppointmentMutation.mutateAsync({
+        const saved = await saveAppointmentMutation.mutateAsync({
           payload: {
             client_id: payload.client_id,
             session_date: date,
@@ -896,6 +983,7 @@ export default function CalendarModule({ persona }) {
             end_time: payload.end_time,
             duration_minutes: payload.duration_minutes,
             therapy_modality: payload.therapy_modality,
+            service_id: payload.service_id,
             location: payload.location,
             other_info: payload.other_info,
             appointment_type: payload.appointment_type,
@@ -903,12 +991,13 @@ export default function CalendarModule({ persona }) {
           },
           userId: session.user.id,
         })
+        if (!first) first = saved
       }
       setScheduleDraft(null)
-      if (last) {
-        setActiveDate(last.session_date)
+      if (first) {
+        setActiveDate(first.session_date)
         if (viewMode === 'month') setViewMode('day')
-        setSelectedAppointment(last)
+        setSelectedAppointment(first)
       }
     } finally {
       setScheduleSaving(false)
@@ -996,7 +1085,7 @@ export default function CalendarModule({ persona }) {
   const paneOpen = Boolean(selectedAppointment || scheduleDraft)
 
   return (
-    <div className="calendar-module">
+    <div className="calendar-module" data-service-catalog={serviceCatalogVersion}>
       <header className="page-header page-header--with-toolbar page-header--calendar">
         <div className="page-header__text">
           <h1 className="page-header__title">Calendar</h1>

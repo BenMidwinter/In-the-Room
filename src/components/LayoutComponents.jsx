@@ -12,10 +12,14 @@ import {
   appointmentOtherInfo,
 } from '../lib/appointmentUtils'
 import { modalityLabel } from '../lib/calendarConstants'
+import { appointmentServiceLabel } from '../lib/calendarServiceStyles'
 import { getAppointmentOrgServices } from '../lib/store'
+import { db } from '../lib/data/collections'
 import { addDaysYmd } from '../lib/dateArchitecture'
 import { canAssignAppointmentClinician } from '../lib/permissions'
 import { CALENDAR_OWNER_ALL, CALENDAR_OWNER_ALL_TEAM } from '../lib/calendarOwners'
+import { listServices } from '../lib/supabase/servicesRepo'
+import { isSupabaseConfigured } from '../lib/supabase/client'
 
 function cx(...parts) {
   return parts.filter(Boolean).join(' ')
@@ -333,6 +337,7 @@ function appointmentFormSeed(appt) {
   const dur = Math.max(0, parseMinutes(appt.end_time) - parseMinutes(appt.start_time)) || 60
   return {
     clientId: appt.client_id || '',
+    serviceId: appt.service_id || '',
     modality: appt.therapy_modality || 'music_therapy',
     sessionDate: appt.session_date,
     start: appt.start_time || '09:00',
@@ -341,6 +346,28 @@ function appointmentFormSeed(appt) {
     location: appt.location || '',
     otherInfo: appointmentOtherInfo(appt),
     clinicianId: appt.clinician_id || '',
+    createMeetLink: Boolean(appt.create_meet_link || appt.meet_url),
+  }
+}
+
+function hydrateOrgServices(services) {
+  if (!Array.isArray(services) || !services.length) return
+  for (const service of services) {
+    const idx = db.orgServices.findIndex((row) => row.id === service.id || row.slug === service.slug)
+    const mapped = {
+      id: service.id,
+      name: service.name,
+      slug: service.slug,
+      service_type: service.service_type || 'appointment',
+      color: service.color,
+      default_duration_minutes: service.default_duration_minutes,
+      create_meet_link: Boolean(service.create_meet_link),
+      follow_on_service_id: service.follow_on_service_id,
+      follow_on_duration_minutes: service.follow_on_duration_minutes,
+      is_active: service.is_active !== false,
+    }
+    if (idx === -1) db.orgServices.push(mapped)
+    else db.orgServices[idx] = { ...db.orgServices[idx], ...mapped }
   }
 }
 
@@ -369,7 +396,13 @@ function timesOverlap(aStart, aEnd, bStart, bEnd) {
 
 export function resolveEventKind(appointment) {
   if (!appointment) return 'standard'
-  if (appointment.is_busy || appointment.appointment_type === 'busy') return 'busy'
+  if (
+    appointment.is_busy
+    || appointment.appointment_type === 'busy'
+    || appointment.block_role === 'busy'
+    || appointment.is_external_busy
+  ) return 'busy'
+  if (appointment.block_role === 'support' || appointment.block_role === 'admin') return 'support'
   if (appointment.appointment_type === 'group') return 'group'
   return 'standard'
 }
@@ -401,7 +434,7 @@ function invoiceTag(status) {
 }
 
 function EventDrawerActions({ onEdit, onBookAnother, onRecurring, locked = false, kind = 'standard' }) {
-  if (kind === 'busy') {
+  if (kind === 'busy' || kind === 'support') {
     return (
       <section className="ck-event-drawer__actions">
         <button type="button" className="secondary" onClick={onEdit} disabled={locked}>
@@ -477,12 +510,12 @@ export function AttendanceMarking({ value, onChange, locked = false, compact = f
   )
 }
 
-function StandardEventBody({ appointment, locked, onAttendanceChange }) {
-  const linkedNote = getProgressNoteByAppointment(appointment.id)
-  const noteHref = appointment.client_id
+function StandardEventBody({ appointment, locked, onAttendanceChange, showAttendance = true }) {
+  const linkedNote = showAttendance ? getProgressNoteByAppointment(appointment.id) : null
+  const noteHref = showAttendance && appointment.client_id
     ? `/clients/${appointment.client_id}/progress-notes?appointment=${appointment.id}`
     : null
-  const apptHref = appointment.client_id
+  const apptHref = showAttendance && appointment.client_id
     ? `/clients/${appointment.client_id}/appointments/${appointment.id}`
     : null
   const timeRange = appointment.end_time
@@ -491,6 +524,8 @@ function StandardEventBody({ appointment, locked, onAttendanceChange }) {
   const duration = appointment.end_time
     ? `${Math.max(0, parseMinutes(appointment.end_time) - parseMinutes(appointment.start_time))} min`
     : null
+  const serviceLabel = appointment.service_name
+    || appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)
 
   return (
     <SafetyLock
@@ -499,25 +534,27 @@ function StandardEventBody({ appointment, locked, onAttendanceChange }) {
     >
       <section className="ck-event-drawer__section ck-event-drawer__section--compact">
         <StackedDataList className="ck-stacked-list--compact">
-          <StackedDataRow
-            icon="👤"
-            label="Client"
-            value={appointment.client_name}
-            href={appointment.client_id ? `/clients/${appointment.client_id}` : undefined}
-          />
+          {showAttendance && (
+            <StackedDataRow
+              icon="👤"
+              label="Client"
+              value={appointment.client_name}
+              href={appointment.client_id ? `/clients/${appointment.client_id}` : undefined}
+            />
+          )}
           <StackedDataRow
             icon="🕐"
             label="When"
             value={`${appointment.session_date} · ${timeRange}`}
             meta={[duration, appointment.location].filter(Boolean).join(' · ')}
-            href={apptHref}
+            href={apptHref || undefined}
           />
           <StackedDataRow
             icon="🎨"
-            label="Modality"
-            value={modalityLabel(appointment.therapy_modality)}
-            meta={appointmentTypeLabel(appointment.appointment_type)}
-            tags={invoiceTag(appointment.invoice_status || 'draft')}
+            label="Service"
+            value={serviceLabel}
+            meta={showAttendance ? appointmentTypeLabel(appointment.appointment_type) : 'Follow-on block'}
+            tags={showAttendance ? invoiceTag(appointment.invoice_status || 'draft') : null}
           />
           {appointmentOtherInfo(appointment) && (
             <StackedDataRow
@@ -529,14 +566,16 @@ function StandardEventBody({ appointment, locked, onAttendanceChange }) {
         </StackedDataList>
       </section>
 
-      <AttendanceMarking
-        value={appointment.attendance_status}
-        onChange={onAttendanceChange}
-        locked={locked}
-        compact
-      />
+      {showAttendance && (
+        <AttendanceMarking
+          value={appointment.attendance_status}
+          onChange={onAttendanceChange}
+          locked={locked}
+          compact
+        />
+      )}
 
-      {linkedNote || noteHref ? (
+      {showAttendance && (linkedNote || noteHref) ? (
         <section className="ck-event-drawer__section ck-event-drawer__section--compact">
           <StackedDataList className="ck-stacked-list--compact">
             <StackedDataRow
@@ -708,15 +747,21 @@ export function EventDrawer({
 
   if (!appointment) return null
 
+  const serviceLabel = appointment.service_name
+    || appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)
   const title = kind === 'busy'
     ? 'Busy block'
-    : kind === 'group'
-      ? 'Group session'
-      : appointment.client_name
+    : kind === 'support'
+      ? serviceLabel
+      : kind === 'group'
+        ? 'Group session'
+        : appointment.client_name
 
   const subtitle = kind === 'busy'
     ? APPOINTMENT_TYPES[appointment.appointment_type] || 'Practitioner unavailable'
-    : `${modalityLabel(appointment.therapy_modality)} · ${appointment.assigned_therapist}`
+    : kind === 'support'
+      ? `${appointment.client_name || 'Client'} · follow-on`
+      : `${serviceLabel} · ${appointment.assigned_therapist}`
 
   return (
     <AccessoryPane
@@ -767,11 +812,12 @@ export function EventDrawer({
       {kind === 'busy' && (
         <BusyEventBody appointment={appointment} locked={locked} />
       )}
-      {kind === 'standard' && (
+      {(kind === 'standard' || kind === 'support') && (
         <StandardEventBody
           appointment={appointment}
           locked={locked}
           onAttendanceChange={onAttendanceChange}
+          showAttendance={kind === 'standard'}
         />
       )}
     </AccessoryPane>
@@ -804,7 +850,8 @@ export function ScheduleSessionPanel({
 
   const [query, setQuery] = useState('')
   const [clientId, setClientId] = useState(seed?.clientId || '')
-  const [modality, setModality] = useState(seed?.modality || 'music_therapy')
+  const [serviceId, setServiceId] = useState(seed?.serviceId || '')
+  const [modality, setModality] = useState(seed?.modality || '')
   const [sessionDate, setSessionDate] = useState(seed?.sessionDate || initialSessionDate)
   const [start, setStart] = useState(seed?.start || startTime || '09:00')
   const [end, setEnd] = useState(seed?.end || addMinutesToTimeStr(startTime || '09:00', 60))
@@ -814,8 +861,72 @@ export function ScheduleSessionPanel({
   const [clinicianId, setClinicianId] = useState(seed?.clinicianId || sessionUserId || '')
   const [recurringWeekly, setRecurringWeekly] = useState(false)
   const [recurWeeks, setRecurWeeks] = useState(4)
+  const [createMeetLink, setCreateMeetLink] = useState(Boolean(seed?.createMeetLink))
+  const [services, setServices] = useState(() => getAppointmentOrgServices())
+  const [servicesError, setServicesError] = useState(null)
 
-  const appointmentServices = useMemo(() => getAppointmentOrgServices(), [])
+  useEffect(() => {
+    let cancelled = false
+    async function loadServices() {
+      if (!isSupabaseConfigured()) {
+        setServices(getAppointmentOrgServices())
+        return
+      }
+      try {
+        const remote = await listServices()
+        if (cancelled) return
+        const bookable = remote.filter(
+          (s) => (s.service_type === 'appointment' || !s.service_type) && s.is_active !== false,
+        )
+        hydrateOrgServices(remote)
+        setServices(bookable)
+        setServicesError(null)
+      } catch (err) {
+        if (!cancelled) {
+          setServices(getAppointmentOrgServices())
+          setServicesError(err.message || 'Could not load services')
+        }
+      }
+    }
+    loadServices()
+    return () => { cancelled = true }
+  }, [])
+
+  // Bind the service catalogue once loaded (prefer seed service / modality).
+  useEffect(() => {
+    if (!services.length || serviceId) return
+    const bySlug = modality
+      ? services.find((s) => s.slug === modality || s.id === modality)
+      : null
+    const next = bySlug || services[0]
+    if (!next) return
+    setServiceId(next.id)
+    setModality(next.slug)
+    if (!isEdit) {
+      const dur = Number(next.default_duration_minutes) || 50
+      setDurationStr(String(dur))
+      setEnd(addMinutesToTimeStr(start, dur))
+      setCreateMeetLink(Boolean(next.create_meet_link))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [services])
+
+  const selectedService = useMemo(
+    () => services.find((s) => s.id === serviceId) || null,
+    [services, serviceId],
+  )
+
+  const applyService = (nextId) => {
+    const next = services.find((s) => s.id === nextId)
+    setServiceId(nextId)
+    if (!next) return
+    setModality(next.slug)
+    const dur = Number(next.default_duration_minutes) || 50
+    setDurationStr(String(dur))
+    setEnd(addMinutesToTimeStr(start, dur))
+    if (!next.create_meet_link) setCreateMeetLink(false)
+    else setCreateMeetLink(true)
+  }
 
   const [prevSlot, setPrevSlot] = useState(`${initialSessionDate}|${startTime}|${appointment?.id || ''}|${prefill?.id || ''}`)
   const slotKey = `${initialSessionDate}|${startTime}|${appointment?.id || ''}|${prefill?.id || ''}`
@@ -828,11 +939,13 @@ export function ScheduleSessionPanel({
     setEnd(nextSeed?.end || addMinutesToTimeStr(startTime || '09:00', clampDuration(dur)))
     if (nextSeed) {
       setClientId(nextSeed.clientId)
+      setServiceId(nextSeed.serviceId || '')
       setModality(nextSeed.modality)
       setDurationStr(nextSeed.durationStr)
       setLocation(nextSeed.location)
       setOtherInfo(nextSeed.otherInfo)
       setClinicianId(nextSeed.clinicianId)
+      setCreateMeetLink(Boolean(nextSeed.createMeetLink))
     }
   }
 
@@ -852,33 +965,13 @@ export function ScheduleSessionPanel({
     if (nextId) setClinicianId(nextId)
   }, [selectedClient?.id, calendarOwner, isEdit, showClinicianPicker, sessionUserId, workplaceClinicians])
 
-  const durationMinutes = clampDuration(durationStr)
+  const durationMinutes = clampDuration(
+    selectedService?.default_duration_minutes || durationStr,
+  )
 
   const handleStartChange = (value) => {
-    const currentDur = Math.max(0, parseMinutes(end) - parseMinutes(start))
-    const dur = currentDur > 0 ? currentDur : durationMinutes
     setStart(value)
-    setEnd(addMinutesToTimeStr(value, dur))
-  }
-
-  const handleEndChange = (value) => {
-    setEnd(value)
-    const diff = parseMinutes(value) - parseMinutes(start)
-    if (diff > 0) setDurationStr(String(diff))
-  }
-
-  const handleDurationChange = (value) => {
-    setDurationStr(value)
-    const n = Number(value)
-    if (Number.isFinite(n) && n > 0) {
-      setEnd(addMinutesToTimeStr(start, clampDuration(n)))
-    }
-  }
-
-  const handleDurationBlur = (value) => {
-    const n = clampDuration(value)
-    setDurationStr(String(n))
-    setEnd(addMinutesToTimeStr(start, n))
+    setEnd(addMinutesToTimeStr(value, durationMinutes))
   }
 
   const filteredClients = useMemo(() => {
@@ -890,8 +983,8 @@ export function ScheduleSessionPanel({
     })
   }, [clients, query])
 
-  const computedDuration = Math.max(0, parseMinutes(end) - parseMinutes(start))
-  const finalDuration = computedDuration > 0 ? computedDuration : durationMinutes
+  const finalDuration = durationMinutes
+  const computedEnd = addMinutesToTimeStr(start, finalDuration)
 
   const draftAppointment = useMemo(() => ({
     id: appointment?.id || '__draft__',
@@ -899,8 +992,8 @@ export function ScheduleSessionPanel({
     clinician_id: clinicianId,
     session_date: sessionDate,
     start_time: start,
-    end_time: end,
-  }), [appointment?.id, clientId, clinicianId, sessionDate, start, end])
+    end_time: computedEnd,
+  }), [appointment?.id, clientId, clinicianId, sessionDate, start, computedEnd])
 
   const conflictPool = useMemo(
     () => (appointment?.id ? allAppointments.filter(a => a.id !== appointment.id) : allAppointments),
@@ -914,7 +1007,7 @@ export function ScheduleSessionPanel({
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if (!clientId || finalDuration <= 0) return
+    if (!clientId || !serviceId || finalDuration <= 0) return
     const bookDates = recurringWeekly && !isEdit
       ? Array.from({ length: recurWeeks }, (_, i) => addDaysYmd(sessionDate, i * 7))
       : undefined
@@ -923,13 +1016,15 @@ export function ScheduleSessionPanel({
       client_id: clientId,
       session_date: sessionDate,
       start_time: start,
-      end_time: addMinutesToTimeStr(start, finalDuration),
+      end_time: computedEnd,
       duration_minutes: finalDuration,
-      therapy_modality: modality,
+      therapy_modality: selectedService?.slug || modality || 'music_therapy',
+      service_id: serviceId || null,
       location: location.trim(),
       other_info: otherInfo.trim(),
       clinician_id: showClinicianPicker ? clinicianId : sessionUserId,
       appointment_type: appointment?.appointment_type || prefill?.appointment_type || 'one_to_one',
+      create_meet_link: Boolean(createMeetLink && selectedService?.create_meet_link),
       dates: bookDates,
     })
   }
@@ -941,7 +1036,7 @@ export function ScheduleSessionPanel({
   return (
     <AccessoryPane
       title={panelTitle}
-      subtitle={`${sessionDate} · ${start}–${end}`}
+      subtitle={`${sessionDate} · ${start}–${computedEnd}`}
       onClose={onCancel}
       bodyClassName="ck-schedule-panel"
     >
@@ -1001,20 +1096,33 @@ export function ScheduleSessionPanel({
         )}
 
         <div className="form-group">
-          <label htmlFor="schedule-modality">Service</label>
+          <label htmlFor="schedule-service">Service</label>
           <select
-            id="schedule-modality"
+            id="schedule-service"
             className="paper-input"
-            value={modality}
-            onChange={e => setModality(e.target.value)}
+            value={serviceId}
+            onChange={e => applyService(e.target.value)}
+            required
+            disabled={!services.length}
           >
-            {appointmentServices.map(svc => (
-              <option key={svc.id} value={svc.slug}>{svc.name}</option>
+            {!services.length && <option value="">No services configured</option>}
+            {services.map(svc => (
+              <option key={svc.id} value={svc.id}>
+                {svc.name} ({svc.default_duration_minutes || 50} min)
+              </option>
             ))}
           </select>
+          {servicesError && (
+            <p className="text-small ck-schedule-warning">{servicesError}</p>
+          )}
+          {!services.length && !servicesError && (
+            <p className="text-small text-muted">
+              Add services under Settings → Services to book sessions.
+            </p>
+          )}
         </div>
 
-        <div className="ck-schedule-times">
+        <div className="ck-schedule-times ck-schedule-times--start-only">
           <div className="form-group">
             <label htmlFor="schedule-start">Start</label>
             <input
@@ -1027,37 +1135,26 @@ export function ScheduleSessionPanel({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="schedule-end">End</label>
-            <input
-              id="schedule-end"
-              type="time"
-              step={300}
-              className="paper-input"
-              value={end}
-              onChange={e => handleEndChange(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="schedule-duration">Duration (min)</label>
-            <input
-              id="schedule-duration"
-              type="number"
-              inputMode="numeric"
-              min={5}
-              max={480}
-              step={5}
-              className="paper-input"
-              value={durationStr}
-              onChange={e => handleDurationChange(e.target.value)}
-              onBlur={e => handleDurationBlur(e.target.value)}
-            />
+            <label>Ends</label>
+            <p className="ck-schedule-derived">
+              <strong>{computedEnd}</strong>
+              <span className="text-muted"> · {finalDuration} min from service</span>
+            </p>
           </div>
         </div>
-        <p className="text-small text-muted ck-schedule-times-hint">
-          Adjust start, end, or duration — the other fields update automatically.
-        </p>
-        {computedDuration <= 0 && (
-          <p className="text-small ck-schedule-warning">End time must be after the start time.</p>
+
+        {selectedService?.create_meet_link && (
+          <label className="ck-schedule-meet">
+            <input
+              type="checkbox"
+              checked={createMeetLink}
+              onChange={e => setCreateMeetLink(e.target.checked)}
+            />
+            <span>
+              Create Google Meet link
+              <span className="text-small text-muted"> — adds a Meet URL when you book</span>
+            </span>
+          </label>
         )}
 
         {conflicts.length > 0 && (
@@ -1138,7 +1235,7 @@ export function ScheduleSessionPanel({
         )}
 
         <div className="form-actions">
-          <button type="submit" className="primary" disabled={!clientId || saving || finalDuration <= 0}>
+          <button type="submit" className="primary" disabled={!clientId || !serviceId || saving || finalDuration <= 0}>
             {saving ? 'Saving…' : conflicts.length > 0 && !isEdit ? `Book ${sessionCount} anyway` : isEdit ? 'Save changes' : sessionCount > 1 ? `Book ${sessionCount} sessions` : 'Book session'}
           </button>
           <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
@@ -1177,6 +1274,7 @@ export function RecurringSchedulePanel({
       end_time: source.end_time || addMinutesToTimeStr(source.start_time, duration),
       duration_minutes: duration,
       therapy_modality: source.therapy_modality,
+      service_id: source.service_id,
       location: source.location || '',
       other_info: source.other_info || appointmentOtherInfo(source),
       appointment_type: source.appointment_type || 'one_to_one',

@@ -14,3 +14,5 @@ Run through this before pointing a production web domain at In the Room.
 - [ ] Google Calendar API enabled on that Google Cloud project
 - [ ] Secrets set: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `SITE_URL`, `CREDENTIALS_ENCRYPTION_KEY`
 - [ ] Smoke-test **Connect Google Calendar** on the production domain after `SITE_URL` is updated
+- [ ] After Connect, Integrations should show the linked Google email (not “No Google account linked”)
+- [ ] Calendar should show hatched **Google busy** blocks after connect/sync (Settings → Sync now if empty)

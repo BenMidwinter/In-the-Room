@@ -1,5 +1,6 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 import { hmacSign } from '../_shared/crypto.ts'
+import { credentialsKey, secret } from '../_shared/secrets.ts'
 import { userClient } from '../_shared/supabaseAdmin.ts'
 
 const SCOPES = [
@@ -9,8 +10,8 @@ const SCOPES = [
   'https://www.googleapis.com/auth/calendar.freebusy',
 ].join(' ')
 
-function secret(name: string): string {
-  return String(Deno.env.get(name) || '').trim()
+function toBase64Url(value: string): string {
+  return btoa(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
 }
 
 Deno.serve(async (req) => {
@@ -26,7 +27,7 @@ Deno.serve(async (req) => {
     // CLIENT_SECRET is only needed in google-oauth-callback (token exchange), not here.
     const clientId = secret('GOOGLE_OAUTH_CLIENT_ID')
     const siteUrl = secret('SITE_URL') || req.headers.get('origin') || ''
-    const encKey = secret('CREDENTIALS_ENCRYPTION_KEY') || secret('SUPABASE_SERVICE_ROLE_KEY')
+    const encKey = credentialsKey()
 
     const missing: string[] = []
     if (!clientId) missing.push('GOOGLE_OAUTH_CLIENT_ID')
@@ -44,7 +45,7 @@ Deno.serve(async (req) => {
       exp: Date.now() + 10 * 60_000,
       nonce: crypto.randomUUID(),
     })
-    const stateBody = btoa(payload)
+    const stateBody = toBase64Url(payload)
     const sig = await hmacSign(encKey, stateBody)
     const state = `${stateBody}.${sig}`
 
