@@ -16,14 +16,14 @@ export default function HomePage() {
           <header className="role-block__header">
             <h2 className="role-block__title">Your practice</h2>
           </header>
-          <div className="role-block__panel card">
-            <p className="text-muted" style={{ marginBottom: '1rem' }}>
+          <div className="role-block__panel">
+            <p className="text-muted" style={{ margin: '0 0 1rem' }}>
               No clients or sessions yet. Start by adding a client — clinical notes stay encrypted on your device before they ever reach storage.
             </p>
-            <div className="flex flex-wrap gap-3">
-              <Link to="/clients/add" className="btn btn--primary">Add client</Link>
-              <Link to="/calendar" className="btn">Open calendar</Link>
-              <Link to="/profile" className="btn">Edit profile</Link>
+            <div className="role-block__actions">
+              <Link to="/clients/add" className="btn btn-primary">Add client</Link>
+              <Link to="/calendar" className="btn btn-secondary">Open calendar</Link>
+              <Link to="/profile" className="btn btn-secondary">Edit profile</Link>
             </div>
           </div>
         </section>

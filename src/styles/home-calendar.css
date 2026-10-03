@@ -666,10 +666,23 @@
   padding: 1rem 1.15rem 1.15rem;
 }
 
+.role-block__panel {
+  padding: 1rem 1.15rem 1.15rem;
+}
+
+.role-block__body .role-block__panel {
+  padding: 0;
+}
+
 .role-block__panel + .role-block__panel {
   margin-top: 1.25rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--border-light);
+}
+
+.role-block__body .role-block__panel + .role-block__panel {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
 }
 
 .role-block__panel-title {

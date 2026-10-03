@@ -98,15 +98,18 @@
   .top-nav {
     position: fixed;
     top: 0;
-    left: 0;
+    right: 0;
+    left: auto;
     bottom: 0;
-    width: min(18rem, 86vw);
+    order: 0;
+    width: min(14rem, 86vw);
     flex: none;
     height: 100vh;
     height: 100dvh;
-    transform: translateX(-105%);
+    transform: translateX(105%);
     transition: transform 0.2s ease;
-    border-right: 2px solid var(--col-primary);
+    border-left: 2px solid var(--col-primary);
+    border-right: none;
     box-shadow: var(--shadow-md);
   }
 
@@ -163,7 +166,11 @@
   }
 
   .top-nav__link {
-    padding: 0.55rem 0.65rem;
+    padding: 0.5rem 0.65rem;
+  }
+
+  .main-content {
+    order: 0;
   }
 }
 
@@ -303,7 +310,7 @@ select.paper-input {
 
 .data-table th,
 .data-table td {
-  padding: 0.75rem 0.5rem;
+  padding: 0.75rem 1rem;
 }
 
 .data-table tbody tr:nth-child(even) {
