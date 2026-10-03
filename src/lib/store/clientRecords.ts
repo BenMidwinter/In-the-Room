@@ -1,4 +1,5 @@
 import { db, uid } from '../data/collections'
+import { getOrgServiceForModality } from './organisation'
 import type { StoreRecord } from '../types/collections'
 import { canAccessClient, filterClientsForUser, type Client } from '../permissions'
 import { sortLatestFirst } from '../dateArchitecture'
@@ -110,10 +111,20 @@ function stripHtml(html) {
 }
 
 /**
- * Client overview timeline — sessions, notes, documents, and legacy seed events.
+ * Client overview timeline — sessions, notes, documents, letters, and activity.
  * Pass `appointments` when the Supabase query has loaded so live bookings appear.
+ * Pass `activity` for remote letters / reports / form submissions.
  */
-export function getClientTimeline(clientId, { appointments } = {}) {
+export function getClientTimeline(
+  clientId,
+  {
+    appointments,
+    activity,
+  }: {
+    appointments?: StoreRecord[]
+    activity?: StoreRecord[]
+  } = {},
+) {
   const events = db.timelineEvents.filter(e => e.client_id === clientId)
   const noteEvents = db.progressNotes
     .filter(n => n.client_id === clientId)
@@ -140,30 +151,56 @@ export function getClientTimeline(clientId, { appointments } = {}) {
       ref_id: d.id,
     }))
 
+  const letterEvents = db.letters
+    .filter((l) => l.client_id === clientId)
+    .map((l) => ({
+      id: `timeline-letter-local-${l.id}`,
+      client_id: clientId,
+      type: 'letter',
+      title: l.title || 'Letter created',
+      summary: [l.letter_date, l.recipient ? `To ${l.recipient}` : 'Letter created']
+        .filter(Boolean)
+        .join(' · '),
+      created_at: l.letter_date
+        ? `${l.letter_date}T12:00:00`
+        : (l.updated_at || l.created_at),
+      author_id: l.author_id,
+      ref_id: l.id,
+    }))
+
   const apptSource = Array.isArray(appointments)
-    ? appointments
+    ? appointments.filter((a) => !a.client_id || a.client_id === clientId)
     : db.appointments.filter((a) => a.client_id === clientId)
 
   const sessionEvents = apptSource
     .filter((a) => {
       if (a.attendance_status === 'cancelled') return false
+      if (!a.client_id) return false
       const role = a.block_role
-      // Primary clinical sessions only — skip Notes/admin follow-ons and busy blocks.
-      return !role || role === 'client_session' || role === 'primary' || role === 'appointment'
+      // Everything created for the client except pure busy blocks.
+      return role !== 'busy'
     })
     .map((a) => {
       const sessionDate = a.session_date || String(a.scheduled_at || '').slice(0, 10)
       const startTime = a.start_time || String(a.scheduled_at || '').slice(11, 16)
+      const role = a.block_role
+      const isSupport = role === 'support' || role === 'admin'
+      const catalogName = getOrgServiceForModality(a.service_id || a.therapy_modality)?.name
       const title = a.service_name
-        || (a.therapy_modality && a.therapy_modality !== 't' ? String(a.therapy_modality).replace(/_/g, ' ') : null)
-        || 'Session'
+        || catalogName
+        || (a.therapy_modality && a.therapy_modality !== 't' && String(a.therapy_modality).length > 2
+          ? String(a.therapy_modality).replace(/_/g, ' ')
+          : null)
+        || (isSupport ? (role === 'admin' ? 'Admin time' : 'Support activity') : 'Session')
       const when = [sessionDate, startTime].filter(Boolean).join(' · ')
       return {
         id: `timeline-appt-${a.id}`,
         client_id: clientId,
-        type: 'session',
+        type: isSupport ? 'support' : 'session',
         title,
-        summary: [when, a.location].filter(Boolean).join(' · '),
+        summary: [when, a.location, isSupport ? (role === 'admin' ? 'Admin' : 'Support') : null]
+          .filter(Boolean)
+          .join(' · '),
         created_at: sessionDate
           ? `${sessionDate}T${startTime || '00:00'}:00`
           : (a.created_at || a.starts_at || new Date().toISOString()),
@@ -172,7 +209,16 @@ export function getClientTimeline(clientId, { appointments } = {}) {
       }
     })
 
-  return [...events, ...noteEvents, ...docEvents, ...sessionEvents].sort(
+  const activityEvents = Array.isArray(activity) ? activity : []
+
+  return [
+    ...events,
+    ...noteEvents,
+    ...docEvents,
+    ...letterEvents,
+    ...sessionEvents,
+    ...activityEvents,
+  ].sort(
     (a, b) => new Date(String(b.created_at)).getTime() - new Date(String(a.created_at)).getTime(),
   )
 }

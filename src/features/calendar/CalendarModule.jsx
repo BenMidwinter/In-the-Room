@@ -731,6 +731,7 @@ export default function CalendarModule({ persona }) {
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false)
   const [deleteScopeFor, setDeleteScopeFor] = useState(null)
   const [scheduleDeleting, setScheduleDeleting] = useState(false)
+  const [rescheduleTarget, setRescheduleTarget] = useState(null)
 
   const [availabilitySettings, setAvailabilitySettings] = useState(() => (
     getClinicianWorkplaceSettings(session.user.id)
@@ -889,17 +890,46 @@ export default function CalendarModule({ persona }) {
 
   const selectAppointment = (appt) => {
     if (appt?.is_external_busy) return
+    // Leave reschedule mode if the clinician picks another event.
+    if (rescheduleTarget) setRescheduleTarget(null)
     // View overlay (attendance / details). Edit is a separate overlay from there.
     setScheduleDraft(null)
     setSelectedAppointment((prev) => (prev?.id === appt.id ? null : appt))
   }
 
   const openScheduleSlot = (sessionDate, startTime, manual = false) => {
+    if (rescheduleTarget) {
+      const duration = Math.max(
+        0,
+        parseMinutes(rescheduleTarget.end_time) - parseMinutes(rescheduleTarget.start_time),
+      ) || 60
+      const endTime = hhmm(
+        Math.floor((parseMinutes(startTime) + duration) / 60),
+        (parseMinutes(startTime) + duration) % 60,
+      )
+      const moved = {
+        ...rescheduleTarget,
+        session_date: sessionDate,
+        start_time: startTime,
+        end_time: endTime,
+      }
+      setRescheduleTarget(null)
+      setSelectedAppointment(null)
+      setScheduleDraft({
+        mode: 'edit',
+        appointment: moved,
+        session_date: sessionDate,
+        start_time: startTime,
+        manual: true,
+      })
+      return
+    }
     setSelectedAppointment(null)
     setScheduleDraft({ mode: 'create', session_date: sessionDate, start_time: startTime, manual })
   }
 
   const openAddAppointment = () => {
+    setRescheduleTarget(null)
     openScheduleSlot(activeDate, hhmm(viewPrefs.startHour, 0), true)
   }
 
@@ -907,6 +937,17 @@ export default function CalendarModule({ persona }) {
     setSelectedAppointment(null)
     setScheduleDraft(null)
   }
+
+  const cancelReschedule = () => setRescheduleTarget(null)
+
+  useEffect(() => {
+    if (!rescheduleTarget) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') setRescheduleTarget(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [rescheduleTarget])
 
   const handleViewPrefsChange = (patch) => {
     setViewPrefs(prev => saveCalendarViewPreferences({ ...prev, ...patch }))
@@ -923,7 +964,12 @@ export default function CalendarModule({ persona }) {
         end_time: selectedAppointment.end_time,
         appointment_type: selectedAppointment.appointment_type,
         therapy_modality: selectedAppointment.therapy_modality,
+        service_id: selectedAppointment.service_id,
+        service_name: selectedAppointment.service_name,
         location: selectedAppointment.location,
+        other_info: selectedAppointment.other_info,
+        block_role: selectedAppointment.block_role || 'client_session',
+        clinician_id: selectedAppointment.clinician_id,
         attendance_status: status,
       },
       userId: session.user.id,
@@ -1070,11 +1116,13 @@ export default function CalendarModule({ persona }) {
             duration_minutes: payload.duration_minutes,
             therapy_modality: payload.therapy_modality,
             service_id: payload.service_id,
+            service_name: payload.service_name,
             series_id: seriesId,
             location: payload.location,
             other_info: payload.other_info,
             appointment_type: payload.appointment_type,
             clinician_id: payload.clinician_id || session.user.id,
+            block_role: payload.block_role || 'client_session',
           },
           userId: session.user.id,
         })
@@ -1093,6 +1141,7 @@ export default function CalendarModule({ persona }) {
 
   const handleEditAppointment = (appt) => {
     // Close the right-hand drawer first; edit always uses the centred overlay.
+    setRescheduleTarget(null)
     setSelectedAppointment(null)
     setScheduleDraft({
       mode: 'edit',
@@ -1104,6 +1153,7 @@ export default function CalendarModule({ persona }) {
   }
 
   const handleBookAnother = (appt) => {
+    setRescheduleTarget(null)
     setSelectedAppointment(null)
     setScheduleDraft({
       mode: 'book_another',
@@ -1115,8 +1165,17 @@ export default function CalendarModule({ persona }) {
   }
 
   const handleRecurring = (appt) => {
+    setRescheduleTarget(null)
     setSelectedAppointment(null)
     setScheduleDraft({ mode: 'recurring', source: appt })
+  }
+
+  const handleReschedule = (appt) => {
+    setSelectedAppointment(null)
+    setScheduleDraft(null)
+    setRescheduleTarget(appt)
+    if (appt?.session_date) setActiveDate(appt.session_date)
+    if (viewMode === 'month') setViewMode('week')
   }
 
   const gridHandlers = {
@@ -1173,9 +1232,9 @@ export default function CalendarModule({ persona }) {
   )
 
   // Side pane only for recurring helper — view + edit/create use centred overlays.
-  const paneOpen = scheduleDraft?.mode === 'recurring'
+  const showRecurringOverlay = scheduleDraft?.mode === 'recurring'
   const showScheduleOverlay = Boolean(scheduleDraft && scheduleDraft.mode !== 'recurring')
-  const showViewOverlay = Boolean(selectedAppointment && !showScheduleOverlay)
+  const showViewOverlay = Boolean(selectedAppointment && !showScheduleOverlay && !showRecurringOverlay)
 
   const closeScheduleOverlay = () => {
     if (scheduleDraft?.mode === 'edit' && scheduleDraft.appointment) {
@@ -1187,7 +1246,21 @@ export default function CalendarModule({ persona }) {
   }
 
   return (
-    <div className="calendar-module" data-service-catalog={serviceCatalogVersion}>
+    <div
+      className={`calendar-module${rescheduleTarget ? ' calendar-module--reschedule' : ''}`}
+      data-service-catalog={serviceCatalogVersion}
+    >
+      {rescheduleTarget && (
+        <div className="calendar-reschedule-banner" role="status">
+          <p>
+            Rescheduling <strong>{rescheduleTarget.client_name || rescheduleTarget.service_name || 'session'}</strong>
+            {' — '}click a calendar slot, then fine-tune in the edit panel.
+          </p>
+          <button type="button" className="secondary" onClick={cancelReschedule}>
+            Cancel
+          </button>
+        </div>
+      )}
       <header className="page-header page-header--with-toolbar page-header--calendar">
         <div className="page-header__text">
           <h1 className="page-header__title">Calendar</h1>
@@ -1225,23 +1298,10 @@ export default function CalendarModule({ persona }) {
       </header>
 
       <CalendarWorkspaceFrame
-        paneOpen={paneOpen}
+        paneOpen={false}
         grid={(
           <ErrorBoundary label="calendar-grid">
             <div className="calendar-module__body">{calendarGrid}</div>
-          </ErrorBoundary>
-        )}
-        accessory={(
-          <ErrorBoundary label="calendar-pane">
-            {scheduleDraft?.mode === 'recurring' ? (
-              <RecurringSchedulePanel
-                key={scheduleDraft.source.id}
-                source={scheduleDraft.source}
-                onSave={handleRecurringSave}
-                onCancel={closeSidePane}
-                saving={scheduleSaving}
-              />
-            ) : null}
           </ErrorBoundary>
         )}
       />
@@ -1257,7 +1317,21 @@ export default function CalendarModule({ persona }) {
             onEdit={handleEditAppointment}
             onBookAnother={handleBookAnother}
             onRecurring={handleRecurring}
+            onReschedule={handleReschedule}
             onDelete={handleDeleteAppointment}
+          />
+        </ErrorBoundary>
+      )}
+
+      {showRecurringOverlay && (
+        <ErrorBoundary label="calendar-recurring-overlay">
+          <RecurringSchedulePanel
+            key={scheduleDraft.source.id}
+            source={scheduleDraft.source}
+            onSave={handleRecurringSave}
+            onCancel={closeSidePane}
+            saving={scheduleSaving}
+            presentation="overlay"
           />
         </ErrorBoundary>
       )}

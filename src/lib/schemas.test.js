@@ -40,9 +40,17 @@ describe('appointmentInputSchema', () => {
     }, 'Appointment')
     expect(out.duration_minutes).toBe(45)
   })
-  it('requires a client on create', () => {
+  it('requires a client on create for clinical sessions', () => {
     expect(() => parseOrThrow(appointmentInputSchema, { session_date: '2026-07-02' }, 'Appointment'))
       .toThrow(/client is required/i)
+  })
+  it('allows support/admin blocks without a client', () => {
+    const out = parseOrThrow(appointmentInputSchema, {
+      session_date: '2026-07-02',
+      start_time: '09:00',
+      block_role: 'admin',
+    }, 'Appointment')
+    expect(out.block_role).toBe('admin')
   })
   it('requires a date on create', () => {
     expect(() => parseOrThrow(appointmentInputSchema, { client_id: 'client-1' }, 'Appointment'))

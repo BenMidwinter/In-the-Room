@@ -5,17 +5,27 @@ import { getProfile } from '../../lib/store'
 const TYPE_LABELS = {
   created: 'Record',
   session: 'Session',
+  support: 'Support / admin',
   referral: 'Referral',
   note: 'Progress note',
   document: 'Document',
+  letter: 'Letter',
+  report: 'Report',
+  form: 'Form',
+  event: 'Activity',
 }
 
 const TYPE_COLORS = {
   created: 'badge-blue',
   session: 'badge-green',
+  support: 'badge-grey',
   referral: 'badge-grey',
   note: 'badge-blue',
   document: 'badge-grey',
+  letter: 'badge-blue',
+  report: 'badge-green',
+  form: 'badge-blue',
+  event: 'badge-grey',
 }
 
 function formatDate(iso) {
@@ -34,8 +44,12 @@ export default function ClientTimeline({ events, orientation = 'vertical' }) {
   const eventHref = (event) => {
     const clientId = event.client_id || routeClientId
     if (!clientId || !event.ref_id) return null
-    if (event.type === 'session') return `/clients/${clientId}/appointments/${event.ref_id}`
+    if (event.type === 'session' || event.type === 'support') {
+      return `/clients/${clientId}/appointments/${event.ref_id}`
+    }
     if (event.type === 'note') return `/clients/${clientId}/notes-history`
+    if (event.type === 'letter') return `/clients/${clientId}/letters`
+    if (event.type === 'document') return `/clients/${clientId}/documents`
     return null
   }
 

@@ -239,6 +239,13 @@ export async function fetchUpcomingAppointments(
   ).reverse() as AppAppointment[]
 }
 
+function blockRoleFromServiceType(serviceType: string | null | undefined): string {
+  if (serviceType === 'admin') return 'admin'
+  if (serviceType === 'busy') return 'busy'
+  if (serviceType === 'support') return 'support'
+  return 'client_session'
+}
+
 export async function upsertAppointmentRemote(
   payload: Record<string, unknown>,
   userId: string,
@@ -247,57 +254,109 @@ export async function upsertAppointmentRemote(
   if (!supabase) throw new Error('Supabase is not configured')
 
   payload = parseOrThrow(appointmentInputSchema, payload, 'Appointment') as Record<string, unknown>
+
+  const existingId = payload.id && /^[0-9a-f-]{36}$/i.test(String(payload.id))
+    ? String(payload.id)
+    : null
+  const existingLocal = existingId
+    ? (db.appointments.find((a) => a.id === existingId) as AppAppointment | undefined)
+    : undefined
+
   const schedule = payload.session_date
-    ? { session_date: String(payload.session_date), start_time: String(payload.start_time || '09:00') }
+    ? { session_date: String(payload.session_date), start_time: String(payload.start_time || existingLocal?.start_time || '09:00') }
     : fromDatetimeLocalValue(String(payload.scheduled_at || ''))
 
-  const durationMinutes = Number(payload.duration_minutes ?? 60)
-  const client = db.clients.find((c) => c.id === payload.client_id) as
-    | { real_name?: string; first_name?: string; surname?: string; workplace_id?: string | null }
-    | undefined
-  const clinicianId = String(payload.clinician_id || userId)
-  const startTime = String(schedule.start_time || '09:00')
+  const durationMinutes = Number(
+    payload.duration_minutes
+    ?? (existingLocal
+      ? Math.max(0, Number(parseMinutesSafe(existingLocal.end_time) - parseMinutesSafe(existingLocal.start_time))) || 60
+      : 60),
+  )
+  const clientId = payload.client_id != null && payload.client_id !== ''
+    ? String(payload.client_id)
+    : (existingLocal?.client_id || null)
+  const client = clientId
+    ? (db.clients.find((c) => c.id === clientId) as
+      | { real_name?: string; first_name?: string; surname?: string; workplace_id?: string | null }
+      | undefined)
+    : undefined
+  const clinicianId = String(payload.clinician_id || existingLocal?.clinician_id || userId)
+  const startTime = String(schedule.start_time || existingLocal?.start_time || '09:00')
   const endTime = payload.end_time
     ? String(payload.end_time)
-    : addMinutesToTime(startTime, durationMinutes)
-  const sessionDate = String(schedule.session_date)
+    : (existingLocal?.end_time && !payload.duration_minutes && !payload.start_time
+      ? existingLocal.end_time
+      : addMinutesToTime(startTime, durationMinutes))
+  const sessionDate = String(schedule.session_date || existingLocal?.session_date || '')
   const startsAt = new Date(`${sessionDate}T${startTime}:00`).toISOString()
   const endsAt = new Date(`${sessionDate}T${endTime}:00`).toISOString()
 
   const clientName = String(
     client?.real_name
     || `${client?.first_name || ''} ${client?.surname || ''}`.trim()
-    || 'Client',
+    || existingLocal?.client_name
+    || (clientId ? 'Client' : 'No client'),
   )
   const assignedTherapist = await resolveClinicianDisplayName(supabase, clinicianId)
 
-  const serviceId = payload.service_id && /^[0-9a-f-]{36}$/i.test(String(payload.service_id))
-    ? String(payload.service_id)
+  const serviceIdRaw = payload.service_id !== undefined
+    ? payload.service_id
+    : existingLocal?.service_id
+  const serviceId = serviceIdRaw && /^[0-9a-f-]{36}$/i.test(String(serviceIdRaw))
+    ? String(serviceIdRaw)
     : null
 
-  let serviceName = String(payload.service_name || '').trim()
-  let therapyModality = String(payload.therapy_modality || 'music_therapy')
+  let serviceName = String(
+    (payload as { service_name?: string }).service_name
+    || existingLocal?.service_name
+    || '',
+  ).trim()
+  let therapyModality = String(
+    payload.therapy_modality
+    || existingLocal?.therapy_modality
+    || 'music_therapy',
+  )
+  let serviceType: string | null = null
   if (serviceId) {
     try {
       const primary = await getServiceById(serviceId)
       if (primary) {
         serviceName = primary.name
         therapyModality = primary.slug || therapyModality
+        serviceType = primary.service_type || null
       }
     } catch {
       /* keep payload modality */
     }
   }
 
+  const previousExtras = existingLocal
+    ? {
+        location: existingLocal.location || '',
+        notes: existingLocal.notes || '',
+        other_info: existingLocal.other_info || '',
+        service_name: existingLocal.service_name,
+        therapy_modality: existingLocal.therapy_modality,
+        client_name: existingLocal.client_name,
+        assigned_therapist: existingLocal.assigned_therapist,
+      }
+    : null
+
   const extras: AppointmentExtras = {
     v: 0,
     client_name: clientName,
-    assigned_therapist: assignedTherapist,
+    assigned_therapist: assignedTherapist || previousExtras?.assigned_therapist || 'Clinician',
     therapy_modality: therapyModality,
-    service_name: serviceName || undefined,
-    location: String(payload.location ?? ''),
-    notes: String(payload.notes ?? ''),
-    other_info: String((payload.other_info as string | undefined)?.trim?.() || payload.other_info || ''),
+    service_name: serviceName || previousExtras?.service_name || undefined,
+    location: payload.location !== undefined
+      ? String(payload.location ?? '')
+      : (previousExtras?.location || ''),
+    notes: payload.notes !== undefined
+      ? String(payload.notes ?? '')
+      : (previousExtras?.notes || ''),
+    other_info: payload.other_info !== undefined
+      ? String((payload.other_info as string | undefined)?.trim?.() || payload.other_info || '')
+      : (previousExtras?.other_info || ''),
     session_date: sessionDate,
     start_time: startTime,
     end_time: endTime,
@@ -309,27 +368,44 @@ export async function upsertAppointmentRemote(
     ? String(payload.series_id)
     : undefined
 
+  const blockRole = String(
+    payload.block_role
+    || (serviceType ? blockRoleFromServiceType(serviceType) : null)
+    || existingLocal?.block_role
+    || 'client_session',
+  )
+
+  const attendanceStatus = payload.attendance_status !== undefined
+    ? (payload.attendance_status as string | null)
+    : (existingLocal?.attendance_status ?? null)
+
   const row = {
     owner_id: userId,
     organization_id: client?.workplace_id || null,
-    client_id: payload.client_id ? String(payload.client_id) : null,
+    client_id: clientId,
     clinician_id: clinicianId,
-    episode_id: payload.episode_id ? String(payload.episode_id) : null,
+    episode_id: payload.episode_id !== undefined
+      ? (payload.episode_id ? String(payload.episode_id) : null)
+      : (existingLocal?.episode_id || null),
     service_id: serviceId,
-    appointment_type: String(payload.appointment_type || 'one_to_one'),
+    appointment_type: String(
+      payload.appointment_type
+      || existingLocal?.appointment_type
+      || 'one_to_one',
+    ),
     starts_at: startsAt,
     ends_at: endsAt,
-    attendance_status: (payload.attendance_status as string | null | undefined) ?? null,
+    attendance_status: attendanceStatus,
     encrypted_payload: extras as unknown as Json,
-    block_role: 'client_session' as const,
+    block_role: blockRole,
     ...(seriesId ? { series_id: seriesId } : {}),
   }
 
-  if (payload.id && /^[0-9a-f-]{36}$/i.test(String(payload.id))) {
+  if (existingId) {
     const { data, error } = await supabase
       .from('appointments')
       .update(row)
-      .eq('id', String(payload.id))
+      .eq('id', existingId)
       .select(selectCols)
       .single()
     if (error) throw error
@@ -367,6 +443,12 @@ export async function upsertAppointmentRemote(
   }
 
   return mapped
+}
+
+function parseMinutesSafe(time: string | undefined): number {
+  if (!time) return 0
+  const [h, m] = String(time).split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
 }
 
 async function createFollowOnBlock(opts: {
