@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import RoleBlockShell from '../../components/RoleBlockShell'
 import { getProfile, updateProfile } from '../../lib/store'
 import { profileInitials } from '../../lib/clinicianAvailability'
-import PrivatePracticeBrandingPanel from './PrivatePracticeBrandingPanel'
 import ProfileAvailabilityPanel from './ProfileAvailabilityPanel'
+import LetterheadsPanel from './LetterheadsPanel'
 import { getSupabase } from '../../lib/supabase/client'
 import { useToast } from '../../components/ui'
 
@@ -271,10 +271,6 @@ export function ProfileAvailabilityBlock({ userId, onSaved }) {
   )
 }
 
-export function ProfileLetterheadBlock({ userId }) {
-  return (
-    <RoleBlockShell blockId="profile_letterhead" title="Private practice letterhead">
-      <PrivatePracticeBrandingPanel userId={userId} />
-    </RoleBlockShell>
-  )
+export function ProfileLetterheadBlock() {
+  return <LetterheadsPanel />
 }

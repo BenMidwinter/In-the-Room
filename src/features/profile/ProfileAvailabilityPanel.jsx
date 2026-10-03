@@ -11,7 +11,11 @@ import {
   getSettingsForLocation,
   mergeSettingsForLocations,
 } from '../../lib/clinicianAvailability'
+import { listAvailabilitySettings, saveAvailabilitySettings } from '../../lib/supabase/availabilityRepo'
+import { isSupabaseConfigured } from '../../lib/supabase/client'
+import { listServices as listRemoteServices } from '../../lib/supabase/servicesRepo'
 import { useToast } from '../../components/ui'
+
 function formatMemberRole(role) {
   return String(role || '').replace(/_/g, ' ')
 }
@@ -100,13 +104,13 @@ function LocationAvailabilityEditor({
 export default function ProfileAvailabilityPanel({ userId, onSaved }) {
   const toast = useToast()
   const locations = useMemo(() => getClinicianLocationsForUser(userId), [userId])
-  const services = useMemo(() => getAppointmentOrgServices(), [])
   const locationIds = useMemo(() => locations.map(loc => loc.id), [locations])
   const locationNameById = useMemo(
     () => Object.fromEntries(locations.map(loc => [loc.id, loc.name])),
     [locations],
   )
 
+  const [services, setServices] = useState(() => getAppointmentOrgServices())
   const [settings, setSettings] = useState([])
   const [activeLocationId, setActiveLocationId] = useState('')
   const [overlapNote, setOverlapNote] = useState('')
@@ -115,12 +119,33 @@ export default function ProfileAvailabilityPanel({ userId, onSaved }) {
 
   useEffect(() => {
     if (!userId) return
-    const stored = getClinicianWorkplaceSettings(userId)
-    const merged = mergeSettingsForLocations(stored, locationIds)
-    setSettings(merged)
-    setActiveLocationId(prev => (
-      prev && locationIds.includes(prev) ? prev : locationIds[0] || ''
-    ))
+    let cancelled = false
+
+    async function load() {
+      setError('')
+      let remote = []
+      if (isSupabaseConfigured()) {
+        try {
+          remote = await listAvailabilitySettings()
+          const remoteServices = await listRemoteServices()
+          if (!cancelled && remoteServices.length) {
+            setServices(remoteServices.filter((s) => s.service_type === 'appointment' || !s.service_type))
+          }
+        } catch (err) {
+          if (!cancelled) setError(err.message)
+        }
+      }
+      if (cancelled) return
+      const local = getClinicianWorkplaceSettings(userId)
+      const merged = mergeSettingsForLocations(remote.length ? remote : local, locationIds)
+      setSettings(merged)
+      setActiveLocationId(prev => (
+        prev && locationIds.includes(prev) ? prev : locationIds[0] || ''
+      ))
+    }
+
+    load()
+    return () => { cancelled = true }
   }, [userId, locationIds])
 
   const activeLocation = locations.find(loc => loc.id === activeLocationId) || locations[0]
@@ -171,6 +196,9 @@ export default function ProfileAvailabilityPanel({ userId, onSaved }) {
     setSaving(true)
     try {
       updateClinicianWorkplaceSettings(userId, settings, locationIds)
+      if (isSupabaseConfigured()) {
+        await saveAvailabilitySettings(settings)
+      }
       setOverlapNote('')
       toast.saved()
       onSaved?.()

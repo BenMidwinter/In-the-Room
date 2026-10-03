@@ -38,6 +38,8 @@ import {
   isMinutesWithinAvailability,
   unionWeeklyHours,
 } from '../../lib/clinicianAvailability'
+import { listAvailabilitySettings } from '../../lib/supabase/availabilityRepo'
+import { isSupabaseConfigured } from '../../lib/supabase/client'
 import {
   canPickCalendarOwner,
   filterAppointmentsByCalendarOwner,
@@ -693,10 +695,33 @@ export default function CalendarModule({ persona }) {
   const [viewPrefs, setViewPrefs] = useState(() => getCalendarViewPreferences())
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false)
 
-  const weeklyHours = useMemo(() => {
-    const settings = getClinicianWorkplaceSettings(session.user.id)
-    return unionWeeklyHours(settings)
+  const [availabilitySettings, setAvailabilitySettings] = useState(() => (
+    getClinicianWorkplaceSettings(session.user.id)
+  ))
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadAvailability() {
+      const local = getClinicianWorkplaceSettings(session.user.id)
+      if (!isSupabaseConfigured()) {
+        if (!cancelled) setAvailabilitySettings(local)
+        return
+      }
+      try {
+        const remote = await listAvailabilitySettings()
+        if (!cancelled) setAvailabilitySettings(remote.length ? remote : local)
+      } catch {
+        if (!cancelled) setAvailabilitySettings(local)
+      }
+    }
+    loadAvailability()
+    return () => { cancelled = true }
   }, [session.user.id])
+
+  const weeklyHours = useMemo(
+    () => unionWeeklyHours(availabilitySettings),
+    [availabilitySettings],
+  )
 
   useEffect(() => {
     const bounds = getAvailabilityBounds(weeklyHours)

@@ -14,7 +14,7 @@ export default function AccountSettingsPage() {
   return (
     <div className="role-block-stack">
       <ProfileIdentityBlock session={session} onSaved={refreshClients} />
-      <ProfileLetterheadBlock userId={session.user.id} />
+      <ProfileLetterheadBlock />
     </div>
   )
 }

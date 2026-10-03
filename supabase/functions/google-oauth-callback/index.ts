@@ -17,13 +17,20 @@ Deno.serve(async (req) => {
     if (oauthError) return redirect(siteUrl, { google: 'error', message: oauthError })
     if (!code || !state) return redirect(siteUrl, { google: 'error', message: 'Missing code/state' })
 
-    const clientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')
-    const clientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')
-    const encKey = Deno.env.get('CREDENTIALS_ENCRYPTION_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const clientId = String(Deno.env.get('GOOGLE_OAUTH_CLIENT_ID') || '').trim()
+    const clientSecret = String(Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET') || '').trim()
+    const encKey = String(
+      Deno.env.get('CREDENTIALS_ENCRYPTION_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '',
+    ).trim()
     if (!clientId || !clientSecret || !encKey) {
+      const missing = [
+        !clientId && 'GOOGLE_OAUTH_CLIENT_ID',
+        !clientSecret && 'GOOGLE_OAUTH_CLIENT_SECRET',
+        !encKey && 'CREDENTIALS_ENCRYPTION_KEY',
+      ].filter(Boolean).join(', ')
       return redirect(siteUrl, {
         google: 'error',
-        message: 'Missing GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, or CREDENTIALS_ENCRYPTION_KEY secrets',
+        message: `Missing Edge Function secrets: ${missing}`,
       })
     }
     const [stateBody, sig] = state.split('.')

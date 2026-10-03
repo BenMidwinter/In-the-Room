@@ -3,7 +3,19 @@ import { ORG_BLOCK_META } from '../lib/orgBlocks'
 
 const BLOCK_META = { ...ROLE_BLOCK_META, ...PROFILE_BLOCK_META, ...ORG_BLOCK_META }
 
-export default function RoleBlockShell({ blockId, title, description, children, actions }) {
+/**
+ * Modular section chrome.
+ * - `actions`: header-right controls
+ * - `toolbar`: strip above the body (lists, + New, filters)
+ */
+export default function RoleBlockShell({
+  blockId,
+  title,
+  description,
+  children,
+  actions,
+  toolbar,
+}) {
   const meta = BLOCK_META[blockId] || {}
   const heading = title ?? meta.title
 
@@ -20,6 +32,11 @@ export default function RoleBlockShell({ blockId, title, description, children, 
         </div>
         {actions && <div className="role-block__actions">{actions}</div>}
       </header>
+      {toolbar && (
+        <div className="role-block__toolbar" role="toolbar" aria-label={`${heading} tools`}>
+          {toolbar}
+        </div>
+      )}
       <div className="role-block__body">{children}</div>
     </section>
   )
