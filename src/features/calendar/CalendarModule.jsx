@@ -400,7 +400,7 @@ function MonthView({ activeDate, appointments, onSelectDate, blurNames = false, 
   return (
     <div className="calendar-month">
       <div className="calendar-month__head">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(d => (
           <div key={d} className="calendar-month__weekday">{d}</div>
         ))}
       </div>
@@ -685,7 +685,7 @@ function DayView({
 
 export default function CalendarModule({ persona }) {
   const { myWorkplace, session } = useAppSession()
-  const [viewMode, setViewMode] = useState('working-week')
+  const [viewMode, setViewMode] = useState('week')
   const [activeDate, setActiveDate] = useState(DEMO_TODAY)
   const [selectedAppointment, setSelectedAppointment] = useState(null)
   const [scheduleDraft, setScheduleDraft] = useState(null)

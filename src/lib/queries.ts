@@ -1,24 +1,18 @@
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import {
-  getClientsForUser,
   getOrganisationClients,
   getWorkplaceContextsForUser,
   getOrganisationWorkplaceContexts,
 } from './store'
+import { fetchClientsForUser } from './supabase/clientsRepo'
 import { ROLES } from './permissions'
 import { workplaceQueryKeys } from './workplaceQueries'
 import { useAppSession } from './AppSessionContext'
 
 /**
- * Server-state facade. The store is still synchronous today, so the query
- * functions resolve immediately — but routing everything through TanStack Query
- * gives us a single cache, automatic dedupe, and invalidation-based refresh
- * instead of manual re-fetch counters. When the store becomes a real async API,
- * only the query functions change; the hooks and their consumers do not.
- *
- * staleTime: Infinity because the in-memory store never goes stale on its own —
- * data only changes via mutations, which explicitly invalidate the relevant keys.
+ * Server-state facade via TanStack Query.
+ * Clients load from Supabase when configured; otherwise the in-memory store.
  */
 
 export const queryKeys = {
@@ -30,14 +24,14 @@ export const queryKeys = {
 
 /** Caseload for the active user/workplace/role, sourced from the query cache. */
 export function useClientsQuery({ userId, demoRole, activeWorkplaceId, myWorkplace }) {
-  const needsWorkplaceContext = demoRole !== ROLES.SERVICE_LEAD
   return useQuery({
     queryKey: queryKeys.clientList(userId, activeWorkplaceId, demoRole),
     queryFn: () =>
       demoRole === ROLES.SERVICE_LEAD
-        ? getOrganisationClients()
-        : getClientsForUser(userId, myWorkplace),
-    enabled: Boolean(userId) && (!needsWorkplaceContext || Boolean(myWorkplace)),
+        ? Promise.resolve(getOrganisationClients())
+        : fetchClientsForUser(userId, myWorkplace),
+    // Freelance clinicians have no workplace context — still load their private caseload.
+    enabled: Boolean(userId),
     placeholderData: keepPreviousData,
   })
 }

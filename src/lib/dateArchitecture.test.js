@@ -16,6 +16,7 @@ import {
   buildCalendarTimeSlots,
   appointmentTimeSlot,
   monthGridDays,
+  weekDatesYmd,
   workingWeekDatesYmd,
 } from './dateArchitecture'
 
@@ -115,5 +116,12 @@ describe('grids', () => {
     expect(week).toHaveLength(5)
     expect(week[0]).toBe('2026-06-22') // Monday
     expect(week[4]).toBe('2026-06-26') // Friday
+  })
+
+  it('weekDatesYmd returns Mon–Sun', () => {
+    const week = weekDatesYmd('2026-06-24') // Wednesday
+    expect(week).toHaveLength(7)
+    expect(week[0]).toBe('2026-06-22') // Monday
+    expect(week[6]).toBe('2026-06-28') // Sunday
   })
 })

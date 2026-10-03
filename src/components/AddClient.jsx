@@ -6,6 +6,8 @@ import PageHeader from './PageHeader'
 import { usePermissions } from '../lib/usePermissions'
 import { useToast } from './ui'
 import { getWorkplacesForUser, upsertClient, getClientById } from '../lib/store'
+import { upsertClientRemote } from '../lib/supabase/clientsRepo'
+import { isSupabaseConfigured } from '../lib/supabase/client'
 
 export default function AddClient() {
   const navigate = useNavigate()
@@ -77,7 +79,7 @@ export default function AddClient() {
     setErrors({})
     setLoading(true)
     try {
-      upsertClient({
+      const payload = {
         id: isEditMode ? clientId : undefined,
         first_name: firstName,
         surname,
@@ -85,7 +87,12 @@ export default function AddClient() {
         school,
         diagnosis: selectedDiagnoses.join(', '),
         workplace_id: selectedWorkplaceId === 'private' ? null : selectedWorkplaceId,
-      }, session.user.id)
+      }
+      if (isSupabaseConfigured()) {
+        await upsertClientRemote(payload, session.user.id)
+      } else {
+        upsertClient(payload, session.user.id)
+      }
       refreshClients()
       toast.success(isEditMode ? 'Client updated.' : 'Client added.')
       navigate('/clients')

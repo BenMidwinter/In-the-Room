@@ -111,10 +111,15 @@ export function daysBetweenYmd(fromYmd: string, toYmd: string): number {
 /** Demo anchor — avoids Date objects in React state for “today”. */
 export const DEMO_TODAY = '2026-06-26'
 
+/** Days from Monday (0) … Sunday (6) for UK-style calendars. */
+export function mondayWeekdayIndex(ymd: string): number {
+  return (weekdayIndex(ymd) + 6) % 7
+}
+
 export function monthGridDays(activeYmd: string): MonthGridDay[] {
   const first = startOfMonthYmd(activeYmd)
   const totalDays = daysInMonthYmd(activeYmd)
-  const startPad = weekdayIndex(first)
+  const startPad = mondayWeekdayIndex(first)
   const cells: MonthGridDay[] = []
 
   for (let i = 0; i < startPad; i += 1) {
@@ -133,14 +138,14 @@ export function monthGridDays(activeYmd: string): MonthGridDay[] {
   return cells.slice(0, 35)
 }
 
+/** Full week Mon–Sun containing `activeYmd`. */
 export function weekDatesYmd(activeYmd: string): string[] {
-  const sunday = addDaysYmd(activeYmd, -weekdayIndex(activeYmd))
-  return Array.from({ length: 7 }, (_, i) => addDaysYmd(sunday, i))
+  const monday = addDaysYmd(activeYmd, -mondayWeekdayIndex(activeYmd))
+  return Array.from({ length: 7 }, (_, i) => addDaysYmd(monday, i))
 }
 
 export function workingWeekDatesYmd(activeYmd: string): string[] {
-  const mondayOffset = (weekdayIndex(activeYmd) + 6) % 7
-  const monday = addDaysYmd(activeYmd, -mondayOffset)
+  const monday = addDaysYmd(activeYmd, -mondayWeekdayIndex(activeYmd))
   return Array.from({ length: 5 }, (_, i) => addDaysYmd(monday, i))
 }
 
