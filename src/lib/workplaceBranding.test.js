@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { resetStore, getWorkplaceRecord, updateWorkplaceBranding, updatePrivatePracticeBranding, getProfile } from './store'
 import {
-  CHROMATIK_DEFAULT_LOGO_URL,
+  DEFAULT_PRACTICE_LOGO_URL,
   DEFAULT_WORKPLACE_BRANDING,
   formatWorkplaceAddress,
   getClinicalExportBranding,
