@@ -17,7 +17,8 @@ Linked to the **In the Room** Supabase project (`wejnkrjrhzzztrrizxai`).
 cp .env.example .env
 ```
 
-See `docs/SYSTEM_ARCHITECTURE.md` for security and frontend architecture directives.
+See `docs/SYSTEM_ARCHITECTURE.md` for security and frontend architecture directives.  
+Before go-live on a custom domain, see `docs/PRE_LAUNCH_CHECKLIST.md`.
 
 ## App
 
