@@ -163,3 +163,50 @@
 .role-block--settings_templates_working_document {
   border-left: 4px solid var(--col-primary);
 }
+
+.settings-google-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.settings-google-row__icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  background: #fff;
+}
+
+.settings-google-row__body {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.settings-google-row__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.settings-google-row__meta {
+  margin: 0.2rem 0 0;
+  color: var(--txt-muted);
+  font-size: 0.875rem;
+}
+
+.settings-google-row__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.settings-integration--compact {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}

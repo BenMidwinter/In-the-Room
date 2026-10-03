@@ -34,6 +34,7 @@ export type AppAppointment = {
   client_name: string
   episode_id: string | null
   clinician_id: string
+  service_id?: string | null
   assigned_therapist: string
   session_date: string
   start_time: string
@@ -79,6 +80,7 @@ function toAppAppointment(row: {
   client_id: string | null
   clinician_id: string
   episode_id: string | null
+  service_id?: string | null
   appointment_type: string
   attendance_status: string | null
   starts_at: string
@@ -100,6 +102,7 @@ function toAppAppointment(row: {
     client_name: extras.client_name || 'Client',
     episode_id: row.episode_id,
     clinician_id: row.clinician_id,
+    service_id: row.service_id ?? null,
     assigned_therapist: extras.assigned_therapist || 'Clinician',
     session_date: sessionDate,
     start_time: startTime,
@@ -130,7 +133,7 @@ export async function listAppointmentsFromSupabase(): Promise<AppAppointment[]> 
 
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
     .order('starts_at', { ascending: false })
 
   if (error) throw error
@@ -162,7 +165,7 @@ export async function fetchAppointment(appointmentId: string): Promise<AppAppoin
   if (!supabase) return null
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
     .eq('id', appointmentId)
     .maybeSingle()
   if (error) throw error
@@ -241,12 +244,17 @@ export async function upsertAppointmentRemote(
     end_time: endTime,
   }
 
+  const serviceId = payload.service_id && /^[0-9a-f-]{36}$/i.test(String(payload.service_id))
+    ? String(payload.service_id)
+    : null
+
   const row = {
     owner_id: userId,
     organization_id: client?.workplace_id || null,
     client_id: payload.client_id ? String(payload.client_id) : null,
     clinician_id: clinicianId,
     episode_id: payload.episode_id ? String(payload.episode_id) : null,
+    service_id: serviceId,
     appointment_type: String(payload.appointment_type || 'one_to_one'),
     starts_at: startsAt,
     ends_at: endsAt,
@@ -260,7 +268,7 @@ export async function upsertAppointmentRemote(
       .from('appointments')
       .update(row)
       .eq('id', String(payload.id))
-      .select('id, client_id, clinician_id, episode_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+      .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
       .single()
     if (error) throw error
     const mapped = toAppAppointment(data)
@@ -273,7 +281,7 @@ export async function upsertAppointmentRemote(
   const { data, error } = await supabase
     .from('appointments')
     .insert(row)
-    .select('id, client_id, clinician_id, episode_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
     .single()
   if (error) throw error
   const mapped = toAppAppointment(data)

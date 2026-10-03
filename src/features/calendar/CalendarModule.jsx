@@ -891,8 +891,7 @@ export default function CalendarModule({ persona }) {
           },
           userId: session.user.id,
         })
-        // Google Meet for opted-in services once appointments persist as UUIDs in Supabase.
-        if (last?.id && /^[0-9a-f-]{36}$/i.test(last.id) && payload.create_meet_link !== false) {
+        if (last?.id && /^[0-9a-f-]{36}$/i.test(last.id) && payload.create_meet_link) {
           try {
             const { createMeetForAppointment } = await import('../../lib/supabase/googleMeet')
             const startsAt = `${last.session_date}T${last.start_time}:00`

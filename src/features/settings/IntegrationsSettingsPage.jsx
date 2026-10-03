@@ -45,24 +45,21 @@ export default function IntegrationsSettingsPage() {
     const pulled = params.get('pulled')
     const email = params.get('email')
 
-    // Clear OAuth query params so refresh does not re-toast.
     const next = new URLSearchParams(params)
     ;['google', 'message', 'pulled', 'email'].forEach((key) => next.delete(key))
     setParams(next, { replace: true })
 
     if (status === 'connected') {
-      const label = email ? `Google connected (${email}).` : 'Google Calendar connected.'
       const syncNote = pulled != null ? ` Pulled ${pulled} busy block${pulled === '1' ? '' : 's'}.` : ''
-      setInfo(`${label}${syncNote}`)
+      setInfo(`Connected${email ? ` as ${email}` : ''}.${syncNote}`)
       toast.saved('Google connected')
       reload()
         .then(async (rows) => {
           const linked = rows.find((row) => row.provider === 'google' && row.status === 'connected')
           if (!linked || pulled != null) return
-          // Callback may have skipped sync; pull now from the browser session.
           try {
             const data = await invokeFunction('google-calendar-sync', { method: 'POST', body: {} })
-            setInfo(`Google Calendar connected. Pulled ${data?.pulled ?? 0} busy blocks.`)
+            setInfo(`Connected. Pulled ${data?.pulled ?? 0} busy blocks.`)
             await reload()
           } catch (err) {
             setError(err.message || 'Connected, but sync failed. Try Sync now.')
@@ -137,7 +134,7 @@ export default function IntegrationsSettingsPage() {
     setError(null)
     try {
       const data = await invokeFunction('google-calendar-sync', { method: 'POST', body: {} })
-      setInfo(`Sync complete. Pulled ${data?.pulled ?? 0} busy blocks into your calendar.`)
+      setInfo(`Synced ${data?.pulled ?? 0} busy blocks.`)
       await reload()
       toast.saved('Synced')
     } catch (err) {
@@ -149,25 +146,66 @@ export default function IntegrationsSettingsPage() {
 
   return (
     <div className="role-block-stack">
-      <SettingsSectionCard blockId="settings_integrations_google" title="Google Workspace">
-        <p className="text-muted" style={{ marginTop: 0 }}>
-          Every clinician links their own Google account with Connect below — no one pastes API keys.
-          In the Room uses one shared Google Cloud OAuth app (configured once by us as project secrets);
-          each user then authorises their Workspace/Calendar through Google’s normal consent screen.
-          After connect, busy time is pulled into the calendar automatically.
-        </p>
-
+      <SettingsSectionCard blockId="settings_integrations_google" title="Google Calendar">
         {!isSupabaseConfigured() && (
           <p className="auth-page__alert">Supabase env vars required.</p>
         )}
 
-        {google?.status === 'connected' ? (
-          <div className="settings-integration">
-            <p>
-              Status: <strong>{google.status}</strong>
-              {google.account_email ? ` · ${google.account_email}` : ''}
-              {google.last_synced_at ? ` · last sync ${new Date(google.last_synced_at).toLocaleString()}` : ''}
-            </p>
+        <div className="settings-google-row">
+          <img
+            className="settings-google-row__icon"
+            src="/integrations/google-calendar.jpg"
+            alt=""
+            width={40}
+            height={40}
+          />
+          <div className="settings-google-row__body">
+            <div className="settings-google-row__title">
+              <strong>Google Calendar</strong>
+              {google?.status === 'connected' ? (
+                <span className="badge badge-green">Connected</span>
+              ) : (
+                <span className="badge badge-grey">Not linked</span>
+              )}
+            </div>
+            {google?.status === 'connected' ? (
+              <p className="settings-google-row__meta">
+                {google.account_email || 'Linked account'}
+                {google.last_synced_at
+                  ? ` · synced ${new Date(google.last_synced_at).toLocaleString()}`
+                  : ''}
+              </p>
+            ) : (
+              <p className="settings-google-row__meta">
+                Link your account to pull busy time and create Meet links.
+              </p>
+            )}
+          </div>
+          <div className="settings-google-row__actions">
+            {google?.status === 'connected' ? (
+              <>
+                <button type="button" className="btn btn-secondary" onClick={syncNow} disabled={busy}>
+                  Sync now
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={connectGoogle} disabled={busy}>
+                  Reconnect
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={connectGoogle}
+                disabled={busy || !isSupabaseConfigured()}
+              >
+                {busy ? 'Redirecting…' : 'Connect'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {google?.status === 'connected' && (
+          <div className="settings-integration settings-integration--compact">
             {google.last_error && (
               <p className="auth-page__alert" role="alert">
                 Last sync error: {google.last_error}
@@ -180,7 +218,7 @@ export default function IntegrationsSettingsPage() {
                 onChange={(e) => updateFlags({ pull_external_busy: e.target.checked })}
                 disabled={busy}
               />
-              Pull Google busy time into calendar
+              Pull Google busy time
             </label>
             <label className="settings-service-list__meet">
               <input
@@ -189,7 +227,7 @@ export default function IntegrationsSettingsPage() {
                 onChange={(e) => updateFlags({ push_appointments: e.target.checked })}
                 disabled={busy}
               />
-              Push practice appointments to Google
+              Push appointments to Google
             </label>
             <label className="settings-service-list__meet">
               <input
@@ -198,27 +236,8 @@ export default function IntegrationsSettingsPage() {
                 onChange={(e) => updateFlags({ create_meet_links: e.target.checked })}
                 disabled={busy}
               />
-              Allow Google Meet links for opted-in services
+              Allow Google Meet for opted-in services
             </label>
-            <div className="settings-form__actions">
-              <button type="button" className="btn btn-secondary" onClick={syncNow} disabled={busy}>
-                Sync now
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={connectGoogle} disabled={busy}>
-                Reconnect
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="settings-integration">
-            <p className="text-muted">
-              No Google account linked yet. Click Connect to open Google and choose the calendar
-              account for this practice. (App-level OAuth client secrets are already held by In the Room —
-              users only complete the Google login/consent step.)
-            </p>
-            <button type="button" className="btn btn-primary" onClick={connectGoogle} disabled={busy || !isSupabaseConfigured()}>
-              {busy ? 'Redirecting…' : 'Connect Google Calendar'}
-            </button>
           </div>
         )}
 
@@ -227,9 +246,8 @@ export default function IntegrationsSettingsPage() {
             {error}
             {/GOOGLE_OAUTH|SITE_URL|CREDENTIALS_ENCRYPTION|refresh token|Invalid state|Token exchange/i.test(error) && (
               <>
-                {' '}Check Supabase Edge Function secrets and that Google Cloud has redirect URI
+                {' '}Check Edge Function secrets and Google redirect URI
                 {' '}<code>…/functions/v1/google-oauth-callback</code>.
-                {' '}SITE_URL must match the origin you are using now (e.g. http://localhost:5173).
               </>
             )}
           </p>
@@ -239,8 +257,7 @@ export default function IntegrationsSettingsPage() {
 
       <SettingsSectionCard blockId="settings_integrations_feed" title="Calendar feed (ICS)">
         <p className="text-muted" style={{ marginTop: 0 }}>
-          Splose-style private feed for phones and Outlook. Events export as busy blocks by default
-          (no client names). Active feeds: {feeds.length}.
+          Private feed for phones and Outlook. Busy blocks by default — no client names. Active feeds: {feeds.length}.
         </p>
         <button type="button" className="btn btn-secondary" onClick={createFeed} disabled={busy || !isSupabaseConfigured()}>
           Create feed URL

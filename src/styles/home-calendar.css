@@ -1801,8 +1801,35 @@ button.calendar-event {
   gap: 0.65rem;
 }
 
+.ck-schedule-times--start-only {
+  grid-template-columns: minmax(8rem, 11rem) 1fr;
+  align-items: end;
+}
+
 .ck-schedule-times .form-group {
   margin-bottom: 0.85rem;
+}
+
+.ck-schedule-derived {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  background: var(--bg-page);
+  font-size: 0.9rem;
+}
+
+.ck-schedule-meet {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.ck-schedule-meet input {
+  margin-top: 0.2rem;
 }
 
 .ck-schedule-warning {

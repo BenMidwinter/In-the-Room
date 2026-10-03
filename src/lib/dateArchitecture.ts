@@ -108,8 +108,18 @@ export function daysBetweenYmd(fromYmd: string, toYmd: string): number {
   return Math.round((msB - msA) / 86400000)
 }
 
-/** Demo anchor — avoids Date objects in React state for “today”. */
-export const DEMO_TODAY = '2026-06-26'
+/** Live calendar “today” as YYYY-MM-DD (local timezone). */
+export function todayYmd(): string {
+  const d = new Date()
+  return toYmd(d.getFullYear(), d.getMonth() + 1, d.getDate())
+}
+
+/**
+ * App “today” anchor used by calendar / agenda.
+ * Kept as a constant name for existing imports; value is the real local date
+ * so Google busy blocks and bookings land on the week the clinician is in.
+ */
+export const DEMO_TODAY = todayYmd()
 
 /** Days from Monday (0) … Sunday (6) for UK-style calendars. */
 export function mondayWeekdayIndex(ymd: string): number {

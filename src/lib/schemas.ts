@@ -84,6 +84,7 @@ export const appointmentInputSchema = z
     client_id: z.string().optional(),
     episode_id: z.string().nullish(),
     clinician_id: z.string().nullish(),
+    service_id: z.string().nullish(),
     session_date: dateString.optional(),
     start_time: timeString.optional(),
     end_time: timeString.optional(),
@@ -95,6 +96,7 @@ export const appointmentInputSchema = z
     location: optionalText,
     notes: z.string().optional(),
     other_info: z.string().optional(),
+    create_meet_link: z.boolean().optional(),
   })
   .refine((p) => Boolean(p.id || p.client_id), {
     message: 'A client is required to schedule an appointment.',
