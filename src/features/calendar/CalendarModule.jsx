@@ -108,6 +108,8 @@ function clamp(value, min, max) {
  */
 function layoutDayEvents(appts, dayStartMin, dayEndMin) {
   const total = Math.max(1, dayEndMin - dayStartMin)
+  // Keep short follow-on blocks tall enough to see a label (~12 minutes of day height).
+  const minHeightPct = Math.min(8, (12 / total) * 100)
   const items = appts
     .map(appt => ({
       appt,
@@ -136,10 +138,11 @@ function layoutDayEvents(appts, dayStartMin, dayEndMin) {
     const laneCount = laneEnds.length || 1
     cluster.forEach(it => {
       const width = 100 / laneCount
+      const naturalHeight = ((it.end - it.start) / total) * 100
       result.push({
         appt: it.appt,
         top: ((it.start - dayStartMin) / total) * 100,
-        height: ((it.end - it.start) / total) * 100,
+        height: Math.max(naturalHeight, minHeightPct),
         left: it.lane * width,
         width,
       })
@@ -510,8 +513,24 @@ function DayColumn({
           })}
         </div>
       ))}
+      <div className="calendar-col__busy" aria-hidden="true">
+        {laidOut.filter((item) => item.appt.is_external_busy).map((item) => (
+          <EventChip
+            key={item.appt.id}
+            appointment={item.appt}
+            compact={compact}
+            blurNames={blurNames}
+            style={{
+              top: `${item.top}%`,
+              height: `${item.height}%`,
+              left: `calc(${item.left}% + 2px)`,
+              width: `calc(${item.width}% - 4px)`,
+            }}
+          />
+        ))}
+      </div>
       <div className="calendar-col__events">
-        {laidOut.map(item => (
+        {laidOut.filter((item) => !item.appt.is_external_busy).map((item) => (
           <EventChip
             key={item.appt.id}
             appointment={item.appt}
@@ -733,6 +752,39 @@ export default function CalendarModule({ persona }) {
     [externalBusyQuery.data, session.user.id],
   )
 
+  const servicesQuery = useQuery({
+    queryKey: ['services', 'calendar-catalog'],
+    enabled: isSupabaseConfigured(),
+    queryFn: listServices,
+    staleTime: 60_000,
+  })
+
+  // Keep a React-state catalogue so chip labels/colours re-render after hydrate
+  // (mutating db.orgServices alone does not trigger a paint).
+  const [serviceCatalogVersion, setServiceCatalogVersion] = useState(0)
+  useEffect(() => {
+    const services = servicesQuery.data
+    if (!services?.length) return
+    for (const service of services) {
+      const idx = db.orgServices.findIndex((row) => row.id === service.id || row.slug === service.slug)
+      const mapped = {
+        id: service.id,
+        name: service.name,
+        slug: service.slug,
+        service_type: service.service_type || 'appointment',
+        color: service.color,
+        default_duration_minutes: service.default_duration_minutes,
+        create_meet_link: Boolean(service.create_meet_link),
+        follow_on_service_id: service.follow_on_service_id,
+        follow_on_duration_minutes: service.follow_on_duration_minutes,
+        is_active: service.is_active !== false,
+      }
+      if (idx === -1) db.orgServices.push(mapped)
+      else db.orgServices[idx] = { ...db.orgServices[idx], ...mapped }
+    }
+    setServiceCatalogVersion((v) => v + 1)
+  }, [servicesQuery.data])
+
   useEffect(() => {
     let cancelled = false
     async function loadAvailability() {
@@ -748,34 +800,7 @@ export default function CalendarModule({ persona }) {
         if (!cancelled) setAvailabilitySettings(local)
       }
     }
-    async function hydrateServices() {
-      if (!isSupabaseConfigured()) return
-      try {
-        const services = await listServices()
-        if (cancelled || !services.length) return
-        for (const service of services) {
-          const idx = db.orgServices.findIndex((row) => row.id === service.id || row.slug === service.slug)
-          const mapped = {
-            id: service.id,
-            name: service.name,
-            slug: service.slug,
-            service_type: service.service_type || 'appointment',
-            color: service.color,
-            default_duration_minutes: service.default_duration_minutes,
-            create_meet_link: Boolean(service.create_meet_link),
-            follow_on_service_id: service.follow_on_service_id,
-            follow_on_duration_minutes: service.follow_on_duration_minutes,
-            is_active: service.is_active !== false,
-          }
-          if (idx === -1) db.orgServices.push(mapped)
-          else db.orgServices[idx] = { ...db.orgServices[idx], ...mapped }
-        }
-      } catch {
-        /* labels fall back to slug */
-      }
-    }
     loadAvailability()
-    hydrateServices()
     return () => { cancelled = true }
   }, [session.user.id])
 
@@ -900,6 +925,7 @@ export default function CalendarModule({ persona }) {
     setScheduleSaving(true)
     try {
       const dates = payload.dates?.length ? payload.dates : [payload.session_date]
+      let first = null
       let last = null
       for (const date of dates) {
         last = await saveAppointmentMutation.mutateAsync({
@@ -911,6 +937,7 @@ export default function CalendarModule({ persona }) {
           },
           userId: session.user.id,
         })
+        if (!first) first = last
         if (last?.id && /^[0-9a-f-]{36}$/i.test(last.id) && payload.create_meet_link) {
           try {
             const { createMeetForAppointment } = await import('../../lib/supabase/googleMeet')
@@ -924,6 +951,7 @@ export default function CalendarModule({ persona }) {
             })
             if (meet.meetUrl) {
               last = { ...last, meet_url: meet.meetUrl }
+              if (first?.id === last.id) first = last
             }
           } catch {
             // Meet is best-effort; booking still succeeds.
@@ -931,10 +959,11 @@ export default function CalendarModule({ persona }) {
         }
       }
       setScheduleDraft(null)
-      if (last) {
-        setActiveDate(last.session_date)
+      // Stay on the first occurrence — jumping to the series end is confusing.
+      if (first) {
+        setActiveDate(first.session_date)
         if (viewMode === 'month') setViewMode('day')
-        setSelectedAppointment(last)
+        setSelectedAppointment(first)
       }
     } finally {
       setScheduleSaving(false)
@@ -944,9 +973,9 @@ export default function CalendarModule({ persona }) {
   const handleRecurringSave = async (payload) => {
     setScheduleSaving(true)
     try {
-      let last = null
+      let first = null
       for (const date of payload.dates) {
-        last = await saveAppointmentMutation.mutateAsync({
+        const saved = await saveAppointmentMutation.mutateAsync({
           payload: {
             client_id: payload.client_id,
             session_date: date,
@@ -954,6 +983,7 @@ export default function CalendarModule({ persona }) {
             end_time: payload.end_time,
             duration_minutes: payload.duration_minutes,
             therapy_modality: payload.therapy_modality,
+            service_id: payload.service_id,
             location: payload.location,
             other_info: payload.other_info,
             appointment_type: payload.appointment_type,
@@ -961,12 +991,13 @@ export default function CalendarModule({ persona }) {
           },
           userId: session.user.id,
         })
+        if (!first) first = saved
       }
       setScheduleDraft(null)
-      if (last) {
-        setActiveDate(last.session_date)
+      if (first) {
+        setActiveDate(first.session_date)
         if (viewMode === 'month') setViewMode('day')
-        setSelectedAppointment(last)
+        setSelectedAppointment(first)
       }
     } finally {
       setScheduleSaving(false)
@@ -1054,7 +1085,7 @@ export default function CalendarModule({ persona }) {
   const paneOpen = Boolean(selectedAppointment || scheduleDraft)
 
   return (
-    <div className="calendar-module">
+    <div className="calendar-module" data-service-catalog={serviceCatalogVersion}>
       <header className="page-header page-header--with-toolbar page-header--calendar">
         <div className="page-header__text">
           <h1 className="page-header__title">Calendar</h1>

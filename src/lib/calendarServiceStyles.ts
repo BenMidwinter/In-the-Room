@@ -35,7 +35,12 @@ export function appointmentServiceColor(modalityId) {
 export function appointmentServiceLabel(modalityId) {
   const service = getOrgServiceForModality(modalityId)
   if (service) return service.name
-  return MODALITY_FALLBACK_LABELS[String(modalityId)] || modalityId
+  const key = String(modalityId || '')
+  if (MODALITY_FALLBACK_LABELS[key]) return MODALITY_FALLBACK_LABELS[key]
+  // Never render raw UUIDs / single-letter slugs as the chip title.
+  if (/^[0-9a-f-]{36}$/i.test(key)) return 'Session'
+  if (key.length <= 2) return 'Session'
+  return key
 }
 
 /** Client initials for compact calendar chips, e.g. "Selena Gauche" → "SG". */
@@ -52,10 +57,14 @@ export function clientInitials(name) {
 /** Calendar chip title: "SG: Music Therapy". */
 export function appointmentChipLabel(appointment, { blurNames = false } = {}) {
   if (appointment?.is_external_busy) return 'Busy'
-  const service = appointmentServiceLabel(
+  const embeddedName = String(appointment?.service_name || '').trim()
+  const service = embeddedName || appointmentServiceLabel(
     appointment?.service_id || appointment?.therapy_modality,
   )
   if (blurNames) return service
+  if (appointment?.block_role === 'support' || appointment?.block_role === 'admin') {
+    return service
+  }
   const initials = clientInitials(appointment?.client_name)
   return `${initials}: ${service}`
 }

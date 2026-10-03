@@ -362,6 +362,8 @@ function hydrateOrgServices(services) {
       color: service.color,
       default_duration_minutes: service.default_duration_minutes,
       create_meet_link: Boolean(service.create_meet_link),
+      follow_on_service_id: service.follow_on_service_id,
+      follow_on_duration_minutes: service.follow_on_duration_minutes,
       is_active: service.is_active !== false,
     }
     if (idx === -1) db.orgServices.push(mapped)
@@ -739,7 +741,8 @@ export function EventDrawer({
 
   if (!appointment) return null
 
-  const serviceLabel = appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)
+  const serviceLabel = appointment.service_name
+    || appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)
   const title = kind === 'busy'
     ? 'Busy block'
     : kind === 'support'
@@ -803,7 +806,7 @@ export function EventDrawer({
       {kind === 'busy' && (
         <BusyEventBody appointment={appointment} locked={locked} />
       )}
-      {kind === 'standard' && (
+      {(kind === 'standard' || kind === 'support') && (
         <StandardEventBody
           appointment={appointment}
           locked={locked}
@@ -1264,6 +1267,7 @@ export function RecurringSchedulePanel({
       end_time: source.end_time || addMinutesToTimeStr(source.start_time, duration),
       duration_minutes: duration,
       therapy_modality: source.therapy_modality,
+      service_id: source.service_id,
       location: source.location || '',
       other_info: source.other_info || appointmentOtherInfo(source),
       appointment_type: source.appointment_type || 'one_to_one',

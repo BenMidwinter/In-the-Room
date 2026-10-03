@@ -21,11 +21,13 @@ const EMPTY_FORM = {
 }
 
 function slugify(value) {
-  return value
+  const slug = value
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_|_$/g, '')
+  // Guard against empty / single-letter slugs from short names or bad edits.
+  return slug.length >= 2 ? slug : `service_${Date.now().toString(36)}`
 }
 
 function toForm(service) {

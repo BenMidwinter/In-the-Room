@@ -57,7 +57,9 @@ export function useSaveAppointmentMutation() {
     mutationFn: async ({ payload, userId }: { payload: Record<string, unknown>; userId: string }) =>
       saveAppointmentForUser(payload, userId),
     onSuccess: (saved) => {
+      // Refetch the full diary so follow-on blocks created server-side appear too.
       queryClient.invalidateQueries({ queryKey: appointmentQueryKeys.appointments })
+      queryClient.invalidateQueries({ queryKey: appointmentQueryKeys.all })
       queryClient.setQueryData(appointmentQueryKeys.detail(String(saved.id)), saved)
     },
   })

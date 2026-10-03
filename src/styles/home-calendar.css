@@ -1741,19 +1741,28 @@ button.calendar-event {
   opacity: 0.9;
 }
 
+/* Busy overlays sit under session chips and never capture clicks. */
+.calendar-col__busy {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
 .calendar-col__events {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
 }
 
 /* Parent layer ignores clicks; interactive session chips must opt back in
    so bookings stay selectable above empty-slot hit targets. */
 .calendar-col__events .calendar-event--interactive {
   pointer-events: auto;
-  z-index: 3;
+  z-index: 4;
   cursor: pointer;
+  position: absolute;
 }
 
 .ck-time-slot[title] {

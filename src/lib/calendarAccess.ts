@@ -1,6 +1,7 @@
 import { ROLES } from './permissions'
 import { compareYmd, compareTime, appointmentTimeSlot } from './dateArchitecture'
 
+/** True when this appointment belongs on the given persona's diary. */
 export function appointmentMatchesPersona(appointment, persona) {
   if (!appointment || !persona) return false
 
@@ -10,9 +11,16 @@ export function appointmentMatchesPersona(appointment, persona) {
     case ROLES.SERVICE_LEAD:
       return true
     case ROLES.CLINICIAN:
-      return appointment.assigned_therapist === persona.name
-    default:
-      return appointment.assigned_therapist === persona.name
+    default: {
+      // Prefer stable user id — assigned_therapist was historically first-name only
+      // and often fell back to "Clinician" when the Supabase profile wasn't in the local store.
+      if (persona.userId && appointment.clinician_id === persona.userId) return true
+      if (!appointment.assigned_therapist || !persona.name) return false
+      const personaName = String(persona.name).trim()
+      const personaFirst = personaName.split(/\s+/)[0]
+      const assigned = String(appointment.assigned_therapist).trim()
+      return assigned === personaName || assigned === personaFirst
+    }
   }
 }
 

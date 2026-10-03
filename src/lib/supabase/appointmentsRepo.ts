@@ -21,6 +21,7 @@ type AppointmentExtras = {
   client_name: string
   assigned_therapist: string
   therapy_modality: string
+  service_name?: string
   location: string
   notes: string
   other_info: string
@@ -36,6 +37,7 @@ export type AppAppointment = {
   episode_id: string | null
   clinician_id: string
   service_id?: string | null
+  service_name?: string
   assigned_therapist: string
   session_date: string
   start_time: string
@@ -48,6 +50,7 @@ export type AppAppointment = {
   notes: string
   other_info: string
   block_role?: string
+  parent_appointment_id?: string | null
   created_at: string
   updated_at: string
   meet_url?: string
@@ -87,6 +90,7 @@ function toAppAppointment(row: {
   starts_at: string
   ends_at: string
   block_role?: string
+  parent_appointment_id?: string | null
   encrypted_payload: Json | null
   created_at: string
   updated_at: string
@@ -104,6 +108,7 @@ function toAppAppointment(row: {
     episode_id: row.episode_id,
     clinician_id: row.clinician_id,
     service_id: row.service_id ?? null,
+    service_name: extras.service_name || undefined,
     assigned_therapist: extras.assigned_therapist || 'Clinician',
     session_date: sessionDate,
     start_time: startTime,
@@ -116,9 +121,36 @@ function toAppAppointment(row: {
     notes: extras.notes || '',
     other_info: extras.other_info || '',
     block_role: row.block_role,
+    parent_appointment_id: row.parent_appointment_id ?? null,
     created_at: row.created_at.slice(0, 10),
     updated_at: row.updated_at.slice(0, 10),
   }
+}
+
+async function resolveClinicianDisplayName(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  clinicianId: string,
+): Promise<string> {
+  const local = db.profiles.find((p) => p.id === clinicianId) as
+    | { display_name?: string; full_name?: string; name?: string }
+    | undefined
+  const fromLocal = local?.display_name || local?.full_name || local?.name
+  if (fromLocal) return String(fromLocal).trim()
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', clinicianId)
+    .maybeSingle()
+  if (data?.display_name) {
+    const name = String(data.display_name).trim()
+    const idx = db.profiles.findIndex((p) => p.id === clinicianId)
+    const row = { id: clinicianId, display_name: name, full_name: name }
+    if (idx === -1) db.profiles.push(row as unknown as StoreRecord)
+    else db.profiles[idx] = { ...db.profiles[idx], ...row }
+    return name
+  }
+  return 'Clinician'
 }
 
 function hydrateLocal(appointments: AppAppointment[]) {
@@ -134,7 +166,7 @@ export async function listAppointmentsFromSupabase(): Promise<AppAppointment[]> 
 
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, encrypted_payload, created_at, updated_at')
     .order('starts_at', { ascending: false })
 
   if (error) throw error
@@ -166,7 +198,7 @@ export async function fetchAppointment(appointmentId: string): Promise<AppAppoin
   if (!supabase) return null
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, encrypted_payload, created_at, updated_at')
     .eq('id', appointmentId)
     .maybeSingle()
   if (error) throw error
@@ -214,9 +246,6 @@ export async function upsertAppointmentRemote(
     | { real_name?: string; first_name?: string; surname?: string; workplace_id?: string | null }
     | undefined
   const clinicianId = String(payload.clinician_id || userId)
-  const clinicianProfile = db.profiles.find((p) => p.id === clinicianId) as
-    | { full_name?: string }
-    | undefined
   const startTime = String(schedule.start_time || '09:00')
   const endTime = payload.end_time
     ? String(payload.end_time)
@@ -230,13 +259,32 @@ export async function upsertAppointmentRemote(
     || `${client?.first_name || ''} ${client?.surname || ''}`.trim()
     || 'Client',
   )
-  const assignedTherapist = String(clinicianProfile?.full_name || '').split(' ')[0] || 'Clinician'
+  const assignedTherapist = await resolveClinicianDisplayName(supabase, clinicianId)
+
+  const serviceId = payload.service_id && /^[0-9a-f-]{36}$/i.test(String(payload.service_id))
+    ? String(payload.service_id)
+    : null
+
+  let serviceName = String(payload.service_name || '').trim()
+  let therapyModality = String(payload.therapy_modality || 'music_therapy')
+  if (serviceId) {
+    try {
+      const primary = await getServiceById(serviceId)
+      if (primary) {
+        serviceName = primary.name
+        therapyModality = primary.slug || therapyModality
+      }
+    } catch {
+      /* keep payload modality */
+    }
+  }
 
   const extras: AppointmentExtras = {
     v: 0,
     client_name: clientName,
     assigned_therapist: assignedTherapist,
-    therapy_modality: String(payload.therapy_modality || 'music_therapy'),
+    therapy_modality: therapyModality,
+    service_name: serviceName || undefined,
     location: String(payload.location ?? ''),
     notes: String(payload.notes ?? ''),
     other_info: String((payload.other_info as string | undefined)?.trim?.() || payload.other_info || ''),
@@ -245,9 +293,7 @@ export async function upsertAppointmentRemote(
     end_time: endTime,
   }
 
-  const serviceId = payload.service_id && /^[0-9a-f-]{36}$/i.test(String(payload.service_id))
-    ? String(payload.service_id)
-    : null
+  const selectCols = 'id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, encrypted_payload, created_at, updated_at'
 
   const row = {
     owner_id: userId,
@@ -269,7 +315,7 @@ export async function upsertAppointmentRemote(
       .from('appointments')
       .update(row)
       .eq('id', String(payload.id))
-      .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+      .select(selectCols)
       .single()
     if (error) throw error
     const mapped = toAppAppointment(data)
@@ -282,7 +328,7 @@ export async function upsertAppointmentRemote(
   const { data, error } = await supabase
     .from('appointments')
     .insert(row)
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+    .select(selectCols)
     .single()
   if (error) throw error
   const mapped = toAppAppointment(data)
@@ -300,8 +346,8 @@ export async function upsertAppointmentRemote(
         clientName,
         assignedTherapist,
       })
-    } catch {
-      /* follow-on is best-effort; primary booking already succeeded */
+    } catch (err) {
+      console.error('Failed to create follow-on block for appointment', mapped.id, err)
     }
   }
 
@@ -350,6 +396,7 @@ async function createFollowOnBlock(opts: {
     client_name: opts.clientName,
     assigned_therapist: opts.assignedTherapist,
     therapy_modality: followOn.slug,
+    service_name: followOn.name,
     location: opts.parent.location || '',
     notes: '',
     other_info: followOn.name,
@@ -375,7 +422,7 @@ async function createFollowOnBlock(opts: {
       encrypted_payload: extras as unknown as Json,
       block_role: blockRole,
     })
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, encrypted_payload, created_at, updated_at')
     .single()
 
   if (error) throw error
