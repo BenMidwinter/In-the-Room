@@ -47,24 +47,9 @@ export function resolveEpisodeAttachment(input: EpisodeAttachmentInput): Episode
   return { episodeId: null, open: true }
 }
 
-export type NoteEpisodeInput = {
-  requestedEpisodeId?: string | null
-  appointmentEpisodeId?: string | null
-  activeEpisodeId?: string | null
-}
-
-/**
- * A Process Note keeps the episode the clinician asked for, including a
- * discharged course. Otherwise it inherits the appointment, then the open course.
- */
-export function episodeForNote(input: NoteEpisodeInput): EpisodeAttachment {
-  const requested = cleanId(input.requestedEpisodeId)
-  if (requested) return { episodeId: requested, open: false }
-  const fromAppointment = cleanId(input.appointmentEpisodeId)
-  if (fromAppointment) return { episodeId: fromAppointment, open: false }
-  const active = cleanId(input.activeEpisodeId)
-  if (active) return { episodeId: active, open: false }
-  return { episodeId: null, open: true }
+/** A Process Note takes its episode from the appointment it is attached to. */
+export function episodeIdForAppointment(appointmentEpisodeId?: string | null): string | null {
+  return cleanId(appointmentEpisodeId)
 }
 
 export function nextEpisodeNumber(existingNumbers: Array<number | null | undefined>): number {

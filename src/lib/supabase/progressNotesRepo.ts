@@ -16,9 +16,10 @@ import {
   signOffProgressNote,
 } from '../store/clinicalDocs'
 import { getAppointment } from '../store/scheduling'
-import { episodeForNote } from '../scheduling/episodes'
-import { findActiveEpisode, openEpisode } from './episodesRepo'
-import { activeLocalEpisode, getLocalEpisode } from '../store/episodes'
+import { getLocalEpisode } from '../store/episodes'
+
+const NOTE_NEEDS_APPOINTMENT = 'A Process Note is saved against an appointment.'
+const NOTE_NEEDS_EPISODE = 'Add this appointment to an episode before saving the Process Note.'
 
 const NOTE_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, appointment_id, author_id, note_number, session_date, noted_at, status, signed_off_at, lock_until, template_id, encrypted_payload, created_at, updated_at'
 
@@ -110,29 +111,23 @@ async function organizationFor(clientId: string, episodeId: string | null): Prom
   return client?.workplace_id || null
 }
 
-async function resolveEpisodeId(payload: {
-  client_id?: string
-  episode_id?: string | null
-  appointment_id?: string | null
-}, userId: string): Promise<string> {
-  const clientId = String(payload.client_id || '')
-  if (!clientId) throw new Error('A client is required to create a Process Note.')
-  const appointment = payload.appointment_id ? getAppointment(payload.appointment_id) : null
-  const active = isSupabaseConfigured()
-    ? await findActiveEpisode(clientId)
-    : activeLocalEpisode(clientId)
-  const decision = episodeForNote({
-    requestedEpisodeId: asId(payload.episode_id),
-    appointmentEpisodeId: asId(appointment?.episode_id),
-    activeEpisodeId: active?.id ?? null,
-  })
-  if (!decision.open && decision.episodeId) return decision.episodeId
-  const opened = await openEpisode({
-    clientId,
-    ownerId: userId,
-    organizationId: await organizationFor(clientId, null),
-  })
-  return opened.id
+async function episodeIdFromAppointment(appointmentId: string | null): Promise<string> {
+  if (!appointmentId) throw new Error(NOTE_NEEDS_APPOINTMENT)
+  let episodeId = asId(getAppointment(appointmentId)?.episode_id)
+  if (!episodeId && isSupabaseConfigured() && isUuid(appointmentId)) {
+    const supabase = getSupabase()
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('appointments')
+        .select('episode_id')
+        .eq('id', appointmentId)
+        .maybeSingle()
+      if (error) throw error
+      episodeId = asId(data?.episode_id)
+    }
+  }
+  if (!episodeId) throw new Error(NOTE_NEEDS_EPISODE)
+  return episodeId
 }
 
 export async function fetchProgressNotesForClient(clientId: string) {
@@ -194,22 +189,14 @@ async function nextNoteNumber(episodeId: string): Promise<number> {
 
 export async function saveProgressNoteForUser(payload: Record<string, unknown>, userId: string) {
   const parsed = parseOrThrow(progressNoteInputSchema, payload, 'Process Note') as Record<string, unknown>
-  if (!isSupabaseConfigured()) {
-    const existing = parsed.id ? getProgressNote(String(parsed.id)) : null
-    const episodeId = asId(parsed.episode_id)
-      || asId(existing?.episode_id)
-      || (parsed.client_id
-        ? await resolveEpisodeId({
-          client_id: String(parsed.client_id),
-          episode_id: null,
-          appointment_id: (parsed.appointment_id as string | null | undefined) ?? null,
-        }, userId)
-        : null)
-    return saveProgressNote({ ...parsed, episode_id: episodeId }, userId)
-  }
+  const existingLocal = parsed.id ? getProgressNote(String(parsed.id)) : null
+  const appointmentId = asId(parsed.appointment_id) || asId(existingLocal?.appointment_id)
+  const episodeId = await episodeIdFromAppointment(appointmentId)
+  const filed = { ...parsed, appointment_id: appointmentId, episode_id: episodeId }
+  if (!isSupabaseConfigured()) return saveProgressNote(filed, userId)
 
   const supabase = getSupabase()
-  if (!supabase) return saveProgressNote(parsed, userId)
+  if (!supabase) return saveProgressNote(filed, userId)
 
   const existingId = isUuid(parsed.id) ? String(parsed.id) : null
   const current = existingId ? await fetchProgressNote(existingId) : null
@@ -218,11 +205,8 @@ export async function saveProgressNoteForUser(payload: Record<string, unknown>, 
   }
 
   const clientId = String(parsed.client_id || current?.client_id || '')
-  const episodeId = await resolveEpisodeId({
-    client_id: clientId,
-    episode_id: asId(parsed.episode_id) || asId(current?.episode_id),
-    appointment_id: asId(parsed.appointment_id) ?? asId(current?.appointment_id),
-  }, userId)
+  const remoteAppointmentId = asId(parsed.appointment_id) || asId(current?.appointment_id) || appointmentId
+  const remoteEpisodeId = await episodeIdFromAppointment(remoteAppointmentId)
   const today = new Date().toISOString().slice(0, 10)
   const extras: NotePayload = {
     v: 0,
@@ -232,14 +216,13 @@ export async function saveProgressNoteForUser(payload: Record<string, unknown>, 
     therapeutic_theme: String(parsed.therapeutic_theme || ''),
     artwork_attachments: Array.isArray(parsed.artwork_attachments) ? parsed.artwork_attachments : [],
   }
-  const appointmentId = isUuid(parsed.appointment_id) ? String(parsed.appointment_id) : null
   const shared = {
     client_id: clientId,
-    episode_id: episodeId,
-    appointment_id: appointmentId,
+    episode_id: remoteEpisodeId,
+    appointment_id: isUuid(remoteAppointmentId) ? remoteAppointmentId : null,
     session_date: String(parsed.session_date || today),
     encrypted_payload: extras as unknown as Json,
-    organization_id: await organizationFor(clientId, episodeId),
+    organization_id: await organizationFor(clientId, remoteEpisodeId),
   }
 
   if (existingId) {
@@ -259,7 +242,7 @@ export async function saveProgressNoteForUser(payload: Record<string, unknown>, 
       ...shared,
       owner_id: userId,
       author_id: userId,
-      note_number: await nextNoteNumber(episodeId),
+      note_number: await nextNoteNumber(remoteEpisodeId),
       noted_at: new Date().toISOString(),
       status: 'draft',
     })

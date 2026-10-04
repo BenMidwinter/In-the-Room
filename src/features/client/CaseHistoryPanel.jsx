@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import { useConfirm, useToast } from '../../components/ui'
 import { useClientSession } from '../../lib/useClientSession'
 import {
+  useAssignAppointmentsMutation,
   useClientEpisodesQuery,
   useDischargeEpisodeMutation,
   useOpenEpisodeMutation,
 } from '../../lib/episodeQueries'
-import { useClientProgressNotesQuery } from '../../lib/progressNoteQueries'
+import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
 import { useEpisodeReportsQuery, useSaveReportMutation } from '../../lib/reportQueries'
+import { formatSessionDateTime } from '../../lib/appointmentUtils'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -34,6 +36,98 @@ const EPISODE_COLUMNS = [
   { key: 'end', label: 'Ended' },
   { key: 'status', label: 'Status', filter: { type: 'select', allLabel: 'All statuses' } },
 ]
+
+function EpisodeAppointments({ episode, clientId, episodes }) {
+  const toast = useToast()
+  const { data: appointments = [] } = useClientAppointmentsQuery(clientId)
+  const assign = useAssignAppointmentsMutation()
+  const [picked, setPicked] = useState([])
+
+  const primaries = appointments
+    .filter((appt) => appt.client_id === clientId && !appt.parent_appointment_id)
+    .sort((a, b) => String(b.session_date || '').localeCompare(String(a.session_date || ''))
+      || String(b.start_time || '').localeCompare(String(a.start_time || '')))
+  const onThisEpisode = primaries.filter((appt) => appt.episode_id === episode.id)
+  const available = primaries.filter((appt) => appt.episode_id !== episode.id)
+
+  const episodeLabel = (episodeId) => {
+    if (!episodeId) return 'Unassigned'
+    const match = episodes.find((item) => item.id === episodeId)
+    return match ? `Episode ${match.episode_number}` : 'Another episode'
+  }
+
+  const toggle = (id) => {
+    setPicked((current) => (
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    ))
+  }
+
+  const add = async () => {
+    try {
+      const moved = await assign.mutateAsync({
+        clientId,
+        episodeId: episode.id,
+        appointmentIds: picked,
+      })
+      setPicked([])
+      toast.saved(moved.length === 1
+        ? 'Appointment added to this episode'
+        : `${moved.length} appointments added to this episode`)
+    } catch (err) {
+      toast.error(err?.message || 'Could not add those appointments')
+    }
+  }
+
+  return (
+    <div className="episode-detail__appointments">
+      <div className="episode-detail__reports-header">
+        <h4>Appointments</h4>
+        <button
+          type="button"
+          className="primary"
+          onClick={add}
+          disabled={!picked.length || assign.isPending}
+        >
+          Add to this episode
+        </button>
+      </div>
+      <p className="text-small text-muted episode-detail__hint">
+        Tick sessions to put them on this course. A Process Note stays with its appointment.
+      </p>
+      {onThisEpisode.length > 0 && (
+        <ul className="episode-appointment-list">
+          {onThisEpisode.map((appt) => (
+            <li key={appt.id}>
+              <span>{formatSessionDateTime(appt)}</span>
+              <span className="text-small text-muted">{appt.service_name || 'Appointment'}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {available.length === 0 ? (
+        <p className="text-small text-muted">No other appointments to add.</p>
+      ) : (
+        <ul className="episode-appointment-list">
+          {available.map((appt) => (
+            <li key={appt.id}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={picked.includes(appt.id)}
+                  onChange={() => toggle(appt.id)}
+                />
+                <span>{formatSessionDateTime(appt)}</span>
+                <span className="text-small text-muted">
+                  {appt.service_name || 'Appointment'} · {episodeLabel(appt.episode_id)}
+                </span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 function EpisodeReports({ episode, clientId, userId, organizationId }) {
   const toast = useToast()
@@ -155,14 +249,12 @@ function EpisodeReports({ episode, clientId, userId, organizationId }) {
 
 export default function CaseHistoryPanel() {
   const { id: clientId } = useParams()
-  const navigate = useNavigate()
   const toast = useToast()
   const confirm = useConfirm()
   const { client, session } = useClientSession()
   const episodesQuery = useClientEpisodesQuery(clientId)
   const openEpisode = useOpenEpisodeMutation()
   const dischargeEpisode = useDischargeEpisodeMutation()
-  const { data: notes = [] } = useClientProgressNotesQuery(clientId)
   const episodes = episodesQuery.data || []
   const [selectedId, setSelectedId] = useState(null)
   const selected = episodes.find((episode) => episode.id === selectedId) || episodes[0] || null
@@ -242,14 +334,10 @@ export default function CaseHistoryPanel() {
     },
   }))
 
-  const episodeNotes = selected
-    ? notes.filter((note) => note.episode_id === selected.id)
-    : []
-
   return (
     <RecordListLayout
       title="Case history"
-      subtitle="Each course of treatment is its own episode. A discharged course stays open for notes and reports."
+      subtitle="Each course holds its appointments. A Process Note belongs to the appointment, and follows it onto the course."
       headerActions={headerActions}
       editor={selected && (
         <div className="card episode-detail">
@@ -261,7 +349,7 @@ export default function CaseHistoryPanel() {
           </div>
           {selected.status === 'discharged' && (
             <p className="episode-detail__banner">
-              This course is closed. You can still add a Process Note or a report.
+              This course is closed. Its appointments stay here. Add a Process Note from the appointment if something was missed.
             </p>
           )}
           <dl className="episode-detail__grid">
@@ -274,39 +362,15 @@ export default function CaseHistoryPanel() {
               <dd>{formatDate(selected.end_date)}</dd>
             </div>
           </dl>
-          <div className="episode-detail__note">
-            <div className="episode-detail__reports-header">
-              <h4>Process Notes</h4>
-              <button
-                type="button"
-                className="primary"
-                onClick={() => navigate(`/clients/${clientId}/progress-notes?episode=${selected.id}`)}
-              >
-                Add Process Note
-              </button>
-            </div>
-            {episodeNotes.length === 0 ? (
-              <p className="text-small text-muted">No Process Notes on this course yet.</p>
-            ) : (
-              <ul className="episode-note-list">
-                {episodeNotes.map((note) => (
-                  <li key={note.id}>
-                    <button
-                      type="button"
-                      className="linkish"
-                      onClick={() => navigate(`/clients/${clientId}/progress-notes?note=${note.id}&episode=${selected.id}`)}
-                    >
-                      {note.title || 'Untitled Process Note'}
-                    </button>
-                    <span className="text-small text-muted">{formatDate(note.session_date)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <EpisodeAppointments
+            key={`appointments-${selected.id}`}
+            episode={selected}
+            clientId={clientId}
+            episodes={episodes}
+          />
           {userId && (
             <EpisodeReports
-              key={selected.id}
+              key={`reports-${selected.id}`}
               episode={selected}
               clientId={clientId}
               userId={userId}

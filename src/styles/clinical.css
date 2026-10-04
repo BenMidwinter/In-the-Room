@@ -757,11 +757,37 @@ select.paper-input {
   grid-column: 1 / -1;
 }
 
-.episode-detail__note,
+.episode-detail__appointments,
 .episode-detail__reports {
   margin-top: 1.25rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border-light);
+}
+
+.episode-detail__hint {
+  margin: 0 0 0.75rem;
+}
+
+.episode-appointment-list {
+  margin: 0 0 0.85rem;
+  padding: 0;
+  list-style: none;
+}
+
+.episode-appointment-list li {
+  margin-bottom: 0.45rem;
+}
+
+.episode-appointment-list label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--col-accent);
 }
 
 .episode-detail__banner {

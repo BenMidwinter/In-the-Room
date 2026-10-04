@@ -1,10 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { resetStore, saveProgressNote, getProgressNote } from '../store'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+
+vi.mock('../supabase/client', () => ({
+  isSupabaseConfigured: () => false,
+  getSupabase: () => null,
+}))
+import { resetStore, getProgressNote } from '../store'
 import { db } from '../data/collections'
-import { saveAppointment } from '../store/scheduling'
-import { dischargeLocalEpisode, getLocalEpisode } from '../store/episodes'
-import { episodeForNote, resolveEpisodeAttachment } from './episodes'
+import { assignAppointmentsToEpisodeLocal, saveAppointment } from '../store/scheduling'
+import { dischargeLocalEpisode, getLocalEpisode, openLocalEpisode } from '../store/episodes'
+import { resolveEpisodeAttachment } from './episodes'
 import { isProgressNoteEditable } from '../progressNoteLifecycle'
+import { saveProgressNoteForUser } from '../supabase/progressNotesRepo'
 
 beforeEach(() => {
   resetStore()
@@ -118,35 +124,99 @@ describe('episode courses on bookings', () => {
   })
 })
 
-describe('notes on a discharged episode', () => {
-  it('keeps a requested discharged episode and leaves the note editable', () => {
-    expect(episodeForNote({
-      requestedEpisodeId: 'ep-closed',
-      appointmentEpisodeId: 'ep-appt',
-      activeEpisodeId: 'ep-open',
-    })).toEqual({ episodeId: 'ep-closed', open: false })
-
-    const episodeId = 'ep-closed'
-    db.episodes.push({
-      id: episodeId,
+describe('notes follow the appointment', () => {
+  it('copies the appointment episode, including after discharge', async () => {
+    const booked = saveAppointment({
       client_id: 'c1',
-      episode_number: 1,
-      status: 'discharged',
-      start_date: '2024-01-01',
-      end_date: '2024-06-01',
-    })
-    const note = saveProgressNote({
+      block_role: 'client_session',
+      session_date: '2024-06-01',
+      start_time: '09:00',
+      end_time: '10:00',
+    }, 'user-1')
+    dischargeLocalEpisode(String(booked.episode_id))
+    const note = await saveProgressNoteForUser({
       client_id: 'c1',
-      episode_id: episodeId,
+      appointment_id: booked.id,
+      episode_id: 'not-this-episode',
       title: 'Late addition',
       content: '<p>Forgot the closing note.</p>',
       session_date: '2024-06-02',
     }, 'user-1')
-    dischargeLocalEpisode(episodeId)
-    const stored = getProgressNote(note.id)
-    expect(stored.episode_id).toBe(episodeId)
-    expect(stored.content).toContain('Forgot the closing note')
-    expect(isProgressNoteEditable(stored)).toBe(true)
-    expect(getLocalEpisode(episodeId)?.status).toBe('discharged')
+    expect(note.episode_id).toBe(booked.episode_id)
+    expect(getProgressNote(note.id).content).toContain('Forgot the closing note')
+    expect(isProgressNoteEditable(note)).toBe(true)
+    expect(getLocalEpisode(String(booked.episode_id))?.status).toBe('discharged')
+  })
+
+  it('does not open a course for a note, and refuses an appointment with no episode', async () => {
+    await expect(saveProgressNoteForUser({
+      client_id: 'c1',
+      title: 'Loose note',
+      content: '<p></p>',
+      session_date: '2026-01-01',
+    }, 'user-1')).rejects.toThrow(/appointment/)
+    expect(db.episodes).toHaveLength(0)
+
+    db.appointments.push({
+      id: 'appt-legacy',
+      client_id: 'c1',
+      episode_id: null,
+      session_date: '2026-01-01',
+      start_time: '09:00',
+      end_time: '10:00',
+      block_role: 'client_session',
+    })
+    await expect(saveProgressNoteForUser({
+      client_id: 'c1',
+      appointment_id: 'appt-legacy',
+      title: 'Waiting',
+      content: '<p></p>',
+      session_date: '2026-01-01',
+    }, 'user-1')).rejects.toThrow(/episode/)
+  })
+})
+
+describe('assign appointments to an episode', () => {
+  it('moves an existing appointment, its follow-on, and its note', async () => {
+    const course = openLocalEpisode({ clientId: 'c1', ownerId: 'user-1' })
+    const admin = saveAppointment({
+      client_id: 'c1',
+      block_role: 'admin',
+      session_date: '2026-03-01',
+      start_time: '09:00',
+      end_time: '10:00',
+    }, 'user-1')
+    db.appointments.push({
+      id: 'appt-child',
+      client_id: 'c1',
+      parent_appointment_id: admin.id,
+      episode_id: null,
+      block_role: 'admin',
+      session_date: '2026-03-01',
+      start_time: '10:00',
+      end_time: '10:15',
+    })
+    const note = await saveProgressNoteForUser({
+      client_id: 'c1',
+      appointment_id: admin.id,
+      title: 'Admin note',
+      content: '<p>Filed once the appointment has a course.</p>',
+      session_date: '2026-03-01',
+    }, 'user-1').catch(() => null)
+    expect(note).toBeNull()
+
+    const moved = assignAppointmentsToEpisodeLocal('c1', course.id, [admin.id])
+    expect(moved).toEqual([admin.id])
+    expect(db.appointments.find((row) => row.id === admin.id)?.episode_id).toBe(course.id)
+    expect(db.appointments.find((row) => row.id === 'appt-child')?.episode_id).toBe(course.id)
+
+    const filed = await saveProgressNoteForUser({
+      client_id: 'c1',
+      appointment_id: admin.id,
+      title: 'Admin note',
+      content: '<p>Filed once the appointment has a course.</p>',
+      session_date: '2026-03-01',
+    }, 'user-1')
+    expect(filed.episode_id).toBe(course.id)
   })
 })

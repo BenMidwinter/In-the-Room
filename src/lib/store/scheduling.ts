@@ -117,6 +117,39 @@ function syncLocalFollowOn(parent) {
   })
 }
 
+/** Put existing appointments, their follow-on blocks, and their notes onto an episode. */
+export function assignAppointmentsToEpisodeLocal(
+  clientId: string,
+  episodeId: string,
+  appointmentIds: string[],
+): string[] {
+  const parents = new Set(appointmentIds.map((id) => String(id)))
+  const moved: string[] = []
+  for (const row of db.appointments) {
+    if (String(row.client_id || '') !== clientId) continue
+    if (row.parent_appointment_id) continue
+    if (!parents.has(String(row.id))) continue
+    row.episode_id = episodeId
+    moved.push(String(row.id))
+  }
+  const movedParents = new Set(moved)
+  for (const row of db.appointments) {
+    const parentId = row.parent_appointment_id ? String(row.parent_appointment_id) : ''
+    if (parentId && movedParents.has(parentId)) row.episode_id = episodeId
+  }
+  const touched = new Set(moved)
+  for (const row of db.appointments) {
+    const parentId = row.parent_appointment_id ? String(row.parent_appointment_id) : ''
+    if (parentId && movedParents.has(parentId)) touched.add(String(row.id))
+  }
+  for (const note of db.progressNotes) {
+    if (note.appointment_id && touched.has(String(note.appointment_id))) {
+      note.episode_id = episodeId
+    }
+  }
+  return moved
+}
+
 export function saveAppointment(payload, userId) {
   assertWritableAppointment(payload)
   payload = parseOrThrow(appointmentInputSchema, payload, 'Appointment')

@@ -72,9 +72,7 @@ export default function NotesHistoryPanel() {
   return (
     <RecordListLayout
       title="Notes history"
-      subtitle="All Process Notes — linked to appointments or recorded independently."
-      newLabel="Process Note"
-      onNew={() => navigate(`/clients/${clientId}/progress-notes`)}
+      subtitle="Process Notes filed against appointments."
     >
       <RecordTable
         columns={NOTE_COLUMNS}

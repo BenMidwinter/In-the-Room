@@ -15,15 +15,13 @@ function VisitBox({ label, empty, appointment, onOpen }) {
   return (
     <button
       type="button"
-      className="card client-visit-card"
+      className="client-visit-card"
       onClick={() => appointment && onOpen(appointment)}
       disabled={!appointment}
     >
       <span className="client-visit-card__label">{label}</span>
       <strong className="client-visit-card__when">{when || empty}</strong>
-      {appointment?.service_name ? (
-        <span className="client-visit-card__service">{appointment.service_name}</span>
-      ) : null}
+      <span className="client-visit-card__service">{appointment?.service_name || ' '}</span>
     </button>
   )
 }
