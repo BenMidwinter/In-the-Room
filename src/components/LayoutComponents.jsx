@@ -338,6 +338,17 @@ function clampDuration(raw) {
   return Math.min(480, Math.max(5, n))
 }
 
+function servicesForBookingKind(list, kind) {
+  if (kind === 'busy') return []
+  return (list || []).filter((service) => {
+    if (service.is_active === false) return false
+    const type = service.service_type || 'appointment'
+    if (kind === 'support') return type === 'support'
+    if (kind === 'admin') return type === 'admin'
+    return type === 'appointment'
+  })
+}
+
 function appointmentFormSeed(appt) {
   if (!appt) return null
   const dur = Math.max(0, parseMinutes(appt.end_time) - parseMinutes(appt.start_time)) || 60
@@ -353,6 +364,7 @@ function appointmentFormSeed(appt) {
     otherInfo: appointmentOtherInfo(appt),
     clinicianId: appt.clinician_id || '',
     createMeetLink: Boolean(appt.create_meet_link || appt.meet_url),
+    serviceName: appt.service_name || '',
   }
 }
 
@@ -447,19 +459,21 @@ function EventDrawerActions({
   const editLabel = kind === 'busy' || kind === 'support' ? 'Edit block' : 'Edit'
   return (
     <section className="room-event-drawer__actions">
-      <button type="button" className="primary" onClick={onEdit} disabled={locked}>
-        {editLabel}
-      </button>
-      {onMove && (
-        <button type="button" className="secondary" onClick={onMove} disabled={locked}>
-          Move
+      <div className="room-event-drawer__action-row">
+        <button type="button" className="secondary" onClick={onEdit} disabled={locked}>
+          {editLabel}
         </button>
-      )}
-      {onDelete && (
-        <button type="button" className="secondary" onClick={onDelete} disabled={locked}>
-          Delete
-        </button>
-      )}
+        {onMove && (
+          <button type="button" className="secondary" onClick={onMove} disabled={locked}>
+            Move
+          </button>
+        )}
+        {onDelete && (
+          <button type="button" className="secondary" onClick={onDelete} disabled={locked}>
+            Delete
+          </button>
+        )}
+      </div>
     </section>
   )
 }
@@ -515,11 +529,18 @@ export function AttendanceMarking({ value, onChange, locked = false, compact = f
   )
 }
 
+function ProcessNoteLink({ appointment }) {
+  if (!appointment?.client_id) return null
+  const linkedNote = getProgressNoteByAppointment(appointment.id)
+  const noteHref = `/clients/${appointment.client_id}/progress-notes?appointment=${appointment.id}`
+  return (
+    <Link to={noteHref} className="primary room-event-drawer__note-action">
+      {linkedNote?.title ? `Process Note · ${linkedNote.title}` : 'Add Process Note'}
+    </Link>
+  )
+}
+
 function StandardEventBody({ appointment, locked, onAttendanceChange, showAttendance = true }) {
-  const linkedNote = showAttendance ? getProgressNoteByAppointment(appointment.id) : null
-  const noteHref = showAttendance && appointment.client_id
-    ? `/clients/${appointment.client_id}/progress-notes?appointment=${appointment.id}`
-    : null
   const timeRange = appointment.end_time
     ? `${appointment.start_time}–${appointment.end_time}`
     : appointment.start_time
@@ -583,6 +604,8 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
         </StackedDataList>
       </section>
 
+      <ProcessNoteLink appointment={appointment} />
+
       {showAttendance && (
         <AttendanceMarking
           value={appointment.attendance_status}
@@ -591,20 +614,6 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
           compact
         />
       )}
-
-      {showAttendance && (linkedNote || noteHref) ? (
-        <section className="room-event-drawer__section room-event-drawer__section--compact">
-          <StackedDataList className="room-stacked-list--compact">
-            <StackedDataRow
-              icon="📝"
-              label="Note"
-              value={linkedNote ? linkedNote.title : 'Add progress note'}
-              href={noteHref}
-              tags={linkedNote?.is_locked ? <DataTag variant="final">Locked</DataTag> : null}
-            />
-          </StackedDataList>
-        </section>
-      ) : null}
     </SafetyLock>
   )
 }
@@ -655,12 +664,11 @@ function GroupEventBody({ appointment, locked }) {
                 {isOpen && (
                   <div className="room-group-accordion__panel">
                     <StackedDataList>
-                      <StackedDataRow
-                        icon="📝"
-                        label="Progress note"
-                        value="Open note workspace"
-                        href={noteHref}
-                      />
+                      <li className="room-stacked-row">
+                        <Link to={noteHref} className="primary room-event-drawer__note-action">
+                          Add Process Note
+                        </Link>
+                      </li>
                       <StackedDataRow
                         icon="£"
                         label="Invoice"
@@ -788,14 +796,6 @@ export function EventDrawer({
         </ContextBanner>
       )}
 
-      <EventDrawerActions
-        kind={kind}
-        locked={locked}
-        onEdit={() => onEdit?.(appointment)}
-        onMove={onMove ? () => onMove?.(appointment) : undefined}
-        onDelete={onDelete ? () => onDelete?.(appointment) : undefined}
-      />
-
       {kind === 'group' && (
         <GroupEventBody appointment={appointment} locked={locked} />
       )}
@@ -810,6 +810,14 @@ export function EventDrawer({
           showAttendance={kind === 'standard'}
         />
       )}
+
+      <EventDrawerActions
+        kind={kind}
+        locked={locked}
+        onEdit={() => onEdit?.(appointment)}
+        onMove={onMove ? () => onMove?.(appointment) : undefined}
+        onDelete={onDelete ? () => onDelete?.(appointment) : undefined}
+      />
     </>
   )
 
@@ -817,7 +825,7 @@ export function EventDrawer({
     return (
       <FormOverlay
         title={title}
-        eyebrow="Appointment"
+        eyebrow={kind === 'busy' ? 'Busy' : kind === 'support' ? 'Support activity' : kind === 'group' ? 'Group' : 'Appointment'}
         meta={subtitle}
         onClose={onClose}
         size="md"
@@ -864,6 +872,9 @@ export function ScheduleSessionPanel({
   /** `pane` = calendar side accessory; `overlay` = centred modal editor */
   presentation = 'overlay',
   lockedClient = false,
+  bookingKind = 'appointment',
+  outsideAvailability = false,
+  onChangeKind,
 }) {
   const seed = appointmentFormSeed(appointment) || appointmentFormSeed(prefill)
   const isEdit = Boolean(appointment?.id)
@@ -890,7 +901,11 @@ export function ScheduleSessionPanel({
   const [recurringWeekly, setRecurringWeekly] = useState(false)
   const [recurWeeks, setRecurWeeks] = useState(4)
   const [createMeetLink, setCreateMeetLink] = useState(Boolean(seed?.createMeetLink))
-  const [services, setServices] = useState(() => getBookableOrgServices())
+  const [blockLabel, setBlockLabel] = useState(
+    () => seed?.serviceName || (bookingKind === 'busy' ? 'Busy' : ''),
+  )
+  const [services, setServices] = useState(() => servicesForBookingKind(getBookableOrgServices(), bookingKind))
+  const [servicesReady, setServicesReady] = useState(() => !isSupabaseConfigured() || bookingKind === 'busy')
   const [servicesError, setServicesError] = useState(null)
   const [showAdvanced, setShowAdvanced] = useState(() => Boolean(
     seed?.location || seed?.otherInfo || seed?.createMeetLink,
@@ -899,31 +914,30 @@ export function ScheduleSessionPanel({
   useEffect(() => {
     let cancelled = false
     async function loadServices() {
-      if (!isSupabaseConfigured()) {
-        setServices(getBookableOrgServices())
+      if (bookingKind === 'busy' || !isSupabaseConfigured()) {
+        setServices(servicesForBookingKind(getBookableOrgServices(), bookingKind))
+        setServicesReady(true)
         return
       }
+      setServicesReady(false)
       try {
         const remote = await listServices()
         if (cancelled) return
-        const bookable = remote.filter((s) => {
-          if (s.is_active === false) return false
-          const type = s.service_type || 'appointment'
-          return type === 'appointment' || type === 'support' || type === 'admin' || !s.service_type
-        })
         hydrateOrgServices(remote)
-        setServices(bookable)
+        setServices(servicesForBookingKind(remote, bookingKind))
         setServicesError(null)
       } catch (err) {
         if (!cancelled) {
-          setServices(getBookableOrgServices())
+          setServices(servicesForBookingKind(getBookableOrgServices(), bookingKind))
           setServicesError(err.message || 'Could not load services')
         }
+      } finally {
+        if (!cancelled) setServicesReady(true)
       }
     }
     loadServices()
     return () => { cancelled = true }
-  }, [])
+  }, [bookingKind])
 
   // Bind the service catalogue once loaded (prefer seed service / modality).
   useEffect(() => {
@@ -949,15 +963,17 @@ export function ScheduleSessionPanel({
     [services, serviceId],
   )
 
-  const serviceType = selectedService?.service_type || 'appointment'
-  const clientRequired = serviceType === 'appointment' || !selectedService?.service_type
-  const blockRole = serviceType === 'admin'
-    ? 'admin'
-    : serviceType === 'support'
-      ? 'support'
-      : serviceType === 'busy'
+  const clientRequired = bookingKind === 'appointment' || bookingKind === 'support'
+  const clientOptional = bookingKind === 'admin'
+  const hideClient = bookingKind === 'busy'
+  const blockRole = bookingKind === 'support'
+    ? 'support'
+    : bookingKind === 'admin'
+      ? 'admin'
+      : bookingKind === 'busy'
         ? 'busy'
         : 'client_session'
+  const catalogueOptional = bookingKind === 'busy' || (servicesReady && services.length === 0)
 
   const applyService = (nextId) => {
     const next = services.find((s) => s.id === nextId)
@@ -1009,7 +1025,9 @@ export function ScheduleSessionPanel({
   }, [selectedClient?.id, calendarOwner, isEdit, showClinicianPicker, sessionUserId, workplaceClinicians])
 
   const durationMinutes = clampDuration(
-    selectedService?.default_duration_minutes || durationStr,
+    catalogueOptional
+      ? durationStr
+      : (selectedService?.default_duration_minutes || durationStr),
   )
 
   const handleStartChange = (value) => {
@@ -1057,14 +1075,14 @@ export function ScheduleSessionPanel({
       : (appointment?.series_id || undefined)
     return {
       ...(appointment?.id ? { id: appointment.id } : {}),
-      client_id: clientId || null,
+      client_id: hideClient ? null : (clientId || null),
       session_date: sessionDate,
       start_time: start,
       end_time: computedEnd,
       duration_minutes: finalDuration,
-      therapy_modality: selectedService?.slug || modality || 'music_therapy',
-      service_id: serviceId || null,
-      service_name: selectedService?.name || undefined,
+      therapy_modality: selectedService?.slug || (bookingKind === 'busy' ? 'busy' : modality || 'music_therapy'),
+      service_id: selectedService?.id || null,
+      service_name: selectedService?.name || blockLabel.trim() || (bookingKind === 'busy' ? 'Busy' : undefined),
       series_id: seriesId || undefined,
       location: location.trim(),
       other_info: otherInfo.trim(),
@@ -1078,7 +1096,8 @@ export function ScheduleSessionPanel({
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    if ((clientRequired && !clientId) || !serviceId || finalDuration <= 0) return
+    if ((clientRequired && !clientId) || finalDuration <= 0) return
+    if (!catalogueOptional && !serviceId) return
     const payload = buildPayload()
     if (isEdit && inSeries) {
       setPendingPayload(payload)
@@ -1098,11 +1117,56 @@ export function ScheduleSessionPanel({
     onDelete?.(appointment, 'this')
   }
 
-  const panelTitle = isEdit ? 'Edit appointment' : prefill ? 'Book another session' : 'Schedule session'
+  const panelTitle = isEdit
+    ? (bookingKind === 'busy'
+      ? 'Edit busy time'
+      : bookingKind === 'support'
+        ? 'Edit support activity'
+        : bookingKind === 'admin'
+          ? 'Edit admin'
+          : 'Edit appointment')
+    : prefill && bookingKind === 'appointment'
+      ? 'Book another session'
+      : (bookingKind === 'busy'
+        ? 'Block busy time'
+        : bookingKind === 'support'
+          ? 'Schedule support activity'
+          : bookingKind === 'admin'
+            ? 'Schedule admin'
+            : 'Schedule appointment')
+  const panelEyebrow = bookingKind === 'busy'
+    ? 'Busy'
+    : bookingKind === 'support'
+      ? 'Support activity'
+      : bookingKind === 'admin'
+        ? 'Admin'
+        : 'Appointment'
   const showDate = showDateField || isEdit || Boolean(prefill)
   const sessionCount = recurringWeekly && !isEdit ? recurWeeks : 1
   const formBody = (
       <form className="room-schedule-form" onSubmit={handleSubmit}>
+        {!isEdit && onChangeKind && (
+          <button type="button" className="room-schedule-advanced-toggle" onClick={onChangeKind}>
+            Change booking type
+          </button>
+        )}
+
+        {bookingKind === 'busy' && (
+          <p className="text-small text-muted room-schedule-times-hint">
+            Blocks time you are unexpectedly unavailable. This can sit outside your usual availability.
+          </p>
+        )}
+        {outsideAvailability && bookingKind !== 'busy' && (
+          <p className="text-small room-schedule-warning">
+            This time is outside your usual availability.
+          </p>
+        )}
+
+        {!servicesReady && services.length === 0 && bookingKind !== 'busy' && (
+          <p className="text-small text-muted">Loading services…</p>
+        )}
+
+        {services.length > 0 && (
         <div className="form-group">
           <label htmlFor="schedule-service">Service</label>
           <select
@@ -1122,15 +1186,42 @@ export function ScheduleSessionPanel({
               </option>
             ))}
           </select>
-          {servicesError && (
-            <p className="text-small room-schedule-warning">{servicesError}</p>
-          )}
-          {!services.length && !servicesError && (
-            <p className="text-small text-muted">
-              Add services under Settings → Services to book sessions.
-            </p>
-          )}
         </div>
+        )}
+        {servicesError && (
+          <p className="text-small room-schedule-warning">{servicesError}</p>
+        )}
+
+        {catalogueOptional && (
+          <>
+            <div className="form-group">
+              <label htmlFor="schedule-label">{bookingKind === 'busy' ? 'Label' : 'Name'}</label>
+              <input
+                id="schedule-label"
+                type="text"
+                className="paper-input"
+                value={blockLabel}
+                onChange={e => setBlockLabel(e.target.value)}
+                placeholder={bookingKind === 'busy' ? 'Busy' : 'Name this block'}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="schedule-duration">Duration (minutes)</label>
+              <input
+                id="schedule-duration"
+                type="number"
+                min={5}
+                step={5}
+                className="paper-input"
+                value={durationStr}
+                onChange={e => {
+                  setDurationStr(e.target.value)
+                  setEnd(addMinutesToTimeStr(start, clampDuration(e.target.value)))
+                }}
+              />
+            </div>
+          </>
+        )}
 
         {showDate && (
           <div className="form-group">
@@ -1162,12 +1253,12 @@ export function ScheduleSessionPanel({
             <label>Ends</label>
             <p className="room-schedule-derived">
               <strong>{computedEnd}</strong>
-              <span className="text-muted"> · {finalDuration} min from service</span>
+              <span className="text-muted"> · {finalDuration} min{catalogueOptional ? '' : ' from service'}</span>
             </p>
           </div>
         </div>
 
-        {!lockedClient && (
+        {!lockedClient && !hideClient && (
           <>
             <div className="form-group">
               <label htmlFor="schedule-client-search">
@@ -1221,9 +1312,9 @@ export function ScheduleSessionPanel({
             {lockedClient ? 'Client' : 'Selected'}: <strong>{selectedClient.real_name}</strong>
           </p>
         )}
-        {!clientRequired && !selectedClient && (
+        {clientOptional && !selectedClient && (
           <p className="text-small text-muted room-schedule-selected">
-            No client linked — this {serviceType === 'admin' ? 'admin' : 'support'} block can stand alone.
+            No client linked — this admin block can stand alone.
           </p>
         )}
 
@@ -1364,7 +1455,7 @@ export function ScheduleSessionPanel({
           <button
             type="submit"
             className="primary"
-            disabled={(clientRequired && !clientId) || !serviceId || saving || deleting || finalDuration <= 0}
+            disabled={(clientRequired && !clientId) || (!catalogueOptional && !serviceId) || saving || deleting || finalDuration <= 0}
           >
             {saving
               ? 'Saving…'
@@ -1409,7 +1500,7 @@ export function ScheduleSessionPanel({
       <>
         <FormOverlay
           title={panelTitle}
-          eyebrow="Appointment"
+          eyebrow={panelEyebrow}
           meta={`${sessionDate} · ${start}–${computedEnd}`}
           onClose={onCancel}
           size="md"
@@ -1425,7 +1516,7 @@ export function ScheduleSessionPanel({
     <>
       <AccessoryPane
         title={panelTitle}
-        subtitle={`${sessionDate} · ${start}–${computedEnd}`}
+        subtitle={`${panelEyebrow} · ${sessionDate} · ${start}–${computedEnd}`}
         onClose={onCancel}
         bodyClassName="room-schedule-panel"
       >

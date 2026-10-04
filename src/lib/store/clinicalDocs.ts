@@ -13,7 +13,7 @@ import {
   lockUntilFromSignOff,
 } from '../progressNoteLifecycle'
 
-/* ── Progress notes ───────────────────────────────────────────────────── */
+/* ── Process Notes ────────────────────────────────────────────────────── */
 
 export function getProgressNotes(clientId) {
   return sortLatestFirst(
@@ -50,7 +50,7 @@ export function getProgressNoteByAppointment(appointmentId) {
 }
 
 export function saveProgressNote(payload, userId) {
-  payload = parseOrThrow(progressNoteInputSchema, payload, 'Progress note')
+  payload = parseOrThrow(progressNoteInputSchema, payload, 'Process Note')
   const today = new Date().toISOString().split('T')[0]
   if (payload.id) {
     const idx = db.progressNotes.findIndex(n => n.id === payload.id)
@@ -79,7 +79,7 @@ export function saveProgressNote(payload, userId) {
     client_id: payload.client_id,
     author_id: userId,
     appointment_id: payload.appointment_id || null,
-    title: payload.title || 'Untitled progress note',
+    title: payload.title || 'Untitled Process Note',
     content: payload.content || '<p></p>',
     session_date: payload.session_date || today,
     modality_used: payload.modality_used || null,

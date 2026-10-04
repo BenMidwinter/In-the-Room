@@ -533,7 +533,7 @@
   }
 }
 
-/* --- Progress notes full-page workspace --- */
+/* --- Process Notes full-page workspace --- */
 
 .progress-notes-page {
   display: flex;
@@ -987,7 +987,7 @@ select.progress-notes-page__meta-input {
   max-height: none;
 }
 
-/* Progress notes — flat immersive editor (toolbar + writing surface, no nested paper) */
+/* Process Notes — flat immersive editor (toolbar + writing surface, no nested paper) */
 .progress-notes-page .doc-editor--immersive {
   border: none;
   border-radius: 0;
@@ -1030,7 +1030,7 @@ select.progress-notes-page__meta-input {
   margin-bottom: 0.85em;
 }
 
-/* Legacy document layout inside progress notes (if used elsewhere) */
+/* Legacy document layout inside Process Notes (if used elsewhere) */
 .progress-notes-page .doc-editor:not(.doc-editor--immersive) {
   border: none;
   border-radius: 0;

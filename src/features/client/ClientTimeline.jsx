@@ -8,7 +8,7 @@ const TYPE_LABELS = {
   session: 'Session',
   support: 'Support / admin',
   referral: 'Referral',
-  note: 'Progress note',
+  note: 'Process Note',
   document: 'Document',
   letter: 'Letter',
   report: 'Report',

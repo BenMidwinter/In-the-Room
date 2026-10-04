@@ -13,7 +13,7 @@ const PRIMARY_TABS = [
 ]
 
 const TEMPLATE_TABS = [
-  { to: '/settings/templates/progress-notes', label: '[Progress notes]' },
+  { to: '/settings/templates/progress-notes', label: '[Process Notes]' },
   { to: '/settings/templates/letters', label: '[Letters]' },
   { to: '/settings/templates/reports', label: '[Reports]' },
   { to: '/settings/templates/working-documents', label: '[Working documents]' },

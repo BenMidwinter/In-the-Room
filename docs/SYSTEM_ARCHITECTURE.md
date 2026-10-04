@@ -111,7 +111,7 @@ Before producing any database migration, API route, or frontend component, verif
 # IN THE ROOM — PRODUCT SCOPE (FREELANCE FIRST)
 
 - **Primary market:** private / freelance creative arts therapists.
-- **Phase 1:** individual practitioner tooling (clients, episodes of care, sessions/appointments, progress notes, calendar, profile, clinician-designed forms & templates, contacts, client timeline, reporting, audit log, finance placeholders for Xero).
+- **Phase 1:** individual practitioner tooling (clients, episodes of care, sessions/appointments, Process Notes, calendar, profile, clinician-designed forms & templates, contacts, client timeline, reporting, audit log, finance placeholders for Xero).
 - **Later:** workplace contracts, multi-user delegation, and org features — do not build these ahead of the freelance core.
 - **Out of scope for now:** workplace team admin, service-lead org consoles, and safeguarding workflows.
 - **Language:** product copy and schema naming stay practice/freelance-scoped. Do not describe Reporting or caseload as “organisation-wide” or “workplace” in Phase 1.
@@ -148,7 +148,7 @@ You are building "In the Room" following a strict **Thin-Page / Encapsulated-Mod
 
 ## 2. MODULAR REUSE & THE UNIFIED RICH-TEXT ENGINE
 
-The core of the clinical workflow is narrative documentation (letters, progress notes, formulation reports, supervision records).
+The core of the clinical workflow is narrative documentation (letters, Process Notes, formulation reports, supervision records).
 
 1. **The Core Document Module (`EditorModule`):**
    - Must be decoupled from any specific clinical table.
@@ -356,7 +356,7 @@ Hybrid schedule row for the calendar.
 - `encrypted_payload`: location, session notes, other_info
 - Booking an `appointment` service with `follow_on_service_id` creates two rows: client session + support block.
 
-## E. Progress notes (within an episode)
+## E. Process Notes (within an episode)
 
 ### `progress_notes`
 
@@ -399,7 +399,7 @@ Clinician-designed intake / information-gathering forms (distinct from RTE “pr
 - `encrypted_payload`: answers
 - Onboarding flow: published form with `is_onboarding` → decrypt/map answers → create `clients` + `client_identities` (+ optional first `episodes` row) → set `client_id` → emit timeline + audit events
 
-Forms **collect** information; letters/reports/working docs/progress notes **produce** information. Keep those product paths separate in UI and schema (`form_*` vs `templates` + document tables).
+Forms **collect** information; letters/reports/working docs/Process Notes **produce** information. Keep those product paths separate in UI and schema (`form_*` vs `templates` + document tables).
 
 ## G. Clinical documents (produced artefacts)
 
@@ -514,7 +514,7 @@ Total bookable occupancy for a 50+10 service = 60 minutes (+ `buffer_minutes` be
 ## L. Near-term product workstreams
 
 1. **Forms builder + submissions** (next larger piece) — clinician-designed forms on `form_definitions` / `form_submissions`, including onboarding that creates clients.
-2. **Rich Text Editor usability** — progress notes / letters / reports / working documents templates and editing UX (paired with Forms).
+2. **Rich Text Editor usability** — Process Notes / letters / reports / working documents templates and editing UX (paired with Forms).
 3. Wire Calendar module persistence to Supabase `appointments` (so Meet + ICS push use real UUIDs end-to-end).
 
 ## M. Suggested migration / build order

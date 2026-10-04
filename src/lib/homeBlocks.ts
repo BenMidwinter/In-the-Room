@@ -12,7 +12,7 @@ function sortUpcomingSoonestFirst(items) {
 }
 
 /**
- * Next progress note that still needs completing — oldest incomplete first.
+ * Next Process Note that still needs completing — oldest incomplete first.
  * Includes draft notes and past/attended sessions with no note yet.
  */
 export function getNextProgressNoteTask(

@@ -72,14 +72,14 @@ export default function NotesHistoryPanel() {
   return (
     <RecordListLayout
       title="Notes history"
-      subtitle="All progress notes — linked to appointments or recorded independently."
-      newLabel="progress note"
+      subtitle="All Process Notes — linked to appointments or recorded independently."
+      newLabel="Process Note"
       onNew={() => navigate(`/clients/${clientId}/progress-notes`)}
     >
       <RecordTable
         columns={NOTE_COLUMNS}
         rows={rows}
-        emptyMessage="No progress notes recorded yet."
+        emptyMessage="No Process Notes recorded yet."
         onRowClick={openNote}
       />
     </RecordListLayout>

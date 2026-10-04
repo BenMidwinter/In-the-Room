@@ -49,7 +49,7 @@ export const progressNoteInputSchema = z
     status: z.enum(['draft', 'signed_off']).optional(),
   })
   .refine((p) => Boolean(p.id || p.client_id), {
-    message: 'A client is required to create a progress note.',
+    message: 'A client is required to create a Process Note.',
     path: ['client_id'],
   })
 
@@ -79,7 +79,8 @@ export const letterInputSchema = z
     path: ['client_id'],
   })
 
-const optionalClientBlockRoles = new Set(['support', 'admin', 'busy'])
+/** Admin can stand alone. Busy is a personal block. Appointment and support need a client. */
+const optionalClientBlockRoles = new Set(['admin', 'busy'])
 
 export const appointmentInputSchema = z
   .object({
@@ -101,7 +102,7 @@ export const appointmentInputSchema = z
     notes: z.string().optional(),
     other_info: z.string().optional(),
     create_meet_link: z.boolean().optional(),
-    /** support/admin/busy blocks may be booked without a client */
+    /** admin and busy blocks may be booked without a client */
     block_role: z.enum(BLOCK_ROLES).optional(),
   })
   .refine((p) => {

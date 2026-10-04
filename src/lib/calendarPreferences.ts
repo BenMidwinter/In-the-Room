@@ -51,6 +51,14 @@ function toNumber(value, fallback) {
   return Number.isFinite(n) ? n : fallback
 }
 
+/** 30-minute view is the fitted size. 15 is a bit taller; 60 is a bit shorter. */
+export function calendarHourScale(intervalMinutes: number): number {
+  const n = Number(intervalMinutes)
+  if (!Number.isFinite(n) || n <= 15) return 1.5
+  if (n >= 60) return 0.75
+  return 1
+}
+
 function snapInterval(value) {
   const n = toNumber(value, DEFAULT_CALENDAR_INTERVAL)
   let best = DEFAULT_CALENDAR_INTERVAL

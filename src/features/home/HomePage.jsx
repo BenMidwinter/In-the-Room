@@ -177,7 +177,7 @@ export default function HomePage() {
                     className="home-stat-card__link"
                   >
                     <p className="home-stat-card__primary">
-                      {nextTaskNote ? 'Finish progress note' : 'Write progress note'}
+                      {nextTaskNote ? 'Finish Process Note' : 'Write Process Note'}
                     </p>
                     <p className="home-stat-card__meta">
                       {clientLabel(clients, nextTask.client_id)}
@@ -189,7 +189,7 @@ export default function HomePage() {
                     </p>
                   </Link>
                 ) : (
-                  <p className="section-card__empty">No progress notes waiting — you&apos;re up to date.</p>
+                  <p className="section-card__empty">No Process Notes waiting — you&apos;re up to date.</p>
                 )}
               </HomeStatCard>
             </div>

@@ -50,7 +50,7 @@ export function getWorkplaceById(workplaceId: string | null | undefined) {
   return db.workplaces.find(w => w.id === workplaceId) || null
 }
 
-/** Branding applied to letters, progress notes, and other workplace documents. */
+/** Branding applied to letters, Process Notes, and other workplace documents. */
 export function getWorkplaceBranding(workplaceId: string | null | undefined): WorkplaceBranding {
   return resolveWorkplaceBranding(getWorkplaceById(workplaceId))
 }

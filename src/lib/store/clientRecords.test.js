@@ -21,7 +21,7 @@ beforeEach(() => {
 })
 
 describe('getClientTimeline', () => {
-  it('merges timeline events, progress notes, and working documents', () => {
+  it('merges timeline events, Process Notes, and working documents', () => {
     const client = seedClient()
     saveProgressNote({
       client_id: client.id,

@@ -56,13 +56,26 @@ describe('appointmentInputSchema', () => {
       block_role: 'appointment',
     }, 'Appointment')).toThrow()
   })
-  it('allows support/admin blocks without a client', () => {
-    const out = parseOrThrow(appointmentInputSchema, {
+  it('allows admin and busy blocks without a client', () => {
+    const admin = parseOrThrow(appointmentInputSchema, {
       session_date: '2026-07-02',
       start_time: '09:00',
       block_role: 'admin',
     }, 'Appointment')
-    expect(out.block_role).toBe('admin')
+    expect(admin.block_role).toBe('admin')
+    const busy = parseOrThrow(appointmentInputSchema, {
+      session_date: '2026-07-02',
+      start_time: '12:00',
+      block_role: 'busy',
+    }, 'Appointment')
+    expect(busy.block_role).toBe('busy')
+  })
+  it('requires a client for support activity', () => {
+    expect(() => parseOrThrow(appointmentInputSchema, {
+      session_date: '2026-07-02',
+      start_time: '09:00',
+      block_role: 'support',
+    }, 'Appointment')).toThrow(/client is required/i)
   })
   it('requires a date on create', () => {
     expect(() => parseOrThrow(appointmentInputSchema, { client_id: 'client-1' }, 'Appointment'))
@@ -77,11 +90,11 @@ describe('appointmentInputSchema', () => {
 
 describe('progressNoteInputSchema', () => {
   it('requires a client (or id) to create', () => {
-    expect(() => parseOrThrow(progressNoteInputSchema, { title: 'Note' }, 'Progress note'))
+    expect(() => parseOrThrow(progressNoteInputSchema, { title: 'Note' }, 'Process Note'))
       .toThrow(/client is required/i)
   })
   it('accepts an update by id', () => {
-    const out = parseOrThrow(progressNoteInputSchema, { id: 'note-1', title: 'Edited' }, 'Progress note')
+    const out = parseOrThrow(progressNoteInputSchema, { id: 'note-1', title: 'Edited' }, 'Process Note')
     expect(out.id).toBe('note-1')
   })
 })
