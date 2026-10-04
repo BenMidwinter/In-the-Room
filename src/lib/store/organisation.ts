@@ -533,12 +533,12 @@ export function getAppointmentOrgServices() {
   return getAllOrgServices().filter(s => s.service_type === 'appointment' && s.is_active !== false)
 }
 
-/** Services that can be placed on the calendar (clinical, support, or admin). */
+/** Services that can be placed on the calendar (clinical, support, admin, or busy). */
 export function getBookableOrgServices() {
   return getAllOrgServices().filter((s) => {
     if (s.is_active === false) return false
     const type = s.service_type || 'appointment'
-    return type === 'appointment' || type === 'support' || type === 'admin'
+    return type === 'appointment' || type === 'support' || type === 'admin' || type === 'busy'
   })
 }
 

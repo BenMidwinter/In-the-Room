@@ -96,6 +96,7 @@ function toAppAppointment(row: {
   encrypted_payload: Json | null
   created_at: string
   updated_at: string
+  meet_url?: string | null
 }): AppAppointment {
   const extras = parseExtras(row.encrypted_payload)
   const start = localParts(row.starts_at)
@@ -127,7 +128,38 @@ function toAppAppointment(row: {
     series_id: row.series_id ?? null,
     created_at: row.created_at.slice(0, 10),
     updated_at: row.updated_at.slice(0, 10),
+    meet_url: row.meet_url || undefined,
   }
+}
+
+/** Attach Google Meet URLs from appointment_external_links onto mapped appointments. */
+async function attachMeetUrls(
+  supabase: NonNullable<ReturnType<typeof getSupabase>>,
+  appointments: AppAppointment[],
+): Promise<AppAppointment[]> {
+  if (!appointments.length) return appointments
+  const ids = appointments.map((a) => a.id).filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+  if (!ids.length) return appointments
+
+  const { data, error } = await supabase
+    .from('appointment_external_links')
+    .select('appointment_id, meet_url, updated_at')
+    .in('appointment_id', ids)
+    .not('meet_url', 'is', null)
+
+  if (error || !data?.length) return appointments
+
+  const byAppt = new Map<string, string>()
+  for (const row of data) {
+    if (!row.meet_url) continue
+    // Prefer the newest link if multiple connections exist.
+    if (!byAppt.has(row.appointment_id)) byAppt.set(row.appointment_id, row.meet_url)
+  }
+
+  return appointments.map((appt) => {
+    const meetUrl = byAppt.get(appt.id)
+    return meetUrl ? { ...appt, meet_url: meetUrl } : appt
+  })
 }
 
 async function resolveClinicianDisplayName(
@@ -173,7 +205,7 @@ export async function listAppointmentsFromSupabase(): Promise<AppAppointment[]> 
     .order('starts_at', { ascending: false })
 
   if (error) throw error
-  const mapped = (data || []).map((row) => toAppAppointment(row))
+  const mapped = await attachMeetUrls(supabase, (data || []).map((row) => toAppAppointment(row)))
   hydrateLocal(mapped)
   return mapped
 }
@@ -205,7 +237,9 @@ export async function fetchAppointment(appointmentId: string): Promise<AppAppoin
     .eq('id', appointmentId)
     .maybeSingle()
   if (error) throw error
-  return data ? toAppAppointment(data) : null
+  if (!data) return null
+  const [mapped] = await attachMeetUrls(supabase, [toAppAppointment(data)])
+  return mapped
 }
 
 export async function fetchUpcomingAppointments(
@@ -409,11 +443,14 @@ export async function upsertAppointmentRemote(
       .select(selectCols)
       .single()
     if (error) throw error
-    const mapped = toAppAppointment(data)
-    const idx = db.appointments.findIndex((a) => a.id === mapped.id)
-    if (idx === -1) db.appointments.push(mapped as unknown as StoreRecord)
-    else db.appointments[idx] = mapped as unknown as StoreRecord
-    return mapped
+    const [mapped] = await attachMeetUrls(supabase, [toAppAppointment(data)])
+    const withMeet = mapped.meet_url || !existingLocal?.meet_url
+      ? mapped
+      : { ...mapped, meet_url: existingLocal.meet_url }
+    const idx = db.appointments.findIndex((a) => a.id === withMeet.id)
+    if (idx === -1) db.appointments.push(withMeet as unknown as StoreRecord)
+    else db.appointments[idx] = withMeet as unknown as StoreRecord
+    return withMeet
   }
 
   const { data, error } = await supabase
@@ -422,7 +459,7 @@ export async function upsertAppointmentRemote(
     .select(selectCols)
     .single()
   if (error) throw error
-  const mapped = toAppAppointment(data)
+  const [mapped] = await attachMeetUrls(supabase, [toAppAppointment(data)])
   db.appointments.push(mapped as unknown as StoreRecord)
 
   // Auto-create linked follow-on support/admin block from service settings.

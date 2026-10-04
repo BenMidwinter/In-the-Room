@@ -573,6 +573,19 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
         </StackedDataList>
       </section>
 
+      {appointment.meet_url && (
+        <section className="ck-event-drawer__section ck-event-drawer__section--compact">
+          <a
+            className="ck-event-drawer__meet-link"
+            href={appointment.meet_url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Start Google Meet
+          </a>
+        </section>
+      )}
+
       {showAttendance && (
         <AttendanceMarking
           value={appointment.attendance_status}
@@ -839,6 +852,8 @@ export function ScheduleSessionPanel({
   startTime,
   appointment = null,
   prefill = null,
+  /** When creating from the calendar type menu: appointment | support | admin | busy */
+  preferredServiceType = null,
   clients = [],
   allAppointments = [],
   sessionUserId,
@@ -900,7 +915,7 @@ export function ScheduleSessionPanel({
         const bookable = remote.filter((s) => {
           if (s.is_active === false) return false
           const type = s.service_type || 'appointment'
-          return type === 'appointment' || type === 'support' || type === 'admin' || !s.service_type
+          return type === 'appointment' || type === 'support' || type === 'admin' || type === 'busy' || !s.service_type
         })
         hydrateOrgServices(remote)
         setServices(bookable)
@@ -916,13 +931,21 @@ export function ScheduleSessionPanel({
     return () => { cancelled = true }
   }, [])
 
-  // Bind the service catalogue once loaded (prefer seed service / modality).
+  const catalogServices = useMemo(() => {
+    if (!preferredServiceType || isEdit) return services
+    return services.filter((s) => (s.service_type || 'appointment') === preferredServiceType)
+  }, [services, preferredServiceType, isEdit])
+
+  // Bind the service catalogue once loaded (prefer create-kind, then seed service / modality).
   useEffect(() => {
-    if (!services.length || serviceId) return
-    const bySlug = modality
-      ? services.find((s) => s.slug === modality || s.id === modality)
+    if (!catalogServices.length || (serviceId && catalogServices.some((s) => s.id === serviceId))) return
+    const preferred = preferredServiceType && !isEdit
+      ? catalogServices.find((s) => (s.service_type || 'appointment') === preferredServiceType)
       : null
-    const next = bySlug || services[0]
+    const bySlug = modality
+      ? catalogServices.find((s) => s.slug === modality || s.id === modality)
+      : null
+    const next = preferred || bySlug || catalogServices[0]
     if (!next) return
     setServiceId(next.id)
     setModality(next.slug)
@@ -933,15 +956,17 @@ export function ScheduleSessionPanel({
       setCreateMeetLink(Boolean(next.create_meet_link))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [services])
+  }, [catalogServices, preferredServiceType])
 
   const selectedService = useMemo(
-    () => services.find((s) => s.id === serviceId) || null,
-    [services, serviceId],
+    () => catalogServices.find((s) => s.id === serviceId)
+      || services.find((s) => s.id === serviceId)
+      || null,
+    [catalogServices, services, serviceId],
   )
 
-  const serviceType = selectedService?.service_type || 'appointment'
-  const clientRequired = serviceType === 'appointment' || !selectedService?.service_type
+  const serviceType = selectedService?.service_type || preferredServiceType || 'appointment'
+  const clientRequired = serviceType === 'appointment' || (!selectedService?.service_type && !preferredServiceType)
   const blockRole = serviceType === 'admin'
     ? 'admin'
     : serviceType === 'support'
@@ -951,7 +976,7 @@ export function ScheduleSessionPanel({
         : 'client_session'
 
   const applyService = (nextId) => {
-    const next = services.find((s) => s.id === nextId)
+    const next = catalogServices.find((s) => s.id === nextId) || services.find((s) => s.id === nextId)
     setServiceId(nextId)
     if (!next) return
     setModality(next.slug)
@@ -1091,7 +1116,17 @@ export function ScheduleSessionPanel({
     onDelete?.(appointment, 'this')
   }
 
-  const panelTitle = isEdit ? 'Edit appointment' : prefill ? 'Book another session' : 'Schedule session'
+  const createTitleByType = {
+    appointment: 'Schedule appointment',
+    support: 'Schedule support activity',
+    admin: 'Schedule admin block',
+    busy: 'Schedule busy block',
+  }
+  const panelTitle = isEdit
+    ? 'Edit appointment'
+    : prefill
+      ? 'Book another session'
+      : (createTitleByType[preferredServiceType] || 'Schedule session')
   const showDate = showDateField || isEdit || Boolean(prefill)
   const sessionCount = recurringWeekly && !isEdit ? recurWeeks : 1
   const formBody = (
@@ -1106,8 +1141,8 @@ export function ScheduleSessionPanel({
             required
             disabled={!services.length}
           >
-            {!services.length && <option value="">No services configured</option>}
-            {services.map(svc => (
+            {!catalogServices.length && <option value="">No services configured</option>}
+            {catalogServices.map(svc => (
               <option key={svc.id} value={svc.id}>
                 {svc.name}
                 {svc.service_type && svc.service_type !== 'appointment' ? ` · ${svc.service_type}` : ''}
@@ -1118,9 +1153,11 @@ export function ScheduleSessionPanel({
           {servicesError && (
             <p className="text-small ck-schedule-warning">{servicesError}</p>
           )}
-          {!services.length && !servicesError && (
+          {!catalogServices.length && !servicesError && (
             <p className="text-small text-muted">
-              Add services under Settings → Services to book sessions.
+              {preferredServiceType
+                ? `Add a ${preferredServiceType} service under Settings → Services to book this type.`
+                : 'Add services under Settings → Services to book sessions.'}
             </p>
           )}
         </div>

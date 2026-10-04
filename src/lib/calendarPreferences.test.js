@@ -7,11 +7,11 @@ import {
 } from './calendarPreferences'
 
 describe('normalizeCalendarViewPreferences', () => {
-  it('defaults to 8:00–17:00 in 30-minute slots', () => {
+  it('defaults to 8:00–17:00 in 15-minute slots', () => {
     expect(getDefaultCalendarViewPreferences()).toEqual({
       startHour: 8,
       endHour: 17,
-      intervalMinutes: 30,
+      intervalMinutes: 15,
     })
   })
 
@@ -19,11 +19,11 @@ describe('normalizeCalendarViewPreferences', () => {
     expect(normalizeCalendarViewPreferences({
       startHour: 9,
       endHour: '',
-      intervalMinutes: 30,
+      intervalMinutes: 15,
     })).toEqual({
       startHour: 9,
       endHour: DEFAULT_CALENDAR_END_HOUR,
-      intervalMinutes: 30,
+      intervalMinutes: 15,
     })
   })
 
@@ -31,7 +31,7 @@ describe('normalizeCalendarViewPreferences', () => {
     const prefs = normalizeCalendarViewPreferences({
       startHour: 0,
       endHour: 0,
-      intervalMinutes: 30,
+      intervalMinutes: 15,
     })
     expect(prefs.startHour).toBeGreaterThanOrEqual(5)
     expect(prefs.endHour).toBeGreaterThan(prefs.startHour)
@@ -39,15 +39,15 @@ describe('normalizeCalendarViewPreferences', () => {
     expect(prefs.endHour).toBe(DEFAULT_CALENDAR_END_HOUR)
   })
 
-  it('keeps valid custom ranges', () => {
+  it('keeps valid custom ranges but locks interval to 15', () => {
     expect(normalizeCalendarViewPreferences({
       startHour: 7,
       endHour: 18,
-      intervalMinutes: 30,
+      intervalMinutes: 5,
     })).toEqual({
       startHour: 7,
       endHour: 18,
-      intervalMinutes: 30,
+      intervalMinutes: 15,
     })
   })
 
@@ -59,7 +59,7 @@ describe('normalizeCalendarViewPreferences', () => {
     })).toEqual({
       startHour: 10,
       endHour: DEFAULT_CALENDAR_END_HOUR,
-      intervalMinutes: 30,
+      intervalMinutes: 15,
     })
   })
 })

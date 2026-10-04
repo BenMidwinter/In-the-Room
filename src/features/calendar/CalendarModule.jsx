@@ -41,8 +41,7 @@ import {
   syncCalendarPrefsFromAvailability,
   CALENDAR_START_HOUR_OPTIONS,
   CALENDAR_END_HOUR_OPTIONS,
-  MIN_CALENDAR_INTERVAL,
-  MAX_CALENDAR_INTERVAL,
+  CALENDAR_SNAP_MINUTES,
 } from '../../lib/calendarPreferences'
 import { getClinicianWorkplaceSettings } from '../../lib/store'
 import {
@@ -88,6 +87,21 @@ function parseMinutes(time) {
   const [h, m] = String(time).split(':').map(Number)
   return (h || 0) * 60 + (m || 0)
 }
+
+/** Snap a clock time onto the calendar grid (15-minute slots). */
+function snapTimeToGrid(time, intervalMinutes = CALENDAR_SNAP_MINUTES) {
+  const total = parseMinutes(time)
+  const snapped = Math.round(total / intervalMinutes) * intervalMinutes
+  const bounded = ((snapped % 1440) + 1440) % 1440
+  return hhmm(Math.floor(bounded / 60), bounded % 60)
+}
+
+const CREATE_KINDS = [
+  { id: 'appointment', label: 'Appointment', hint: 'Client session', symbol: '●' },
+  { id: 'support', label: 'Support activity', hint: 'Follow-on / support', symbol: '◇' },
+  { id: 'admin', label: 'Admin', hint: 'Notes & paperwork', symbol: '▣' },
+  { id: 'busy', label: 'Busy', hint: 'Unavailable block', symbol: '⊘' },
+]
 
 function eventEndMinutes(appt) {
   const start = parseMinutes(appt.start_time)
@@ -263,16 +277,9 @@ function CalendarViewOptions({
   showAdminBlocks = false,
   onShowAdminBlocksChange,
 }) {
-  const [intervalDraft, setIntervalDraft] = useState(String(prefs.intervalMinutes))
-  const [prevInterval, setPrevInterval] = useState(prefs.intervalMinutes)
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0 })
   const triggerRef = useRef(null)
   const panelRef = useRef(null)
-
-  if (prefs.intervalMinutes !== prevInterval) {
-    setPrevInterval(prefs.intervalMinutes)
-    setIntervalDraft(String(prefs.intervalMinutes))
-  }
 
   const updatePanelPosition = useCallback(() => {
     const trigger = triggerRef.current
@@ -326,14 +333,6 @@ function CalendarViewOptions({
       document.removeEventListener('keydown', onKeyDown)
     }
   }, [open, onClose])
-
-  const commitInterval = () => {
-    if (intervalDraft.trim() === '') {
-      setIntervalDraft(String(prefs.intervalMinutes))
-      return
-    }
-    onChange({ intervalMinutes: intervalDraft })
-  }
 
   const panel = open ? (
     <div
@@ -397,22 +396,6 @@ function CalendarViewOptions({
           ))}
         </select>
       </div>
-      <div className="calendar-view-options__field">
-        <label htmlFor="calendar-interval">Slot interval (minutes)</label>
-        <input
-          id="calendar-interval"
-          type="number"
-          inputMode="numeric"
-          min={MIN_CALENDAR_INTERVAL}
-          max={MAX_CALENDAR_INTERVAL}
-          step={5}
-          className="paper-input"
-          value={intervalDraft}
-          onChange={e => setIntervalDraft(e.target.value)}
-          onBlur={commitInterval}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitInterval() } }}
-        />
-      </div>
       <label className="calendar-view-options__check">
         <input
           type="checkbox"
@@ -422,7 +405,7 @@ function CalendarViewOptions({
         <span>Show admin blocks (Notes)</span>
       </label>
       <p className="calendar-view-options__hint text-small text-muted">
-        Grid lines mark each interval; events still span their true length.
+        Grid snaps to {CALENDAR_SNAP_MINUTES}-minute slots. Fine-tune exact times when editing.
       </p>
     </div>
   ) : null
@@ -540,18 +523,22 @@ function DayColumn({
   className,
   style,
 }) {
+  const [dragOverSlot, setDragOverSlot] = useState(null)
   const laidOut = useMemo(
     () => layoutDayEvents(appts, dayStartMin, dayEndMin),
     [appts, dayStartMin, dayEndMin],
   )
 
   const slotsPerHour = subSlotMinutes.length || 1
-  const slotSpan = intervalMinutes || 30
+  const slotSpan = intervalMinutes || CALENDAR_SNAP_MINUTES
 
   return (
     <div
       className={`calendar-col${className ? ` ${className}` : ''}`}
       style={{ '--calendar-slots-per-hour': slotsPerHour, ...style }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget)) setDragOverSlot(null)
+      }}
     >
       {hours.map(hour => (
         <div key={hour} className="calendar-col__hour">
@@ -562,20 +549,24 @@ function DayColumn({
             return (
               <CalendarTimeSlot
                 key={slot}
+                droppable={Boolean(onDropOnSlot)}
+                dragOver={dragOverSlot === slot}
                 className={`calendar-col__slot${available ? '' : ' calendar-col__slot--unavailable'}`}
-                onClick={() => onEmptySlotClick?.(ymd, slot)}
+                onClick={(e) => onEmptySlotClick?.(ymd, slot, e)}
                 onDragOver={(e) => {
                   if (!onDropOnSlot) return
                   e.preventDefault()
                   e.dataTransfer.dropEffect = 'move'
+                  if (dragOverSlot !== slot) setDragOverSlot(slot)
                 }}
                 onDrop={(e) => {
                   if (!onDropOnSlot) return
                   e.preventDefault()
                   e.stopPropagation()
+                  setDragOverSlot(null)
                   const id = e.dataTransfer.getData('application/x-itr-appointment')
                     || e.dataTransfer.getData('text/appointment-id')
-                  if (id) onDropOnSlot(id, ymd, slot)
+                  if (id) onDropOnSlot(id, ymd, snapTimeToGrid(slot))
                 }}
                 title={available ? `Book ${ymd} at ${slot}` : `Outside availability · ${ymd} at ${slot}`}
               />
@@ -802,6 +793,8 @@ export default function CalendarModule({ persona }) {
   const [activeDate, setActiveDate] = useState(DEMO_TODAY)
   const [selectedAppointment, setSelectedAppointment] = useState(null)
   const [scheduleDraft, setScheduleDraft] = useState(null)
+  /** Floating create-type menu after clicking an empty slot. */
+  const [createMenu, setCreateMenu] = useState(null)
   const [scheduleSaving, setScheduleSaving] = useState(false)
   const { data: appointments = [] } = useAllAppointmentsQuery()
   const saveAppointmentMutation = useSaveAppointmentMutation()
@@ -992,49 +985,103 @@ export default function CalendarModule({ persona }) {
   }
 
   const applyMoveToSlot = (appt, sessionDate, startTime) => {
+    const snappedStart = snapTimeToGrid(startTime)
     const duration = Math.max(
       0,
       parseMinutes(appt.end_time) - parseMinutes(appt.start_time),
     ) || 60
-    const endTime = hhmm(
-      Math.floor((parseMinutes(startTime) + duration) / 60),
-      (parseMinutes(startTime) + duration) % 60,
-    )
+    const endTotal = parseMinutes(snappedStart) + duration
+    const endTime = hhmm(Math.floor(endTotal / 60), endTotal % 60)
     const moved = {
       ...appt,
       session_date: sessionDate,
-      start_time: startTime,
+      start_time: snappedStart,
       end_time: endTime,
     }
+    setCreateMenu(null)
     setRescheduleTarget(null)
     setSelectedAppointment(null)
     setScheduleDraft({
       mode: 'edit',
       appointment: moved,
       session_date: sessionDate,
-      start_time: startTime,
+      start_time: snappedStart,
       manual: true,
     })
   }
 
-  const openScheduleSlot = (sessionDate, startTime, manual = false) => {
+  const openScheduleSlot = (sessionDate, startTime, {
+    manual = false,
+    serviceType = 'appointment',
+  } = {}) => {
+    const snappedStart = snapTimeToGrid(startTime)
+    if (rescheduleTarget) {
+      applyMoveToSlot(rescheduleTarget, sessionDate, snappedStart)
+      return
+    }
+    setCreateMenu(null)
+    setSelectedAppointment(null)
+    setScheduleDraft({
+      mode: 'create',
+      session_date: sessionDate,
+      start_time: snappedStart,
+      manual,
+      serviceType,
+    })
+  }
+
+  const openCreateMenuAt = (sessionDate, startTime, event) => {
     if (rescheduleTarget) {
       applyMoveToSlot(rescheduleTarget, sessionDate, startTime)
       return
     }
+    const rect = event?.currentTarget?.getBoundingClientRect?.()
+    const x = rect
+      ? Math.min(rect.left + 8, window.innerWidth - 220)
+      : Math.min((event?.clientX || 24), window.innerWidth - 220)
+    const y = rect
+      ? Math.min(rect.top + 8, window.innerHeight - 220)
+      : Math.min((event?.clientY || 24), window.innerHeight - 220)
     setSelectedAppointment(null)
-    setScheduleDraft({ mode: 'create', session_date: sessionDate, start_time: startTime, manual })
+    setScheduleDraft(null)
+    setCreateMenu({
+      session_date: sessionDate,
+      start_time: snapTimeToGrid(startTime),
+      x: Math.max(8, x),
+      y: Math.max(8, y),
+    })
   }
 
   const openAddAppointment = () => {
     setRescheduleTarget(null)
-    openScheduleSlot(activeDate, hhmm(viewPrefs.startHour, 0), true)
+    openScheduleSlot(activeDate, hhmm(viewPrefs.startHour, 0), {
+      manual: true,
+      serviceType: 'appointment',
+    })
   }
 
   const closeSidePane = () => {
+    setCreateMenu(null)
     setSelectedAppointment(null)
     setScheduleDraft(null)
   }
+
+  useEffect(() => {
+    if (!createMenu) return undefined
+    const onKey = (e) => {
+      if (e.key === 'Escape') setCreateMenu(null)
+    }
+    const onPointer = (e) => {
+      if (e.target?.closest?.('.calendar-create-menu')) return
+      setCreateMenu(null)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('mousedown', onPointer)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousedown', onPointer)
+    }
+  }, [createMenu])
 
   const cancelReschedule = () => setRescheduleTarget(null)
 
@@ -1294,9 +1341,9 @@ export default function CalendarModule({ persona }) {
     subSlotMinutes,
     dayStartMin,
     dayEndMin,
-    onEmptySlotClick: openScheduleSlot,
+    onEmptySlotClick: openCreateMenuAt,
     weeklyHours,
-    intervalMinutes: viewPrefs.intervalMinutes,
+    intervalMinutes: CALENDAR_SNAP_MINUTES,
   }
 
   const calendarGrid = (
@@ -1411,6 +1458,37 @@ export default function CalendarModule({ persona }) {
         )}
       />
 
+      {createMenu && createPortal(
+        <div
+          className="calendar-create-menu"
+          role="menu"
+          aria-label="Create on calendar"
+          style={{ top: createMenu.y, left: createMenu.x }}
+        >
+          <p className="calendar-create-menu__meta text-small text-muted">
+            {formatDisplayDate(createMenu.session_date)} · {createMenu.start_time}
+          </p>
+          {CREATE_KINDS.map((kind) => (
+            <button
+              key={kind.id}
+              type="button"
+              role="menuitem"
+              className="calendar-create-menu__item"
+              onClick={() => openScheduleSlot(createMenu.session_date, createMenu.start_time, {
+                serviceType: kind.id,
+              })}
+            >
+              <span className="calendar-create-menu__symbol" aria-hidden>{kind.symbol}</span>
+              <span className="calendar-create-menu__copy">
+                <strong>{kind.label}</strong>
+                <span className="text-small text-muted">{kind.hint}</span>
+              </span>
+            </button>
+          ))}
+        </div>,
+        document.body,
+      )}
+
       {showViewOverlay && (
         <ErrorBoundary label="calendar-view-overlay">
           <EventDrawer
@@ -1442,11 +1520,12 @@ export default function CalendarModule({ persona }) {
       {showScheduleOverlay && (
         <ErrorBoundary label="calendar-schedule-overlay">
           <ScheduleSessionPanel
-            key={scheduleDraft.appointment?.id || scheduleDraft.prefill?.id || `${scheduleDraft.mode}-${scheduleDraft.session_date}-${scheduleDraft.start_time}`}
+            key={scheduleDraft.appointment?.id || scheduleDraft.prefill?.id || `${scheduleDraft.mode}-${scheduleDraft.session_date}-${scheduleDraft.start_time}-${scheduleDraft.serviceType || ''}`}
             sessionDate={scheduleDraft.session_date}
             startTime={scheduleDraft.start_time}
             appointment={scheduleDraft.mode === 'edit' ? scheduleDraft.appointment : null}
             prefill={scheduleDraft.mode === 'book_another' ? scheduleDraft.prefill : null}
+            preferredServiceType={scheduleDraft.mode === 'create' ? scheduleDraft.serviceType : undefined}
             clients={assignedClients}
             allAppointments={filtered}
             sessionUserId={session.user.id}

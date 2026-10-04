@@ -2,10 +2,12 @@
 
 export const DEFAULT_CALENDAR_START_HOUR = 8
 export const DEFAULT_CALENDAR_END_HOUR = 17
-export const DEFAULT_CALENDAR_INTERVAL = 30
+/** Calendar grid is locked to 15-minute slots for drag/drop snapping. */
+export const DEFAULT_CALENDAR_INTERVAL = 15
+export const CALENDAR_SNAP_MINUTES = 15
 
-export const MIN_CALENDAR_INTERVAL = 5
-export const MAX_CALENDAR_INTERVAL = 120
+export const MIN_CALENDAR_INTERVAL = 15
+export const MAX_CALENDAR_INTERVAL = 15
 
 export const CALENDAR_START_HOUR_OPTIONS = [
   { value: 5, label: '5:00 am' },
@@ -45,9 +47,9 @@ function toNumber(value, fallback) {
   return Number.isFinite(n) ? n : fallback
 }
 
-function clampInterval(value) {
-  const n = toNumber(value, DEFAULT_CALENDAR_INTERVAL)
-  return Math.min(MAX_CALENDAR_INTERVAL, Math.max(MIN_CALENDAR_INTERVAL, Math.round(n)))
+function clampInterval(_value) {
+  // Grid interval is fixed so drag/drop always attaches to a 15-minute slot.
+  return CALENDAR_SNAP_MINUTES
 }
 
 function snapToAllowed(value, allowed, fallback) {
@@ -101,11 +103,10 @@ export function getCalendarViewPreferences() {
       endHour: localStorage.getItem(END_KEY),
       intervalMinutes: localStorage.getItem(INTERVAL_KEY),
     }
-    // Migrate legacy default interval (15) to 30 when the user never customized it.
-    if (raw.intervalMinutes === null) {
-      raw.intervalMinutes = String(DEFAULT_CALENDAR_INTERVAL)
-    }
-    const normalized = normalizeCalendarViewPreferences(raw)
+    const normalized = normalizeCalendarViewPreferences({
+      ...raw,
+      intervalMinutes: raw.intervalMinutes ?? String(CALENDAR_SNAP_MINUTES),
+    })
 
     if (
       String(normalized.startHour) !== raw.startHour

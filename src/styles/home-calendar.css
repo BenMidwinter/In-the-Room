@@ -1879,6 +1879,14 @@ button.calendar-event {
   transform: none;
 }
 
+.calendar-col__slot.ck-time-slot--drag-over,
+.calendar-col__slot.ck-time-slot.ck-time-slot--drag-over {
+  background: color-mix(in srgb, var(--col-primary) 18%, transparent);
+  border-top: 2px solid var(--col-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--col-primary) 35%, transparent);
+  transform: none;
+}
+
 .calendar-col__slot--unavailable,
 .calendar-col__slot--unavailable.ck-time-slot {
   background: color-mix(in srgb, var(--txt-muted) 10%, var(--bg-zone-muted, var(--bg-zone)));
@@ -1984,6 +1992,91 @@ button.calendar-event {
   border-radius: 0.4rem;
   background: var(--bg-page);
   font-size: 0.9rem;
+}
+
+.calendar-create-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 13.5rem;
+  max-width: 16rem;
+  padding: 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.55rem;
+  background: var(--bg-page, #fff);
+  box-shadow: 0 10px 28px color-mix(in srgb, #1a1a1a 16%, transparent);
+}
+
+.calendar-create-menu__meta {
+  margin: 0.15rem 0.45rem 0.4rem;
+}
+
+.calendar-create-menu__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.5rem 0.55rem;
+  border: none;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.calendar-create-menu__item:hover,
+.calendar-create-menu__item:focus-visible {
+  background: color-mix(in srgb, var(--col-primary) 10%, transparent);
+  outline: none;
+}
+
+.calendar-create-menu__symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin-top: 0.1rem;
+  border-radius: 0.3rem;
+  background: color-mix(in srgb, var(--txt-muted) 12%, transparent);
+  color: var(--txt-primary, inherit);
+  font-size: 0.85rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.calendar-create-menu__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.calendar-create-menu__copy strong {
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.ck-event-drawer__meet-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.15rem 0 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--col-primary) 35%, var(--border-color));
+  border-radius: 0.45rem;
+  background: color-mix(in srgb, var(--col-primary) 8%, transparent);
+  color: var(--col-primary-dark, var(--col-primary));
+  font-weight: 650;
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.ck-event-drawer__meet-link:hover,
+.ck-event-drawer__meet-link:focus-visible {
+  background: color-mix(in srgb, var(--col-primary) 14%, transparent);
+  outline: none;
 }
 
 .ck-schedule-meet {

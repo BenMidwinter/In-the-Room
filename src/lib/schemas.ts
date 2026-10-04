@@ -177,7 +177,7 @@ export const clinicianUserInputSchema = z.object({
 })
 
 export const orgServiceInputSchema = z.object({
-  service_type: z.enum(['appointment', 'admin', 'busy']).optional(),
+  service_type: z.enum(['appointment', 'support', 'admin', 'busy']).optional(),
   name: requiredText('Service name'),
   description: z.string().optional(),
   color: z.string().optional(),
