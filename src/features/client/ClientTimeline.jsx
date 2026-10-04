@@ -1,5 +1,6 @@
 import { useMemo, useRef, useEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
 import { getProfile } from '../../lib/store'
 
 const TYPE_LABELS = {
@@ -36,8 +37,9 @@ function formatDate(iso) {
   })
 }
 
-export default function ClientTimeline({ events, orientation = 'vertical' }) {
+export default function ClientTimeline({ events = [], orientation = 'vertical' }) {
   const { id: routeClientId } = useParams()
+  const overlay = useAppointmentOverlay()
   const scrollRef = useRef(null)
   const isHorizontal = orientation === 'horizontal'
 
@@ -108,10 +110,17 @@ export default function ClientTimeline({ events, orientation = 'vertical' }) {
                 )}
                 {(() => {
                   const href = eventHref(event)
-                  const Body = href ? Link : 'div'
-                  const bodyProps = href
-                    ? { to: href, className: 'timeline__body timeline__body--link' }
-                    : { className: 'timeline__body' }
+                  const isAppointment = event.type === 'session' || event.type === 'support'
+                  const Body = isAppointment ? 'button' : href ? Link : 'div'
+                  const bodyProps = isAppointment
+                    ? {
+                      type: 'button',
+                      className: 'timeline__body timeline__body--link',
+                      onClick: () => overlay.openView(event.ref_id),
+                    }
+                    : href
+                      ? { to: href, className: 'timeline__body timeline__body--link' }
+                      : { className: 'timeline__body' }
                   return (
                     <Body {...bodyProps}>
                       <div className="timeline__meta">

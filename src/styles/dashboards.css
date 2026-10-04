@@ -603,6 +603,13 @@
   transition: border-color 0.12s ease, background 0.12s ease;
 }
 
+button.timeline__body--link {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .timeline__body--link:hover {
   text-decoration: none;
   border-color: color-mix(in srgb, var(--col-primary) 35%, var(--border-light));

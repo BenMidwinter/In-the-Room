@@ -51,6 +51,29 @@ describe('normalizeCalendarViewPreferences', () => {
     })
   })
 
+  it('snaps slot size to 15, 30, or 60 minutes', () => {
+    expect(normalizeCalendarViewPreferences({
+      startHour: 8,
+      endHour: 17,
+      intervalMinutes: 15,
+    }).intervalMinutes).toBe(15)
+    expect(normalizeCalendarViewPreferences({
+      startHour: 8,
+      endHour: 17,
+      intervalMinutes: 45,
+    }).intervalMinutes).toBe(30)
+    expect(normalizeCalendarViewPreferences({
+      startHour: 8,
+      endHour: 17,
+      intervalMinutes: 50,
+    }).intervalMinutes).toBe(60)
+    expect(normalizeCalendarViewPreferences({
+      startHour: 8,
+      endHour: 17,
+      intervalMinutes: 5,
+    }).intervalMinutes).toBe(15)
+  })
+
   it('snaps invalid end hour to the default end time', () => {
     expect(normalizeCalendarViewPreferences({
       startHour: 10,

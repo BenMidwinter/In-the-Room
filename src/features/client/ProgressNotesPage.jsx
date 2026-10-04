@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
 import { useClientSession } from '../../lib/useClientSession'
 import {
   WorkspaceLayout,
@@ -176,6 +177,7 @@ function ProgressNotesPageContent() {
   const appointmentParam = searchParams.get('appointment')
   const noteParam = searchParams.get('note')
   const navigate = useNavigate()
+  const overlay = useAppointmentOverlay()
   const { client, session, refreshClients } = useClientSession()
   const toast = useToast()
   const confirm = useConfirm()
@@ -579,11 +581,13 @@ function ProgressNotesPageContent() {
             <button
               type="button"
               className="secondary"
-              onClick={() => navigate(
-                isStandalone
-                  ? `/clients/${client.id}/notes-history`
-                  : `/clients/${client.id}/appointments/${linkedAppointment.id}`,
-              )}
+              onClick={() => {
+                if (isStandalone || !linkedAppointment) {
+                  navigate(`/clients/${client.id}/notes-history`)
+                  return
+                }
+                overlay.openView(linkedAppointment)
+              }}
             >
               {isStandalone ? '← Notes history' : '← Appointment'}
             </button>
@@ -626,9 +630,9 @@ function ProgressNotesPageContent() {
             {' · '}{APPOINTMENT_TYPES[linkedAppointment.appointment_type]}
             {linkedAppointment.location && ` · ${linkedAppointment.location}`}
           </span>
-          <Link to={`/clients/${client.id}/appointments/${linkedAppointment.id}`} className="text-small">
+          <button type="button" className="text-small" onClick={() => overlay.openView(linkedAppointment)}>
             View appointment
-          </Link>
+          </button>
         </div>
       ) : (
         <div className="progress-notes-page__banner progress-notes-page__banner--standalone">
