@@ -104,7 +104,7 @@ export default function LettersPanel() {
       const identity = await loadClinicianPrintIdentity(session?.user?.id)
       const letterhead = await resolveDownloadLetterhead(await listLetterheads(), chooseLetterhead, identity)
       if (!letterhead) return
-      const opened = downloadLetterPdf(
+      const opened = await downloadLetterPdf(
         {
           title: title.trim() || 'Untitled letter',
           content,
@@ -117,10 +117,10 @@ export default function LettersPanel() {
         },
       )
       if (!opened) {
-        toast.error('Could not open the print dialog. Please try again.')
+        toast.error('Could not create the PDF. Please try again.')
         return
       }
-      toast.info('Choose “Save as PDF” in the print dialog.')
+      toast.success('PDF downloaded.')
     } catch (err) {
       toast.error(err?.message || 'Could not prepare the letterhead.')
     }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import DiagnosisPicker from '../../components/DiagnosisPicker'
 import { updateClientClinicalDetails, updateClientClinicalProfile } from '../../lib/store'
 import { useToast } from '../../components/ui'
+import { joinDiagnosisList, parseDiagnosisList } from '../../lib/diagnosisList'
 
 const TEXT_PROFILE_FIELDS = [
   {
@@ -24,11 +25,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
   useEffect(() => {
     setSchool(client.school || '')
     setMedication(client.medication || '')
-    setSelectedDiagnoses(
-      client.diagnosis
-        ? client.diagnosis.split(',').map(s => s.trim()).filter(Boolean)
-        : [],
-    )
+    setSelectedDiagnoses(parseDiagnosisList(client.diagnosis))
     setProfile(client.clinical_profile || {})
   }, [client])
 
@@ -44,7 +41,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
       updateClientClinicalDetails(client.id, {
         school: school.trim(),
         medication: medication.trim(),
-        diagnosis: selectedDiagnoses.join(', '),
+        diagnosis: joinDiagnosisList(selectedDiagnoses),
       })
       const updated = updateClientClinicalProfile(client.id, profile)
       onSaved?.(updated)
@@ -70,7 +67,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
             <p className="client-profile-overlay__eyebrow">Client clinical profile</p>
             <h2 id="client-profile-overlay-title" className="client-profile-overlay__title">{client.real_name}</h2>
             <p className="client-profile-overlay__meta">
-              DOB {client.dob} · Private practice
+              DOB {client.dob}
             </p>
           </div>
           <button type="button" className="client-profile-overlay__close secondary" onClick={onClose} aria-label="Close">

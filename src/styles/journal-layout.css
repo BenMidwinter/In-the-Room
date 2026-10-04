@@ -824,6 +824,65 @@
   gap: 0.4rem;
 }
 
+.appointment-card__service {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  grid-template-columns: none;
+}
+
+.appointment-card__note {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  padding-left: 0.75rem;
+}
+
+.appointment-card__note .badge {
+  text-decoration: none;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.75rem;
+}
+
+.appointment-card__attendance {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.35rem;
+}
+
+.appointment-card__attendance .badge {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.appointment-card__attendance .badge:disabled {
+  cursor: default;
+}
+
+.appointment-card__attendance-menu {
+  position: absolute;
+  left: 5.5rem;
+  top: calc(100% + 0.25rem);
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.45rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 24px rgba(31, 37, 40, 0.12);
+}
+
+.appointment-card__attendance-menu .badge {
+  cursor: pointer;
+  font-family: inherit;
+}
+
 a.room-event-drawer__note-action {
   display: flex;
   align-items: center;

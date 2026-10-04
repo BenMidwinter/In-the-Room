@@ -11,7 +11,6 @@ export default function ClientDetailsBar({ client, onClientUpdated, embedded = f
     { label: 'School / setting', value: client.school || '—' },
     { label: 'Diagnosis', value: client.diagnosis || '—' },
     { label: 'Medication', value: client.medication || '—' },
-    { label: 'Context', value: client.workplace_id ? client.workplace_name : 'Private practice' },
     { label: 'Status', value: client.is_active ? 'Active' : 'Discharged' },
   ]
 

@@ -25,7 +25,12 @@ describe('process note print', () => {
       { clientName: 'Selena Gauche', letterhead },
     )
 
+    expect(html).toContain('Fraunces')
+    expect(html).toContain('Karla')
+    expect(html).toContain('letterhead__identity')
     expect(html).toContain('letterhead__logo')
+    expect(html).toContain('clinical-pdf__body')
+    expect(html).toContain('Worked on sleep.')
     expect(html).toContain('North Practice')
     expect(html).toContain('1 High Street')
     expect(html).toContain('Ada North')
@@ -41,7 +46,26 @@ describe('process note print', () => {
     expect(html).not.toContain('Author')
     expect(html).not.toContain('United Kingdom')
     expect(html).not.toContain('Private practice')
-    expect(html.indexOf('letterhead__logo')).toBeLessThan(html.indexOf('North Practice'))
+    expect(html.indexOf('letterhead__logo')).toBeLessThan(html.indexOf('Ada North'))
+    expect(html.indexOf('Ada North')).toBeLessThan(html.indexOf('>North Practice<'))
+  })
+
+  it('prints the note body and any addendum under the letterhead', () => {
+    const html = renderProgressNoteDocument(
+      {
+        title: 'Session 2',
+        session_date: '2026-02-02',
+        content: '<p>Talked about school.</p>',
+        status: 'signed_off',
+        signed_off_at: '2026-02-02T10:00:00.000Z',
+        addendums: [{ id: 'a1', body: '<p>Later clarification.</p>', created_at: '2026-02-10T09:00:00.000Z' }],
+      },
+      { clientName: 'Selena Gauche', letterhead },
+    )
+
+    expect(html).toContain('Talked about school.')
+    expect(html).toContain('Later clarification.')
+    expect(html).toContain('Addendum')
   })
 
   it('omits a blank practice name and does not invent a clinician label', () => {

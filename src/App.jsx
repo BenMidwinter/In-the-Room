@@ -16,6 +16,7 @@ import LettersPanel from './features/client/LettersPanel'
 import CaseHistoryPanel from './features/client/CaseHistoryPanel'
 import ClientDocumentsPage from './features/client/ClientDocumentsPage'
 import ClientAppointmentsIndex from './features/client/ClientAppointmentsIndex'
+import ClientSupportActivities from './features/client/ClientSupportActivities'
 import AppointmentEditor from './features/client/AppointmentEditor'
 import ClientSectionPlaceholder from './features/client/ClientSectionPlaceholder'
 import SettingsLayout from './features/settings/SettingsLayout'
@@ -75,6 +76,7 @@ export default function App() {
             <Route path="new" element={<AppointmentEditor />} />
             <Route path=":appointmentId" element={<AppointmentEditor />} />
           </Route>
+          <Route path="support" element={<ClientSupportActivities />} />
           <Route path="notes-history" element={<NotesHistoryPanel />} />
           <Route path="case-history" element={<CaseHistoryPanel />} />
           <Route path="letters" element={<LettersPanel />} />

@@ -102,6 +102,18 @@ type SessionPick = AppointmentLike & {
   service_name?: string
 }
 
+export function isClientSessionAppointment(
+  appt: { block_role?: string | null } | null | undefined,
+): boolean {
+  return (appt?.block_role || 'client_session') === 'client_session'
+}
+
+export function isSupportActivity(
+  appt: { block_role?: string | null } | null | undefined,
+): boolean {
+  return appt?.block_role === 'support'
+}
+
 /** Last finished client session, and the next one from now. Follow-on blocks are skipped. */
 export function splitLastAndNextAppointments<T extends SessionPick>(
   appointments: T[],

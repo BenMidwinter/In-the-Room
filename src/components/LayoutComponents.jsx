@@ -1,13 +1,15 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   APPOINTMENT_TYPES,
-  getProgressNoteByAppointment,
   getWorkplaceClinicians,
 } from '../lib/store'
+import { useProgressNoteByAppointmentQuery } from '../lib/progressNoteQueries'
+import { processNoteAppointmentStatus } from '../lib/progressNoteLifecycle'
 import {
   formatAppointmentDateTime,
   attendanceLabel,
+  attendanceBadgeClass,
   appointmentTypeLabel,
   appointmentOtherInfo,
 } from '../lib/appointmentUtils'
@@ -15,7 +17,7 @@ import { modalityLabel } from '../lib/calendarConstants'
 import { appointmentServiceLabel } from '../lib/calendarServiceStyles'
 import { getBookableOrgServices } from '../lib/store'
 import { db } from '../lib/data/collections'
-import { addDaysYmd } from '../lib/dateArchitecture'
+import { addDaysYmd, formatDisplayDate } from '../lib/dateArchitecture'
 import { canAssignAppointmentClinician } from '../lib/permissions'
 import { listServices } from '../lib/supabase/servicesRepo'
 import { isSupabaseConfigured } from '../lib/supabase/client'
@@ -480,25 +482,80 @@ function EventDrawerActions({
 
 const ATTENDANCE_OPTIONS = ['attended', 'did_not_attend', 'cancelled']
 
+function noteBadgeClass(status) {
+  if (status === 'Complete') return 'badge badge-green'
+  if (status === 'Draft') return 'badge badge-blue'
+  return 'badge badge-grey'
+}
+
+function noteActionDate(note) {
+  if (!note) return ''
+  const raw = note.status === 'signed_off'
+    ? (note.signed_off_at || note.updated_at || note.created_at)
+    : (note.updated_at || note.created_at)
+  return formatDisplayDate(String(raw || '').slice(0, 10))
+}
+
+function AttendanceBadge({ value, onChange, locked = false }) {
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    const onPointer = (event) => {
+      if (!menuRef.current?.contains(event.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onPointer)
+    return () => document.removeEventListener('mousedown', onPointer)
+  }, [open])
+
+  const choose = (status) => {
+    onChange?.(status)
+    setOpen(false)
+  }
+
+  return (
+    <div className="appointment-card__attendance" ref={menuRef}>
+      <span className="room-stacked-row__label">Attendance</span>
+      <button
+        type="button"
+        className={`badge ${attendanceBadgeClass(value)}`}
+        disabled={locked}
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {attendanceLabel(value)}
+      </button>
+      {open && !locked && (
+        <div className="appointment-card__attendance-menu" role="menu">
+          {ATTENDANCE_OPTIONS.map((status) => (
+            <button
+              key={status}
+              type="button"
+              role="menuitem"
+              className={`badge ${attendanceBadgeClass(status)}`}
+              onClick={() => choose(status)}
+            >
+              {attendanceLabel(status)}
+            </button>
+          ))}
+          <button
+            type="button"
+            role="menuitem"
+            className="badge badge-blue"
+            onClick={() => choose(null)}
+          >
+            Not logged
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function AttendanceMarking({ value, onChange, locked = false, compact = false }) {
   if (compact) {
-    return (
-      <div className="room-attendance-row">
-        <label htmlFor="drawer-attendance" className="room-attendance-row__label">Attendance</label>
-        <select
-          id="drawer-attendance"
-          className="paper-input room-attendance-row__select"
-          value={value || ''}
-          disabled={locked}
-          onChange={e => onChange?.(e.target.value || null)}
-        >
-          <option value="">Not recorded</option>
-          {ATTENDANCE_OPTIONS.map(status => (
-            <option key={status} value={status}>{attendanceLabel(status)}</option>
-          ))}
-        </select>
-      </div>
-    )
+    return <AttendanceBadge value={value} onChange={onChange} locked={locked} />
   }
 
   return (
@@ -529,18 +586,36 @@ export function AttendanceMarking({ value, onChange, locked = false, compact = f
   )
 }
 
-function ProcessNoteLink({ appointment }) {
+function ProcessNoteBadge({ appointment, note, pending, onClose }) {
   if (!appointment?.client_id) return null
-  const linkedNote = getProgressNoteByAppointment(appointment.id)
   const noteHref = `/clients/${appointment.client_id}/progress-notes?appointment=${appointment.id}`
+  const status = pending ? null : processNoteAppointmentStatus(note)
+  const date = status && status !== 'Incomplete' ? noteActionDate(note) : ''
+  const label = status ? [status, date].filter(Boolean).join(' · ') : '…'
   return (
-    <Link to={noteHref} className="primary room-event-drawer__note-action">
-      {linkedNote?.title ? `Process Note · ${linkedNote.title}` : 'Add Process Note'}
-    </Link>
+    <div className="appointment-card__note">
+      <span className="room-stacked-row__label">Process Note</span>
+      <Link
+        to={noteHref}
+        className={status ? noteBadgeClass(status) : 'badge badge-grey'}
+        onClick={() => onClose?.()}
+      >
+        {label}
+      </Link>
+    </div>
   )
 }
 
-function StandardEventBody({ appointment, locked, onAttendanceChange, showAttendance = true }) {
+function StandardEventBody({
+  appointment,
+  locked,
+  onAttendanceChange,
+  showAttendance = true,
+  showProcessNote = false,
+  linkedNote = null,
+  notePending = false,
+  onClose,
+}) {
   const timeRange = appointment.end_time
     ? `${appointment.start_time}–${appointment.end_time}`
     : appointment.start_time
@@ -557,27 +632,32 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
     >
       <section className="room-event-drawer__section room-event-drawer__section--compact">
         <StackedDataList className="room-stacked-list--compact">
-          {showAttendance && (
+          {!showAttendance && (
             <StackedDataRow
-              icon="👤"
-              label="Client"
-              value={appointment.client_name}
-              href={appointment.client_id ? `/clients/${appointment.client_id}` : undefined}
+              icon="🕐"
+              label="When"
+              value={`${appointment.session_date} · ${timeRange}`}
+              meta={[duration, appointment.location].filter(Boolean).join(' · ')}
             />
           )}
-          <StackedDataRow
-            icon="🕐"
-            label="When"
-            value={`${appointment.session_date} · ${timeRange}`}
-            meta={[duration, appointment.location].filter(Boolean).join(' · ')}
-          />
-          <StackedDataRow
-            icon="🎨"
-            label="Service"
-            value={serviceLabel}
-            meta={showAttendance ? appointmentTypeLabel(appointment.appointment_type) : 'Follow-on block'}
-            tags={showAttendance ? invoiceTag(appointment.invoice_status || 'draft') : null}
-          />
+          <li className={cx('room-stacked-row', showProcessNote && 'appointment-card__service')}>
+            {!showProcessNote && <div className="room-stacked-row__icon" aria-hidden>🎨</div>}
+            <div className="room-stacked-row__body">
+              <span className="room-stacked-row__label">Service</span>
+              <span className="room-stacked-row__value">{serviceLabel}</span>
+              <span className="room-stacked-row__meta">
+                {showAttendance ? appointmentTypeLabel(appointment.appointment_type) : 'Follow-on block'}
+              </span>
+            </div>
+            {showProcessNote && (
+              <ProcessNoteBadge
+                appointment={appointment}
+                note={linkedNote}
+                pending={notePending}
+                onClose={onClose}
+              />
+            )}
+          </li>
           {appointmentOtherInfo(appointment) && (
             <StackedDataRow
               icon="ℹ️"
@@ -603,8 +683,6 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
           )}
         </StackedDataList>
       </section>
-
-      <ProcessNoteLink appointment={appointment} />
 
       {showAttendance && (
         <AttendanceMarking
@@ -763,7 +841,10 @@ export function EventDrawer({
     [appointment, allAppointments],
   )
 
-  const linkedNote = appointment ? getProgressNoteByAppointment(appointment.id) : null
+  const noteQuery = useProgressNoteByAppointmentQuery(appointment?.id, {
+    enabled: Boolean(appointment?.id && appointment?.client_id),
+  })
+  const linkedNote = noteQuery.data ?? null
   const locked = lockedProp ?? (
     appointment?.invoice_status === 'finalized'
     || Boolean(linkedNote?.is_locked)
@@ -773,6 +854,14 @@ export function EventDrawer({
 
   const serviceLabel = appointment.service_name
     || appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)
+  const timeRange = appointment.end_time
+    ? `${appointment.start_time}–${appointment.end_time}`
+    : appointment.start_time
+  const whenLine = [
+    formatDisplayDate(appointment.session_date) || appointment.session_date,
+    timeRange,
+    appointment.location,
+  ].filter(Boolean).join(' · ')
   const title = kind === 'busy'
     ? 'Busy block'
     : kind === 'support'
@@ -784,8 +873,8 @@ export function EventDrawer({
   const subtitle = kind === 'busy'
     ? APPOINTMENT_TYPES[appointment.appointment_type] || 'Practitioner unavailable'
     : kind === 'support'
-      ? `${appointment.client_name || 'No client'} · follow-on`
-      : `${serviceLabel} · ${appointment.assigned_therapist}`
+      ? `${appointment.client_name || 'No client'} · ${whenLine}`
+      : whenLine
 
   const body = (
     <>
@@ -808,6 +897,10 @@ export function EventDrawer({
           locked={locked}
           onAttendanceChange={onAttendanceChange}
           showAttendance={kind === 'standard'}
+          showProcessNote={kind === 'standard'}
+          linkedNote={linkedNote}
+          notePending={Boolean(noteQuery.isPlaceholderData) || !noteQuery.isSuccess}
+          onClose={onClose}
         />
       )}
 

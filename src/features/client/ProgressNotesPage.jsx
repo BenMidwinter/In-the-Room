@@ -30,6 +30,7 @@ import {
   PROGRESS_NOTE_LOCK_HOURS,
 } from '../../lib/progressNoteLifecycle'
 import { downloadProgressNotePdf } from '../../lib/clinicalExport'
+import { useAppointmentQuery } from '../../lib/appointmentQueries'
 import { loadClinicianPrintIdentity, resolveDownloadLetterhead } from '../../lib/letterheadPrint'
 import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 import {
@@ -205,27 +206,47 @@ function ProgressNotesPageContent() {
   const [lastSavedAt, setLastSavedAt] = useState(null)
   const autoSaveKeyRef = useRef('')
   const autoSaveTimerRef = useRef(null)
+  const appliedNoteKeyRef = useRef('')
 
   const { data: notes = [] } = useClientProgressNotesQuery(client?.id)
-  const { data: noteFromUrl, isPending: noteFromUrlPending } = useProgressNoteQuery(noteParam, {
+  const {
+    data: noteFromUrl,
+    isPending: noteFromUrlPending,
+    isPlaceholderData: noteFromUrlPlaceholder,
+  } = useProgressNoteQuery(noteParam, {
     enabled: Boolean(noteParam && client?.id && !appointmentParam),
   })
-  const { data: noteFromAppointment, isPending: noteFromAppointmentPending } = useProgressNoteByAppointmentQuery(appointmentParam, {
+  const {
+    data: noteFromAppointment,
+    isPending: noteFromAppointmentPending,
+    isPlaceholderData: noteFromAppointmentPlaceholder,
+  } = useProgressNoteByAppointmentQuery(appointmentParam, {
     enabled: Boolean(appointmentParam && client?.id),
   })
+  const noteUrlPending = Boolean(noteParam && client?.id && !appointmentParam)
+    && (noteFromUrlPlaceholder || noteFromUrlPending)
+  const appointmentNotePending = Boolean(appointmentParam && client?.id)
+    && (noteFromAppointmentPlaceholder || noteFromAppointmentPending)
   const { data: noteTemplates = [] } = useAvailableProgressNoteTemplatesQuery(client?.workplace_id)
   const saveNoteMutation = useSaveProgressNoteMutation()
   const signOffMutation = useSignOffProgressNoteMutation()
   const addendumMutation = useAppendProgressNoteAddendumMutation()
   const saving = saveNoteMutation.isPending || signOffMutation.isPending
 
+  const appointmentId = appointmentParam || noteAppointmentId
+  const {
+    data: fetchedAppointment,
+    isPending: fetchedAppointmentPending,
+  } = useAppointmentQuery(appointmentId, {
+    enabled: Boolean(appointmentId && client?.id),
+  })
+  const appointmentRecordPending = Boolean(appointmentId && client?.id) && fetchedAppointmentPending
   const linkedAppointment = useMemo(() => {
-    const appointmentId = appointmentParam || noteAppointmentId
     if (!appointmentId || !client?.id) return null
-    const appt = getAppointment(appointmentId)
+    const appt = fetchedAppointment || getAppointment(appointmentId)
     if (!appt || appt.client_id !== client.id) return null
     return appt
-  }, [appointmentParam, noteAppointmentId, client?.id])
+  }, [appointmentId, client?.id, fetchedAppointment])
 
   const applySavedNote = useCallback((saved) => {
     setActiveNoteId(saved.id)
@@ -304,74 +325,18 @@ function ProgressNotesPageContent() {
   }, [noteLocked])
 
   useEffect(() => {
-    if (noteParam && client?.id && !appointmentParam) {
-      if (noteFromUrlPending) return
-      const existing = noteFromUrl
-      if (existing && existing.client_id === client.id) {
-        setTitle(existing.title)
-        setContent(existing.content)
-        setSessionDate(existing.session_date)
-        setModalityUsed(existing.modality_used || '')
-        setTherapeuticTheme(existing.therapeutic_theme || '')
-        setArtworkAttachments(existing.artwork_attachments || [])
-        setTemplateId(existing.template_id || '')
-        setAddendums(existing.addendums || [])
-        setAmending(false)
-        setAddingAddendum(false)
-        setActiveNoteId(existing.id)
-        setNoteAppointmentId(existing.appointment_id || null)
-        applySavedNote(existing)
-        syncAutoSaveBaseline({
-          id: existing.id,
-          client_id: client.id,
-          appointment_id: existing.appointment_id,
-          title: existing.title,
-          content: existing.content,
-          session_date: existing.session_date,
-          modality_used: existing.modality_used || null,
-          therapeutic_theme: existing.therapeutic_theme || '',
-          artwork_attachments: existing.artwork_attachments || [],
-          template_id: existing.template_id || null,
-        })
+    if (!client?.id) return
+
+    const fillExisting = (existing, appointment) => {
+      const key = `${existing.id}:${existing.updated_at || ''}`
+      if (appliedNoteKeyRef.current === key) {
         setPrefillReady(true)
         return
       }
-    }
-
-    if (!appointmentParam || !client?.id) {
-      if (!noteParam) {
-        setTitle('')
-        setContent('<p></p>')
-        setSessionDate(DEMO_TODAY)
-        setModalityUsed('')
-        setTherapeuticTheme('')
-        setArtworkAttachments([])
-        setTemplateId('')
-        setAddendums([])
-        setAmending(false)
-        setAddingAddendum(false)
-        setActiveNoteId(null)
-        setNoteAppointmentId(null)
-        setNoteMeta({ status: 'draft', signed_off_at: null, lock_until: null, is_locked: false })
-        autoSaveKeyRef.current = ''
-      }
-      setPrefillReady(true)
-      return
-    }
-
-    const appt = linkedAppointment
-    if (!appt) {
-      setPrefillReady(true)
-      return
-    }
-
-    if (noteFromAppointmentPending) return
-
-    const existing = noteFromAppointment
-    if (existing) {
-      setTitle(existing.title)
-      setContent(existing.content)
-      setSessionDate(existing.session_date)
+      appliedNoteKeyRef.current = key
+      setTitle(existing.title || '')
+      setContent(existing.content || '<p></p>')
+      setSessionDate(existing.session_date || DEMO_TODAY)
       setModalityUsed(existing.modality_used || '')
       setTherapeuticTheme(existing.therapeutic_theme || '')
       setArtworkAttachments(existing.artwork_attachments || [])
@@ -380,12 +345,12 @@ function ProgressNotesPageContent() {
       setAmending(false)
       setAddingAddendum(false)
       setActiveNoteId(existing.id)
-      setNoteAppointmentId(existing.appointment_id || appt.id)
+      setNoteAppointmentId(existing.appointment_id || appointment?.id || null)
       applySavedNote(existing)
       syncAutoSaveBaseline({
         id: existing.id,
         client_id: client.id,
-        appointment_id: existing.appointment_id || appt.id,
+        appointment_id: existing.appointment_id || appointment?.id || null,
         title: existing.title,
         content: existing.content,
         session_date: existing.session_date,
@@ -395,24 +360,74 @@ function ProgressNotesPageContent() {
         template_id: existing.template_id || null,
       })
       setPrefillReady(true)
+    }
+
+    if (noteParam && !appointmentParam) {
+      if (noteUrlPending) return
+      if (noteFromUrl && noteFromUrl.client_id === client.id) {
+        fillExisting(noteFromUrl, linkedAppointment)
+        return
+      }
+    }
+
+    if (appointmentParam) {
+      if (appointmentNotePending) return
+      if (noteFromAppointment) {
+        fillExisting(noteFromAppointment, linkedAppointment)
+        return
+      }
+      const appt = linkedAppointment
+      if (!appt) {
+        if (appointmentRecordPending) return
+        setPrefillReady(true)
+        return
+      }
+      const key = `new:${appt.id}`
+      if (appliedNoteKeyRef.current === key) {
+        setPrefillReady(true)
+        return
+      }
+      appliedNoteKeyRef.current = key
+      const typeLabel = APPOINTMENT_TYPES[appt.appointment_type] || 'Session'
+      setTitle(`${typeLabel} — ${formatAppointmentDate(appt.scheduled_at)}`)
+      setSessionDate(sessionDateFromAppointment(appt.scheduled_at))
+      setContent('<p></p>')
+      setModalityUsed('')
+      setTherapeuticTheme('')
+      setArtworkAttachments([])
+      setTemplateId('')
+      setAddendums([])
+      setAmending(false)
+      setAddingAddendum(false)
+      setActiveNoteId(null)
+      setNoteAppointmentId(appt.id)
+      setNoteMeta({ status: 'draft', signed_off_at: null, lock_until: null, is_locked: false })
+      autoSaveKeyRef.current = ''
+      setPrefillReady(true)
       return
     }
 
-    const typeLabel = APPOINTMENT_TYPES[appt.appointment_type] || 'Session'
-    setTitle(`${typeLabel} — ${formatAppointmentDate(appt.scheduled_at)}`)
-    setSessionDate(sessionDateFromAppointment(appt.scheduled_at))
-    setContent('<p></p>')
-    setModalityUsed('')
-    setTherapeuticTheme('')
-    setArtworkAttachments([])
-    setTemplateId('')
-    setAddendums([])
-    setAmending(false)
-    setAddingAddendum(false)
-    setActiveNoteId(null)
-    setNoteAppointmentId(appt.id)
-    setNoteMeta({ status: 'draft', signed_off_at: null, lock_until: null, is_locked: false })
-    autoSaveKeyRef.current = ''
+    if (!noteParam) {
+      if (appliedNoteKeyRef.current === 'blank') {
+        setPrefillReady(true)
+        return
+      }
+      appliedNoteKeyRef.current = 'blank'
+      setTitle('')
+      setContent('<p></p>')
+      setSessionDate(DEMO_TODAY)
+      setModalityUsed('')
+      setTherapeuticTheme('')
+      setArtworkAttachments([])
+      setTemplateId('')
+      setAddendums([])
+      setAmending(false)
+      setAddingAddendum(false)
+      setActiveNoteId(null)
+      setNoteAppointmentId(null)
+      setNoteMeta({ status: 'draft', signed_off_at: null, lock_until: null, is_locked: false })
+      autoSaveKeyRef.current = ''
+    }
     setPrefillReady(true)
   }, [
     appointmentParam,
@@ -420,9 +435,10 @@ function ProgressNotesPageContent() {
     client?.id,
     linkedAppointment,
     noteFromUrl,
-    noteFromUrlPending,
+    noteUrlPending,
     noteFromAppointment,
-    noteFromAppointmentPending,
+    appointmentNotePending,
+    appointmentRecordPending,
     applySavedNote,
     syncAutoSaveBaseline,
   ])
@@ -658,24 +674,30 @@ function ProgressNotesPageContent() {
   }
 
   const handleDownload = async () => {
+    const loadedNote = (appointmentParam && noteFromAppointment) || (noteParam && noteFromUrl) || null
+    const editorHasBody = hasMeaningfulEditorContent(content)
     const note = {
       ...buildNotePayload(),
-      status: noteMeta.status,
-      signed_off_at: noteMeta.signed_off_at,
+      title: title.trim() || loadedNote?.title || `Session note — ${sessionDate}`,
+      content: editorHasBody ? content : (loadedNote?.content || content),
+      session_date: sessionDate || loadedNote?.session_date,
+      status: noteMeta.status === 'signed_off' ? noteMeta.status : (loadedNote?.status || noteMeta.status),
+      signed_off_at: noteMeta.signed_off_at || loadedNote?.signed_off_at || null,
+      addendums: addendums.length ? addendums : (loadedNote?.addendums || []),
     }
     try {
       const identity = await loadClinicianPrintIdentity(session?.user?.id)
       const letterhead = await resolveDownloadLetterhead(await listLetterheads(), chooseLetterhead, identity)
       if (!letterhead) return
-      const opened = downloadProgressNotePdf(note, {
+      const opened = await downloadProgressNotePdf(note, {
         clientName: client.real_name,
         letterhead,
       })
       if (!opened) {
-        toast.error('Could not open the print dialog. Please try again.')
+        toast.error('Could not create the PDF. Please try again.')
         return
       }
-      toast.info('Choose “Save as PDF” in the print dialog.')
+      toast.success('PDF downloaded.')
     } catch (err) {
       toast.error(err?.message || 'Could not prepare the letterhead.')
     }
