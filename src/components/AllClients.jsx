@@ -4,6 +4,12 @@ import { formatDisplayDate } from '../lib/dateArchitecture'
 import PageHeader from './PageHeader'
 import RecordTable from './RecordTable'
 
+function caseloadStatus(client) {
+  if (client.on_waitlist) return 'Waitlist'
+  if (client.is_active) return 'Active'
+  return 'Discharged'
+}
+
 const CLIENT_COLUMNS = [
   { key: 'name', label: 'Name', filter: 'text' },
   { key: 'dob', label: 'Date of birth', sort: 'date' },
@@ -20,25 +26,27 @@ export default function AllClients() {
     .map((client) => ({
       id: client.id,
       client,
-      muted: !client.is_active,
+      muted: !client.is_active && !client.on_waitlist,
       filterValues: {
         name: client.real_name,
         gender: client.gender || '',
-        status: client.is_active ? 'Active' : 'Discharged',
+        status: caseloadStatus(client),
       },
       sortValues: {
         name: client.real_name,
         dob: client.dob || '',
         gender: client.gender || '',
-        status: client.is_active ? 'Active' : 'Discharged',
+        status: caseloadStatus(client),
       },
       cells: {
         name: <span className="record-table__primary">{client.real_name}</span>,
         dob: formatDisplayDate(client.dob) || client.dob || '—',
         gender: client.gender?.trim() || '—',
-        status: client.is_active
-          ? <span className="badge badge-green">Active</span>
-          : <span className="badge badge-grey">Discharged</span>,
+        status: client.on_waitlist
+          ? <span className="badge badge-blue">Waitlist</span>
+          : client.is_active
+            ? <span className="badge badge-green">Active</span>
+            : <span className="badge badge-grey">Discharged</span>,
       },
     }))
 
@@ -46,7 +54,7 @@ export default function AllClients() {
     <div className="page">
       <PageHeader
         title="All clients"
-        subtitle="Everyone you have worked with, including discharged clients."
+        subtitle="Everyone on your list, including people waiting to be seen and people you have discharged."
         actions={(
           <button type="button" className="primary" onClick={() => navigate('/clients/add')}>New client</button>
         )}

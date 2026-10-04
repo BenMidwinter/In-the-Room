@@ -187,26 +187,11 @@ export default function FormFillPage() {
 
   return (
     <FormShell title={pack.title}>
-      {sent ? (
-        <p className="form-fill__note">Thank you. This has been sent.</p>
-      ) : (
-        <p className="form-fill__note">
-          Your answers are saved on this link. You can close it and finish on another device.
-        </p>
-      )}
-      {!sent && (
-        <p className="form-fill__save">
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => navigator.clipboard.writeText(formFillUrl(token)).catch(() => {})}
-          >
-            Copy link
-          </button>
-          <span>{saveState}</span>
-        </p>
-      )}
+      {sent && <p className="form-fill__note">Thank you. This has been sent.</p>}
       {pack.schema.blocks.map((block) => {
+        if (block.type === 'prose') {
+          return <p key={block.id} className="form-fill__prose">{block.text}</p>
+        }
         if (block.type === 'measure') {
           const schema = pack.measures[block.measureId]
           return (
@@ -242,9 +227,21 @@ export default function FormFillPage() {
         )
       })}
       {editable && (
-        <button type="button" className="primary form-fill__send" onClick={send} disabled={sending}>
-          {sending ? 'Sending…' : 'Send'}
-        </button>
+        <footer className="form-fill__foot">
+          <p className="form-fill__save">
+            <span>{saveState === 'Saved' ? 'Saved on this link. You can close it and finish later.' : saveState}</span>
+            <button
+              type="button"
+              className="form-fill__link"
+              onClick={() => navigator.clipboard.writeText(formFillUrl(token)).catch(() => {})}
+            >
+              Copy link
+            </button>
+          </p>
+          <button type="button" className="primary form-fill__send" onClick={send} disabled={sending}>
+            {sending ? 'Sending…' : 'Send'}
+          </button>
+        </footer>
       )}
     </FormShell>
   )

@@ -56,12 +56,13 @@ async function copyText(text) {
 
 export function EpisodeForms({ episode, clientId, userId, organizationId, open, onToggle }) {
   const toast = useToast()
-  const choose = useChoose()
   const confirm = useConfirm()
   const formsQuery = useFormsQuery(userId || '')
   const sentQuery = useEpisodeFormsQuery(episode.id, open)
   const send = useSendFormMutation(episode.id)
   const removeSubmission = useDeleteSubmissionMutation(episode.id)
+  const [picking, setPicking] = useState(false)
+  const published = (formsQuery.data || []).filter((form) => form.audience === 'private' && form.status === 'published')
 
   const copyLink = async (token) => {
     try {
@@ -72,23 +73,7 @@ export function EpisodeForms({ episode, clientId, userId, organizationId, open, 
     }
   }
 
-  const sendForm = async () => {
-    const forms = (formsQuery.data || []).filter((form) => form.audience === 'private' && form.status === 'published')
-    if (!forms.length) {
-      toast.error('Publish a form for a client you already see, in Settings, under Forms.')
-      return
-    }
-    let formId = forms[0].id
-    if (forms.length > 1) {
-      formId = await choose({
-        title: 'Send a form',
-        label: 'Form',
-        confirmLabel: 'Copy link',
-        options: forms.map((form) => ({ value: form.id, label: form.name })),
-        defaultValue: forms[0].id,
-      })
-      if (!formId) return
-    }
+  const addForm = async (formId) => {
     try {
       const created = await send.mutateAsync({
         formId,
@@ -96,9 +81,10 @@ export function EpisodeForms({ episode, clientId, userId, organizationId, open, 
         episodeId: episode.id,
         organizationId: organizationId || null,
       })
+      setPicking(false)
       await copyLink(created.token)
     } catch (err) {
-      toast.error(err.message || 'Could not send the form')
+      toast.error(err.message || 'Could not add the form')
     }
   }
 
@@ -143,7 +129,6 @@ export function EpisodeForms({ episode, clientId, userId, organizationId, open, 
                 onSelect: () => window.open(formFillUrl(form.token), '_blank', 'noopener'),
               },
               { label: 'Copy link', onSelect: () => copyLink(form.token) },
-              { label: 'Send', onSelect: () => copyLink(form.token) },
               { label: 'Delete', danger: true, onSelect: () => removeForm(form) },
             ]}
           />
@@ -158,11 +143,41 @@ export function EpisodeForms({ episode, clientId, userId, organizationId, open, 
       open={open}
       onToggle={onToggle}
       actions={(
-        <button type="button" className="secondary" onClick={sendForm} disabled={send.isPending}>
-          Send
+        <button type="button" className="secondary" onClick={() => setPicking(true)} disabled={send.isPending}>
+          Add
         </button>
       )}
     >
+      {picking && (
+        <div className="form-picker">
+          <p className="form-picker__label">Choose a form to add to this course.</p>
+          {formsQuery.isPending ? (
+            <p className="form-picker__empty">Loading forms…</p>
+          ) : published.length ? (
+            <div className="form-picker__list">
+              {published.map((form) => (
+                <button
+                  key={form.id}
+                  type="button"
+                  className="secondary"
+                  disabled={send.isPending}
+                  onClick={() => addForm(form.id)}
+                >
+                  {form.name}
+                </button>
+              ))}
+              <button type="button" className="secondary" onClick={() => setPicking(false)}>Cancel</button>
+            </div>
+          ) : (
+            <>
+              <p className="form-picker__empty">
+                Publish a form for a client you already see, in Settings, under Forms. An intake form is shared from Settings, and is not added on a course.
+              </p>
+              <button type="button" className="secondary" onClick={() => setPicking(false)}>Cancel</button>
+            </>
+          )}
+        </div>
+      )}
       <RecordTable
         columns={[
           { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
@@ -283,16 +298,9 @@ export function EpisodeOutcomes({ episode, clientId, userId, organizationId, ope
       open={open}
       onToggle={onToggle}
       actions={(
-        <>
-          <button type="button" className="secondary" onClick={addScore}>Add a score</button>
-          <button type="button" className="secondary" onClick={download}>Download</button>
-        </>
+        <button type="button" className="secondary" onClick={addScore}>Add</button>
       )}
     >
-      <p className="form-export-note">
-        Download a spreadsheet of this client’s scores: the date, date of birth, gender, the total, and each statement.
-        Check it against the published tables for that questionnaire, including typical clinical and non-clinical scores.
-      </p>
       <RecordTable
         columns={[
           { key: 'date', label: 'Date', sort: 'date' },
@@ -306,6 +314,13 @@ export function EpisodeOutcomes({ episode, clientId, userId, organizationId, ope
         emptyMessage={outcomesQuery.isPending ? 'Loading scores…' : 'No scores on this course yet.'}
         onRowClick={(row) => setSelectedId(row.id)}
       />
+      <div className="form-table-footer">
+        <button type="button" className="secondary" onClick={download}>Download</button>
+        <p className="form-export-note">
+          Download a spreadsheet of this client’s scores: the date, date of birth, gender, the total, and each statement.
+          Check it against the published tables for that questionnaire, including typical clinical and non-clinical scores.
+        </p>
+      </div>
       {selected && (
         <div className="score-detail">
           <p className="form-question__label">{selected.measure_name} · {selected.total}</p>

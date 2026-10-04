@@ -27,6 +27,7 @@ export type FormBlock =
   | { id: string; type: 'choice'; label: string; required?: boolean; options: string[] }
   | { id: string; type: 'client'; bind: ClientBind; label: string; required?: boolean }
   | { id: string; type: 'measure'; measureId: string; label?: string }
+  | { id: string; type: 'prose'; text: string }
 
 export type FormSchema = { v: 1; blocks: FormBlock[] }
 
@@ -82,6 +83,9 @@ function parseBlock(raw: unknown): FormBlock | null {
   if (!id) return null
   const label = String(row.label || '')
   const required = Boolean(row.required)
+  if (row.type === 'prose') {
+    return { id, type: 'prose', text: String(row.text || row.label || '') }
+  }
   if (row.type === 'measure') {
     const measureId = String(row.measureId || '')
     if (!measureId) return null
@@ -247,6 +251,10 @@ export function validateForm(name: string, schema: FormSchema): string | null {
   if (!name.trim()) return 'Name the form.'
   if (!schema.blocks.length) return 'Add at least one question.'
   for (const block of schema.blocks) {
+    if (block.type === 'prose') {
+      if (!block.text.trim()) return 'Write the text for each section.'
+      continue
+    }
     if (block.type === 'measure') {
       if (!block.measureId) return 'Choose a questionnaire for each score.'
       continue

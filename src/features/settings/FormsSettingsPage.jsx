@@ -11,7 +11,7 @@ import {
   useSendFormMutation,
 } from '../../lib/formQueries'
 import { findActiveEpisode } from '../../lib/supabase/episodesRepo'
-import { formFillUrl, formStartUrl } from '../forms/downloadCsv'
+import { formEmbedCode, formFillUrl, formStartUrl } from '../forms/downloadCsv'
 import RowMenu from '../forms/RowMenu'
 import { SettingsSectionCard } from './SettingsPlaceholders'
 
@@ -152,53 +152,58 @@ export default function FormsSettingsPage() {
     },
   }))
 
-  const formRows = forms.map((form) => ({
-    id: form.id,
-    form,
-    filterValues: {
-      name: form.name,
-      who: form.audience === 'public' ? 'Someone new' : 'A client I see',
-      status: form.status === 'published' ? 'Published' : 'Draft',
-    },
-    sortValues: { name: form.name },
-    cells: {
-      name: <span className="record-table__primary">{form.name}</span>,
-      who: form.audience === 'public' ? 'Someone new' : 'A client I see',
-      status: statusBadge(form.status),
-      menu: (
-        <RowMenu
-          label={`Actions for ${form.name}`}
-          items={[
-            { label: 'View', onSelect: () => navigate(`/settings/forms/edit/${form.id}`) },
-            {
-              label: 'Copy link',
-              onSelect: () => {
-                if (form.status !== 'published') {
-                  toast.error('Publish this form before copying a link.')
-                  return
-                }
-                if (form.audience !== 'public') {
-                  toast.error('This form is for a client you already see. Use Send to copy their link.')
-                  return
-                }
-                copy(formStartUrl(form.id), 'Link copied')
-              },
-            },
-            { label: 'Send', onSelect: () => sendForm(form) },
-            { label: 'Delete', danger: true, onSelect: () => deleteForm(form) },
-          ]}
-        />
-      ),
-    },
-  }))
+  const formRows = forms.map((form) => {
+    const intake = form.audience === 'public'
+    const kind = intake ? 'Intake' : 'Send to a client'
+    const view = { label: 'View', onSelect: () => navigate(`/settings/forms/edit/${form.id}`) }
+    const remove = { label: 'Delete', danger: true, onSelect: () => deleteForm(form) }
+    const share = (label, text, message) => ({
+      label,
+      onSelect: () => {
+        if (form.status !== 'published') {
+          toast.error('Publish this form before copying a link.')
+          return
+        }
+        copy(text, message)
+      },
+    })
+    const items = intake
+      ? [
+        view,
+        share('Copy link', formStartUrl(form.id), 'Link copied. Share it whenever someone new should join the waitlist.'),
+        share('Copy embed', formEmbedCode(form.id, form.name), 'Embed code copied'),
+        remove,
+      ]
+      : [
+        view,
+        { label: 'Send', onSelect: () => sendForm(form) },
+        remove,
+      ]
+    return {
+      id: form.id,
+      form,
+      filterValues: {
+        name: form.name,
+        kind,
+        status: form.status === 'published' ? 'Published' : 'Draft',
+      },
+      sortValues: { name: form.name },
+      cells: {
+        name: <span className="record-table__primary">{form.name}</span>,
+        kind,
+        status: statusBadge(form.status),
+        menu: <RowMenu label={`Actions for ${form.name}`} items={items} />,
+      },
+    }
+  })
 
   return (
     <div className="section-card-stack">
-      <SettingsSectionCard blockId="settings_measures" title="Questionnaires you track">
-        <p className="text-muted" style={{ marginTop: 0 }}>
-          Name the questionnaire, such as YP-CORE or CGAS. Save a draft while you design it, and publish it when it is ready to use.
-        </p>
-        <div className="form-actions">
+      <SettingsSectionCard
+        blockId="settings_measures"
+        title="Questionnaires you track"
+        description="Name the questionnaire, such as YP-CORE or CGAS. Save a draft while you design it, and publish it when it is ready to use."
+        actions={(
           <button
             type="button"
             className="secondary"
@@ -206,7 +211,8 @@ export default function FormsSettingsPage() {
           >
             Add a questionnaire
           </button>
-        </div>
+        )}
+      >
         <RecordTable
           columns={[
             { key: 'name', label: 'Questionnaire', filter: 'text', sort: 'text' },
@@ -221,11 +227,11 @@ export default function FormsSettingsPage() {
         />
       </SettingsSectionCard>
 
-      <SettingsSectionCard blockId="settings_forms" title="Forms you send">
-        <p className="text-muted" style={{ marginTop: 0 }}>
-          A form is how a questionnaire gets filled in. Publish it, then send it to a client you already see, or share a link for someone new.
-        </p>
-        <div className="form-actions">
+      <SettingsSectionCard
+        blockId="settings_forms"
+        title="Forms"
+        description="A form you send is added on a course. An intake form is shared with a link or an embed, and the person who sends it joins the waitlist."
+        actions={(
           <button
             type="button"
             className="secondary"
@@ -233,11 +239,12 @@ export default function FormsSettingsPage() {
           >
             Add a form
           </button>
-        </div>
+        )}
+      >
         <RecordTable
           columns={[
             { key: 'name', label: 'Form', filter: 'text', sort: 'text' },
-            { key: 'who', label: 'Who fills it in', filter: 'choice', sort: 'text' },
+            { key: 'kind', label: 'Kind', filter: 'choice', sort: 'text' },
             { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
             { key: 'menu', label: '', sort: false, className: 'record-table__menu' },
           ]}

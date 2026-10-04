@@ -78,6 +78,7 @@ export default function ClientTimeline({ events = [], orientation = 'vertical' }
     }
     if (event.type === 'note') return `/clients/${clientId}/notes-history`
     if (event.type === 'letter') return `/clients/${clientId}/letters`
+    if (event.type === 'form') return `/clients/${clientId}/case-history`
     if (event.type === 'document') return `/clients/${clientId}/documents`
     return null
   }

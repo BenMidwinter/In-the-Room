@@ -637,6 +637,7 @@ button.home-stat-card__link {
   flex-wrap: wrap;
   gap: 0.65rem;
   align-items: center;
+  margin-left: auto;
 }
 
 .section-card__toolbar {

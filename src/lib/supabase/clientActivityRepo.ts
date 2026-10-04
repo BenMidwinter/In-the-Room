@@ -51,7 +51,7 @@ export async function listClientActivity(clientId: string): Promise<ClientActivi
       .then((res) => res, () => ({ data: null, error: true })),
     supabase
       .from('form_submissions')
-      .select('id, client_id, form_definition_id, submitted_at, created_at, encrypted_payload, form_definitions(name)')
+      .select('id, client_id, form_definition_id, submitted_at, created_at, encrypted_payload, form_definitions(name, audience)')
       .eq('client_id', clientId)
       .order('submitted_at', { ascending: false })
       .then((res) => res, () => ({ data: null, error: true })),
@@ -102,16 +102,15 @@ export async function listClientActivity(clientId: string): Promise<ClientActivi
   }
 
   for (const row of formsRes.data || []) {
-    const def = row.form_definitions as { name?: string } | { name?: string }[] | null
-    const formName = Array.isArray(def)
-      ? def[0]?.name
-      : def?.name
+    const def = row.form_definitions as { name?: string; audience?: string } | { name?: string; audience?: string }[] | null
+    const formDef = Array.isArray(def) ? def[0] : def
+    const formName = formDef?.name
     items.push({
       id: `timeline-form-${row.id}`,
       client_id: clientId,
       type: 'form',
       title: formName || payloadTitle(row.encrypted_payload, 'Form submitted'),
-      summary: 'Form submitted',
+      summary: formDef?.audience === 'public' ? 'Added to the waitlist' : 'Form submitted',
       created_at: row.submitted_at || row.created_at,
       author_id: null,
       ref_id: row.id,

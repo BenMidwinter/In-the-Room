@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: '/home', label: 'Home', end: true },
   { to: '/calendar', label: 'Calendar' },
   { to: '/clients', label: 'All Clients' },
+  { to: '/waitlist', label: 'Waitlist' },
   { to: '/practice', label: 'My Practice' },
   { to: '/finance', label: '[Finance]' },
   { to: '/reporting', label: '[Reporting]' },

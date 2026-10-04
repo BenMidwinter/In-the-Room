@@ -20,6 +20,8 @@ export function useClientsQuery({ userId }) {
     queryFn: () => fetchClientsForUser(userId, null),
     enabled: Boolean(userId),
     placeholderData: keepPreviousData,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   })
 }
 

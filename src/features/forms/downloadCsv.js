@@ -17,3 +17,8 @@ export function formFillUrl(token) {
 export function formStartUrl(formId) {
   return `${window.location.origin}/r/${formId}`
 }
+
+export function formEmbedCode(formId, title) {
+  const safe = String(title || 'Intake form').replace(/"/g, '')
+  return `<iframe src="${formStartUrl(formId)}" title="${safe}" style="width:100%;min-height:720px;border:0"></iframe>`
+}

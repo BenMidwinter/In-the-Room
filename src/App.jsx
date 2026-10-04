@@ -8,6 +8,7 @@ import FormStartPage from './features/forms/FormStartPage'
 import Home from './features/home/HomePage'
 import Calendar from './features/calendar/CalendarPage'
 import AllClients from './components/AllClients'
+import WaitlistPage from './components/WaitlistPage'
 import AddClient from './components/AddClient'
 import PatientProfile from './features/client/PatientProfile'
 import ClientPanelEmpty from './features/client/ClientPanelEmpty'
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="upcoming-appointments" element={<Navigate to="/calendar?view=upcoming" replace />} />
         <Route path="active-cases" element={<Navigate to="/home" replace />} />
         <Route path="clients" element={<AllClients />} />
+        <Route path="waitlist" element={<WaitlistPage />} />
         <Route path="clients/add" element={<AddClient />} />
         <Route path="clients/:clientId/edit" element={<AddClient />} />
 

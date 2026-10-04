@@ -1985,25 +1985,48 @@ button.agenda-event {
 
 .form-fill {
   min-height: 100vh;
-  background: var(--bg-page);
-  color: var(--txt-primary);
-  padding: 2rem 1rem 4rem;
+  background: #e8e2d6;
+  color: #241f1a;
+  padding: 2.75rem 1.25rem 4.5rem;
 }
 
 .form-fill__sheet {
-  max-width: 40rem;
+  max-width: 44rem;
   margin: 0 auto;
+  padding: 3.25rem 3.5rem 3.75rem;
+  background: #fffdf8;
+  color: #241f1a;
+  border: 1px solid rgba(60, 46, 28, 0.08);
+  box-shadow: 0 16px 48px rgba(48, 36, 18, 0.1);
 }
 
-.form-fill h1,
+.form-fill h1 {
+  margin: 0 0 1.75rem;
+  font-family: var(--font-head);
+  font-variation-settings: var(--font-head-variation);
+  font-optical-sizing: auto;
+  font-size: 2.15rem;
+  font-weight: 560;
+  line-height: 1.15;
+  color: #241f1a;
+}
+
 .form-fill h2 {
-  margin: 0 0 0.75rem;
-  color: var(--col-accent);
+  margin: 0 0 0.85rem;
+  font-family: var(--font-head);
+  font-variation-settings: var(--font-head-variation);
   font-size: 1.35rem;
+  font-weight: 560;
+  color: #241f1a;
 }
 
-.form-fill h2 {
+.form-fill__prose {
+  margin: 0 0 1.6rem;
+  max-width: 38rem;
   font-size: 1.05rem;
+  line-height: 1.7;
+  color: #3c342c;
+  white-space: pre-wrap;
 }
 
 .form-fill__note,
@@ -2014,7 +2037,11 @@ button.agenda-event {
   line-height: 1.45;
 }
 
-.form-fill__save,
+.form-fill__note {
+  margin-top: -0.6rem;
+  color: #6d645b;
+}
+
 .form-actions,
 .form-builder__moves {
   display: flex;
@@ -2023,12 +2050,147 @@ button.agenda-event {
   gap: 0.5rem;
 }
 
+.form-fill__foot {
+  margin-top: 2.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #e6dfd3;
+}
+
 .form-fill__save {
-  margin-bottom: 1.25rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem 1.25rem;
+  margin: 0 0 1.35rem;
+  color: #6d645b;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.form-fill__link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #241f1a;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  cursor: pointer;
 }
 
 .form-fill__send {
-  margin-top: 0.5rem;
+  margin-top: 0;
+}
+
+.form-fill .form-question {
+  margin: 0 0 1.65rem;
+}
+
+.form-fill .form-question__label {
+  margin: 0 0 0.3rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #241f1a;
+}
+
+.form-fill .paper-input,
+.form-fill select.paper-input,
+.form-fill input[type="date"].paper-input,
+.form-fill textarea.paper-input {
+  height: auto;
+  min-height: 2.25rem;
+  padding: 0.2rem 0 0.45rem;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #c9bfb0;
+  background: transparent;
+  box-shadow: none;
+  color: #241f1a;
+  font-size: 1.05rem;
+}
+
+.form-fill textarea.paper-input {
+  min-height: 7rem;
+  line-height: 1.55;
+}
+
+.form-fill .paper-input:focus {
+  border-bottom-color: #241f1a;
+  box-shadow: none;
+}
+
+.form-fill .form-scale__btn {
+  background: transparent;
+  border-color: #c9bfb0;
+  color: #241f1a;
+  font-weight: 600;
+}
+
+.form-fill .form-scale__btn--on {
+  background: #241f1a;
+  border-color: #241f1a;
+  color: #fffdf8;
+}
+
+@media (max-width: 640px) {
+  .form-fill {
+    padding: 0;
+    background: #fffdf8;
+  }
+
+  .form-fill__sheet {
+    padding: 1.75rem 1.25rem 2.5rem;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .form-fill h1 {
+    font-size: 1.7rem;
+  }
+}
+
+.form-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.form-picker__label {
+  margin: 0;
+  font-weight: 600;
+  color: var(--col-accent);
+}
+
+.form-picker__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.form-picker__empty {
+  margin: 0;
+  color: var(--txt-muted);
+  line-height: 1.45;
+}
+
+.form-table-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.form-table-footer .form-export-note {
+  margin: 0;
+  max-width: 42rem;
 }
 
 .form-question {
@@ -2228,7 +2390,7 @@ button.agenda-event {
 }
 
 .form-designer__palette-title {
-  margin: 0 0 0.2rem;
+  margin: 0.85rem 0 0.2rem;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -2236,10 +2398,18 @@ button.agenda-event {
   color: var(--txt-muted);
 }
 
+.form-designer__palette-title:first-child {
+  margin-top: 0;
+}
+
 .form-designer__palette .secondary,
 .form-designer__palette .danger {
   width: 100%;
   text-align: left;
+}
+
+.form-designer__palette .danger {
+  margin-top: 0.75rem;
 }
 
 .form-designer__canvas {

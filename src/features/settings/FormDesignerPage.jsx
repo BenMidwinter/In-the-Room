@@ -9,27 +9,52 @@ import {
   useMeasuresQuery,
   useSaveFormMutation,
 } from '../../lib/formQueries'
-import { formStartUrl } from '../forms/downloadCsv'
+import { formEmbedCode, formStartUrl } from '../forms/downloadCsv'
 
-const BLOCK_TYPES = [
-  { value: 'short_text', label: 'Short answer' },
-  { value: 'long_text', label: 'Longer answer' },
-  { value: 'yes_no', label: 'Yes or no' },
-  { value: 'date', label: 'Date' },
-  { value: 'choice', label: 'Choice' },
-  { value: 'client', label: 'Client detail' },
-  { value: 'measure', label: 'Questionnaire' },
+const FORM_MODULES = [
+  { kind: 'prose', label: 'Text' },
+  { kind: 'field', type: 'short_text', label: 'Short answer' },
+  { kind: 'field', type: 'long_text', label: 'Longer answer' },
+  { kind: 'field', type: 'yes_no', label: 'Yes or no' },
+  { kind: 'field', type: 'date', label: 'Date' },
+  { kind: 'field', type: 'choice', label: 'Choice' },
 ]
 
-function blockOfType(type, measures) {
+function blockFromSpec(spec) {
   const id = newFormId()
-  if (type === 'choice') return { id, type, label: '', required: false, options: ['', ''] }
-  if (type === 'client') return { id, type: 'client', bind: 'first_name', label: 'First name', required: false }
-  if (type === 'measure') {
-    const measure = measures[0]
-    return { id, type: 'measure', measureId: measure?.id || '', label: measure?.name || '' }
+  if (spec.kind === 'prose') return [{ id, type: 'prose', text: '' }]
+  if (spec.kind === 'client') {
+    return [{ id, type: 'client', bind: spec.bind, label: bindLabel(spec.bind), required: false }]
   }
-  return { id, type, label: '', required: false }
+  if (spec.kind === 'clients') {
+    return CLIENT_BINDS.map((row) => ({
+      id: newFormId(),
+      type: 'client',
+      bind: row.key,
+      label: row.label,
+      required: false,
+    }))
+  }
+  if (spec.kind === 'measure') {
+    return [{ id, type: 'measure', measureId: spec.measureId, label: spec.name }]
+  }
+  if (spec.type === 'choice') return [{ id, type: 'choice', label: '', required: false, options: ['', ''] }]
+  return [{ id, type: spec.type, label: '', required: false }]
+}
+
+function moduleTitle(block) {
+  if (block.type === 'prose') return 'Text'
+  if (block.type === 'client') return bindLabel(block.bind)
+  if (block.type === 'measure') return block.label || 'Questionnaire'
+  return FORM_MODULES.find((row) => row.type === block.type)?.label || 'Question'
+}
+
+function readDrag(event) {
+  try {
+    return JSON.parse(event.dataTransfer.getData('text/plain'))
+  } catch {
+    return null
+  }
 }
 
 function blankDraft() {
@@ -90,6 +115,23 @@ export default function FormDesignerPage() {
   )
 }
 
+function PaletteButton({ spec, onAdd }) {
+  return (
+    <button
+      type="button"
+      className="secondary form-designer__module"
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData('text/plain', JSON.stringify({ palette: spec }))
+        event.dataTransfer.effectAllowed = 'copy'
+      }}
+      onClick={() => onAdd(spec)}
+    >
+      {spec.label}
+    </button>
+  )
+}
+
 function FormDesigner({ draft, onChange, measures, userId }) {
   const navigate = useNavigate()
   const toast = useToast()
@@ -104,6 +146,30 @@ function FormDesigner({ draft, onChange, measures, userId }) {
   const setBlock = (index, block) => setBlocks(schema.blocks.map((row, rowIndex) => (
     rowIndex === index ? block : row
   )))
+
+  const addSpec = (spec, index = schema.blocks.length) => {
+    let incoming = blockFromSpec(spec)
+    if (spec.kind === 'clients') {
+      const present = new Set(schema.blocks.filter((block) => block.type === 'client').map((block) => block.bind))
+      incoming = incoming.filter((block) => !present.has(block.bind))
+      if (!incoming.length) {
+        toast.saved('Those client details are already on the form')
+        return
+      }
+    }
+    const next = schema.blocks.slice()
+    next.splice(index, 0, ...incoming)
+    setBlocks(next)
+  }
+
+  const dropAt = (event, index) => {
+    event.preventDefault()
+    event.stopPropagation()
+    const payload = readDrag(event)
+    if (!payload) return
+    if (payload.palette) addSpec(payload.palette, index)
+    else if (Number.isInteger(payload.index)) setBlocks(moveListItem(schema.blocks, payload.index, Math.min(index, schema.blocks.length - 1)))
+  }
 
   const persist = async (publish) => {
     try {
@@ -155,9 +221,7 @@ function FormDesigner({ draft, onChange, measures, userId }) {
   }
 
   const link = draft.id && published && draft.audience === 'public' ? formStartUrl(draft.id) : ''
-  const embed = link
-    ? `<iframe src="${link}" title="${draft.name.replace(/"/g, '')}" style="width:100%;min-height:720px;border:0"></iframe>`
-    : ''
+  const embed = link ? formEmbedCode(draft.id, draft.name) : ''
 
   return (
     <div className="form-designer">
@@ -178,20 +242,32 @@ function FormDesigner({ draft, onChange, measures, userId }) {
       </div>
       <div className="form-designer__layout">
         <aside className="form-designer__palette">
-          <p className="form-designer__palette-title">Add a question</p>
-          {BLOCK_TYPES.map((type) => (
-            <button
-              key={type.value}
-              type="button"
-              className="secondary"
-              onClick={() => setBlocks([...schema.blocks, blockOfType(type.value, publishedMeasures)])}
-            >
-              {type.label}
-            </button>
+          <p className="form-designer__palette-title">Form modules</p>
+          {FORM_MODULES.map((spec) => (
+            <PaletteButton key={spec.label} spec={spec} onAdd={addSpec} />
           ))}
+          <p className="form-designer__palette-title">Client modules</p>
+          <PaletteButton spec={{ kind: 'clients', label: 'All client details' }} onAdd={addSpec} />
+          {CLIENT_BINDS.map((row) => (
+            <PaletteButton key={row.key} spec={{ kind: 'client', bind: row.key, label: row.label }} onAdd={addSpec} />
+          ))}
+          <p className="form-designer__palette-title">Outcome modules</p>
+          {publishedMeasures.length ? publishedMeasures.map((measure) => (
+            <PaletteButton
+              key={measure.id}
+              spec={{ kind: 'measure', measureId: measure.id, name: measure.name, label: measure.name }}
+              onAdd={addSpec}
+            />
+          )) : (
+            <p className="text-small text-muted">Publish a questionnaire and it will appear here.</p>
+          )}
           <button type="button" className="danger" onClick={removeDraft} disabled={remove.isPending}>Delete</button>
         </aside>
-        <div className="form-designer__canvas">
+        <div
+          className="form-designer__canvas"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={(event) => dropAt(event, schema.blocks.length)}
+        >
           <div className="form-designer__card">
             <label htmlFor="form-name">Form name</label>
             <input
@@ -202,7 +278,7 @@ function FormDesigner({ draft, onChange, measures, userId }) {
               onChange={(event) => onChange({ ...draft, name: event.target.value })}
             />
             <div className="form-group" style={{ marginTop: '0.8rem' }}>
-              <label htmlFor="form-audience">Who fills this in</label>
+              <label htmlFor="form-audience">What this form is for</label>
               <select
                 id="form-audience"
                 className="paper-input"
@@ -213,21 +289,31 @@ function FormDesigner({ draft, onChange, measures, userId }) {
                   audience: event.target.value === 'public' ? 'public' : 'private',
                 })}
               >
-                <option value="private">A client I already see</option>
-                <option value="public">Someone new, from a link or my website</option>
+                <option value="private">Send to a client I already see</option>
+                <option value="public">Intake. Someone new joins the waitlist</option>
               </select>
             </div>
             <p className="form-export-note">
               {draft.audience === 'public'
-                ? 'A new person who sends this becomes a client, with a first course. Publish it when it is ready to share.'
-                : 'Send a published form from this list, or from the client’s course. A draft cannot be sent.'}
+                ? 'Publish this, then copy the link or the embed from the forms list. When someone sends it, they are added to the waitlist, a course is opened, and the form is the first thing on their timeline.'
+                : 'Add a published form from the client’s course. A draft cannot be added there. Intake forms are not sent from a course.'}
             </p>
           </div>
           {schema.blocks.map((block, index) => (
-            <div key={block.id} className="form-designer__card">
+            <div
+              key={block.id}
+              className="form-designer__card"
+              draggable
+              onDragStart={(event) => {
+                event.dataTransfer.setData('text/plain', JSON.stringify({ index }))
+                event.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => dropAt(event, index)}
+            >
               <div className="form-designer__card-head">
-                <strong>{BLOCK_TYPES.find((type) => type.value === block.type)?.label || 'Question'}</strong>
-                {block.type !== 'measure' && (
+                <strong>{moduleTitle(block)}</strong>
+                {block.type !== 'measure' && block.type !== 'prose' && (
                   <label className="form-builder__required">
                     <input
                       type="checkbox"
@@ -238,23 +324,20 @@ function FormDesigner({ draft, onChange, measures, userId }) {
                   </label>
                 )}
               </div>
-              <div className="form-group">
-                <label htmlFor={`block-type-${block.id}`}>Type</label>
-                <select
-                  id={`block-type-${block.id}`}
-                  className="paper-input"
-                  value={block.type}
-                  onChange={(event) => {
-                    const next = blockOfType(event.target.value, publishedMeasures)
-                    setBlock(index, { ...next, id: block.id, label: block.label || next.label })
-                  }}
-                >
-                  {BLOCK_TYPES.map((type) => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
-              {block.type !== 'measure' && (
+              {block.type === 'prose' && (
+                <div className="form-group">
+                  <label htmlFor={`block-text-${block.id}`}>Section text</label>
+                  <textarea
+                    id={`block-text-${block.id}`}
+                    className="paper-input"
+                    rows={4}
+                    value={block.text}
+                    placeholder="Say what this form is for, or introduce the next questions."
+                    onChange={(event) => setBlock(index, { ...block, text: event.target.value })}
+                  />
+                </div>
+              )}
+              {block.type !== 'prose' && block.type !== 'measure' && (
                 <div className="form-group">
                   <label htmlFor={`block-label-${block.id}`}>Question</label>
                   <input
@@ -277,48 +360,10 @@ function FormDesigner({ draft, onChange, measures, userId }) {
                   />
                 </div>
               )}
-              {block.type === 'client' && (
-                <div className="form-group">
-                  <label htmlFor={`block-bind-${block.id}`}>Client detail</label>
-                  <select
-                    id={`block-bind-${block.id}`}
-                    className="paper-input"
-                    value={block.bind}
-                    onChange={(event) => {
-                      const bind = CLIENT_BINDS.find((row) => row.key === event.target.value)?.key || 'first_name'
-                      setBlock(index, { ...block, bind, label: bindLabel(bind) })
-                    }}
-                  >
-                    {CLIENT_BINDS.map((row) => (
-                      <option key={row.key} value={row.key}>{row.label}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
               {block.type === 'measure' && (
-                <div className="form-group">
-                  <label htmlFor={`block-measure-${block.id}`}>Questionnaire</label>
-                  <select
-                    id={`block-measure-${block.id}`}
-                    className="paper-input"
-                    value={block.measureId}
-                    onChange={(event) => {
-                      const measure = measures.find((row) => row.id === event.target.value)
-                      setBlock(index, {
-                        ...block,
-                        measureId: event.target.value,
-                        label: measure?.name || block.label,
-                      })
-                    }}
-                  >
-                    <option value="">Choose a published questionnaire…</option>
-                    {measures.filter((measure) => measure.status === 'published' || measure.id === block.measureId).map((measure) => (
-                      <option key={measure.id} value={measure.id}>
-                        {measure.name}{measure.status === 'published' ? '' : ' (draft)'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <p className="text-small text-muted" style={{ margin: 0 }}>
+                  This questionnaire is scored when the form is sent.
+                </p>
               )}
               <div className="form-designer__card-actions">
                 <button type="button" className="secondary" disabled={index === 0} onClick={() => setBlocks(moveListItem(schema.blocks, index, index - 1))}>Up</button>
@@ -328,15 +373,15 @@ function FormDesigner({ draft, onChange, measures, userId }) {
             </div>
           ))}
           {!schema.blocks.length && (
-            <p className="text-muted">Add a question from the list on the left.</p>
+            <p className="text-muted">Drag a module here, or click one on the left.</p>
           )}
           {link && (
             <div className="form-designer__card form-share">
-              <p>Share this link, or place it on your website. Each person gets their own saved copy.</p>
-              <input className="paper-input" readOnly value={link} aria-label="Public form link" />
+              <p>This intake form is published. Copy the link, or the embed, from the forms list.</p>
+              <input className="paper-input" readOnly value={link} aria-label="Intake form link" />
               <div className="form-actions">
                 <button type="button" className="secondary" onClick={() => copy(link, 'Link copied')}>Copy link</button>
-                <button type="button" className="secondary" onClick={() => copy(embed, 'Website code copied')}>Copy website code</button>
+                <button type="button" className="secondary" onClick={() => copy(embed, 'Embed code copied')}>Copy embed code</button>
               </div>
             </div>
           )}

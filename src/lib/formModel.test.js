@@ -7,6 +7,7 @@ import {
   measureStructureKey,
   submissionStatusLabel,
   validateDraftName,
+  validateForm,
   validateMeasure,
   outcomesInForm,
   prefillClientAnswers,
@@ -90,6 +91,17 @@ describe('outcome scores', () => {
     expect(csv).toContain('2026-04-02,Ada North,2014-03-01,Female,3,3')
     expect(csv.toLowerCase()).not.toContain('cutoff')
     expect(csv.toLowerCase()).not.toContain('clinical')
+  })
+
+  it('asks for the text a clinician writes to explain a section', () => {
+    expect(validateForm('Intake', {
+      v: 1,
+      blocks: [{ id: 'intro', type: 'prose', text: '   ' }],
+    })).toMatch(/text/i)
+    expect(validateForm('Intake', {
+      v: 1,
+      blocks: [{ id: 'intro', type: 'prose', text: 'This form asks about the start of therapy.' }],
+    })).toBeNull()
   })
 
   it('names a finished form as completed, and a saved draft only needs a name', () => {
