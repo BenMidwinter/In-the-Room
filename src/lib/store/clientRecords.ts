@@ -29,6 +29,7 @@ export function upsertClient(payload, userId) {
     school: payload.school?.trim() || '',
     diagnosis: payload.diagnosis || '',
     medication: payload.medication?.trim() || '',
+    gender: payload.gender?.trim() || '',
     workplace_id: payload.workplace_id || null,
     workplace_name: workplace?.name || 'Private Practice',
     user_id: userId,

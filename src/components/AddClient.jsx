@@ -20,6 +20,7 @@ export default function AddClient() {
   const [surname, setSurname] = useState('')
   const [dob, setDob] = useState('')
   const [school, setSchool] = useState('')
+  const [gender, setGender] = useState('')
   const [selectedDiagnoses, setSelectedDiagnoses] = useState([])
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
@@ -39,6 +40,7 @@ export default function AddClient() {
     setSurname(existing.surname || '')
     setDob(existing.dob || '')
     setSchool(existing.school || '')
+    setGender(existing.gender || '')
     if (existing.diagnosis) {
       setSelectedDiagnoses(parseDiagnosisList(existing.diagnosis))
     }
@@ -63,6 +65,7 @@ export default function AddClient() {
         surname,
         dob,
         school,
+        gender,
         diagnosis: joinDiagnosisList(selectedDiagnoses),
         workplace_id: null,
       }
@@ -127,6 +130,15 @@ export default function AddClient() {
             aria-invalid={!!errors.dob}
           />
           {errors.dob && <p className="mt-1 text-[0.8rem] text-secondary">{errors.dob}</p>}
+        </div>
+        <div className="form-group">
+          <label>Gender</label>
+          <input
+            className="paper-input"
+            value={gender}
+            onChange={e => setGender(e.target.value)}
+            placeholder="Optional"
+          />
         </div>
         <div className="form-group">
           <label>School / setting</label>

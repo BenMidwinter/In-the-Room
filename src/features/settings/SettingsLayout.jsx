@@ -6,7 +6,7 @@ const PRIMARY_TABS = [
   { to: '/settings/availability', label: 'Availability' },
   { to: '/settings/services', label: 'Services' },
   { to: '/settings/templates', label: 'Templates' },
-  { to: '/settings/forms', label: '[Forms]' },
+  { to: '/settings/forms', label: 'Forms' },
   { to: '/settings/login', label: 'Login' },
   { to: '/settings/2fa', label: '[2FA]' },
   { to: '/settings/integrations', label: 'Integrations' },

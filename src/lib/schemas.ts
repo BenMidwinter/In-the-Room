@@ -32,6 +32,7 @@ export const clientInputSchema = z.object({
   school: optionalText,
   diagnosis: optionalText,
   medication: optionalText,
+  gender: optionalText,
   workplace_id: z.string().nullish(),
 })
 

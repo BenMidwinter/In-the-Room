@@ -3,6 +3,8 @@ import { useAppClients } from './lib/queries'
 
 import AppLayout from './components/AppLayout'
 import AuthPage from './features/auth/AuthPage'
+import FormFillPage from './features/forms/FormFillPage'
+import FormStartPage from './features/forms/FormStartPage'
 import Home from './features/home/HomePage'
 import Calendar from './features/calendar/CalendarPage'
 import AllClients from './components/AllClients'
@@ -23,10 +25,8 @@ import AccountSettingsPage from './features/settings/AccountSettingsPage'
 import AvailabilitySettingsPage from './features/settings/AvailabilitySettingsPage'
 import ServicesSettingsPage from './features/settings/ServicesSettingsPage'
 import IntegrationsSettingsPage from './features/settings/IntegrationsSettingsPage'
-import {
-  FormsSettingsPage,
-  TwoFactorSettingsPage,
-} from './features/settings/SettingsPlaceholders'
+import { TwoFactorSettingsPage } from './features/settings/SettingsPlaceholders'
+import FormsSettingsPage from './features/settings/FormsSettingsPage'
 import TemplatesSettingsPage from './features/settings/TemplatesSettingsPage'
 import LoginSettingsPage from './features/settings/LoginSettingsPage'
 import JournalPage from './features/journal/JournalPage'
@@ -43,6 +43,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<AuthPage />} />
+      <Route path="/f/:token" element={<FormFillPage />} />
+      <Route path="/r/:formId" element={<FormStartPage />} />
       <Route path="/" element={<Navigate to="/home" replace />} />
       <Route path="/dashboard" element={<Navigate to="/home" replace />} />
       <Route path="/profile" element={<Navigate to="/settings/account" replace />} />

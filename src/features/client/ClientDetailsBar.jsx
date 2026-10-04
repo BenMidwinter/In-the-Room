@@ -8,6 +8,7 @@ export default function ClientDetailsBar({ client, onClientUpdated, embedded = f
   const perms = usePermissions(client)
   const [showEdit, setShowEdit] = useState(false)
   const items = [
+    { label: 'Gender', value: client.gender || '—' },
     { label: 'School / setting', value: client.school || '—' },
     { label: 'Diagnosis', value: client.diagnosis || '—' },
     { label: 'Medication', value: client.medication || '—' },

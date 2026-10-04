@@ -688,6 +688,7 @@ export type Database = {
       }
       form_definitions: {
         Row: {
+          audience: string
           created_at: string
           description: string | null
           id: string
@@ -702,6 +703,7 @@ export type Database = {
           version: number
         }
         Insert: {
+          audience?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -716,6 +718,7 @@ export type Database = {
           version?: number
         }
         Update: {
+          audience?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -733,42 +736,48 @@ export type Database = {
       }
       form_submissions: {
         Row: {
+          access_token: string
           client_id: string | null
           created_at: string
           encrypted_payload: Json
+          episode_id: string | null
           form_definition_id: string
           form_version: number
           id: string
           organization_id: string | null
           owner_id: string
           status: string
-          submitted_at: string
+          submitted_at: string | null
           updated_at: string
         }
         Insert: {
+          access_token?: string
           client_id?: string | null
           created_at?: string
           encrypted_payload: Json
+          episode_id?: string | null
           form_definition_id: string
           form_version: number
           id?: string
           organization_id?: string | null
           owner_id: string
           status?: string
-          submitted_at?: string
+          submitted_at?: string | null
           updated_at?: string
         }
         Update: {
+          access_token?: string
           client_id?: string | null
           created_at?: string
           encrypted_payload?: Json
+          episode_id?: string | null
           form_definition_id?: string
           form_version?: number
           id?: string
           organization_id?: string | null
           owner_id?: string
           status?: string
-          submitted_at?: string
+          submitted_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -777,6 +786,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_episode_id_fkey"
+            columns: ["episode_id"]
+            isOneToOne: false
+            referencedRelation: "episodes"
             referencedColumns: ["id"]
           },
           {
@@ -1668,6 +1684,10 @@ export type Database = {
     }
     Functions: {
       current_uid: { Args: never; Returns: string }
+      form_link_open: { Args: { token: string }; Returns: Json }
+      form_link_save: { Args: { token: string; answers: Json }; Returns: undefined }
+      form_link_submit: { Args: { token: string }; Returns: Json }
+      form_public_start: { Args: { form_id: string }; Returns: string }
     }
     Enums: {
       [_ in never]: never

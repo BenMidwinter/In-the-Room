@@ -14,6 +14,7 @@ type IdentityPayload = {
   school?: string
   diagnosis?: string
   medication?: string
+  gender?: string
 }
 
 export type AppClientRecord = {
@@ -28,6 +29,7 @@ export type AppClientRecord = {
   school: string
   diagnosis: string
   medication: string
+  gender: string
   is_active: boolean
   created_at: string
   updated_at?: string
@@ -41,6 +43,7 @@ export type ClientWriteInput = {
   school?: string
   diagnosis?: string
   medication?: string
+  gender?: string
   workplace_id?: string | null
 }
 
@@ -57,6 +60,7 @@ function parseIdentity(raw: Json | null | undefined): IdentityPayload {
     school: String(row.school || ''),
     diagnosis: String(row.diagnosis || ''),
     medication: String(row.medication || ''),
+    gender: String(row.gender || ''),
   }
 }
 
@@ -86,6 +90,7 @@ function toAppClient(row: {
     school: identity.school || '',
     diagnosis: identity.diagnosis || '',
     medication: identity.medication || '',
+    gender: identity.gender || '',
     is_active: row.status === 'active',
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -143,6 +148,7 @@ export async function upsertClientRemote(
     school: input.school?.trim() || '',
     diagnosis: input.diagnosis || '',
     medication: input.medication?.trim() || '',
+    gender: input.gender?.trim() || '',
   }
   const organizationId = input.workplace_id || null
   const pseudonym = {

@@ -23,6 +23,7 @@ import { useTemplatesQuery } from '../../lib/templateQueries'
 import { getProfile } from '../../lib/store'
 import { useClientChrome } from './ClientChrome'
 import DocumentWorkspace from './DocumentWorkspace'
+import { EpisodeForms, EpisodeOutcomes } from './CourseRecords'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -200,33 +201,6 @@ function EpisodeAppointments({ episode, clientId, episodes, open, onToggle }) {
           if (editing) toggle(row.id)
           else overlay.openView(row.appt)
         }}
-      />
-    </CourseAccordion>
-  )
-}
-
-function EpisodeSection({ title, empty, newLabel, columns, countNoun, open, onToggle }) {
-  const toast = useToast()
-  return (
-    <CourseAccordion
-      title={title}
-      open={open}
-      onToggle={onToggle}
-      actions={(
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => toast.info(`${newLabel} creation will connect to the backend.`)}
-        >
-          Add
-        </button>
-      )}
-    >
-      <RecordTable
-        columns={columns}
-        rows={[]}
-        countNoun={countNoun}
-        emptyMessage={empty}
       />
     </CourseAccordion>
   )
@@ -440,30 +414,26 @@ function SelectedCourse({ episode, episodes, client, clientId, userId, organizat
           onToggle={() => toggle('reports')}
         />
       )}
-      <EpisodeSection
-        title="Forms"
-        newLabel="Form"
-        empty="No forms on this course yet."
-        countNoun="forms"
-        open={openSection === 'forms'}
-        onToggle={() => toggle('forms')}
-        columns={[
-          { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
-          { key: 'date', label: 'Date', sort: 'date' },
-        ]}
-      />
-      <EpisodeSection
-        title="Outcome measures"
-        newLabel="Outcome measure"
-        empty="No outcome measures on this course yet."
-        countNoun="measures"
-        open={openSection === 'outcomes'}
-        onToggle={() => toggle('outcomes')}
-        columns={[
-          { key: 'name', label: 'Measure', filter: 'text', sort: 'text' },
-          { key: 'date', label: 'Date', sort: 'date' },
-        ]}
-      />
+      {userId && (
+        <EpisodeForms
+          episode={episode}
+          clientId={clientId}
+          userId={userId}
+          organizationId={organizationId}
+          open={openSection === 'forms'}
+          onToggle={() => toggle('forms')}
+        />
+      )}
+      {userId && (
+        <EpisodeOutcomes
+          episode={episode}
+          clientId={clientId}
+          userId={userId}
+          organizationId={organizationId}
+          open={openSection === 'outcomes'}
+          onToggle={() => toggle('outcomes')}
+        />
+      )}
     </div>
   )
 }
