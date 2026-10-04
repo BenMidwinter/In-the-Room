@@ -6,6 +6,7 @@ import {
   listLocalEpisodes,
   openLocalEpisode,
   rememberLocalEpisode,
+  reopenLocalEpisode,
   type AppEpisode,
   type EpisodeStatus,
 } from '../store/episodes'
@@ -133,6 +134,42 @@ export async function openEpisode(input: {
     throw error
   }
 
+  const mapped = toAppEpisode(data as EpisodeRow)
+  rememberLocalEpisode(mapped)
+  return mapped
+}
+
+/** Make a discharged course the open one again. */
+export async function reopenEpisode(episodeId: string): Promise<AppEpisode> {
+  if (!isSupabaseConfigured()) return reopenLocalEpisode(episodeId)
+  const supabase = getSupabase()
+  if (!supabase) return reopenLocalEpisode(episodeId)
+
+  const { data: current, error: readError } = await supabase
+    .from('episodes')
+    .select(EPISODE_COLUMNS)
+    .eq('id', episodeId)
+    .maybeSingle()
+  if (readError) throw readError
+  if (!current) throw new Error('Episode not found')
+  if (current.status === 'active') {
+    const mapped = toAppEpisode(current as EpisodeRow)
+    rememberLocalEpisode(mapped)
+    return mapped
+  }
+
+  const { data, error } = await supabase
+    .from('episodes')
+    .update({ status: 'active', end_date: null })
+    .eq('id', episodeId)
+    .select(EPISODE_COLUMNS)
+    .single()
+  if (error) {
+    if (error.code === '23505') {
+      throw new Error('Another course is still open. Discharge it before reopening this one.')
+    }
+    throw error
+  }
   const mapped = toAppEpisode(data as EpisodeRow)
   rememberLocalEpisode(mapped)
   return mapped

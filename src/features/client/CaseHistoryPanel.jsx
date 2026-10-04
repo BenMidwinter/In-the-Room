@@ -1,18 +1,18 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import RecordListLayout from '../../components/RecordListLayout'
-import RecordTable from '../../components/RecordTable'
 import { useConfirm, useToast } from '../../components/ui'
 import { useClientSession } from '../../lib/useClientSession'
 import {
-  useAssignAppointmentsMutation,
   useClientEpisodesQuery,
   useDischargeEpisodeMutation,
   useOpenEpisodeMutation,
+  useReopenEpisodeMutation,
+  useSetEpisodeAppointmentsMutation,
 } from '../../lib/episodeQueries'
 import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
 import { useEpisodeReportsQuery, useSaveReportMutation } from '../../lib/reportQueries'
 import { formatSessionDateTime } from '../../lib/appointmentUtils'
+import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -30,17 +30,12 @@ const STATUS_LABELS = {
   paused: 'Paused',
 }
 
-const EPISODE_COLUMNS = [
-  { key: 'episode', label: 'Episode' },
-  { key: 'start', label: 'Started' },
-  { key: 'end', label: 'Ended' },
-  { key: 'status', label: 'Status', filter: { type: 'select', allLabel: 'All statuses' } },
-]
-
 function EpisodeAppointments({ episode, clientId, episodes }) {
   const toast = useToast()
+  const overlay = useAppointmentOverlay()
   const { data: appointments = [] } = useClientAppointmentsQuery(clientId)
-  const assign = useAssignAppointmentsMutation()
+  const saveMembership = useSetEpisodeAppointmentsMutation()
+  const [editing, setEditing] = useState(false)
   const [picked, setPicked] = useState([])
 
   const primaries = appointments
@@ -48,12 +43,16 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
     .sort((a, b) => String(b.session_date || '').localeCompare(String(a.session_date || ''))
       || String(b.start_time || '').localeCompare(String(a.start_time || '')))
   const onThisEpisode = primaries.filter((appt) => appt.episode_id === episode.id)
-  const available = primaries.filter((appt) => appt.episode_id !== episode.id)
 
   const episodeLabel = (episodeId) => {
-    if (!episodeId) return 'Unassigned'
+    if (!episodeId || episodeId === episode.id) return ''
     const match = episodes.find((item) => item.id === episodeId)
     return match ? `Episode ${match.episode_number}` : 'Another episode'
+  }
+
+  const startEdit = () => {
+    setPicked(onThisEpisode.map((appt) => appt.id))
+    setEditing(true)
   }
 
   const toggle = (id) => {
@@ -62,19 +61,17 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
     ))
   }
 
-  const add = async () => {
+  const save = async () => {
     try {
-      const moved = await assign.mutateAsync({
+      await saveMembership.mutateAsync({
         clientId,
         episodeId: episode.id,
         appointmentIds: picked,
       })
-      setPicked([])
-      toast.saved(moved.length === 1
-        ? 'Appointment added to this episode'
-        : `${moved.length} appointments added to this episode`)
+      setEditing(false)
+      toast.saved('Appointments saved')
     } catch (err) {
-      toast.error(err?.message || 'Could not add those appointments')
+      toast.error(err?.message || 'Could not save these appointments')
     }
   }
 
@@ -82,49 +79,62 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
     <div className="episode-detail__appointments">
       <div className="episode-detail__reports-header">
         <h4>Appointments</h4>
-        <button
-          type="button"
-          className="primary"
-          onClick={add}
-          disabled={!picked.length || assign.isPending}
-        >
-          Add to this episode
-        </button>
+        {editing ? (
+          <div className="episode-detail__edit-actions">
+            <button type="button" className="secondary" onClick={() => setEditing(false)} disabled={saveMembership.isPending}>
+              Cancel
+            </button>
+            <button type="button" className="primary" onClick={save} disabled={saveMembership.isPending}>
+              Save
+            </button>
+          </div>
+        ) : (
+          <button type="button" className="secondary" onClick={startEdit}>
+            Edit
+          </button>
+        )}
       </div>
-      <p className="text-small text-muted episode-detail__hint">
-        Tick sessions to put them on this course. A Process Note stays with its appointment.
-      </p>
-      {onThisEpisode.length > 0 && (
-        <ul className="episode-appointment-list">
-          {onThisEpisode.map((appt) => (
-            <li key={appt.id}>
-              <span>{formatSessionDateTime(appt)}</span>
-              <span className="text-small text-muted">{appt.service_name || 'Appointment'}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {available.length === 0 ? (
-        <p className="text-small text-muted">No other appointments to add.</p>
-      ) : (
-        <ul className="episode-appointment-list">
-          {available.map((appt) => (
-            <li key={appt.id}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={picked.includes(appt.id)}
-                  onChange={() => toggle(appt.id)}
-                />
-                <span>{formatSessionDateTime(appt)}</span>
-                <span className="text-small text-muted">
-                  {appt.service_name || 'Appointment'} · {episodeLabel(appt.episode_id)}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="episode-appointment-scroll" aria-label={editing ? 'All appointments' : 'Appointments on this episode'}>
+        {editing ? (
+          primaries.length === 0 ? (
+            <p className="text-small text-muted">No appointments for this client yet.</p>
+          ) : (
+            <ul className="episode-appointment-list">
+              {primaries.map((appt) => {
+                const elsewhere = episodeLabel(appt.episode_id)
+                return (
+                  <li key={appt.id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={picked.includes(appt.id)}
+                        onChange={() => toggle(appt.id)}
+                      />
+                      <span>{formatSessionDateTime(appt)}</span>
+                      <span className="text-small text-muted">
+                        {appt.service_name || 'Appointment'}{elsewhere ? ` · ${elsewhere}` : ''}
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          )
+        ) : onThisEpisode.length === 0 ? (
+          <p className="text-small text-muted">No appointments on this course yet.</p>
+        ) : (
+          <ul className="episode-appointment-list">
+            {onThisEpisode.map((appt) => (
+              <li key={appt.id}>
+                <button type="button" className="episode-appointment-list__open" onClick={() => overlay.openView(appt)}>
+                  <span>{formatSessionDateTime(appt)}</span>
+                  <span className="text-small text-muted">{appt.service_name || 'Appointment'}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
@@ -255,10 +265,11 @@ export default function CaseHistoryPanel() {
   const episodesQuery = useClientEpisodesQuery(clientId)
   const openEpisode = useOpenEpisodeMutation()
   const dischargeEpisode = useDischargeEpisodeMutation()
+  const reopenEpisode = useReopenEpisodeMutation()
   const episodes = episodesQuery.data || []
   const [selectedId, setSelectedId] = useState(null)
-  const selected = episodes.find((episode) => episode.id === selectedId) || episodes[0] || null
   const active = episodes.find((episode) => episode.status === 'active') || null
+  const selected = episodes.find((episode) => episode.id === selectedId) || active || episodes[0] || null
   const userId = session?.user?.id
 
   const openNew = async () => {
@@ -283,7 +294,7 @@ export default function CaseHistoryPanel() {
     if (!active || !clientId) return
     const ok = await confirm({
       title: `Discharge episode ${active.episode_number}?`,
-      message: 'This closes the course. Sessions and notes stay on the record, and you can still add a Process Note or a report to this episode afterwards.',
+      message: 'This closes the course. Appointments stay on it, and a Process Note can still be added from an appointment. You can reopen this course if the client returns.',
       confirmLabel: 'Discharge',
     })
     if (!ok) return
@@ -293,6 +304,29 @@ export default function CaseHistoryPanel() {
       toast.saved(`Episode ${closed.episode_number} discharged`)
     } catch (err) {
       toast.error(err?.message || 'Could not discharge this episode')
+    }
+  }
+
+  const reopen = async (episode) => {
+    if (!episode || !clientId) return
+    const blocking = active && active.id !== episode.id ? active : null
+    const ok = await confirm({
+      title: `Reopen episode ${episode.episode_number}?`,
+      message: blocking
+        ? `Episode ${blocking.episode_number} is still open. Discharge it and reopen this course? New appointments will join the reopened course.`
+        : 'This course becomes the open episode again. New appointments will be scheduled onto it.',
+      confirmLabel: 'Reopen',
+    })
+    if (!ok) return
+    try {
+      if (blocking) {
+        await dischargeEpisode.mutateAsync({ episodeId: blocking.id, clientId })
+      }
+      const opened = await reopenEpisode.mutateAsync({ episodeId: episode.id, clientId })
+      setSelectedId(opened.id)
+      toast.saved(`Episode ${opened.episode_number} reopened`)
+    } catch (err) {
+      toast.error(err?.message || 'Could not reopen this episode')
     }
   }
 
@@ -316,82 +350,95 @@ export default function CaseHistoryPanel() {
     </button>
   )
 
-  const rows = episodes.map((episode) => ({
-    id: episode.id,
-    muted: episode.status === 'discharged',
-    filterValues: {
-      status: STATUS_LABELS[episode.status] || episode.status,
-    },
-    cells: {
-      episode: <span className="record-table__primary">Episode {episode.episode_number}</span>,
-      start: formatDate(episode.start_date),
-      end: formatDate(episode.end_date),
-      status: (
-        <span className={`badge ${episode.status === 'active' ? 'badge-green' : 'badge-grey'}`}>
-          {STATUS_LABELS[episode.status] || episode.status}
-        </span>
-      ),
-    },
-  }))
-
   return (
-    <RecordListLayout
-      title="Case history"
-      subtitle="Each course holds its appointments. A Process Note belongs to the appointment, and follows it onto the course."
-      headerActions={headerActions}
-      editor={selected && (
-        <div className="card episode-detail">
-          <div className="episode-detail__header">
-            <h3>Episode {selected.episode_number}</h3>
-            <span className={`badge ${selected.status === 'active' ? 'badge-green' : 'badge-grey'}`}>
-              {STATUS_LABELS[selected.status] || selected.status}
-            </span>
-          </div>
-          {selected.status === 'discharged' && (
-            <p className="episode-detail__banner">
-              This course is closed. Its appointments stay here. Add a Process Note from the appointment if something was missed.
-            </p>
-          )}
-          <dl className="episode-detail__grid">
-            <div>
-              <dt>Started</dt>
-              <dd>{formatDate(selected.start_date)}</dd>
-            </div>
-            <div>
-              <dt>Ended</dt>
-              <dd>{formatDate(selected.end_date)}</dd>
-            </div>
-          </dl>
-          <EpisodeAppointments
-            key={`appointments-${selected.id}`}
-            episode={selected}
-            clientId={clientId}
-            episodes={episodes}
-          />
-          {userId && (
-            <EpisodeReports
-              key={`reports-${selected.id}`}
-              episode={selected}
-              clientId={clientId}
-              userId={userId}
-              organizationId={client?.workplace_id || null}
-            />
-          )}
+    <div className="course-page">
+      <header className="course-page__header">
+        <div>
+          <h2>Course</h2>
+          <p>New appointments join the open course. A Process Note stays with its appointment.</p>
         </div>
-      )}
-    >
+        <div className="course-page__actions">{headerActions}</div>
+      </header>
       {episodesQuery.isError && (
         <p className="text-small text-muted">Episodes could not be loaded. Refresh the page and try again.</p>
       )}
-      <RecordTable
-        columns={EPISODE_COLUMNS}
-        rows={rows}
-        emptyMessage={episodesQuery.isPending
-          ? 'Loading episodes…'
-          : 'No episodes yet. Open a new episode, or book a client session and the first course opens with it.'}
-        onRowClick={(row) => setSelectedId(row.id)}
-        selectedId={selected?.id}
-      />
-    </RecordListLayout>
+      {episodesQuery.isPending && (
+        <p className="text-small text-muted">Loading episodes…</p>
+      )}
+      {!episodesQuery.isPending && episodes.length === 0 && (
+        <p className="text-small text-muted">No episodes yet. Open a new episode, or book a client session and the first course opens with it.</p>
+      )}
+      {episodes.length > 0 && (
+        <div className="course-page__body">
+          <ul className="course-list" aria-label="Episodes">
+            {episodes.map((episode) => (
+              <li key={episode.id}>
+                <button
+                  type="button"
+                  className={`course-list__item${selected?.id === episode.id ? ' course-list__item--selected' : ''}`}
+                  onClick={() => setSelectedId(episode.id)}
+                  aria-current={selected?.id === episode.id ? 'true' : undefined}
+                >
+                  <span>Episode {episode.episode_number}</span>
+                  <span className={`badge ${episode.status === 'active' ? 'badge-green' : 'badge-grey'}`}>
+                    {STATUS_LABELS[episode.status] || episode.status}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {selected && (
+            <div className="episode-detail">
+              <div className="episode-detail__header">
+                <h3>Episode {selected.episode_number}</h3>
+                <span className={`badge ${selected.status === 'active' ? 'badge-green' : 'badge-grey'}`}>
+                  {STATUS_LABELS[selected.status] || selected.status}
+                </span>
+                {selected.status === 'discharged' && (
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => reopen(selected)}
+                    disabled={reopenEpisode.isPending || dischargeEpisode.isPending}
+                  >
+                    Reopen
+                  </button>
+                )}
+              </div>
+              {selected.status === 'discharged' && (
+                <p className="episode-detail__banner">
+                  This course is closed. Reopen it if the client returns to the same course. A missed Process Note is added from the appointment.
+                </p>
+              )}
+              <dl className="episode-detail__grid">
+                <div>
+                  <dt>Started</dt>
+                  <dd>{formatDate(selected.start_date)}</dd>
+                </div>
+                <div>
+                  <dt>Ended</dt>
+                  <dd>{formatDate(selected.end_date)}</dd>
+                </div>
+              </dl>
+              <EpisodeAppointments
+                key={`appointments-${selected.id}`}
+                episode={selected}
+                clientId={clientId}
+                episodes={episodes}
+              />
+              {userId && (
+                <EpisodeReports
+                  key={`reports-${selected.id}`}
+                  episode={selected}
+                  clientId={clientId}
+                  userId={userId}
+                  organizationId={client?.workplace_id || null}
+                />
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   )
 }

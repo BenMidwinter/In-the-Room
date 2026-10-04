@@ -12,9 +12,9 @@ import PatientProfile from './features/client/PatientProfile'
 import ClientPanelEmpty from './features/client/ClientPanelEmpty'
 import ProgressNotesPage from './features/client/ProgressNotesPage'
 import ProgressNotesRedirect from './features/client/ProgressNotesRedirect'
-import WorkingDocumentsPanel from './features/client/WorkingDocumentsPanel'
 import LettersPanel from './features/client/LettersPanel'
 import CaseHistoryPanel from './features/client/CaseHistoryPanel'
+import ClientDocumentsPage from './features/client/ClientDocumentsPage'
 import ClientAppointmentsIndex from './features/client/ClientAppointmentsIndex'
 import AppointmentEditor from './features/client/AppointmentEditor'
 import ClientSectionPlaceholder from './features/client/ClientSectionPlaceholder'
@@ -91,7 +91,7 @@ export default function App() {
               ]}
             />
           } />
-          <Route path="documents" element={<WorkingDocumentsPanel />} />
+          <Route path="documents" element={<ClientDocumentsPage />} />
           <Route path="contacts" element={
             <ClientSectionPlaceholder
               title="Contacts"

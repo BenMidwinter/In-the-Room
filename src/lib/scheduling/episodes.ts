@@ -2,8 +2,9 @@
  * Episode attachment rules.
  *
  * An episode is one course of treatment. A client may have none, and at most
- * one active course. Discharge closes the course and leaves its notes and
- * reports editable. The next client session opens a new episode.
+ * one active course. Discharge closes the course. Reopening it makes that
+ * course the open one again. A new client session joins the open course, or
+ * opens the first one. Support and admin bookings join the open course too.
  */
 
 export type EpisodeAttachmentInput = {
@@ -38,13 +39,21 @@ export function resolveEpisodeAttachment(input: EpisodeAttachmentInput): Episode
     return { episodeId: requested ?? existing, open: false }
   }
 
-  if (!isClientSession || !hasClient) {
+  if (!hasClient) {
+    return { episodeId: requested, open: false }
+  }
+
+  const joinsOpenCourse = isClientSession
+    || input.blockRole === 'support'
+    || input.blockRole === 'admin'
+  if (!joinsOpenCourse) {
     return { episodeId: requested, open: false }
   }
 
   if (requested) return { episodeId: requested, open: false }
   if (active) return { episodeId: active, open: false }
-  return { episodeId: null, open: true }
+  if (isClientSession) return { episodeId: null, open: true }
+  return { episodeId: null, open: false }
 }
 
 /** A Process Note takes its episode from the appointment it is attached to. */

@@ -768,10 +768,128 @@ select.paper-input {
   margin: 0 0 0.75rem;
 }
 
-.episode-appointment-list {
-  margin: 0 0 0.85rem;
-  padding: 0;
+.course-page__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.course-page__header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.course-page__header p {
+  margin: 0.35rem 0 0;
+  max-width: 36rem;
+  color: var(--txt-muted);
+  font-size: 0.9rem;
+}
+
+.course-page__actions,
+.episode-detail__edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.course-page__body {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.course-list {
   list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.course-list__item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  text-align: left;
+  font: inherit;
+  font-weight: 650;
+  color: var(--col-accent);
+  background: color-mix(in srgb, var(--bg-page) 70%, var(--bg-surface));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.course-list__item--selected {
+  border-color: var(--col-accent);
+  box-shadow: inset 3px 0 0 var(--col-primary);
+}
+
+.episode-appointment-scroll {
+  max-height: 16rem;
+  overflow: auto;
+  padding: 0.35rem 0.15rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--bg-page) 72%, var(--bg-surface));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.episode-appointment-list {
+  margin: 0;
+  padding: 0.15rem 0.55rem;
+  list-style: none;
+}
+
+.episode-appointment-list__open {
+  display: flex;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.75rem;
+  padding: 0.35rem 0;
+  text-align: left;
+  font: inherit;
+  font-weight: 650;
+  color: var(--col-accent);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.documents-page__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.documents-page__later {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin: 0 0 1rem;
+  color: var(--txt-muted);
+  font-size: 0.9rem;
+}
+
+.documents-page__later a {
+  color: inherit;
+}
+
+@media (max-width: 800px) {
+  .course-page__body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .episode-appointment-list li {

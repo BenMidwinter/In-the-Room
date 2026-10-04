@@ -6,8 +6,8 @@ vi.mock('../supabase/client', () => ({
 }))
 import { resetStore, getProgressNote } from '../store'
 import { db } from '../data/collections'
-import { assignAppointmentsToEpisodeLocal, saveAppointment } from '../store/scheduling'
-import { dischargeLocalEpisode, getLocalEpisode, openLocalEpisode } from '../store/episodes'
+import { saveAppointment, setEpisodeAppointmentsLocal } from '../store/scheduling'
+import { dischargeLocalEpisode, getLocalEpisode, openLocalEpisode, reopenLocalEpisode } from '../store/episodes'
 import { resolveEpisodeAttachment } from './episodes'
 import { isProgressNoteEditable } from '../progressNoteLifecycle'
 import { saveProgressNoteForUser } from '../supabase/progressNotesRepo'
@@ -38,6 +38,20 @@ describe('resolveEpisodeAttachment', () => {
       isCreate: true,
       activeEpisodeId: null,
     })).toEqual({ episodeId: null, open: false })
+
+    expect(resolveEpisodeAttachment({
+      blockRole: 'support',
+      clientId: 'c1',
+      isCreate: true,
+      activeEpisodeId: 'ep-1',
+    })).toEqual({ episodeId: 'ep-1', open: false })
+
+    expect(resolveEpisodeAttachment({
+      blockRole: 'admin',
+      clientId: 'c1',
+      isCreate: true,
+      activeEpisodeId: 'ep-1',
+    })).toEqual({ episodeId: 'ep-1', open: false })
 
     expect(resolveEpisodeAttachment({
       blockRole: 'admin',
@@ -178,7 +192,6 @@ describe('notes follow the appointment', () => {
 
 describe('assign appointments to an episode', () => {
   it('moves an existing appointment, its follow-on, and its note', async () => {
-    const course = openLocalEpisode({ clientId: 'c1', ownerId: 'user-1' })
     const admin = saveAppointment({
       client_id: 'c1',
       block_role: 'admin',
@@ -205,8 +218,9 @@ describe('assign appointments to an episode', () => {
     }, 'user-1').catch(() => null)
     expect(note).toBeNull()
 
-    const moved = assignAppointmentsToEpisodeLocal('c1', course.id, [admin.id])
-    expect(moved).toEqual([admin.id])
+    const course = openLocalEpisode({ clientId: 'c1', ownerId: 'user-1' })
+    const moved = setEpisodeAppointmentsLocal('c1', course.id, [admin.id])
+    expect(moved.added).toEqual([admin.id])
     expect(db.appointments.find((row) => row.id === admin.id)?.episode_id).toBe(course.id)
     expect(db.appointments.find((row) => row.id === 'appt-child')?.episode_id).toBe(course.id)
 
@@ -218,5 +232,47 @@ describe('assign appointments to an episode', () => {
       session_date: '2026-03-01',
     }, 'user-1')
     expect(filed.episode_id).toBe(course.id)
+
+    const cleared = setEpisodeAppointmentsLocal('c1', course.id, [])
+    expect(cleared.removed).toEqual([admin.id])
+    expect(db.appointments.find((row) => row.id === admin.id)?.episode_id).toBeNull()
+    expect(db.appointments.find((row) => row.id === 'appt-child')?.episode_id).toBeNull()
+  })
+})
+
+describe('reopen a course', () => {
+  it('makes the discharged course active again so new appointments join it', () => {
+    const first = saveAppointment({
+      client_id: 'c1',
+      block_role: 'client_session',
+      session_date: '2024-01-01',
+      start_time: '09:00',
+      end_time: '10:00',
+    }, 'user-1')
+    dischargeLocalEpisode(String(first.episode_id))
+    const reopened = reopenLocalEpisode(String(first.episode_id))
+    expect(reopened.status).toBe('active')
+    expect(reopened.end_date).toBeNull()
+    const next = saveAppointment({
+      client_id: 'c1',
+      block_role: 'client_session',
+      session_date: '2026-04-01',
+      start_time: '09:00',
+      end_time: '10:00',
+    }, 'user-1')
+    expect(next.episode_id).toBe(first.episode_id)
+  })
+
+  it('refuses to reopen while another course is open', () => {
+    const first = saveAppointment({
+      client_id: 'c1',
+      block_role: 'client_session',
+      session_date: '2024-01-01',
+      start_time: '09:00',
+      end_time: '10:00',
+    }, 'user-1')
+    dischargeLocalEpisode(String(first.episode_id))
+    openLocalEpisode({ clientId: 'c1', ownerId: 'user-1' })
+    expect(() => reopenLocalEpisode(String(first.episode_id))).toThrow(/still open/)
   })
 })

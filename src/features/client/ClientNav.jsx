@@ -6,25 +6,8 @@ const NAV_SECTIONS = [
   {
     items: [
       { segment: '', label: 'Overview', end: true, section: 'overview' },
-    ],
-  },
-  {
-    label: 'Clinical',
-    items: [
-      { segment: 'notes-history', label: 'Notes history', section: 'notes-history' },
-      { segment: 'appointments', label: 'Appointments', section: 'appointments' },
-      { segment: 'case-history', label: 'Case history', section: 'case-history' },
-    ],
-  },
-  {
-    label: 'Records',
-    items: [
-      { segment: 'letters', label: 'Letters', section: 'letters' },
-      { segment: 'documents', label: 'Working documents', section: 'documents' },
-      { segment: 'files', label: '[Files]', section: 'files' },
-      { segment: 'forms', label: '[Forms]', section: 'forms' },
-      { segment: 'contacts', label: '[Contacts]', section: 'contacts' },
-      { segment: 'outcomes', label: '[Outcome measures]', section: 'outcomes' },
+      { segment: 'case-history', label: 'Course', section: 'case-history' },
+      { segment: 'documents', label: 'Documents', section: 'documents' },
     ],
   },
 ]

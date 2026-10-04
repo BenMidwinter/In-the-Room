@@ -150,6 +150,35 @@ export function assignAppointmentsToEpisodeLocal(
   return moved
 }
 
+/** Replace which of this client's appointments sit on an episode. */
+export function setEpisodeAppointmentsLocal(
+  clientId: string,
+  episodeId: string,
+  appointmentIds: string[],
+): { added: string[]; removed: string[] } {
+  const desired = new Set(appointmentIds.map((id) => String(id)))
+  const current = db.appointments
+    .filter((row) => (
+      String(row.client_id || '') === clientId
+      && !row.parent_appointment_id
+      && row.episode_id === episodeId
+    ))
+    .map((row) => String(row.id))
+  const removed = current.filter((id) => !desired.has(id))
+  if (removed.length) {
+    const drop = new Set(removed)
+    for (const row of db.appointments) {
+      const parentId = row.parent_appointment_id ? String(row.parent_appointment_id) : ''
+      if (drop.has(String(row.id)) || (parentId && drop.has(parentId))) row.episode_id = null
+    }
+  }
+  const toAdd = [...desired].filter((id) => !current.includes(id))
+  const added = toAdd.length
+    ? assignAppointmentsToEpisodeLocal(clientId, episodeId, toAdd)
+    : []
+  return { added, removed }
+}
+
 export function saveAppointment(payload, userId) {
   assertWritableAppointment(payload)
   payload = parseOrThrow(appointmentInputSchema, payload, 'Appointment')

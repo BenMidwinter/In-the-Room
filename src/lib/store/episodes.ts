@@ -82,6 +82,28 @@ export function openLocalEpisode(input: {
   return created
 }
 
+/** Open a discharged course again. Another open course has to be discharged first. */
+export function reopenLocalEpisode(episodeId: string): AppEpisode {
+  const idx = db.episodes.findIndex((row) => row.id === episodeId)
+  if (idx === -1) throw new Error('Episode not found')
+  const prev = asEpisode(db.episodes[idx])
+  if (prev.status === 'active') return prev
+  const other = db.episodes.find((row) => (
+    row.client_id === prev.client_id && row.status === 'active' && row.id !== episodeId
+  ))
+  if (other) {
+    throw new Error(`Episode ${other.episode_number} is still open. Discharge it before reopening this course.`)
+  }
+  const next: AppEpisode = {
+    ...prev,
+    status: 'active',
+    end_date: null,
+    updated_at: new Date().toISOString(),
+  }
+  db.episodes[idx] = next as unknown as StoreRecord
+  return next
+}
+
 /** Close the course. Notes and reports on this episode stay editable. */
 export function dischargeLocalEpisode(episodeId: string, endDate?: string | null): AppEpisode {
   const idx = db.episodes.findIndex((row) => row.id === episodeId)
