@@ -723,11 +723,13 @@
 .room-calendar-frame {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 0;
   align-items: stretch;
   flex: 1;
   min-height: 0;
   min-width: 0;
+  overflow: hidden;
   transition: grid-template-columns var(--layout-transition-pane);
 }
 
@@ -740,6 +742,8 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  overflow: hidden;
   transition: opacity var(--layout-transition-fast);
 }
 
@@ -805,11 +809,77 @@
 /* Event drawer — actions + group accordion */
 .room-event-drawer__actions {
   display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.55rem;
+  margin-top: var(--layout-space-sm);
+  margin-bottom: 0;
+  padding-top: var(--layout-space-sm);
+  border-top: 1px solid var(--border-light);
+}
+
+.room-event-drawer__action-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-  margin-bottom: var(--layout-space-md);
-  padding-bottom: var(--layout-space-sm);
-  border-bottom: 1px solid var(--border-light);
+}
+
+a.room-event-drawer__note-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin: 0.35rem 0 0.85rem;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+a.room-event-drawer__note-action:hover {
+  color: var(--txt-inverse);
+  text-decoration: none;
+}
+
+.booking-kind-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.booking-kind-menu__option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  text-align: left;
+  background: var(--bg-page);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+.booking-kind-menu__option:hover,
+.booking-kind-menu__option:focus-visible {
+  border-color: var(--col-primary);
+  background: var(--col-primary-light);
+}
+
+.booking-kind-menu__label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--txt-primary);
+}
+
+.booking-kind-menu__detail {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--txt-muted);
+}
+
+.booking-kind-menu__hint {
+  margin: 0.75rem 0 0;
 }
 
 .room-event-drawer__body {

@@ -12,7 +12,7 @@ import { buildMergeContext } from '../../lib/mergeFields'
  */
 export default function ProgressNoteLabPage() {
   const { session } = useAppSession()
-  const [title, setTitle] = useState('Sandbox progress note')
+  const [title, setTitle] = useState('Sandbox Process Note')
   const [sessionDate, setSessionDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [modalityUsed, setModalityUsed] = useState('music_therapy')
   const [content, setContent] = useState('<p></p>')
@@ -35,7 +35,7 @@ export default function ProgressNoteLabPage() {
   return (
     <div className="page page--progress-note-lab">
       <PageHeader
-        title="Progress note lab"
+        title="Process Note lab"
         subtitle="Temporary editor sandbox — no client record. Safe to experiment with layout and typography."
       />
 

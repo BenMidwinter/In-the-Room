@@ -1,7 +1,7 @@
 import { db, uid } from '../data/collections'
 import { parseOrThrow, orgTemplateInputSchema } from '../schemas'
 
-/* ── Progress note templates ──────────────────────────────────────────── */
+/* ── Process Note templates ───────────────────────────────────────────── */
 
 export function getProgressNoteTemplates() {
   return [...db.progressNoteTemplates].sort((a, b) => String(a.name).localeCompare(String(b.name)))
@@ -18,7 +18,7 @@ export function getProgressNoteTemplate(templateId) {
 }
 
 export function saveProgressNoteTemplate(payload) {
-  const data = parseOrThrow(orgTemplateInputSchema, payload, 'Progress note template')
+  const data = parseOrThrow(orgTemplateInputSchema, payload, 'Process Note template')
   const now = new Date().toISOString()
   const workplace = data.workplace_id
     ? db.workplaces.find(w => w.id === data.workplace_id)

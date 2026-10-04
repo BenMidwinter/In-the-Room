@@ -38,6 +38,7 @@ import {
   CALENDAR_START_HOUR_OPTIONS,
   CALENDAR_END_HOUR_OPTIONS,
   CALENDAR_INTERVAL_OPTIONS,
+  calendarHourScale,
 } from '../../lib/calendarPreferences'
 import { getClinicianWorkplaceSettings } from '../../lib/store'
 import {
@@ -364,7 +365,7 @@ function CalendarViewOptions({
         </select>
       </div>
       <p className="calendar-view-options__hint text-small text-muted">
-        A smaller slot makes each hour taller, so every row stays easy to click. Events still use their real length.
+        30 minutes fits the screen. 15 minutes is a little taller and scrolls. 60 minutes is a little shorter.
       </p>
     </div>
   ) : null
@@ -374,7 +375,7 @@ function CalendarViewOptions({
       <button
         ref={triggerRef}
         type="button"
-        className={`calendar-toolbar__btn calendar-view-options__trigger${open ? ' calendar-view-options__trigger--open' : ''}`}
+        className={`calendar-toolbar__view calendar-view-options__trigger${open ? ' calendar-view-options__trigger--open' : ''}`}
         onClick={onToggle}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -505,7 +506,7 @@ function DayColumn({
               <CalendarTimeSlot
                 key={slot}
                 className={`calendar-col__slot${available ? '' : ' calendar-col__slot--unavailable'}`}
-                onClick={() => onEmptySlotClick?.(ymd, slot)}
+                onClick={() => onEmptySlotClick?.(ymd, slot, false, { outsideAvailability: !available })}
                 onDragOver={(e) => {
                   if (!onDropOnSlot) return
                   e.preventDefault()
@@ -565,6 +566,8 @@ function DayColumn({
   )
 }
 
+const FIT_HOUR_MIN_PX = 52
+
 function TimeGridView({
   dates,
   appointments,
@@ -600,17 +603,46 @@ function TimeGridView({
   const headerRowOffset = showDayHeaders ? 1 : 0
   const firstHourRow = headerRowOffset + 1
   const dayColSpanEnd = firstHourRow + hourCount
+  const scrollRef = useRef(null)
+  const [fitHourPx, setFitHourPx] = useState(null)
+
+  useLayoutEffect(() => {
+    const pane = scrollRef.current
+    if (!pane) return undefined
+    const measure = () => {
+      const height = pane.clientHeight
+      if (height < 80) return
+      const headerEl = pane.querySelector('.calendar-time-grid__day-head')
+      const headerH = showDayHeaders ? (headerEl?.offsetHeight || 52) : 0
+      const available = Math.max(0, height - headerH)
+      const fitted = available / Math.max(hourCount, 1)
+      const next = Math.max(FIT_HOUR_MIN_PX, fitted)
+      setFitHourPx((prev) => (prev != null && Math.abs(prev - next) < 0.5 ? prev : next))
+    }
+    measure()
+    const raf = requestAnimationFrame(measure)
+    const observer = new ResizeObserver(measure)
+    observer.observe(pane)
+    return () => {
+      cancelAnimationFrame(raf)
+      observer.disconnect()
+    }
+  }, [hourCount, showDayHeaders])
+
+  const hourScale = calendarHourScale(intervalMinutes)
+  const hourPx = fitHourPx ? Math.round(fitHourPx * hourScale) : null
 
   const gridStyle = {
     '--calendar-cols': colCount,
     '--calendar-hours': hourCount,
     '--calendar-slots-per-hour': slotsPerHour,
     '--calendar-header-rows': headerRowOffset,
+    ...(hourPx ? { '--calendar-hour-size': `${hourPx}px` } : {}),
   }
 
   return (
     <div className="calendar-time-grid-wrap">
-      <div className="calendar-time-grid-scroll">
+      <div className="calendar-time-grid-scroll" ref={scrollRef}>
         <div
           className={`calendar-time-grid${showDayHeaders ? '' : ' calendar-time-grid--day-only'}`}
           style={gridStyle}
@@ -957,13 +989,18 @@ export default function CalendarModule({ persona }) {
     overlay.openEdit(moved)
   }
 
-  const openScheduleSlot = (sessionDate, startTime, manual = false) => {
+  const openScheduleSlot = (sessionDate, startTime, manual = false, meta = {}) => {
     if (rescheduleTarget) {
       applyMoveToSlot(rescheduleTarget, sessionDate, startTime)
       return
     }
     setSelectedId(null)
-    overlay.openCreate({ sessionDate, startTime, manual })
+    overlay.openCreate({
+      sessionDate,
+      startTime,
+      manual,
+      outsideAvailability: Boolean(meta.outsideAvailability),
+    })
   }
 
   const openAddAppointment = () => {
@@ -1075,7 +1112,7 @@ export default function CalendarModule({ persona }) {
         <div className="page-header__toolbar calendar-toolbar">
           <div className="calendar-toolbar__primary">
             <button type="button" className="calendar-toolbar__btn calendar-toolbar__btn--add" onClick={openAddAppointment}>
-              + Add Appointment
+              + New booking
             </button>
             <button type="button" className="calendar-toolbar__btn calendar-toolbar__btn--today" onClick={jumpToday}>
               Today
@@ -1089,31 +1126,33 @@ export default function CalendarModule({ persona }) {
             <p className="calendar-toolbar__period">{periodLabel}</p>
           </div>
           <div className="calendar-toolbar__options">
-            <div className="calendar-toolbar__views" role="tablist" aria-label="Calendar view">
-              {VIEW_MODES.map((mode) => (
-                <button
-                  key={mode.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewMode === mode.id}
-                  className={`calendar-toolbar__view${viewMode === mode.id ? ' calendar-toolbar__view--active' : ''}`}
-                  onClick={() => setViewMode(mode.id)}
-                >
-                  {mode.label}
-                </button>
-              ))}
+            <div className="calendar-toolbar__views">
+              <div className="calendar-toolbar__view-tabs" role="tablist" aria-label="Calendar view">
+                {VIEW_MODES.map((mode) => (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={viewMode === mode.id}
+                    className={`calendar-toolbar__view${viewMode === mode.id ? ' calendar-toolbar__view--active' : ''}`}
+                    onClick={() => setViewMode(mode.id)}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+              <CalendarViewOptions
+                prefs={viewPrefs}
+                open={viewOptionsOpen}
+                onToggle={() => setViewOptionsOpen(o => !o)}
+                onClose={() => setViewOptionsOpen(false)}
+                onChange={handleViewPrefsChange}
+                calendarOwner={calendarOwner}
+                ownerOptions={ownerOptions}
+                showOwnerPicker={showOwnerPicker}
+                onOwnerChange={setCalendarOwner}
+              />
             </div>
-            <CalendarViewOptions
-              prefs={viewPrefs}
-              open={viewOptionsOpen}
-              onToggle={() => setViewOptionsOpen(o => !o)}
-              onClose={() => setViewOptionsOpen(false)}
-              onChange={handleViewPrefsChange}
-              calendarOwner={calendarOwner}
-              ownerOptions={ownerOptions}
-              showOwnerPicker={showOwnerPicker}
-              onOwnerChange={setCalendarOwner}
-            />
           </div>
         </div>
       </header>

@@ -13,6 +13,7 @@ import SeriesScopeDialog from '../../components/SeriesScopeDialog'
 import { useConfirm, useToast } from '../../components/ui'
 import { appointmentBelongsToSeries, countSeriesScope, newSeriesId } from '../../lib/appointmentSeries'
 import { addDaysYmd, todayYmd } from '../../lib/dateArchitecture'
+import { BOOKING_KINDS, bookingKindById, bookingKindForBlockRole } from '../../lib/scheduling/bookingKinds'
 
 const AppointmentOverlayContext = createContext(null)
 
@@ -46,16 +47,30 @@ export function AppointmentOverlayProvider({ children }) {
     const sessionDate = draft.sessionDate || todayYmd()
     const startTime = draft.startTime || '09:00'
     const clientId = draft.clientId || draft.prefill?.client_id || null
-    setState({
-      mode: 'create',
+    const base = {
       sessionDate,
       startTime,
       manual: draft.manual !== false,
-      lockedClient: Boolean(draft.lockedClient || clientId),
+      lockedClient: Boolean(draft.lockedClient),
+      clientId,
+      outsideAvailability: Boolean(draft.outsideAvailability),
       prefill: draft.prefill || (clientId
         ? { client_id: clientId, session_date: sessionDate, start_time: startTime }
         : null),
-    })
+    }
+    if (draft.bookingKind) {
+      const kind = bookingKindById(draft.bookingKind)
+      const attachClient = kind.client !== 'none' && clientId
+      setState({
+        ...base,
+        mode: 'create',
+        bookingKind: kind.id,
+        lockedClient: kind.client === 'required' && Boolean(draft.lockedClient || clientId),
+        prefill: attachClient ? base.prefill : null,
+      })
+      return
+    }
+    setState({ ...base, mode: 'choose' })
   }, [])
 
   const openEdit = useCallback((appointment) => {
@@ -176,7 +191,7 @@ function AppointmentOverlayHost({
         if (saved) {
           setState({ mode: 'view', appointment: saved })
           handlersRef.current.onSaved?.(saved, { created: false })
-          toast.saved(scope === 'this' ? 'Appointment updated' : 'Series updated')
+          toast.saved(scope === 'this' ? 'Booking updated' : 'Series updated')
         } else {
           close()
         }
@@ -199,7 +214,11 @@ function AppointmentOverlayHost({
       }
       close()
       if (first) handlersRef.current.onSaved?.(first, { created: true })
-      toast.saved(dates.length > 1 ? `Booked ${dates.length} sessions` : 'Appointment booked')
+      const kindId = state?.bookingKind
+      const savedLabel = kindId === 'busy'
+        ? 'Busy time blocked'
+        : `${bookingKindById(kindId).label} booked`
+      toast.saved(dates.length > 1 ? `Booked ${dates.length} sessions` : savedLabel)
     } finally {
       setSaving(false)
     }
@@ -326,9 +345,66 @@ function AppointmentOverlayHost({
 
   const showSchedule = state.mode === 'create' || state.mode === 'edit'
   const editing = state.mode === 'edit' ? state.appointment : null
+  const bookingKind = state.mode === 'edit'
+    ? bookingKindForBlockRole(editing?.block_role)
+    : (state.bookingKind || 'appointment')
+
+  const chooseKind = (kindId) => {
+    const kind = bookingKindById(kindId)
+    const clientId = state.clientId || state.prefill?.client_id || null
+    const attachClient = kind.client !== 'none' && clientId
+    setState({
+      mode: 'create',
+      bookingKind: kind.id,
+      sessionDate: state.sessionDate,
+      startTime: state.startTime,
+      manual: state.manual,
+      outsideAvailability: state.outsideAvailability,
+      lockedClient: kind.client === 'required' && Boolean(state.lockedClient || clientId),
+      clientId,
+      prefill: attachClient
+        ? {
+          ...(state.prefill || {}),
+          client_id: clientId,
+          session_date: state.sessionDate,
+          start_time: state.startTime,
+        }
+        : null,
+    })
+  }
 
   return (
     <>
+      {state.mode === 'choose' && (
+        <FormOverlay
+          title="New booking"
+          eyebrow="Calendar"
+          meta={state.outsideAvailability ? 'Outside your usual availability' : `${state.sessionDate} · ${state.startTime}`}
+          onClose={close}
+          size="sm"
+        >
+          <div className="booking-kind-menu" role="menu" aria-label="Booking type">
+            {BOOKING_KINDS.map((kind) => (
+              <button
+                key={kind.id}
+                type="button"
+                role="menuitem"
+                className="booking-kind-menu__option"
+                onClick={() => chooseKind(kind.id)}
+              >
+                <span className="booking-kind-menu__label">{kind.label}</span>
+                <span className="booking-kind-menu__detail">{kind.detail}</span>
+              </button>
+            ))}
+          </div>
+          {state.outsideAvailability && (
+            <p className="booking-kind-menu__hint text-small text-muted">
+              Busy is for blocking time you are unexpectedly unavailable.
+            </p>
+          )}
+        </FormOverlay>
+      )}
+
       {state.mode === 'view' && !viewed && (
         <FormOverlay title="Loading appointment…" eyebrow="Appointment" onClose={close} size="md">
           <p className="text-muted">
@@ -363,7 +439,7 @@ function AppointmentOverlayHost({
 
       {showSchedule && (
         <ScheduleSessionPanel
-          key={`${state.mode}-${editing?.id || state.prefill?.client_id || 'new'}-${state.sessionDate}-${state.startTime}`}
+          key={`${state.mode}-${bookingKind}-${editing?.id || state.prefill?.client_id || 'new'}-${state.sessionDate}-${state.startTime}`}
           sessionDate={state.sessionDate}
           startTime={state.startTime}
           appointment={editing}
@@ -375,15 +451,21 @@ function AppointmentOverlayHost({
           showDateField={state.mode === 'edit' || state.manual}
           presentation="overlay"
           lockedClient={Boolean(state.lockedClient)}
+          bookingKind={bookingKind}
+          outsideAvailability={Boolean(state.outsideAvailability)}
+          onChangeKind={state.mode === 'create' ? () => setState((current) => (
+            current ? { ...current, mode: 'choose' } : current
+          )) : undefined}
           onSave={handleSave}
           onDelete={editing ? handleDelete : undefined}
           onBookAnother={(appt) => {
             const sessionDate = addDaysYmd(appt.session_date, 7)
             openCreate({
+              bookingKind: bookingKindForBlockRole(appt.block_role),
               clientId: appt.client_id,
               sessionDate,
               startTime: appt.start_time,
-              lockedClient: Boolean(appt.client_id),
+              lockedClient: Boolean(appt.client_id) && bookingKindForBlockRole(appt.block_role) !== 'admin',
               manual: true,
               prefill: { ...appt, session_date: sessionDate },
             })

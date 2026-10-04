@@ -1071,12 +1071,19 @@ button.home-stat-card__link {
   font-size: 0.92rem;
 }
 
+.main-content:has(.page--calendar) {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
 .page--calendar {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  min-height: calc(100vh - var(--nav-height) - 0.5rem);
-  min-height: calc(100dvh - var(--nav-height) - 0.5rem);
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
   padding-top: 0;
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
 }
@@ -1138,6 +1145,7 @@ button.home-stat-card__link {
   width: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .identity-banner {
@@ -1248,12 +1256,19 @@ button.home-stat-card__link {
 
 .calendar-toolbar__views {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.2rem;
+  align-items: stretch;
+  gap: 0;
   padding: 0.2rem;
   background: var(--bg-page);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
+}
+
+.calendar-toolbar__view-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.2rem;
 }
 
 .calendar-toolbar__view {
@@ -1472,7 +1487,7 @@ button.calendar-event {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid var(--border-light);
   border-radius: 0;
   background: var(--bg-surface);
@@ -1595,6 +1610,9 @@ button.calendar-event {
 }
 
 .calendar-upcoming {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   padding: 0.5rem 0 1.5rem;
 }
 
@@ -1620,11 +1638,12 @@ button.calendar-event {
 
 .calendar-time-grid {
   --calendar-hour-border: color-mix(in srgb, var(--border-color) 85%, var(--txt-muted));
+  --calendar-hour-size: 4.5rem;
   display: grid;
   grid-template-columns: 3.5rem repeat(var(--calendar-cols, 7), minmax(0, 1fr));
-  --calendar-hour-size: calc(var(--calendar-slots-per-hour, 2) * var(--calendar-slot-min, 2.75rem));
   grid-template-rows: auto repeat(var(--calendar-hours, 9), var(--calendar-hour-size));
-  height: auto;
+  align-content: start;
+  height: max-content;
   min-height: calc(
     (var(--calendar-header-rows, 1) * 2.75rem) +
     (var(--calendar-hours, 9) * var(--calendar-hour-size))
@@ -1735,16 +1754,17 @@ button.calendar-event {
 .calendar-col__hour {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: var(--calendar-hour-size, 5.5rem);
-  height: auto;
+  flex: 0 0 var(--calendar-hour-size, 4.5rem);
+  height: var(--calendar-hour-size, 4.5rem);
+  min-height: var(--calendar-hour-size, 4.5rem);
+  max-height: var(--calendar-hour-size, 4.5rem);
   border-bottom: 1px solid var(--calendar-hour-border);
   box-sizing: border-box;
 }
 
 .calendar-col__slot {
-  flex: 1 1 auto;
-  min-height: var(--calendar-slot-min, 2.75rem);
+  flex: 1 1 0;
+  min-height: 0;
   height: auto;
   padding: 0;
   margin: 0;
@@ -1759,7 +1779,7 @@ button.calendar-event {
 }
 
 .calendar-col__slot.room-time-slot {
-  min-height: var(--calendar-slot-min, 2.75rem);
+  min-height: 0;
   padding: 0;
   border-radius: 0;
 }
@@ -1812,7 +1832,31 @@ button.calendar-event {
 
 .calendar-view-options {
   position: relative;
+  display: flex;
+  align-items: stretch;
   flex-shrink: 0;
+  margin-left: 0.2rem;
+  padding-left: 0.2rem;
+  border-left: 1px solid var(--border-color);
+}
+
+.calendar-view-options__trigger {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--txt-muted);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--radius-md) - 2px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.calendar-view-options__trigger:hover,
+.calendar-view-options__trigger--open {
+  background: var(--bg-surface);
+  color: var(--col-primary-dark);
+  box-shadow: var(--shadow-sm);
 }
 
 .calendar-view-options__panel {

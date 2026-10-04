@@ -142,7 +142,7 @@ export default function App() {
           <Route path="templates/progress-notes" element={
             <TemplateKindPage
               kind="progress_note"
-              title="Progress note templates"
+              title="Process Note templates"
               blurb="Reusable structures for session notes. Full builder arrives with the RTE workstream."
             />
           } />

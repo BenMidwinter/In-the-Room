@@ -370,8 +370,8 @@ function ProgressNotesPageContent() {
   ])
 
   const noteHeading = activeNoteId
-    ? (isStandalone ? 'Progress note' : 'Session note')
-    : (isStandalone ? 'New progress note' : 'New session note')
+    ? (isStandalone ? 'Process Note' : 'Session note')
+    : (isStandalone ? 'New Process Note' : 'New session note')
 
   const previewableNotes = useMemo(
     () => getPreviewableNotes(notes, activeNoteId),
@@ -637,7 +637,7 @@ function ProgressNotesPageContent() {
       ) : (
         <div className="progress-notes-page__banner progress-notes-page__banner--standalone">
           <span className="text-small text-muted">
-            Standalone progress note — not linked to an appointment.
+            Standalone Process Note — not linked to an appointment.
           </span>
         </div>
       )}

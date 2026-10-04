@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  calendarHourScale,
   DEFAULT_CALENDAR_END_HOUR,
   DEFAULT_CALENDAR_START_HOUR,
   getDefaultCalendarViewPreferences,
@@ -49,6 +50,12 @@ describe('normalizeCalendarViewPreferences', () => {
       endHour: 18,
       intervalMinutes: 30,
     })
+  })
+
+  it('scales hour height around the fitted 30-minute view', () => {
+    expect(calendarHourScale(30)).toBe(1)
+    expect(calendarHourScale(15)).toBe(1.5)
+    expect(calendarHourScale(60)).toBe(0.75)
   })
 
   it('snaps slot size to 15, 30, or 60 minutes', () => {

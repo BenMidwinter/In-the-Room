@@ -233,7 +233,7 @@ export function ProfileIdentityBlock({ session, onSaved }) {
                   className="paper-input"
                   value={signatureText}
                   onChange={e => setSignatureText(e.target.value)}
-                  placeholder="Printed name for progress notes"
+                  placeholder="Printed name for Process Notes"
                 />
               </div>
               <div className="form-group profile-identity__field--full">

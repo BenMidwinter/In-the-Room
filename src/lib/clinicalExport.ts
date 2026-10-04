@@ -192,7 +192,7 @@ function buildLetterPrintHtml(
   })
 }
 
-/** Open a print-ready progress note — choose “Save as PDF” in the browser print dialog. */
+/** Open a print-ready Process Note — choose “Save as PDF” in the browser print dialog. */
 export function downloadProgressNotePdf(
   note,
   meta: {

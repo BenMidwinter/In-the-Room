@@ -17,7 +17,7 @@ const APPT_COLUMNS = [
   { key: 'date', label: 'Appointment date', filter: { type: 'text', placeholder: 'Filter date…' } },
   { key: 'clinician', label: 'Clinician', filter: { type: 'select', allLabel: 'All clinicians' } },
   { key: 'attendance', label: 'Attendance', filter: { type: 'select', allLabel: 'All attendance' } },
-  { key: 'note', label: 'Progress note', filter: { type: 'text', placeholder: 'Filter note…' } },
+  { key: 'note', label: 'Process Note', filter: { type: 'text', placeholder: 'Filter note…' } },
 ]
 
 export default function ClientAppointmentsIndex() {
@@ -73,7 +73,7 @@ export default function ClientAppointmentsIndex() {
       <RecordListLayout
         title="Appointments"
         subtitle="Scheduled sessions and attendance — open a row to view it."
-        newLabel="appointment"
+        newLabel="booking"
         onNew={() => overlay.openCreate({
           clientId,
           lockedClient: true,

@@ -1,4 +1,4 @@
-/** Hours after sign-off before a progress note becomes permanently locked. */
+/** Hours after sign-off before a Process Note becomes permanently locked. */
 export const PROGRESS_NOTE_LOCK_HOURS = 48
 
 export type ProgressNoteStatus = 'draft' | 'signed_off'

@@ -51,10 +51,10 @@ export default function ProfilePage() {
             className="paper-input"
             value={signatureText}
             onChange={e => setSignatureText(e.target.value)}
-            placeholder="Printed name for progress notes"
+            placeholder="Printed name for Process Notes"
           />
           <p className="text-small text-muted" style={{ marginTop: '0.35rem' }}>
-            Used when you insert a signature in progress notes — typically your printed name or sign-off.
+            Used when you insert a signature in Process Notes — typically your printed name or sign-off.
           </p>
         </div>
         <div className="form-actions">
