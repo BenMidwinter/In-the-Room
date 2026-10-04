@@ -1,18 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useClientSession } from '../../lib/useClientSession'
 import {
   WorkspaceLayout,
   StickyContextBar,
-  SplitWorkspace,
 } from '../../components/LayoutComponents'
 import RichTextEditor from '../../components/RichTextEditor'
-import TemplatePicker, { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
-import ClinicalInsightsSidebar from './ClinicalInsightsSidebar'
-import ArtworkAttachmentZone from './ArtworkAttachmentZone'
+import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { buildMergeContext } from '../../lib/mergeFields'
-import { MODALITY_OPTIONS } from '../../lib/intakeForm'
 import { formatDisplayDate, DEMO_TODAY } from '../../lib/dateArchitecture'
 import {
   getAppointment,
@@ -24,12 +19,13 @@ import {
   useProgressNoteQuery,
   useProgressNoteByAppointmentQuery,
   useAvailableProgressNoteTemplatesQuery,
+  useAppendProgressNoteAddendumMutation,
   useSaveProgressNoteMutation,
   useSignOffProgressNoteMutation,
 } from '../../lib/progressNoteQueries'
 import {
-  isProgressNoteEditable,
   isProgressNoteSignedOff,
+  formatLockCountdown,
   formatLockDeadline,
   PROGRESS_NOTE_LOCK_HOURS,
 } from '../../lib/progressNoteLifecycle'
@@ -42,11 +38,6 @@ import {
 } from '../../lib/appointmentUtils'
 import { useToast, useConfirm } from '../../components/ui'
 import ErrorBoundary from '../../components/ErrorBoundary'
-
-const RAIL_TABS = {
-  INSIGHTS: 'insights',
-  HISTORY: 'history',
-}
 
 function sortNotesLatestFirst(notes) {
   return [...notes].sort((a, b) =>
@@ -177,7 +168,7 @@ function ProgressNotesPageContent() {
   const appointmentParam = searchParams.get('appointment')
   const noteParam = searchParams.get('note')
   const navigate = useNavigate()
-  const overlay = useAppointmentOverlay()
+  const location = useLocation()
   const { client, session, refreshClients } = useClientSession()
   const toast = useToast()
   const confirm = useConfirm()
@@ -193,8 +184,15 @@ function ProgressNotesPageContent() {
   const [modalityUsed, setModalityUsed] = useState('')
   const [therapeuticTheme, setTherapeuticTheme] = useState('')
   const [artworkAttachments, setArtworkAttachments] = useState([])
-  const [noteEditor, setNoteEditor] = useState(null)
-  const [railTab, setRailTab] = useState(RAIL_TABS.INSIGHTS)
+  const [templateId, setTemplateId] = useState('')
+  const [addendums, setAddendums] = useState([])
+  const [amending, setAmending] = useState(false)
+  const [addingAddendum, setAddingAddendum] = useState(false)
+  const [addendumBody, setAddendumBody] = useState('<p></p>')
+  const [addendumVersion, setAddendumVersion] = useState(0)
+  const [historyOpen, setHistoryOpen] = useState(true)
+  const [historyWidth, setHistoryWidth] = useState(360)
+  const [now, setNow] = useState(() => Date.now())
   const [noteMeta, setNoteMeta] = useState({
     status: 'draft',
     signed_off_at: null,
@@ -216,6 +214,7 @@ function ProgressNotesPageContent() {
   const { data: noteTemplates = [] } = useAvailableProgressNoteTemplatesQuery(client?.workplace_id)
   const saveNoteMutation = useSaveProgressNoteMutation()
   const signOffMutation = useSignOffProgressNoteMutation()
+  const addendumMutation = useAppendProgressNoteAddendumMutation()
   const saving = saveNoteMutation.isPending || signOffMutation.isPending
 
   const linkedAppointment = useMemo(() => {
@@ -235,6 +234,8 @@ function ProgressNotesPageContent() {
       lock_until: saved.lock_until || null,
       is_locked: Boolean(saved.is_locked),
     })
+    setAddendums(saved.addendums || [])
+    if (saved.template_id) setTemplateId(saved.template_id)
   }, [])
 
   const buildNotePayload = useCallback(() => ({
@@ -247,6 +248,7 @@ function ProgressNotesPageContent() {
     modality_used: modalityUsed || null,
     therapeutic_theme: therapeuticTheme.trim(),
     artwork_attachments: artworkAttachments,
+    template_id: templateId || null,
   }), [
     activeNoteId,
     client.id,
@@ -257,10 +259,19 @@ function ProgressNotesPageContent() {
     modalityUsed,
     therapeuticTheme,
     artworkAttachments,
+    templateId,
   ])
 
-  const noteEditable = isProgressNoteEditable(noteMeta)
   const noteSignedOff = isProgressNoteSignedOff(noteMeta)
+  const noteLocked = Boolean(
+    noteSignedOff
+    && noteMeta.lock_until
+    && now >= new Date(noteMeta.lock_until).getTime(),
+  )
+  const editorEditable = !noteSignedOff || (amending && !noteLocked)
+  const countdownLabel = noteSignedOff && !noteLocked
+    ? formatLockCountdown(noteMeta.lock_until, now)
+    : null
   const lockDeadlineLabel = formatLockDeadline(noteMeta.lock_until)
 
   const isStandalone = !linkedAppointment
@@ -276,6 +287,21 @@ function ProgressNotesPageContent() {
   }, [])
 
   useEffect(() => {
+    if (!noteSignedOff || !noteMeta.lock_until || noteLocked) return undefined
+    const remaining = new Date(noteMeta.lock_until).getTime() - Date.now()
+    const lockTimer = window.setTimeout(() => setNow(Date.now()), Math.max(0, remaining))
+    const tick = window.setInterval(() => setNow(Date.now()), 30_000)
+    return () => {
+      window.clearTimeout(lockTimer)
+      window.clearInterval(tick)
+    }
+  }, [noteSignedOff, noteMeta.lock_until, noteLocked])
+
+  useEffect(() => {
+    if (noteLocked) setAmending(false)
+  }, [noteLocked])
+
+  useEffect(() => {
     if (noteParam && client?.id && !appointmentParam) {
       if (noteFromUrlPending) return
       const existing = noteFromUrl
@@ -286,6 +312,10 @@ function ProgressNotesPageContent() {
         setModalityUsed(existing.modality_used || '')
         setTherapeuticTheme(existing.therapeutic_theme || '')
         setArtworkAttachments(existing.artwork_attachments || [])
+        setTemplateId(existing.template_id || '')
+        setAddendums(existing.addendums || [])
+        setAmending(false)
+        setAddingAddendum(false)
         setActiveNoteId(existing.id)
         setNoteAppointmentId(existing.appointment_id || null)
         applySavedNote(existing)
@@ -299,6 +329,7 @@ function ProgressNotesPageContent() {
           modality_used: existing.modality_used || null,
           therapeutic_theme: existing.therapeutic_theme || '',
           artwork_attachments: existing.artwork_attachments || [],
+          template_id: existing.template_id || null,
         })
         setPrefillReady(true)
         return
@@ -313,6 +344,10 @@ function ProgressNotesPageContent() {
         setModalityUsed('')
         setTherapeuticTheme('')
         setArtworkAttachments([])
+        setTemplateId('')
+        setAddendums([])
+        setAmending(false)
+        setAddingAddendum(false)
         setActiveNoteId(null)
         setNoteAppointmentId(null)
         setNoteMeta({ status: 'draft', signed_off_at: null, lock_until: null, is_locked: false })
@@ -338,6 +373,10 @@ function ProgressNotesPageContent() {
       setModalityUsed(existing.modality_used || '')
       setTherapeuticTheme(existing.therapeutic_theme || '')
       setArtworkAttachments(existing.artwork_attachments || [])
+      setTemplateId(existing.template_id || '')
+      setAddendums(existing.addendums || [])
+      setAmending(false)
+      setAddingAddendum(false)
       setActiveNoteId(existing.id)
       setNoteAppointmentId(existing.appointment_id || appt.id)
       applySavedNote(existing)
@@ -351,6 +390,7 @@ function ProgressNotesPageContent() {
         modality_used: existing.modality_used || null,
         therapeutic_theme: existing.therapeutic_theme || '',
         artwork_attachments: existing.artwork_attachments || [],
+        template_id: existing.template_id || null,
       })
       setPrefillReady(true)
       return
@@ -363,6 +403,10 @@ function ProgressNotesPageContent() {
     setModalityUsed('')
     setTherapeuticTheme('')
     setArtworkAttachments([])
+    setTemplateId('')
+    setAddendums([])
+    setAmending(false)
+    setAddingAddendum(false)
     setActiveNoteId(null)
     setNoteAppointmentId(appt.id)
     setNoteMeta({ status: 'draft', signed_off_at: null, lock_until: null, is_locked: false })
@@ -421,7 +465,15 @@ function ProgressNotesPageContent() {
     [client, linkedAppointment, clinicianProfile, sessionDate],
   )
 
-  const applyNoteTemplate = async (template) => {
+  const applyNoteTemplate = async (nextId) => {
+    if (!editorEditable) return
+    if (!nextId) {
+      setTemplateId('')
+      return
+    }
+    const template = noteTemplates.find((item) => item.id === nextId)
+    if (!template) return
+    if (template.id === templateId) return
     if (hasMeaningfulEditorContent(content)) {
       const ok = await confirm({
         title: 'Replace note content?',
@@ -430,14 +482,34 @@ function ProgressNotesPageContent() {
       })
       if (!ok) return
     }
-    setContent(template.content)
-    setEditorVersion(v => v + 1)
+    setTemplateId(template.id)
+    setContent(template.content || '<p></p>')
+    setEditorVersion((value) => value + 1)
   }
 
-  const insertIntoNote = useCallback((text) => {
-    if (!noteEditor || noteEditor.isDestroyed) return
-    noteEditor.chain().focus().insertContent(`${text} `).run()
-  }, [noteEditor])
+  const goBack = () => {
+    if (location.key !== 'default') {
+      navigate(-1)
+      return
+    }
+    navigate(`/clients/${client.id}/notes-history`)
+  }
+
+  const startHistoryResize = (event) => {
+    event.preventDefault()
+    const startX = event.clientX
+    const startWidth = historyWidth
+    const move = (moveEvent) => {
+      const next = Math.min(720, Math.max(220, startWidth - (moveEvent.clientX - startX)))
+      setHistoryWidth(next)
+    }
+    const stop = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', stop)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', stop)
+  }
 
   const persistNote = useCallback(({
     onSuccess,
@@ -448,8 +520,8 @@ function ProgressNotesPageContent() {
       if (!silent) toast.error('Session unavailable — please refresh the page.')
       return
     }
-    if (noteMeta.is_locked) {
-      if (!silent) toast.error('This note is locked and cannot be edited.')
+    if (noteLocked || (noteSignedOff && !amending)) {
+      if (!silent) toast.error(noteLocked ? 'This note is locked and cannot be edited.' : 'Choose Edit to amend this note.')
       return
     }
     const payload = buildNotePayload()
@@ -477,7 +549,9 @@ function ProgressNotesPageContent() {
     )
   }, [
     session?.user?.id,
-    noteMeta.is_locked,
+    noteLocked,
+    noteSignedOff,
+    amending,
     buildNotePayload,
     saveNoteMutation,
     applySavedNote,
@@ -485,13 +559,14 @@ function ProgressNotesPageContent() {
     refreshClients,
     isStandalone,
     noteParam,
+    linkedAppointment,
     client.id,
     navigate,
     toast,
   ])
 
   useEffect(() => {
-    if (!prefillReady || !client?.id || !session?.user?.id || noteMeta.is_locked || filingError) return
+    if (!prefillReady || !client?.id || !session?.user?.id || !editorEditable || filingError) return
 
     const payload = buildNotePayload()
     const key = JSON.stringify(payload)
@@ -504,7 +579,7 @@ function ProgressNotesPageContent() {
     }, 2500)
 
     return () => clearTimeout(autoSaveTimerRef.current)
-  }, [prefillReady, client?.id, session?.user?.id, noteMeta.is_locked, filingError, buildNotePayload, persistNote])
+  }, [prefillReady, client?.id, session?.user?.id, editorEditable, filingError, buildNotePayload, persistNote])
 
   const handleSaveDraft = () => {
     if (filingError) {
@@ -538,7 +613,7 @@ function ProgressNotesPageContent() {
     }
     const ok = await confirm({
       title: 'Save and sign off?',
-      message: `The note will be signed off and remain editable for ${PROGRESS_NOTE_LOCK_HOURS} hours. After that it locks permanently.`,
+      message: `The note will be signed off. It opens read-only, and Edit stays available for ${PROGRESS_NOTE_LOCK_HOURS} hours. After that the note locks and you can add an addendum below it.`,
       confirmLabel: 'Save & sign-off',
     })
     if (!ok) return
@@ -553,12 +628,29 @@ function ProgressNotesPageContent() {
           setLastSavedAt(Date.now())
           setAutoSaveStatus('saved')
           refreshClients?.()
-          toast.success(`Signed off — amendments allowed until ${formatLockDeadline(saved.lock_until)}`)
+          toast.success(`Signed off — Edit is available for ${PROGRESS_NOTE_LOCK_HOURS} hours`)
           navigate(`/clients/${client.id}/notes-history`)
         },
         onError: (err) => {
           toast.error(err?.message || 'Could not sign off this note.')
         },
+      },
+    )
+  }
+
+  const handleSaveAddendum = () => {
+    if (!activeNoteId) return
+    addendumMutation.mutate(
+      { noteId: activeNoteId, body: addendumBody },
+      {
+        onSuccess: (saved) => {
+          setAddendums(saved.addendums || [])
+          setAddendumBody('<p></p>')
+          setAddendumVersion((value) => value + 1)
+          setAddingAddendum(false)
+          toast.saved('Addendum saved')
+        },
+        onError: (err) => toast.error(err?.message || 'Could not save the addendum'),
       },
     )
   }
@@ -598,18 +690,8 @@ function ProgressNotesPageContent() {
         className="progress-notes-page__header"
         leading={(
           <>
-            <button
-              type="button"
-              className="secondary"
-              onClick={() => {
-                if (isStandalone || !linkedAppointment) {
-                  navigate(`/clients/${client.id}/notes-history`)
-                  return
-                }
-                overlay.openView(linkedAppointment)
-              }}
-            >
-              {isStandalone ? '← Notes history' : '← Appointment'}
+            <button type="button" className="secondary" onClick={goBack}>
+              Back
             </button>
             <h1>{noteHeading}</h1>
             <span className="text-small text-muted">{client.real_name}</span>
@@ -618,27 +700,51 @@ function ProgressNotesPageContent() {
         trailing={(
           <div className="progress-notes-page__header-actions">
             <span className="progress-notes-page__save-status text-small text-muted" aria-live="polite">
-              {noteMeta.is_locked ? 'Locked' : autoSaveLabel}
+              {noteLocked ? 'Locked' : editorEditable ? autoSaveLabel : 'Signed off'}
             </span>
             <button type="button" className="secondary" onClick={handleDownload}>
               Download
             </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={handleSaveDraft}
-              disabled={saving || !noteEditable || Boolean(filingError)}
-            >
-              {saving ? 'Saving…' : 'Save draft'}
-            </button>
-            <button
-              type="button"
-              className="primary"
-              onClick={handleSignOff}
-              disabled={saving || !noteEditable || noteSignedOff || Boolean(filingError)}
-            >
-              {noteSignedOff && !noteMeta.is_locked ? 'Signed off' : 'Save & sign-off'}
-            </button>
+            {!historyOpen && (
+              <button type="button" className="secondary" onClick={() => setHistoryOpen(true)}>
+                Previous notes
+              </button>
+            )}
+            {noteLocked ? (
+              <button
+                type="button"
+                className="primary"
+                onClick={() => setAddingAddendum(true)}
+                disabled={addingAddendum}
+              >
+                Add addendum
+              </button>
+            ) : noteSignedOff && !amending ? (
+              <button type="button" className="primary" onClick={() => setAmending(true)}>
+                Edit
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={handleSaveDraft}
+                  disabled={saving || !editorEditable || Boolean(filingError)}
+                >
+                  {saving ? 'Saving…' : noteSignedOff ? 'Save' : 'Save draft'}
+                </button>
+                {!noteSignedOff && (
+                  <button
+                    type="button"
+                    className="primary"
+                    onClick={handleSignOff}
+                    disabled={saving || !editorEditable || Boolean(filingError)}
+                  >
+                    Save & sign-off
+                  </button>
+                )}
+              </>
+            )}
           </div>
         )}
       />
@@ -651,9 +757,6 @@ function ProgressNotesPageContent() {
             {linkedAppointment.location && ` · ${linkedAppointment.location}`}
             {filingError ? ` · ${filingError}` : ''}
           </span>
-          <button type="button" className="text-small" onClick={() => overlay.openView(linkedAppointment)}>
-            View appointment
-          </button>
         </div>
       ) : (
         <div className="progress-notes-page__banner progress-notes-page__banner--standalone">
@@ -663,17 +766,9 @@ function ProgressNotesPageContent() {
         </div>
       )}
 
-      {noteMeta.is_locked ? (
-        <div className="progress-notes-page__banner progress-notes-page__banner--locked" role="status">
-          <span className="text-small">
-            <strong>Locked.</strong> This note was signed off and the {PROGRESS_NOTE_LOCK_HOURS}-hour amendment window has ended.
-          </span>
-        </div>
-      ) : noteSignedOff && lockDeadlineLabel ? (
+      {countdownLabel ? (
         <div className="progress-notes-page__banner progress-notes-page__banner--signed-off" role="status">
-          <span className="text-small">
-            <strong>Signed off.</strong> Amendments allowed until {lockDeadlineLabel}, then this note locks permanently.
-          </span>
+          <span className="text-small">Locks in {countdownLabel}</span>
         </div>
       ) : null}
 
@@ -685,7 +780,7 @@ function ProgressNotesPageContent() {
             value={title}
             onChange={e => setTitle(e.target.value)}
             placeholder="Session note title"
-            disabled={!noteEditable}
+            disabled={!editorEditable}
           />
         </label>
 
@@ -696,101 +791,103 @@ function ProgressNotesPageContent() {
             className="progress-notes-page__meta-input"
             value={sessionDate}
             onChange={e => setSessionDate(e.target.value)}
-            disabled={!noteEditable}
+            disabled={!editorEditable}
           />
         </label>
 
-        <label className="progress-notes-page__meta-field">
-          <span className="progress-notes-page__meta-label">Modality</span>
-          <select className="progress-notes-page__meta-input" value={modalityUsed} onChange={e => setModalityUsed(e.target.value)} disabled={!noteEditable}>
-            <option value="">Select…</option>
-            {MODALITY_OPTIONS.map(m => (
-              <option key={m.value} value={m.value}>{m.label}</option>
+        <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+          <span className="progress-notes-page__meta-label">Template</span>
+          <select
+            className="progress-notes-page__meta-input"
+            value={templateId}
+            onChange={(event) => applyNoteTemplate(event.target.value)}
+            disabled={!editorEditable}
+          >
+            <option value="">No template</option>
+            {noteTemplates.map((template) => (
+              <option key={template.id} value={template.id}>{template.name}</option>
             ))}
           </select>
         </label>
-
-        <label className="progress-notes-page__meta-field progress-notes-page__meta-field--theme">
-          <span className="progress-notes-page__meta-label">Theme</span>
-          <input
-            className="progress-notes-page__meta-input"
-            value={therapeuticTheme}
-            onChange={e => setTherapeuticTheme(e.target.value)}
-            placeholder="e.g. Bridge / transition"
-            disabled={!noteEditable}
-          />
-        </label>
-
-        <div className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
-          <TemplatePicker
-            templates={noteTemplates}
-            onApply={applyNoteTemplate}
-            label="Template"
-            emptyLabel="Choose template…"
-          />
-        </div>
       </div>
 
-      <SplitWorkspace
-        paneOpen
-        className="progress-notes-page__workspace split-layout split-layout--note room-split room-split--pane-open"
-        main={(
-          <main className="split-layout__main progress-notes-page__editor">
-            <div className="progress-notes-page__artwork-strip">
-              <ArtworkAttachmentZone
-                attachments={artworkAttachments}
-                onChange={setArtworkAttachments}
-                disabled={!noteEditable}
-              />
+      <div className={`note-split${historyOpen ? ' note-split--open' : ''}`}>
+        <main className="note-split__editor progress-notes-page__editor">
+          <div className="progress-notes-page__canvas-zone">
+            <RichTextEditor
+              key={`${activeNoteId || 'new'}-${linkedAppointment?.id || 'standalone'}-${editorVersion}`}
+              content={content}
+              onChange={setContent}
+              layout="immersive"
+              variant="a4"
+              mode="clinical"
+              editable={editorEditable}
+              mergeContext={mergeContext}
+              clinicianProfile={clinicianProfile}
+            />
+          </div>
+          {addendums.length > 0 && (
+            <div className="progress-note-addenda">
+              {addendums.map((item) => (
+                <article key={item.id} className="progress-note-addendum">
+                  <p className="text-small text-muted">
+                    Addendum · {item.created_at ? new Date(item.created_at).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : ''}
+                  </p>
+                  <div
+                    className="progress-note-addendum__body clinical-prose"
+                    dangerouslySetInnerHTML={{ __html: item.body }}
+                  />
+                </article>
+              ))}
             </div>
-            <div className="progress-notes-page__canvas-zone">
+          )}
+          {addingAddendum && (
+            <div className="progress-note-addendum progress-note-addendum--draft">
+              <p className="text-small text-muted">Addendum</p>
               <RichTextEditor
-                key={`${activeNoteId || 'new'}-${linkedAppointment?.id || 'standalone'}-${editorVersion}`}
-                content={content}
-                onChange={setContent}
+                key={`addendum-${addendumVersion}`}
+                content={addendumBody}
+                onChange={setAddendumBody}
                 layout="immersive"
                 variant="a4"
                 mode="clinical"
-                editable={noteEditable}
-                mergeContext={mergeContext}
-                clinicianProfile={clinicianProfile}
-                onEditorReady={setNoteEditor}
               />
+              <div className="progress-note-addendum__actions">
+                <button type="button" className="secondary" onClick={() => setAddingAddendum(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={handleSaveAddendum}
+                  disabled={addendumMutation.isPending}
+                >
+                  {addendumMutation.isPending ? 'Saving…' : 'Save addendum'}
+                </button>
+              </div>
             </div>
-          </main>
-        )}
-        accessory={(
-          <aside className="split-layout__side progress-notes-page__rail" aria-label="Note context">
-          <div className="progress-notes-page__rail-tabs" role="tablist" aria-label="Sidebar views">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={railTab === RAIL_TABS.INSIGHTS}
-              className={`progress-notes-page__rail-tab${railTab === RAIL_TABS.INSIGHTS ? ' progress-notes-page__rail-tab--active' : ''}`}
-              onClick={() => setRailTab(RAIL_TABS.INSIGHTS)}
+          )}
+        </main>
+        {historyOpen && (
+          <>
+            <div
+              className="note-split__handle"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize previous notes"
+              onPointerDown={startHistoryResize}
+            />
+            <aside
+              className="note-split__history progress-notes-page__rail"
+              style={{ width: historyWidth }}
+              aria-label="Previous notes"
             >
-              Current profile & intake
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={railTab === RAIL_TABS.HISTORY}
-              className={`progress-notes-page__rail-tab${railTab === RAIL_TABS.HISTORY ? ' progress-notes-page__rail-tab--active' : ''}`}
-              onClick={() => setRailTab(RAIL_TABS.HISTORY)}
-            >
-              Past Case Notes
-            </button>
-          </div>
-
-          <div className="progress-notes-page__rail-panel">
-            {railTab === RAIL_TABS.INSIGHTS ? (
-              <ClinicalInsightsSidebar
-                clientId={client.id}
-                client={client}
-                onInsert={insertIntoNote}
-                embedded
-              />
-            ) : (
+              <div className="note-split__history-bar">
+                <h2>Previous notes</h2>
+                <button type="button" className="secondary" onClick={() => setHistoryOpen(false)}>
+                  Hide
+                </button>
+              </div>
               <PastCaseNotesPanel
                 previewableNotes={previewableNotes}
                 previewNote={previewNote}
@@ -799,11 +896,10 @@ function ProgressNotesPageContent() {
                 onSelectNote={setPreviewNoteId}
                 onCycle={cyclePreview}
               />
-            )}
-          </div>
-        </aside>
+            </aside>
+          </>
         )}
-      />
+      </div>
     </WorkspaceLayout>
   )
 }

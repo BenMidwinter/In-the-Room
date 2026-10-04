@@ -47,6 +47,12 @@ export const progressNoteInputSchema = z
     modality_used: z.string().nullish(),
     therapeutic_theme: optionalText,
     artwork_attachments: z.array(z.unknown()).optional(),
+    template_id: z.string().nullish(),
+    addendums: z.array(z.object({
+      id: z.string(),
+      body: z.string(),
+      created_at: z.string(),
+    })).optional(),
     status: z.enum(['draft', 'signed_off']).optional(),
   })
   .refine((p) => Boolean(p.id || p.client_id), {

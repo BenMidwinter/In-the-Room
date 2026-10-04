@@ -3,6 +3,7 @@ import {
   getAvailableProgressNoteTemplates,
 } from './store'
 import {
+  appendProgressNoteAddendumForUser,
   fetchProgressNote,
   fetchProgressNoteByAppointment,
   fetchProgressNotesForClient,
@@ -59,7 +60,7 @@ export function useAvailableProgressNoteTemplatesQuery(workplaceId) {
   return useQuery({
     queryKey: progressNoteQueryKeys.templates(workplaceId),
     queryFn: () => getAvailableProgressNoteTemplates(workplaceId),
-    enabled: Boolean(workplaceId),
+    enabled: true,
     placeholderData: keepPreviousData,
   })
 }
@@ -81,6 +82,25 @@ export function useSaveProgressNoteMutation() {
       }
       if (saved.client_id) {
         queryClient.invalidateQueries({ queryKey: ['episodes', 'client', saved.client_id] })
+      }
+    },
+  })
+}
+
+export function useAppendProgressNoteAddendumMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ noteId, body }: { noteId: string; body: string }) =>
+      appendProgressNoteAddendumForUser(noteId, body),
+    onSuccess: (saved) => {
+      queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.progressNotes })
+      queryClient.setQueryData(progressNoteQueryKeys.detail(String(saved.id)), saved)
+      if (saved.client_id) {
+        queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.client(String(saved.client_id)) })
+        queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.feed(String(saved.client_id)) })
+      }
+      if (saved.appointment_id) {
+        queryClient.setQueryData(progressNoteQueryKeys.byAppointment(String(saved.appointment_id)), saved)
       }
     },
   })

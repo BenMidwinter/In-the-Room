@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { resetStore, saveProgressNote, signOffProgressNote, getProgressNote } from './store'
 import { db } from './data/collections'
+import { appendProgressNoteAddendum } from './store'
 import {
   enrichProgressNoteLock,
+  formatLockCountdown,
   isProgressNoteEditable,
   lockUntilFromSignOff,
   progressNoteHistoryStatusLabel,
@@ -89,6 +91,38 @@ describe('progressNoteLifecycle', () => {
     const until = new Date(lockUntilFromSignOff(signedAt))
     const hours = (until.getTime() - signedAt.getTime()) / (60 * 60 * 1000)
     expect(hours).toBe(PROGRESS_NOTE_LOCK_HOURS)
+  })
+
+  it('adds an addendum only after the note has locked', () => {
+    const draft = saveProgressNote({
+      client_id: 'client-1',
+      title: 'Locked note',
+      content: '<p>Original</p>',
+      session_date: '2026-07-03',
+    }, 'user-1')
+    const signed = signOffProgressNote({
+      id: draft.id,
+      client_id: 'client-1',
+      title: draft.title,
+      content: draft.content,
+      session_date: draft.session_date,
+    }, 'user-1')
+    expect(() => appendProgressNoteAddendum(signed.id, '<p>Too soon</p>')).toThrow(/locks/)
+
+    const idx = db.progressNotes.findIndex(n => n.id === signed.id)
+    db.progressNotes[idx].lock_until = new Date(Date.now() - 60_000).toISOString()
+    const updated = appendProgressNoteAddendum(signed.id, '<p>Later clarification</p>')
+    expect(updated.content).toBe('<p>Original</p>')
+    expect(updated.addendums).toHaveLength(1)
+    expect(updated.addendums[0].body).toContain('Later clarification')
+    expect(getProgressNote(signed.id).content).toBe('<p>Original</p>')
+  })
+
+  it('formats the time left before a note locks', () => {
+    const now = Date.parse('2026-07-03T10:00:00Z')
+    const lockUntil = new Date(now + (47 * 60 + 12) * 60 * 1000).toISOString()
+    expect(formatLockCountdown(lockUntil, now)).toBe('47h 12m')
+    expect(formatLockCountdown(new Date(now - 1000).toISOString(), now)).toBeNull()
   })
 
   it('maps lifecycle status to notes history labels', () => {
