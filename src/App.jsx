@@ -30,6 +30,8 @@ import {
 import TemplatesSettingsPage from './features/settings/TemplatesSettingsPage'
 import LoginSettingsPage from './features/settings/LoginSettingsPage'
 import JournalPage from './features/journal/JournalPage'
+import PracticeLayout from './features/practice/PracticeLayout'
+import PracticeDocumentsPage from './features/practice/PracticeDocumentsPage'
 import Resources from './components/Resources'
 import About from './components/About'
 import NotesHistoryPanel from './features/client/NotesHistoryPanel'
@@ -51,7 +53,12 @@ export default function App() {
         <Route path="calendar" element={<Calendar />} />
         <Route path="reporting" element={<Reporting />} />
         <Route path="finance" element={<FinancePage />} />
-        <Route path="journal" element={<JournalPage />} />
+        <Route path="journal" element={<Navigate to="/practice/journal" replace />} />
+        <Route path="practice" element={<PracticeLayout />}>
+          <Route index element={<Navigate to="journal" replace />} />
+          <Route path="documents" element={<PracticeDocumentsPage />} />
+          <Route path="journal" element={<JournalPage />} />
+        </Route>
         <Route path="lab/progress-note" element={<Navigate to="/home" replace />} />
         <Route path="upcoming-appointments" element={<Navigate to="/calendar?view=upcoming" replace />} />
         <Route path="active-cases" element={<Navigate to="/home" replace />} />
