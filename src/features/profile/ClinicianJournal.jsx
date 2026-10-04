@@ -2,7 +2,8 @@ import { useMemo, useState, useCallback } from 'react'
 import { useAppSession } from '../../lib/AppSessionContext'
 import SectionCard from '../../components/SectionCard'
 import RichTextEditor from '../../components/RichTextEditor'
-import { getJournalEntries, saveJournalEntry } from '../../lib/store'
+import { useToast } from '../../components/ui'
+import { useJournalEntriesQuery, useSaveJournalEntryMutation } from '../../lib/journalQueries'
 import { DEMO_TODAY } from '../../lib/dateArchitecture'
 
 const SOMATIC_TAGS = ['Grounded', 'Activated', 'Fatigued', 'Open', 'Constricted', 'Settled']
@@ -30,26 +31,49 @@ function stripHtml(html) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+function draftFromEntry(entry) {
+  if (!entry) {
+    return {
+      date: DEMO_TODAY,
+      time: defaultJournalTime(),
+      somatic: 'Grounded',
+      body: '<p></p>',
+    }
+  }
+  return {
+    date: entry.date,
+    time: entry.time || '09:00',
+    somatic: entry.somatic_state || 'Grounded',
+    body: entry.body_text || '<p></p>',
+  }
+}
+
 export default function ClinicianJournal() {
   const { session } = useAppSession()
   const userId = session?.user?.id ?? ''
-
-  const initialEntries = useMemo(
-    () => (userId ? getJournalEntries(userId) : []),
-    [userId],
-  )
-  const initialEntry = initialEntries[0] ?? null
-
-  const [entries, setEntries] = useState(initialEntries)
-  const [selectedId, setSelectedId] = useState(initialEntry?.id ?? 'new')
-  const [feedOpen, setFeedOpen] = useState(false)
-
-  const [draftDate, setDraftDate] = useState(initialEntry?.date ?? DEMO_TODAY)
-  const [draftTime, setDraftTime] = useState(initialEntry?.time ?? defaultJournalTime())
-  const [draftSomatic, setDraftSomatic] = useState(initialEntry?.somatic_state ?? 'Grounded')
-  const [draftBody, setDraftBody] = useState(initialEntry?.body_text ?? '<p></p>')
+  const toast = useToast()
+  const { data: entries = [], isPending, error } = useJournalEntriesQuery(userId)
+  const saveEntry = useSaveJournalEntryMutation(userId)
 
   const sortedEntries = useMemo(() => sortJournalEntries(entries), [entries])
+  const [selectedId, setSelectedId] = useState('new')
+  const [booted, setBooted] = useState(false)
+  const [feedOpen, setFeedOpen] = useState(false)
+  const [draftDate, setDraftDate] = useState(DEMO_TODAY)
+  const [draftTime, setDraftTime] = useState(defaultJournalTime)
+  const [draftSomatic, setDraftSomatic] = useState('Grounded')
+  const [draftBody, setDraftBody] = useState('<p></p>')
+
+  if (!booted && userId && !isPending) {
+    const first = sortedEntries[0] ?? null
+    const draft = draftFromEntry(first)
+    setBooted(true)
+    if (first) setSelectedId(first.id)
+    setDraftDate(draft.date)
+    setDraftTime(draft.time)
+    setDraftSomatic(draft.somatic)
+    setDraftBody(draft.body)
+  }
 
   const selectedEntry = useMemo(
     () => sortedEntries.find(e => e.id === selectedId) ?? null,
@@ -57,19 +81,12 @@ export default function ClinicianJournal() {
   )
 
   const loadEntry = useCallback((entry) => {
-    if (!entry) {
-      setSelectedId('new')
-      setDraftDate(DEMO_TODAY)
-      setDraftTime(defaultJournalTime())
-      setDraftSomatic('Grounded')
-      setDraftBody('<p></p>')
-      return
-    }
-    setSelectedId(entry.id)
-    setDraftDate(entry.date)
-    setDraftTime(entry.time || '09:00')
-    setDraftSomatic(entry.somatic_state)
-    setDraftBody(entry.body_text || '<p></p>')
+    const draft = draftFromEntry(entry)
+    setSelectedId(entry?.id ?? 'new')
+    setDraftDate(draft.date)
+    setDraftTime(draft.time)
+    setDraftSomatic(draft.somatic)
+    setDraftBody(draft.body)
     setFeedOpen(false)
   }, [])
 
@@ -81,17 +98,20 @@ export default function ClinicianJournal() {
     loadEntry(null)
   }
 
-  const handleSave = () => {
-    const saved = saveJournalEntry(userId, {
-      id: selectedId === 'new' ? undefined : selectedId,
-      date: draftDate,
-      time: draftTime,
-      somatic_state: draftSomatic,
-      body_text: draftBody,
-    })
-    const next = getJournalEntries(userId)
-    setEntries(next)
-    setSelectedId(saved.id)
+  const handleSave = async () => {
+    try {
+      const saved = await saveEntry.mutateAsync({
+        id: selectedId === 'new' ? undefined : selectedId,
+        date: draftDate,
+        time: draftTime,
+        somatic_state: draftSomatic,
+        body_text: draftBody,
+      })
+      setSelectedId(saved.id)
+      toast.saved()
+    } catch (err) {
+      toast.error(err?.message || 'Could not save the journal entry.')
+    }
   }
 
   return (
@@ -120,7 +140,10 @@ export default function ClinicianJournal() {
           </button>
         </div>
         <ul className="journal__feed-list">
-          {sortedEntries.map(entry => (
+          {!booted && (
+            <li className="journal__feed-empty">Loading journal…</li>
+          )}
+          {booted && sortedEntries.map(entry => (
             <li key={entry.id}>
               <button
                 type="button"
@@ -137,7 +160,10 @@ export default function ClinicianJournal() {
               </button>
             </li>
           ))}
-          {sortedEntries.length === 0 && (
+          {booted && error && (
+            <li className="journal__feed-empty">{error.message || 'Could not load journal entries.'}</li>
+          )}
+          {booted && !error && sortedEntries.length === 0 && (
             <li className="journal__feed-empty">No journal entries yet.</li>
           )}
         </ul>
@@ -181,8 +207,8 @@ export default function ClinicianJournal() {
               </select>
             </div>
           </div>
-          <button type="button" className="primary" onClick={handleSave}>
-            Save entry
+          <button type="button" className="primary" onClick={handleSave} disabled={!booted || saveEntry.isPending}>
+            {saveEntry.isPending ? 'Saving…' : 'Save entry'}
           </button>
         </header>
 

@@ -46,11 +46,17 @@
   padding: 1.25rem 1.5rem;
 }
 
-.page--client {
+.page--client,
+.page--practice {
   padding: 0;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - var(--nav-height));
+}
+
+.page--practice .client-shell__identity {
+  border-right: none;
+  flex: 1;
 }
 
 .main-content--progress-notes {
@@ -1350,6 +1356,69 @@ a.badge {
   color: var(--col-primary-dark);
   border-bottom-color: var(--col-primary);
   font-weight: 700;
+}
+
+.practice-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0 0 0.85rem;
+  font-size: 0.8125rem;
+}
+
+.practice-crumbs button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--col-primary-dark);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.practice-crumbs__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.practice-crumbs__sep,
+.practice-crumbs__current {
+  color: var(--txt-muted);
+}
+
+.practice-docs__actions {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.practice-docs__actions button {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.practice-docs__actions-col {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.record-table th.practice-docs__mark-col,
+.record-table td.practice-docs__mark-col {
+  width: 2.5rem;
+  padding-right: 0.25rem;
+  padding-left: 0.9rem;
+}
+
+.practice-docs__mark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--txt-muted);
+}
+
+.practice-docs__mark--folder {
+  color: var(--col-primary-dark);
 }
 
 .client-layout__main {

@@ -965,6 +965,47 @@ export type Database = {
         }
         Relationships: []
       }
+      practice_items: {
+        Row: {
+          created_at: string
+          encrypted_payload: Json | null
+          id: string
+          kind: string
+          name: string
+          owner_id: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_payload?: Json | null
+          id?: string
+          kind: string
+          name: string
+          owner_id: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_payload?: Json | null
+          id?: string
+          kind?: string
+          name?: string
+          owner_id?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "practice_items_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "practice_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           bio: string | null
