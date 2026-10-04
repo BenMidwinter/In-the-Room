@@ -1132,6 +1132,8 @@ button.home-stat-card__link {
 .calendar-module .calendar-event,
 .calendar-module .calendar-col__slot,
 .calendar-module .calendar-month__cell,
+.calendar-module .calendar-month__event,
+.calendar-module .calendar-time-grid__day-head,
 .calendar-module .room-time-slot {
   border-radius: 0;
 }
@@ -1680,6 +1682,7 @@ button.calendar-event {
   background: var(--bg-page);
   border-bottom: 1px solid var(--calendar-hour-border);
   border-right: 1px solid var(--border-light);
+  border-radius: 0;
   cursor: pointer;
   transition: background 0.12s;
 }
