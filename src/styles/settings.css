@@ -163,21 +163,6 @@
   font-weight: 600;
 }
 
-.section-card--settings_coming_soon,
-.section-card--settings_forms,
-.section-card--settings_password,
-.section-card--settings_2fa,
-.section-card--settings_services,
-.section-card--settings_services_add,
-.section-card--settings_integrations_google,
-.section-card--settings_integrations_feed,
-.section-card--settings_templates_progress_note,
-.section-card--settings_templates_letter,
-.section-card--settings_templates_report,
-.section-card--settings_templates_working_document {
-  border-left: 4px solid var(--col-primary);
-}
-
 .settings-google-row {
   display: flex;
   align-items: center;
