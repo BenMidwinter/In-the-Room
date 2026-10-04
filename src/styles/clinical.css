@@ -917,10 +917,12 @@ a.badge {
 }
 
 .course-episode-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
   justify-content: flex-end;
   gap: 0.4rem;
+  white-space: nowrap;
 }
 
 .course-episode-actions .secondary,
