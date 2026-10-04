@@ -9,6 +9,11 @@ const base = process.env.GITHUB_PAGES === '1' ? '/In-the-Room/' : '/'
 export default defineConfig({
   base,
   plugins: [react(), tailwindcss()],
+  server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+  },
   resolve: {
     // Prefer .ts sources when both a shim .js and .ts exist (Phase A lib migration).
     extensions: ['.ts', '.tsx', '.mts', '.mjs', '.js', '.jsx', '.json'],
