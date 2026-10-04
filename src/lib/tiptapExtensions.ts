@@ -9,14 +9,14 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
-import { MERGE_FIELD_OPTIONS } from './mergeFields'
+import { mergeFieldDisplay } from './mergeFields'
 import { fontCssForId, textColorHexForId } from './editorFormatting'
 
 export const MergeContextExtension = Extension.create({
   name: 'mergeContext',
 
   addStorage() {
-    return { values: {} }
+    return { values: {}, mode: 'document', listeners: new Set() }
   },
 
   addCommands() {
@@ -30,6 +30,14 @@ export const MergeContextExtension = Extension.create({
     }
   },
 })
+
+export function publishMergeContext(editor, values, mode = 'document') {
+  const storage = editor?.storage?.mergeContext
+  if (!storage) return
+  storage.values = values || {}
+  storage.mode = mode === 'template' ? 'template' : 'document'
+  storage.listeners?.forEach((refresh) => refresh())
+}
 
 export const ClinicianProfileExtension = Extension.create({
   name: 'clinicianProfile',
@@ -68,39 +76,44 @@ export const MergeField = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const opt = MERGE_FIELD_OPTIONS.find(o => o.key === node.attrs.field)
     return [
       'span',
       mergeAttributes(HTMLAttributes, {
         'data-merge-field': node.attrs.field,
         class: 'merge-field',
       }),
-      opt?.label || node.attrs.field,
+      mergeFieldDisplay(node.attrs.field, null, 'template'),
     ]
   },
 
   addNodeView() {
-    return ({ node, editor }) => {
+    return ({ node: initial, editor }) => {
+      let current = initial
       const dom = document.createElement('span')
       dom.className = 'merge-field'
-      dom.dataset.mergeField = node.attrs.field
+      const listeners = editor.storage.mergeContext?.listeners
 
       const refresh = () => {
-        const values = editor.storage.mergeContext?.values || {}
-        const opt = MERGE_FIELD_OPTIONS.find(o => o.key === node.attrs.field)
-        const resolved = values[node.attrs.field]
-        dom.textContent = resolved || `{${opt?.label || node.attrs.field}}`
-        dom.title = opt?.label || node.attrs.field
+        const storage = editor.storage.mergeContext || {}
+        const field = current.attrs.field
+        dom.dataset.mergeField = field
+        dom.textContent = mergeFieldDisplay(field, storage.values, storage.mode || 'document')
+        dom.title = mergeFieldDisplay(field, null, 'template')
       }
 
       refresh()
+      listeners?.add(refresh)
 
       return {
         dom,
         update(updatedNode) {
           if (updatedNode.type.name !== 'mergeField') return false
+          current = updatedNode
           refresh()
           return true
+        },
+        destroy() {
+          listeners?.delete(refresh)
         },
       }
     }

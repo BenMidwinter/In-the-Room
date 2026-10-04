@@ -5,7 +5,7 @@ const PRIMARY_TABS = [
   { to: '/settings/account', label: 'Account settings', end: true },
   { to: '/settings/availability', label: 'Availability' },
   { to: '/settings/services', label: 'Services' },
-  { to: '/settings/templates', label: '[Templates]' },
+  { to: '/settings/templates', label: 'Templates' },
   { to: '/settings/forms', label: '[Forms]' },
   { to: '/settings/login', label: 'Login' },
   { to: '/settings/2fa', label: '[2FA]' },
@@ -13,10 +13,10 @@ const PRIMARY_TABS = [
 ]
 
 const TEMPLATE_TABS = [
-  { to: '/settings/templates/progress-notes', label: '[Process Notes]' },
-  { to: '/settings/templates/letters', label: '[Letters]' },
-  { to: '/settings/templates/reports', label: '[Reports]' },
-  { to: '/settings/templates/working-documents', label: '[Working documents]' },
+  { to: '/settings/templates/progress-notes', label: 'Process Notes' },
+  { to: '/settings/templates/letters', label: 'Letters' },
+  { to: '/settings/templates/reports', label: 'Reports' },
+  { to: '/settings/templates/working-documents', label: 'Working documents' },
 ]
 
 export default function SettingsLayout() {
@@ -25,10 +25,7 @@ export default function SettingsLayout() {
 
   return (
     <div className="page page--settings">
-      <PageHeader
-        title="Settings"
-        subtitle="Practice account, services, templates, and integrations."
-      />
+      <PageHeader title="Settings" />
       <nav className="settings-tabs" aria-label="Settings">
         {PRIMARY_TABS.map(({ to, label, end }) => (
           <NavLink

@@ -264,10 +264,6 @@ export default function ServicesSettingsPage() {
     <div className="section-card-stack">
       <SettingsSectionCard blockId="settings_services" title="Services">
         <div className="settings-services-toolbar">
-          <p className="text-muted" style={{ margin: 0 }}>
-            Appointment types, support activities, admin holds, and busy blocks.
-            Attach a follow-on support service, and optionally create a Google Meet link when booked.
-          </p>
           <button
             type="button"
             className="btn btn-primary"

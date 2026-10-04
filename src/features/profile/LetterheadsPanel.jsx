@@ -180,7 +180,6 @@ export default function LetterheadsPanel() {
     <SectionCard
       blockId="profile_letterhead"
       title="Letterheads"
-      description="Practice letterheads for letters and clinical exports. Select one to edit, or create another."
       toolbar={toolbar}
     >
       <div className="section-card__panel">

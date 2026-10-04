@@ -2,10 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SettingsSectionCard } from './SettingsPlaceholders'
 import { getSupabase, isSupabaseConfigured } from '../../lib/supabase/client'
-import {
-  listCalendarConnections,
-  listCalendarFeedTokens,
-} from '../../lib/supabase/calendarConnectionsRepo'
+import { listCalendarConnections } from '../../lib/supabase/calendarConnectionsRepo'
 import { invokeFunction } from '../../lib/supabase/invokeFunction'
 import { useToast } from '../../components/ui'
 
@@ -13,7 +10,6 @@ export default function IntegrationsSettingsPage() {
   const toast = useToast()
   const [params, setParams] = useSearchParams()
   const [connections, setConnections] = useState([])
-  const [feeds, setFeeds] = useState([])
   const [error, setError] = useState(null)
   const [info, setInfo] = useState(null)
   const [busy, setBusy] = useState(false)
@@ -23,12 +19,8 @@ export default function IntegrationsSettingsPage() {
     || connections.find((row) => row.provider === 'google')
 
   const reload = async () => {
-    const [nextConnections, nextFeeds] = await Promise.all([
-      listCalendarConnections(),
-      listCalendarFeedTokens(),
-    ])
+    const nextConnections = await listCalendarConnections()
     setConnections(nextConnections)
-    setFeeds(nextFeeds)
     return nextConnections
   }
 
@@ -256,9 +248,6 @@ export default function IntegrationsSettingsPage() {
       </SettingsSectionCard>
 
       <SettingsSectionCard blockId="settings_integrations_feed" title="Calendar feed (ICS)">
-        <p className="text-muted" style={{ marginTop: 0 }}>
-          Private feed for phones and Outlook. Busy blocks by default — no client names. Active feeds: {feeds.length}.
-        </p>
         <button type="button" className="btn btn-secondary" onClick={createFeed} disabled={busy || !isSupabaseConfigured()}>
           Create feed URL
         </button>

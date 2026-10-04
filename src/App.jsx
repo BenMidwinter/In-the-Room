@@ -25,9 +25,9 @@ import ServicesSettingsPage from './features/settings/ServicesSettingsPage'
 import IntegrationsSettingsPage from './features/settings/IntegrationsSettingsPage'
 import {
   FormsSettingsPage,
-  TemplateKindPage,
   TwoFactorSettingsPage,
 } from './features/settings/SettingsPlaceholders'
+import TemplatesSettingsPage from './features/settings/TemplatesSettingsPage'
 import LoginSettingsPage from './features/settings/LoginSettingsPage'
 import JournalPage from './features/journal/JournalPage'
 import Resources from './components/Resources'
@@ -113,32 +113,16 @@ export default function App() {
           <Route path="services" element={<ServicesSettingsPage />} />
           <Route path="templates" element={<Navigate to="progress-notes" replace />} />
           <Route path="templates/progress-notes" element={
-            <TemplateKindPage
-              kind="progress_note"
-              title="Process Note templates"
-              blurb="Reusable structures for session notes. Full builder arrives with the RTE workstream."
-            />
+            <TemplatesSettingsPage kind="progress_note" title="Process Note templates" />
           } />
           <Route path="templates/letters" element={
-            <TemplateKindPage
-              kind="letter"
-              title="Letter templates"
-              blurb="Letterhead-aware clinical letter templates for your practice."
-            />
+            <TemplatesSettingsPage kind="letter" title="Letter templates" />
           } />
           <Route path="templates/reports" element={
-            <TemplateKindPage
-              kind="report"
-              title="Report templates"
-              blurb="Formulation and assessment report templates."
-            />
+            <TemplatesSettingsPage kind="report" title="Report templates" />
           } />
           <Route path="templates/working-documents" element={
-            <TemplateKindPage
-              kind="working_document"
-              title="Working document templates"
-              blurb="Working notes and collaborative document templates."
-            />
+            <TemplatesSettingsPage kind="working_document" title="Working document templates" />
           } />
           <Route path="forms" element={<FormsSettingsPage />} />
           <Route path="login" element={<LoginSettingsPage />} />
