@@ -45,6 +45,7 @@ const EPISODE_COLUMNS = [
   { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
   { key: 'started', label: 'Started', sort: 'date' },
   { key: 'ended', label: 'Ended', sort: 'date' },
+  { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
 const APPOINTMENT_COLUMNS = [
@@ -78,12 +79,11 @@ function CourseAccordion({ title, open, onToggle, actions, children }) {
   )
 }
 
-function EpisodeAppointments({ episode, clientId, episodes }) {
+function EpisodeAppointments({ episode, clientId, episodes, open, onToggle }) {
   const toast = useToast()
   const overlay = useAppointmentOverlay()
   const { data: appointments = [] } = useClientAppointmentsQuery(clientId)
   const saveMembership = useSetEpisodeAppointmentsMutation()
-  const [open, setOpen] = useState(true)
   const [editing, setEditing] = useState(false)
   const [picked, setPicked] = useState([])
 
@@ -173,7 +173,7 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
     <CourseAccordion
       title="Appointments"
       open={open}
-      onToggle={() => setOpen((value) => !value)}
+      onToggle={onToggle}
       actions={editing ? (
         <div className="episode-detail__edit-actions">
           <button type="button" className="secondary" onClick={() => setEditing(false)} disabled={saveMembership.isPending}>
@@ -205,14 +205,13 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
   )
 }
 
-function EpisodeSection({ title, empty, newLabel, columns, countNoun }) {
+function EpisodeSection({ title, empty, newLabel, columns, countNoun, open, onToggle }) {
   const toast = useToast()
-  const [open, setOpen] = useState(false)
   return (
     <CourseAccordion
       title={title}
       open={open}
-      onToggle={() => setOpen((value) => !value)}
+      onToggle={onToggle}
       actions={(
         <button
           type="button"
@@ -233,14 +232,13 @@ function EpisodeSection({ title, empty, newLabel, columns, countNoun }) {
   )
 }
 
-function EpisodeReports({ episode, client, clientId, userId, organizationId }) {
+function EpisodeReports({ episode, client, clientId, userId, organizationId, open, onToggle }) {
   const toast = useToast()
   const confirm = useConfirm()
   const { profile: accountProfile } = useAuth()
   const { data: reportTemplates = [] } = useTemplatesQuery('report')
   const { data: reports = [], isPending } = useEpisodeReportsQuery(episode.id)
   const saveReport = useSaveReportMutation()
-  const [open, setOpen] = useState(false)
   const [openId, setOpenId] = useState(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('<p></p>')
@@ -399,7 +397,7 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId }) {
     <CourseAccordion
       title="Reports"
       open={open}
-      onToggle={() => setOpen((value) => !value)}
+      onToggle={onToggle}
       actions={(
         <button type="button" className="secondary" onClick={startReport}>
           Add
@@ -415,6 +413,58 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId }) {
         onRowClick={(row) => openReport(row.report)}
       />
     </CourseAccordion>
+  )
+}
+
+function SelectedCourse({ episode, episodes, client, clientId, userId, organizationId }) {
+  const [openSection, setOpenSection] = useState('appointments')
+  const toggle = (key) => setOpenSection((current) => (current === key ? null : key))
+
+  return (
+    <div className="episode-detail">
+      <EpisodeAppointments
+        episode={episode}
+        clientId={clientId}
+        episodes={episodes}
+        open={openSection === 'appointments'}
+        onToggle={() => toggle('appointments')}
+      />
+      {userId && (
+        <EpisodeReports
+          episode={episode}
+          client={client}
+          clientId={clientId}
+          userId={userId}
+          organizationId={organizationId}
+          open={openSection === 'reports'}
+          onToggle={() => toggle('reports')}
+        />
+      )}
+      <EpisodeSection
+        title="Forms"
+        newLabel="Form"
+        empty="No forms on this course yet."
+        countNoun="forms"
+        open={openSection === 'forms'}
+        onToggle={() => toggle('forms')}
+        columns={[
+          { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
+          { key: 'date', label: 'Date', sort: 'date' },
+        ]}
+      />
+      <EpisodeSection
+        title="Outcome measures"
+        newLabel="Outcome measure"
+        empty="No outcome measures on this course yet."
+        countNoun="measures"
+        open={openSection === 'outcomes'}
+        onToggle={() => toggle('outcomes')}
+        columns={[
+          { key: 'name', label: 'Measure', filter: 'text', sort: 'text' },
+          { key: 'date', label: 'Date', sort: 'date' },
+        ]}
+      />
+    </div>
   )
 }
 
@@ -452,16 +502,16 @@ export default function CaseHistoryPanel() {
     }
   }
 
-  const discharge = async () => {
-    if (!active || !clientId) return
+  const discharge = async (episode) => {
+    if (!episode || !clientId) return
     const ok = await confirm({
-      title: `Discharge episode ${active.episode_number}?`,
+      title: `Discharge episode ${episode.episode_number}?`,
       message: 'This closes the course. Appointments stay on it, and a Process Note can still be added from an appointment. You can reopen this course if the client returns.',
       confirmLabel: 'Discharge',
     })
     if (!ok) return
     try {
-      const closed = await dischargeEpisode.mutateAsync({ episodeId: active.id, clientId })
+      const closed = await dischargeEpisode.mutateAsync({ episodeId: episode.id, clientId })
       setSelectedId(closed.id)
       toast.saved(`Episode ${closed.episode_number} discharged`)
     } catch (err) {
@@ -570,6 +620,23 @@ export default function CaseHistoryPanel() {
                   ),
                   started: formatDate(episode.start_date),
                   ended: formatDate(episode.end_date),
+                  actions: (
+                    <div className="course-episode-actions" onClick={(event) => event.stopPropagation()}>
+                      {episode.status === 'active' && (
+                        <button type="button" className="secondary" onClick={() => discharge(episode)} disabled={episodeBusy}>
+                          Discharge
+                        </button>
+                      )}
+                      {episode.status === 'discharged' && (
+                        <button type="button" className="secondary" onClick={() => reopen(episode)} disabled={episodeBusy}>
+                          Reopen
+                        </button>
+                      )}
+                      <button type="button" className="danger" onClick={() => remove(episode)} disabled={episodeBusy}>
+                        Delete
+                      </button>
+                    </div>
+                  ),
                 },
               }
             })}
@@ -580,59 +647,15 @@ export default function CaseHistoryPanel() {
             onRowClick={(row) => setSelectedId(row.id)}
           />
           {selected && (
-            <div className="episode-detail">
-              <div className="episode-detail__actions course-page__episode-actions">
-                {selected.status === 'active' && (
-                  <button type="button" className="secondary" onClick={discharge} disabled={episodeBusy}>
-                    Discharge
-                  </button>
-                )}
-                {selected.status === 'discharged' && (
-                  <button type="button" className="secondary" onClick={() => reopen(selected)} disabled={episodeBusy}>
-                    Reopen
-                  </button>
-                )}
-                <button type="button" className="danger" onClick={() => remove(selected)} disabled={episodeBusy}>
-                  Delete
-                </button>
-              </div>
-              {userId && (
-                <EpisodeReports
-                  key={`reports-${selected.id}`}
-                  episode={selected}
-                  client={client}
-                  clientId={clientId}
-                  userId={userId}
-                  organizationId={client?.workplace_id || null}
-                />
-              )}
-              <EpisodeAppointments
-                key={`appointments-${selected.id}`}
-                episode={selected}
-                clientId={clientId}
-                episodes={episodes}
-              />
-              <EpisodeSection
-                title="Forms"
-                newLabel="Form"
-                empty="No forms on this course yet."
-                countNoun="forms"
-                columns={[
-                  { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
-                  { key: 'date', label: 'Date', sort: 'date' },
-                ]}
-              />
-              <EpisodeSection
-                title="Outcome measures"
-                newLabel="Outcome measure"
-                empty="No outcome measures on this course yet."
-                countNoun="measures"
-                columns={[
-                  { key: 'name', label: 'Measure', filter: 'text', sort: 'text' },
-                  { key: 'date', label: 'Date', sort: 'date' },
-                ]}
-              />
-            </div>
+            <SelectedCourse
+              key={selected.id}
+              episode={selected}
+              episodes={episodes}
+              client={client}
+              clientId={clientId}
+              userId={userId}
+              organizationId={client?.workplace_id || null}
+            />
           )}
         </div>
       )}

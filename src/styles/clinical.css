@@ -916,8 +916,23 @@ a.badge {
   flex-direction: column;
 }
 
-.course-page__episode-actions {
-  margin: 0.85rem 0 0.35rem;
+.course-episode-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.course-episode-actions .secondary,
+.course-episode-actions .danger {
+  padding: 0.28rem 0.65rem;
+  font-size: 0.8125rem;
+}
+
+.record-table__col--actions {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .course-accordion {
