@@ -8,6 +8,8 @@ import {
   getAppointment as getLocalAppointment,
   getUpcomingAppointments as getLocalUpcoming,
   saveAppointment as saveLocalAppointment,
+  assignAppointmentsToEpisodeLocal,
+  setEpisodeAppointmentsLocal,
 } from '../store/scheduling'
 import { addMinutesToTime, todayYmd } from '../dateArchitecture'
 import { appointmentSchedule, fromDatetimeLocalValue, type AppointmentLike } from '../appointmentUtils'
@@ -22,6 +24,8 @@ import {
   planFollowOnBlock,
   planFollowOnWrite,
 } from '../scheduling/appointmentHygiene'
+import { resolveEpisodeAttachment } from '../scheduling/episodes'
+import { findActiveEpisode, openEpisode } from './episodesRepo'
 
 type AppointmentExtras = {
   v: 0
@@ -417,14 +421,38 @@ export async function upsertAppointmentRemote(
     ? (payload.attendance_status as string | null)
     : (existingLocal?.attendance_status ?? null)
 
+  let episodeId: string | null = payload.episode_id !== undefined
+    ? (payload.episode_id ? String(payload.episode_id) : null)
+    : (existingLocal?.episode_id || null)
+
+  if (!existingId) {
+    const active = clientId ? await findActiveEpisode(clientId) : null
+    const attachment = resolveEpisodeAttachment({
+      blockRole,
+      clientId,
+      isCreate: true,
+      requestedEpisodeId: payload.episode_id ? String(payload.episode_id) : null,
+      existingEpisodeId: null,
+      activeEpisodeId: active?.id ?? null,
+    })
+    if (attachment.open && clientId) {
+      const opened = await openEpisode({
+        clientId,
+        ownerId: userId,
+        organizationId: client?.workplace_id || null,
+      })
+      episodeId = opened.id
+    } else {
+      episodeId = attachment.episodeId
+    }
+  }
+
   const row = {
     owner_id: userId,
     organization_id: client?.workplace_id || null,
     client_id: clientId,
     clinician_id: clinicianId,
-    episode_id: payload.episode_id !== undefined
-      ? (payload.episode_id ? String(payload.episode_id) : null)
-      : (existingLocal?.episode_id || null),
+    episode_id: episodeId,
     service_id: serviceId,
     appointment_type: String(
       payload.appointment_type
@@ -624,6 +652,157 @@ async function ensureMeetLink(appointment: AppAppointment, requested: boolean): 
     console.error('Meet link was not created for appointment', appointment.id, err)
     return appointment
   }
+}
+
+/** Attach existing client appointments to an episode. Notes follow their appointment. */
+export async function assignAppointmentsToEpisode(input: {
+  clientId: string
+  episodeId: string
+  appointmentIds: string[]
+}): Promise<string[]> {
+  const requested = [...new Set(input.appointmentIds.map((id) => String(id)).filter(Boolean))]
+  if (!input.clientId || !input.episodeId || !requested.length) {
+    throw new Error('Choose an episode and at least one appointment.')
+  }
+  if (!isSupabaseConfigured()) {
+    const moved = assignAppointmentsToEpisodeLocal(input.clientId, input.episodeId, requested)
+    if (!moved.length) throw new Error('Choose appointments for this client.')
+    return moved
+  }
+
+  const supabase = getSupabase()
+  if (!supabase) {
+    const moved = assignAppointmentsToEpisodeLocal(input.clientId, input.episodeId, requested)
+    if (!moved.length) throw new Error('Choose appointments for this client.')
+    return moved
+  }
+
+  const { data: episode, error: episodeError } = await supabase
+    .from('episodes')
+    .select('id, client_id')
+    .eq('id', input.episodeId)
+    .maybeSingle()
+  if (episodeError) throw episodeError
+  if (!episode || episode.client_id !== input.clientId) {
+    throw new Error('That episode is not on this client.')
+  }
+
+  const ids = requested.filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+  if (!ids.length) throw new Error('Choose appointments for this client.')
+
+  const { data: rows, error: listError } = await supabase
+    .from('appointments')
+    .select('id, client_id, parent_appointment_id')
+    .in('id', ids)
+  if (listError) throw listError
+  const parents = (rows || [])
+    .filter((row) => row.client_id === input.clientId && !row.parent_appointment_id)
+    .map((row) => row.id)
+  if (!parents.length) throw new Error('Choose appointments for this client.')
+
+  const { error: updateError } = await supabase
+    .from('appointments')
+    .update({ episode_id: input.episodeId })
+    .in('id', parents)
+  if (updateError) throw updateError
+
+  const { error: childError } = await supabase
+    .from('appointments')
+    .update({ episode_id: input.episodeId })
+    .in('parent_appointment_id', parents)
+  if (childError) throw childError
+
+  const { data: notes, error: notesError } = await supabase
+    .from('progress_notes')
+    .select('id, note_number, episode_id')
+    .in('appointment_id', parents)
+  if (notesError) throw notesError
+
+  const moving = (notes || []).filter((note) => note.episode_id !== input.episodeId)
+  if (moving.length) {
+    const { data: taken, error: takenError } = await supabase
+      .from('progress_notes')
+      .select('note_number')
+      .eq('episode_id', input.episodeId)
+    if (takenError) throw takenError
+    const used = new Set((taken || []).map((row) => Number(row.note_number) || 0))
+    let nextNumber = used.size ? Math.max(...used) + 1 : 1
+    for (const note of moving) {
+      let noteNumber = Number(note.note_number) || nextNumber
+      if (used.has(noteNumber)) {
+        while (used.has(nextNumber)) nextNumber += 1
+        noteNumber = nextNumber
+        nextNumber += 1
+      }
+      used.add(noteNumber)
+      const { error } = await supabase
+        .from('progress_notes')
+        .update({ episode_id: input.episodeId, note_number: noteNumber })
+        .eq('id', note.id)
+      if (error) throw error
+    }
+  }
+
+  assignAppointmentsToEpisodeLocal(input.clientId, input.episodeId, parents)
+  return parents
+}
+
+/** Save the appointments that belong on this episode. Unticked ones leave the course. */
+export async function setEpisodeAppointments(input: {
+  clientId: string
+  episodeId: string
+  appointmentIds: string[]
+}): Promise<{ added: string[]; removed: string[] }> {
+  const requested = [...new Set(input.appointmentIds.map((id) => String(id)).filter(Boolean))]
+  if (!input.clientId || !input.episodeId) {
+    throw new Error('Choose an episode first.')
+  }
+  if (!isSupabaseConfigured()) {
+    return setEpisodeAppointmentsLocal(input.clientId, input.episodeId, requested)
+  }
+  const supabase = getSupabase()
+  if (!supabase) return setEpisodeAppointmentsLocal(input.clientId, input.episodeId, requested)
+
+  const { data: episode, error: episodeError } = await supabase
+    .from('episodes')
+    .select('id, client_id')
+    .eq('id', input.episodeId)
+    .maybeSingle()
+  if (episodeError) throw episodeError
+  if (!episode || episode.client_id !== input.clientId) {
+    throw new Error('That episode is not on this client.')
+  }
+
+  const { data: rows, error: listError } = await supabase
+    .from('appointments')
+    .select('id, episode_id, parent_appointment_id')
+    .eq('client_id', input.clientId)
+    .is('parent_appointment_id', null)
+  if (listError) throw listError
+  const known = new Set((rows || []).map((row) => row.id))
+  const desired = requested.filter((id) => known.has(id))
+  const current = (rows || []).filter((row) => row.episode_id === input.episodeId).map((row) => row.id)
+  const removed = current.filter((id) => !desired.includes(id))
+  const toAdd = desired.filter((id) => !current.includes(id))
+
+  if (removed.length) {
+    const { error } = await supabase.from('appointments').update({ episode_id: null }).in('id', removed)
+    if (error) throw error
+    const { error: childError } = await supabase
+      .from('appointments')
+      .update({ episode_id: null })
+      .in('parent_appointment_id', removed)
+    if (childError) throw childError
+  }
+  if (toAdd.length) {
+    await assignAppointmentsToEpisode({
+      clientId: input.clientId,
+      episodeId: input.episodeId,
+      appointmentIds: toAdd,
+    })
+  }
+  setEpisodeAppointmentsLocal(input.clientId, input.episodeId, desired)
+  return { added: toAdd, removed }
 }
 
 export async function saveAppointmentForUser(

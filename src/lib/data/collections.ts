@@ -40,6 +40,7 @@ function seed(): Db {
     progressNotes: structuredClone(SEED_NOTES) as StoreRecord[],
     workingDocuments: structuredClone(SEED_DOCS) as StoreRecord[],
     episodes: structuredClone(SEED_EPISODES) as StoreRecord[],
+    reports: [] as StoreRecord[],
     letters: structuredClone(SEED_LETTERS) as StoreRecord[],
     appointments: structuredClone(SEED_APPOINTMENTS) as StoreRecord[],
     progressNoteTemplates: structuredClone(SEED_NOTE_TEMPLATES) as StoreRecord[],

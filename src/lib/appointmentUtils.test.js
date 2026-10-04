@@ -10,6 +10,7 @@ import {
   formatSessionDateTime,
   formatAgendaDayHeading,
   groupAppointmentsForAgenda,
+  splitLastAndNextAppointments,
 } from './appointmentUtils'
 import { DEMO_TODAY, addDaysYmd } from './dateArchitecture'
 
@@ -107,5 +108,21 @@ describe('agenda grouping', () => {
     expect(byKey.today).toEqual(['b', 'a']) // sorted by time
     expect(byKey.tomorrow).toEqual(['c'])
     expect(byKey.later).toEqual(['d'])
+  })
+})
+
+describe('splitLastAndNextAppointments', () => {
+  it('keeps client sessions and skips follow-on and other block types', () => {
+    const visits = splitLastAndNextAppointments([
+      { id: 'past', session_date: '2026-01-01', start_time: '09:00', block_role: 'client_session' },
+      { id: 'later-past', session_date: '2026-02-01', start_time: '09:00', block_role: 'client_session' },
+      { id: 'next', session_date: '2026-12-01', start_time: '09:00', block_role: 'client_session' },
+      { id: 'further', session_date: '2026-12-02', start_time: '09:00', block_role: 'client_session' },
+      { id: 'child', session_date: '2026-02-01', start_time: '10:00', parent_appointment_id: 'later-past', block_role: 'admin' },
+      { id: 'admin', session_date: '2026-11-01', start_time: '09:00', block_role: 'admin' },
+      { id: 'cancelled', session_date: '2026-11-15', start_time: '09:00', block_role: 'client_session', attendance_status: 'cancelled' },
+    ], new Date('2026-06-01T12:00:00'))
+    expect(visits.last?.id).toBe('later-past')
+    expect(visits.next?.id).toBe('next')
   })
 })

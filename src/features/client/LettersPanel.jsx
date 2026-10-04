@@ -7,6 +7,7 @@ import { getClinicalExportBranding } from '../../lib/workplaceBranding'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import { useToast } from '../../components/ui'
+import { useClientChrome } from './ClientChrome'
 
 function formatDocDate(iso) {
   if (!iso) return '—'
@@ -35,6 +36,13 @@ export default function LettersPanel() {
   const [letterDate, setLetterDate] = useState(todayISO())
   const [saving, setSaving] = useState(false)
   const toast = useToast()
+  const setEditorOpen = useClientChrome()?.setEditorOpen
+
+  useEffect(() => {
+    if (!setEditorOpen) return undefined
+    setEditorOpen(selectedId != null)
+    return () => setEditorOpen(false)
+  }, [selectedId, setEditorOpen])
 
   useEffect(() => {
     setLetters(getLetters(clientId))
@@ -173,15 +181,12 @@ export default function LettersPanel() {
   return (
     <RecordListLayout
       title={editing ? editorTitle : 'Letters'}
-      subtitle={editing
-        ? 'Compose and save correspondence for this client.'
-        : 'Correspondence and formal letters for this client.'}
       newLabel={editing ? undefined : 'letter'}
       onNew={editing ? undefined : handleNew}
       headerActions={editing ? (
         <>
+          <button type="button" className="secondary" onClick={handleCancel}>Back</button>
           <button type="button" className="secondary" onClick={handleDownload}>Download</button>
-          <button type="button" className="secondary" onClick={handleCancel}>Cancel</button>
           <button type="button" className="primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save letter'}
           </button>

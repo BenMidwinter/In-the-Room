@@ -11,6 +11,8 @@ import {
   planFollowOnWrite,
   type ServiceFollowOnSource,
 } from '../scheduling/appointmentHygiene'
+import { resolveEpisodeAttachment } from '../scheduling/episodes'
+import { activeLocalEpisode, openLocalEpisode } from './episodes'
 
 export { APPOINTMENT_TYPES, ATTENDANCE_STATUSES } from '../mockData'
 
@@ -115,6 +117,68 @@ function syncLocalFollowOn(parent) {
   })
 }
 
+/** Put existing appointments, their follow-on blocks, and their notes onto an episode. */
+export function assignAppointmentsToEpisodeLocal(
+  clientId: string,
+  episodeId: string,
+  appointmentIds: string[],
+): string[] {
+  const parents = new Set(appointmentIds.map((id) => String(id)))
+  const moved: string[] = []
+  for (const row of db.appointments) {
+    if (String(row.client_id || '') !== clientId) continue
+    if (row.parent_appointment_id) continue
+    if (!parents.has(String(row.id))) continue
+    row.episode_id = episodeId
+    moved.push(String(row.id))
+  }
+  const movedParents = new Set(moved)
+  for (const row of db.appointments) {
+    const parentId = row.parent_appointment_id ? String(row.parent_appointment_id) : ''
+    if (parentId && movedParents.has(parentId)) row.episode_id = episodeId
+  }
+  const touched = new Set(moved)
+  for (const row of db.appointments) {
+    const parentId = row.parent_appointment_id ? String(row.parent_appointment_id) : ''
+    if (parentId && movedParents.has(parentId)) touched.add(String(row.id))
+  }
+  for (const note of db.progressNotes) {
+    if (note.appointment_id && touched.has(String(note.appointment_id))) {
+      note.episode_id = episodeId
+    }
+  }
+  return moved
+}
+
+/** Replace which of this client's appointments sit on an episode. */
+export function setEpisodeAppointmentsLocal(
+  clientId: string,
+  episodeId: string,
+  appointmentIds: string[],
+): { added: string[]; removed: string[] } {
+  const desired = new Set(appointmentIds.map((id) => String(id)))
+  const current = db.appointments
+    .filter((row) => (
+      String(row.client_id || '') === clientId
+      && !row.parent_appointment_id
+      && row.episode_id === episodeId
+    ))
+    .map((row) => String(row.id))
+  const removed = current.filter((id) => !desired.has(id))
+  if (removed.length) {
+    const drop = new Set(removed)
+    for (const row of db.appointments) {
+      const parentId = row.parent_appointment_id ? String(row.parent_appointment_id) : ''
+      if (drop.has(String(row.id)) || (parentId && drop.has(parentId))) row.episode_id = null
+    }
+  }
+  const toAdd = [...desired].filter((id) => !current.includes(id))
+  const added = toAdd.length
+    ? assignAppointmentsToEpisodeLocal(clientId, episodeId, toAdd)
+    : []
+  return { added, removed }
+}
+
 export function saveAppointment(payload, userId) {
   assertWritableAppointment(payload)
   payload = parseOrThrow(appointmentInputSchema, payload, 'Appointment')
@@ -164,13 +228,36 @@ export function saveAppointment(payload, userId) {
   }
 
   const startTime = schedule.start_time
+  const blockRole = payload.block_role || blockRoleForServiceType(
+    db.orgServices.find((row) => row.id === payload.service_id)?.service_type as string | undefined,
+  )
+  const clientId = typeof payload.client_id === 'string' && payload.client_id ? payload.client_id : null
+  const requestedEpisodeId = typeof payload.episode_id === 'string' ? payload.episode_id : null
+  const active = clientId ? activeLocalEpisode(clientId) : null
+  const attachment = resolveEpisodeAttachment({
+    blockRole,
+    clientId,
+    isCreate: true,
+    requestedEpisodeId,
+    existingEpisodeId: null,
+    activeEpisodeId: active?.id ?? null,
+  })
+  const workplaceId = typeof client?.workplace_id === 'string' ? client.workplace_id : null
+  const episodeId = attachment.open && clientId
+    ? openLocalEpisode({
+      clientId,
+      ownerId: String(payload.clinician_id || userId),
+      organizationId: workplaceId,
+    }).id
+    : attachment.episodeId
+
   const created = {
     id: uid('appt'),
-    client_id: payload.client_id || null,
+    client_id: clientId,
     client_name: client?.real_name
       || `${client?.first_name || ''} ${client?.surname || ''}`.trim()
-      || (payload.client_id ? 'Client' : 'No client'),
-    episode_id: payload.episode_id || null,
+      || (clientId ? 'Client' : 'No client'),
+    episode_id: episodeId,
     clinician_id: payload.clinician_id || userId,
     service_id: payload.service_id || null,
     service_name: payload.service_name || undefined,
@@ -185,9 +272,7 @@ export function saveAppointment(payload, userId) {
     location: payload.location ?? '',
     notes: payload.notes || '',
     other_info: payload.other_info?.trim() || '',
-    block_role: payload.block_role || blockRoleForServiceType(
-      db.orgServices.find((row) => row.id === payload.service_id)?.service_type as string | undefined,
-    ),
+    block_role: blockRole,
     parent_appointment_id: null,
     series_id: payload.series_id || null,
     created_at: now,

@@ -95,6 +95,45 @@ export function formatAppointmentTime(apptOrIso: AppointmentLike | string | null
   return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 }
 
+type SessionPick = AppointmentLike & {
+  block_role?: string | null
+  parent_appointment_id?: string | null
+  attendance_status?: string | null
+  service_name?: string
+}
+
+/** Last finished client session, and the next one from now. Follow-on blocks are skipped. */
+export function splitLastAndNextAppointments<T extends SessionPick>(
+  appointments: T[],
+  now: Date = new Date(),
+): { last: T | null; next: T | null } {
+  const nowMs = now.getTime()
+  let last: T | null = null
+  let next: T | null = null
+  let lastMs = -Infinity
+  let nextMs = Infinity
+
+  for (const appt of appointments) {
+    if ((appt.block_role || 'client_session') !== 'client_session') continue
+    if (appt.parent_appointment_id) continue
+    if (appt.attendance_status === 'cancelled') continue
+    const instant = appointmentInstant(appt)
+    const ms = new Date(instant).getTime()
+    if (!instant || Number.isNaN(ms)) continue
+    if (ms < nowMs) {
+      if (ms >= lastMs) {
+        last = appt
+        lastMs = ms
+      }
+    } else if (ms < nextMs) {
+      next = appt
+      nextMs = ms
+    }
+  }
+
+  return { last, next }
+}
+
 /** Date + time for lists — e.g. "26 Jun 2026 · 14:00" */
 export function formatSessionDateTime(appt: AppointmentLike | null | undefined): string {
   const { session_date, start_time } = appointmentSchedule(appt)

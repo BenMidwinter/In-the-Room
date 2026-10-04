@@ -5,11 +5,13 @@ import { useAppClients } from '../../lib/queries'
 import BodyMap from './BodyMap'
 import ClientDetailsBar from './ClientDetailsBar'
 import ClientNav from './ClientNav'
+import { ClientChromeProvider, useClientChrome } from './ClientChrome'
 import ClientClinicalAlerts from './ClientClinicalAlerts'
 import ErrorBoundary from '../../components/ErrorBoundary'
 import { usePermissions } from '../../lib/usePermissions'
 
-export default function PatientProfile({ client: initialClient }) {
+function PatientProfileFrame({ client: initialClient }) {
+  const { editorOpen } = useClientChrome()
   const navigate = useNavigate()
   const { session } = useAppSession()
   const { clients } = useAppClients()
@@ -60,10 +62,11 @@ export default function PatientProfile({ client: initialClient }) {
         </div>
       </header>
 
+      {!editorOpen && <ClientNav clientId={client.id} client={client} />}
+
       <ClientClinicalAlerts clientId={client.id} />
 
       <div className="client-layout">
-        <ClientNav clientId={client.id} client={client} />
         <div className="client-layout__main">
           <Outlet context={{ client }} />
         </div>
@@ -75,5 +78,13 @@ export default function PatientProfile({ client: initialClient }) {
         </ErrorBoundary>
       )}
     </div>
+  )
+}
+
+export default function PatientProfile(props) {
+  return (
+    <ClientChromeProvider>
+      <PatientProfileFrame {...props} />
+    </ClientChromeProvider>
   )
 }

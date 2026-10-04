@@ -13,6 +13,7 @@ export interface Db {
   progressNotes: StoreRecord[]
   workingDocuments: StoreRecord[]
   episodes: StoreRecord[]
+  reports: StoreRecord[]
   letters: StoreRecord[]
   appointments: StoreRecord[]
   progressNoteTemplates: StoreRecord[]

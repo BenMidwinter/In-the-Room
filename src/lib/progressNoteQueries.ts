@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import {
-  getProgressNotes,
-  getProgressNotesFeed,
-  getProgressNote,
-  getProgressNoteByAppointment,
-  saveProgressNote,
-  signOffProgressNote,
   getAvailableProgressNoteTemplates,
 } from './store'
+import {
+  fetchProgressNote,
+  fetchProgressNoteByAppointment,
+  fetchProgressNotesForClient,
+  saveProgressNoteForUser,
+  signOffProgressNoteForUser,
+} from './supabase/progressNotesRepo'
 
 export const progressNoteQueryKeys = {
   progressNotes: ['progressNotes'],
@@ -21,7 +22,7 @@ export const progressNoteQueryKeys = {
 export function useClientProgressNotesQuery(clientId) {
   return useQuery({
     queryKey: progressNoteQueryKeys.client(clientId),
-    queryFn: () => getProgressNotes(clientId),
+    queryFn: () => fetchProgressNotesForClient(clientId),
     enabled: Boolean(clientId),
     placeholderData: keepPreviousData,
   })
@@ -30,7 +31,7 @@ export function useClientProgressNotesQuery(clientId) {
 export function useProgressNotesFeedQuery(clientId) {
   return useQuery({
     queryKey: progressNoteQueryKeys.feed(clientId),
-    queryFn: () => getProgressNotesFeed(clientId),
+    queryFn: () => fetchProgressNotesForClient(clientId),
     enabled: Boolean(clientId),
     placeholderData: keepPreviousData,
   })
@@ -39,7 +40,7 @@ export function useProgressNotesFeedQuery(clientId) {
 export function useProgressNoteQuery(noteId, { enabled = true } = {}) {
   return useQuery({
     queryKey: progressNoteQueryKeys.detail(noteId),
-    queryFn: () => getProgressNote(noteId),
+    queryFn: () => fetchProgressNote(noteId),
     enabled: enabled && Boolean(noteId),
     placeholderData: keepPreviousData,
   })
@@ -48,7 +49,7 @@ export function useProgressNoteQuery(noteId, { enabled = true } = {}) {
 export function useProgressNoteByAppointmentQuery(appointmentId, { enabled = true } = {}) {
   return useQuery({
     queryKey: progressNoteQueryKeys.byAppointment(appointmentId),
-    queryFn: () => getProgressNoteByAppointment(appointmentId),
+    queryFn: () => fetchProgressNoteByAppointment(appointmentId),
     enabled: enabled && Boolean(appointmentId),
     placeholderData: keepPreviousData,
   })
@@ -66,8 +67,8 @@ export function useAvailableProgressNoteTemplatesQuery(workplaceId) {
 export function useSaveProgressNoteMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ payload, userId }: { payload: Parameters<typeof saveProgressNote>[0]; userId: string }) =>
-      saveProgressNote(payload, userId),
+    mutationFn: async ({ payload, userId }: { payload: Record<string, unknown>; userId: string }) =>
+      saveProgressNoteForUser(payload, userId),
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.progressNotes })
       queryClient.setQueryData(progressNoteQueryKeys.detail(String(saved.id)), saved)
@@ -77,6 +78,9 @@ export function useSaveProgressNoteMutation() {
       }
       if (saved.appointment_id) {
         queryClient.setQueryData(progressNoteQueryKeys.byAppointment(String(saved.appointment_id)), saved)
+      }
+      if (saved.client_id) {
+        queryClient.invalidateQueries({ queryKey: ['episodes', 'client', saved.client_id] })
       }
     },
   })
@@ -85,8 +89,8 @@ export function useSaveProgressNoteMutation() {
 export function useSignOffProgressNoteMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ payload, userId }: { payload: Parameters<typeof signOffProgressNote>[0]; userId: string }) =>
-      signOffProgressNote(payload, userId),
+    mutationFn: async ({ payload, userId }: { payload: Record<string, unknown>; userId: string }) =>
+      signOffProgressNoteForUser(payload, userId),
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.progressNotes })
       queryClient.setQueryData(progressNoteQueryKeys.detail(String(saved.id)), saved)
@@ -96,6 +100,9 @@ export function useSignOffProgressNoteMutation() {
       }
       if (saved.appointment_id) {
         queryClient.setQueryData(progressNoteQueryKeys.byAppointment(String(saved.appointment_id)), saved)
+      }
+      if (saved.client_id) {
+        queryClient.invalidateQueries({ queryKey: ['episodes', 'client', saved.client_id] })
       }
     },
   })
