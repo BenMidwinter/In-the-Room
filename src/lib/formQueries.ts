@@ -12,6 +12,7 @@ import {
   recordMeasureScore,
   saveForm,
   saveMeasure,
+  setFormPlaceOnScreener,
 } from './supabase/formsRepo'
 
 export const formQueryKeys = {
@@ -103,6 +104,18 @@ export function useDuplicateFormMutation(userId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: duplicateForm,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: formQueryKeys.forms(userId) })
+    },
+  })
+}
+
+export function useSetFormScreenerMutation(userId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, placeOnScreener }: { id: string; placeOnScreener: boolean }) => (
+      setFormPlaceOnScreener(id, placeOnScreener)
+    ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: formQueryKeys.forms(userId) })
     },

@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import FormOverlay from '../../components/FormOverlay'
 import RecordTable from '../../components/RecordTable'
 import { useConfirm, useToast } from '../../components/ui'
-import { createTag, deleteTag, listTags } from '../../lib/supabase/screenerRepo'
+import { createTag, deleteTag, listTags, TAG_COLOURS, tagColourLabel } from '../../lib/supabase/screenerRepo'
 import { SettingsSectionCard } from './SettingsPlaceholders'
 
 function TagList({ kind, title, description }) {
   const toast = useToast()
   const confirm = useConfirm()
   const queryClient = useQueryClient()
+  const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
+  const [color, setColor] = useState(TAG_COLOURS[6].value)
   const [saving, setSaving] = useState(false)
   const tags = useQuery({
     queryKey: ['tags', kind],
@@ -19,11 +22,17 @@ function TagList({ kind, title, description }) {
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['tags', kind] })
 
+  const close = () => {
+    setOpen(false)
+    setName('')
+    setColor(TAG_COLOURS[6].value)
+  }
+
   const add = async () => {
     setSaving(true)
     try {
-      await createTag(kind, name)
-      setName('')
+      await createTag(kind, name, color)
+      close()
       toast.saved('Tag added')
       refresh()
     } catch (err) {
@@ -55,6 +64,13 @@ function TagList({ kind, title, description }) {
     filterValues: { name: tag.name },
     sortValues: { name: tag.name },
     cells: {
+      colour: (
+        <span
+          className="tag-swatch"
+          style={{ background: tag.color }}
+          title={tagColourLabel(tag.color)}
+        />
+      ),
       name: <span className="record-table__primary">{tag.name}</span>,
       remove: (
         <button type="button" className="secondary" onClick={() => remove(tag)}>Delete</button>
@@ -67,27 +83,15 @@ function TagList({ kind, title, description }) {
       blockId={`settings_tags_${kind}`}
       title={title}
       description={description}
-      actions={(
-        <form
-          className="settings-inline-add"
-          onSubmit={(event) => {
-            event.preventDefault()
-            add()
-          }}
-        >
-          <input
-            className="paper-input"
-            value={name}
-            aria-label={`New ${title.toLowerCase()}`}
-            placeholder="New tag"
-            onChange={(event) => setName(event.target.value)}
-          />
-          <button type="submit" className="secondary" disabled={saving}>Add</button>
-        </form>
-      )}
     >
       <RecordTable
+        headerAction={(
+          <button type="button" className="secondary record-table__add" onClick={() => setOpen(true)}>
+            Add
+          </button>
+        )}
         columns={[
+          { key: 'colour', label: 'Colour', sort: false, className: 'record-table__col--swatch' },
           { key: 'name', label: 'Tag', filter: 'text', sort: 'text' },
           { key: 'remove', label: '', sort: false, className: 'record-table__col--actions' },
         ]}
@@ -95,6 +99,58 @@ function TagList({ kind, title, description }) {
         countNoun="tags"
         emptyMessage={tags.isPending ? 'Loading tags…' : 'No tags yet.'}
       />
+      {open ? (
+        <FormOverlay
+          title="Add a tag"
+          eyebrow={title}
+          size="sm"
+          onClose={close}
+          footer={(
+            <div className="form-actions">
+              <button type="submit" form={`add-tag-${kind}`} className="primary" disabled={saving || !name.trim()}>
+                {saving ? 'Adding…' : 'Add'}
+              </button>
+              <button type="button" className="secondary" onClick={close}>Cancel</button>
+            </div>
+          )}
+        >
+          <form
+            id={`add-tag-${kind}`}
+            onSubmit={(event) => {
+              event.preventDefault()
+              add()
+            }}
+          >
+            <div className="form-group">
+              <label htmlFor={`tag-name-${kind}`}>Name</label>
+              <input
+                id={`tag-name-${kind}`}
+                className="paper-input"
+                value={name}
+                autoFocus
+                placeholder="Urgent, assessment, school"
+                onChange={(event) => setName(event.target.value)}
+              />
+            </div>
+            <fieldset className="form-group">
+              <legend>Colour</legend>
+              <div className="tag-colour-picker" role="radiogroup" aria-label="Tag colour">
+                {TAG_COLOURS.map((swatch) => (
+                  <button
+                    key={swatch.value}
+                    type="button"
+                    className={color === swatch.value ? 'tag-colour-picker__swatch is-on' : 'tag-colour-picker__swatch'}
+                    style={{ background: swatch.value }}
+                    aria-label={swatch.label}
+                    aria-pressed={color === swatch.value}
+                    onClick={() => setColor(swatch.value)}
+                  />
+                ))}
+              </div>
+            </fieldset>
+          </form>
+        </FormOverlay>
+      ) : null}
     </SettingsSectionCard>
   )
 }

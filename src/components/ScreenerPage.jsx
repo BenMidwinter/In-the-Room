@@ -112,6 +112,7 @@ function PlacementEditor({ person, mode, services, tags, onClose, onSaved }) {
               checked={tagIds.includes(tag.id)}
               onChange={() => toggleTag(tag.id)}
             />
+            <span className="tag-swatch" style={{ background: tag.color }} aria-hidden />
             <span>{tag.name}</span>
           </label>
         )) : (
@@ -119,6 +120,21 @@ function PlacementEditor({ person, mode, services, tags, onClose, onSaved }) {
         )}
       </fieldset>
     </FormOverlay>
+  )
+}
+
+function TagChips({ ids, tagById }) {
+  const chips = ids.map((id) => tagById.get(id)).filter(Boolean)
+  if (!chips.length) return '—'
+  return (
+    <span className="tag-chips">
+      {chips.map((tag) => (
+        <span key={tag.id} className="tag-chip">
+          <span className="tag-swatch" style={{ background: tag.color }} aria-hidden />
+          {tag.name}
+        </span>
+      ))}
+    </span>
   )
 }
 
@@ -146,7 +162,7 @@ export default function ScreenerPage() {
     staleTime: 0,
   })
   const people = (board.data || []).filter((person) => person.status === view)
-  const tagName = new Map((tags.data || []).map((tag) => [tag.id, tag.name]))
+  const tagById = new Map((tags.data || []).map((tag) => [tag.id, tag]))
   const serviceName = new Map((services.data || []).map((service) => [service.id, service.name]))
 
   const refresh = () => {
@@ -182,7 +198,7 @@ export default function ScreenerPage() {
       filterValues: {
         name: person.name,
         form: person.formName,
-        tags: person.tagIds.map((id) => tagName.get(id)).filter(Boolean).join(' '),
+        tags: person.tagIds.map((id) => tagById.get(id)?.name).filter(Boolean).join(' '),
       },
       sortValues: {
         name: person.name,
@@ -199,7 +215,7 @@ export default function ScreenerPage() {
           : <span className="screener-note screener-note--quiet">{person.information || 'No form yet'}</span>,
         times: person.preferredTimes || '—',
         session: serviceName.get(person.serviceId) || '—',
-        tags: person.tagIds.map((id) => tagName.get(id)).filter(Boolean).join(', ') || '—',
+        tags: <TagChips ids={person.tagIds} tagById={tagById} />,
         accept: (
           <button type="button" className="secondary" onClick={() => setEditor({ person, mode: 'accept' })}>
             Accept

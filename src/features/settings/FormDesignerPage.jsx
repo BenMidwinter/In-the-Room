@@ -65,6 +65,7 @@ function blankDraft() {
     name: '',
     audience: 'private',
     placeOnScreener: false,
+    autofillClient: true,
     letterheadId: undefined,
     status: 'draft',
     schema: blankForm(),
@@ -77,6 +78,7 @@ function fromRecord(form) {
     name: form.name,
     audience: form.audience === 'public' ? 'public' : 'private',
     placeOnScreener: Boolean(form.place_on_screener),
+    autofillClient: form.autofill_client !== false,
     letterheadId: form.letterhead_id || null,
     status: form.status === 'published' ? 'published' : 'draft',
     schema: form.schema,
@@ -195,6 +197,7 @@ function FormDesigner({ draft, onChange, measures, userId }) {
         schema,
         publish,
         placeOnScreener: draft.audience === 'public' && draft.placeOnScreener,
+        autofillClient: draft.autofillClient !== false,
         letterheadId: letterheadId || null,
       })
       onChange(fromRecord(saved))
@@ -301,14 +304,63 @@ function FormDesigner({ draft, onChange, measures, userId }) {
                 className="paper-input"
                 value={draft.audience}
                 disabled={Boolean(draft.id)}
-                onChange={(event) => onChange({
-                  ...draft,
-                  audience: event.target.value === 'public' ? 'public' : 'private',
-                })}
+                onChange={(event) => {
+                  const audience = event.target.value === 'public' ? 'public' : 'private'
+                  onChange({
+                    ...draft,
+                    audience,
+                    placeOnScreener: audience === 'public' ? draft.placeOnScreener : false,
+                  })
+                }}
               >
                 <option value="private">Send to a client I already see</option>
                 <option value="public">Share a link</option>
               </select>
+            </div>
+            <div className="form-group" style={{ marginTop: '0.8rem' }}>
+              <label htmlFor="form-screener">Place the person on the screener</label>
+              <select
+                id="form-screener"
+                className="paper-input"
+                value={draft.placeOnScreener ? 'yes' : 'no'}
+                disabled={Boolean(draft.id) && draft.audience !== 'public'}
+                onChange={(event) => {
+                  const yes = event.target.value === 'yes'
+                  onChange({
+                    ...draft,
+                    placeOnScreener: yes,
+                    audience: yes && !draft.id ? 'public' : draft.audience,
+                  })
+                }}
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+              <p className="form-designer__hint">
+                {draft.audience === 'public'
+                  ? 'Yes creates the client, opens a course, and puts them on the screener when they send the form.'
+                  : draft.id
+                    ? 'A shared form places someone new on the screener. This form is sent to a client you already see.'
+                    : 'Yes shares this form as a link. Someone new who sends it is added to the screener.'}
+              </p>
+            </div>
+            <div className="form-group" style={{ marginTop: '0.8rem' }}>
+              <label htmlFor="form-autofill">Auto fill client details</label>
+              <select
+                id="form-autofill"
+                className="paper-input"
+                value={draft.audience === 'public' || draft.autofillClient === false ? 'no' : 'yes'}
+                disabled={draft.audience === 'public'}
+                onChange={(event) => onChange({ ...draft, autofillClient: event.target.value === 'yes' })}
+              >
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+              <p className="form-designer__hint">
+                {draft.audience === 'public'
+                  ? 'Name, date of birth, and the other profile fields already on the form are filled in when you send a form to a client you already see.'
+                  : 'Name, date of birth, and the other profile fields already on the form are filled in when you send it.'}
+              </p>
             </div>
             <div className="form-group" style={{ marginTop: '0.8rem' }}>
               <label htmlFor="form-letterhead">Letterhead</label>
@@ -324,20 +376,10 @@ function FormDesigner({ draft, onChange, measures, userId }) {
                 ))}
               </select>
             </div>
-            {draft.audience === 'public' && (
-              <label className="form-builder__required" style={{ marginTop: '0.8rem' }}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(draft.placeOnScreener)}
-                  onChange={(event) => onChange({ ...draft, placeOnScreener: event.target.checked })}
-                />
-                Place the person on the screener
-              </label>
-            )}
             <p className="form-export-note">
               {draft.audience === 'public'
-                ? 'Publish this, then copy the link or the embed. With the screener box ticked, sending the form creates the client, opens a course, and puts them on the screener. The letterhead sits at the top of the form and the PDF.'
-                : 'Add a published form from the client’s course. A draft cannot be added there. A shared form is not sent from a course.'}
+                ? 'Publish this, then copy the link or the embed from the forms list. The letterhead sits at the top of the form and the PDF.'
+                : 'Add a published form from the client’s course. A draft cannot be added there.'}
             </p>
           </div>
           {schema.blocks.map((block, index) => (

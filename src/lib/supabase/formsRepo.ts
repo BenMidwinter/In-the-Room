@@ -1,5 +1,6 @@
 import {
   measureEditIsBlocked,
+  mergeEmptyClientAnswers,
   parseFormSchema,
   parseMeasureSchema,
   prefillClientAnswers,
@@ -34,6 +35,7 @@ export type FormRecord = {
   status: string
   is_onboarding: boolean
   place_on_screener: boolean
+  autofill_client: boolean
   letterhead_id: string | null
   version: number
   schema: FormSchema
@@ -307,7 +309,7 @@ export async function listForms(): Promise<FormRecord[]> {
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('form_definitions')
-    .select('id, name, slug, audience, status, is_onboarding, place_on_screener, letterhead_id, version, schema')
+    .select('id, name, slug, audience, status, is_onboarding, place_on_screener, autofill_client, letterhead_id, version, schema')
     .neq('status', 'archived')
     .order('name')
   throwIf(error)
@@ -319,6 +321,7 @@ export async function listForms(): Promise<FormRecord[]> {
     status: row.status,
     is_onboarding: row.is_onboarding,
     place_on_screener: Boolean(row.place_on_screener),
+    autofill_client: row.autofill_client !== false,
     letterhead_id: row.letterhead_id,
     version: row.version,
     schema: parseFormSchema(row.schema),
@@ -351,6 +354,7 @@ export async function saveForm(input: {
   schema: FormSchema
   publish: boolean
   placeOnScreener?: boolean
+  autofillClient?: boolean
   letterheadId?: string | null
 }): Promise<FormRecord> {
   const name = input.name.trim()
@@ -368,6 +372,7 @@ export async function saveForm(input: {
     rowOrThrow(existing, existingError, 'Could not load that form.')
     const audience = existing.audience === 'public' ? 'public' : 'private'
     const placeOnScreener = audience === 'public' && Boolean(input.placeOnScreener)
+    const autofillClient = input.autofillClient !== false
     const letterheadId = input.letterheadId || null
     const status = (input.publish || existing.status === 'published') ? 'published' : 'draft'
     if (status === 'published') {
@@ -384,6 +389,7 @@ export async function saveForm(input: {
         audience,
         is_onboarding: audience === 'public',
         place_on_screener: placeOnScreener,
+        autofill_client: autofillClient,
         letterhead_id: letterheadId,
         status,
         version,
@@ -398,6 +404,7 @@ export async function saveForm(input: {
       status,
       is_onboarding: audience === 'public',
       place_on_screener: placeOnScreener,
+      autofill_client: autofillClient,
       letterhead_id: letterheadId,
       version,
       schema,
@@ -406,6 +413,7 @@ export async function saveForm(input: {
 
   const audience = input.audience === 'public' ? 'public' : 'private'
   const placeOnScreener = audience === 'public' && Boolean(input.placeOnScreener)
+  const autofillClient = input.autofillClient !== false
   const letterheadId = input.letterheadId || null
   const status = input.publish ? 'published' : 'draft'
   if (status === 'published') {
@@ -424,6 +432,7 @@ export async function saveForm(input: {
       status,
       is_onboarding: audience === 'public',
       place_on_screener: placeOnScreener,
+      autofill_client: autofillClient,
       letterhead_id: letterheadId,
       version: 1,
       schema: schema as unknown as Json,
@@ -439,6 +448,7 @@ export async function saveForm(input: {
     status,
     is_onboarding: audience === 'public',
     place_on_screener: placeOnScreener,
+    autofill_client: autofillClient,
     letterhead_id: letterheadId,
     version: data.version,
     schema,
@@ -455,8 +465,27 @@ export async function duplicateForm(id: string): Promise<FormRecord> {
     schema: source.schema,
     publish: false,
     placeOnScreener: source.place_on_screener,
+    autofillClient: source.autofill_client,
     letterheadId: source.letterhead_id,
   })
+}
+
+export async function setFormPlaceOnScreener(id: string, placeOnScreener: boolean): Promise<void> {
+  const supabase = supabaseOrThrow()
+  const { data, error } = await supabase
+    .from('form_definitions')
+    .select('audience')
+    .eq('id', id)
+    .single()
+  rowOrThrow(data, error, 'Could not load that form.')
+  if (data.audience !== 'public') {
+    throw new Error('Only a shared form can place the person on the screener.')
+  }
+  const { error: updateError } = await supabase
+    .from('form_definitions')
+    .update({ place_on_screener: placeOnScreener })
+    .eq('id', id)
+  throwIf(updateError)
 }
 
 export async function deleteForm(id: string): Promise<'deleted' | 'archived'> {
@@ -584,24 +613,51 @@ export async function createPrivateSubmission(input: {
   const { supabase, user } = await signedIn()
   const { data: form, error } = await supabase
     .from('form_definitions')
-    .select('id, version, audience, status, schema')
+    .select('id, version, audience, status, schema, autofill_client')
     .eq('id', input.formId)
     .single()
   rowOrThrow(form, error, 'Could not load that form.')
   if (form.audience !== 'private' || form.status !== 'published') {
     throw new Error('Publish a form for a client you already see before sending it.')
   }
+  const schema = parseFormSchema(form.schema)
+  const autofill = form.autofill_client !== false
+  const clientPrefill = async (target: FormSchema) => {
+    const { data: identityRow, error: identityError } = await supabase
+      .from('client_identities')
+      .select('encrypted_payload')
+      .eq('client_id', input.clientId)
+      .maybeSingle()
+    throwIf(identityError)
+    return prefillClientAnswers(target, clientBinds(identityRow?.encrypted_payload))
+  }
   const { data: openRows, error: openError } = await supabase
     .from('form_submissions')
-    .select('id, access_token')
+    .select('id, access_token, encrypted_payload')
     .eq('form_definition_id', form.id)
     .eq('episode_id', input.episodeId)
     .eq('client_id', input.clientId)
     .eq('status', 'in_progress')
     .limit(1)
   throwIf(openError)
-  if (openRows?.[0]) return { id: openRows[0].id, token: openRows[0].access_token }
-  const schema = parseFormSchema(form.schema)
+  if (openRows?.[0]) {
+    const open = openRows[0]
+    if (autofill) {
+      const payload = asObject(open.encrypted_payload)
+      const savedSchema = parseFormSchema(payload.schema ?? form.schema)
+      const merged = mergeEmptyClientAnswers(asObject(payload.answers), await clientPrefill(savedSchema))
+      if (merged.changed) {
+        const { error: updateError } = await supabase
+          .from('form_submissions')
+          .update({
+            encrypted_payload: { ...payload, answers: merged.answers } as unknown as Json,
+          })
+          .eq('id', open.id)
+        throwIf(updateError)
+      }
+    }
+    return { id: open.id, token: open.access_token }
+  }
   const measureIds = [...new Set(schema.blocks.flatMap((block) => (
     block.type === 'measure' ? [block.measureId] : []
   )))]
@@ -615,13 +671,7 @@ export async function createPrivateSubmission(input: {
     for (const def of defs || []) measures[def.id] = parseMeasureSchema(def.schema)
     if (measureIds.some((id) => !measures[id])) throw new Error('A questionnaire on this form is missing.')
   }
-  const { data: identityRow, error: identityError } = await supabase
-    .from('client_identities')
-    .select('encrypted_payload')
-    .eq('client_id', input.clientId)
-    .maybeSingle()
-  throwIf(identityError)
-  const answers = prefillClientAnswers(schema, clientBinds(identityRow?.encrypted_payload))
+  const answers = autofill ? await clientPrefill(schema) : {}
   const { data, error: insertError } = await supabase
     .from('form_submissions')
     .insert({

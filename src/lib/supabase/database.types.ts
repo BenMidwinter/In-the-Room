@@ -696,6 +696,7 @@ export type Database = {
           letterhead_id: string | null
           name: string
           organization_id: string | null
+          autofill_client: boolean
           owner_id: string
           place_on_screener: boolean
           schema: Json
@@ -712,6 +713,7 @@ export type Database = {
           is_onboarding?: boolean
           letterhead_id?: string | null
           name: string
+          autofill_client?: boolean
           organization_id?: string | null
           owner_id: string
           place_on_screener?: boolean
@@ -729,6 +731,7 @@ export type Database = {
           is_onboarding?: boolean
           letterhead_id?: string | null
           name?: string
+          autofill_client?: boolean
           organization_id?: string | null
           owner_id?: string
           place_on_screener?: boolean
@@ -1689,6 +1692,7 @@ export type Database = {
       }
       tags: {
         Row: {
+          color: string
           created_at: string
           id: string
           kind: string
@@ -1698,6 +1702,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          color?: string
           created_at?: string
           id?: string
           kind: string
@@ -1707,6 +1712,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          color?: string
           created_at?: string
           id?: string
           kind?: string

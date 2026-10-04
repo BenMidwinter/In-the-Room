@@ -153,6 +153,7 @@ export default function RecordTable({
   defaultSort = null,
   countNoun = 'rows',
   scroll = false,
+  headerAction = null,
 }) {
   const [filters, setFilters] = useState({})
   const [sort, setSort] = useState(() => (
@@ -198,29 +199,32 @@ export default function RecordTable({
       <table className="record-table">
         <thead>
           <tr>
-            {columns.map((col) => {
+            {columns.map((col, index) => {
               const sortable = Boolean(columnSortKind(col))
               const filterKind = columnFilterKind(col)
               const active = Boolean(String(filters[col.key] || '').trim())
               const direction = sort?.key === col.key ? sort.direction : null
+              const actionHere = Boolean(headerAction) && index === columns.length - 1
               return (
                 <th
                   key={col.key}
                   className={[
                     col.hideOnMobile ? 'record-table__col--mobile-hide' : '',
                     col.className,
+                    actionHere ? 'record-table__head-action' : '',
                   ].filter(Boolean).join(' ') || undefined}
                   aria-sort={direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : 'none'}
                 >
-                  <div className="record-table__head">
+                  <div className={actionHere ? 'record-table__head record-table__head--action' : 'record-table__head'}>
                     {sortable ? (
                       <button type="button" className="record-table__sort" onClick={() => toggleSort(col)}>
                         <span>{col.label}</span>
                         <SortMark direction={direction} />
                       </button>
-                    ) : (
+                    ) : col.label ? (
                       <span className="record-table__label">{col.label}</span>
-                    )}
+                    ) : null}
+                    {actionHere ? headerAction : null}
                     {filterKind ? (
                       <button
                         type="button"

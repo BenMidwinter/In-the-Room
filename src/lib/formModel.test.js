@@ -10,6 +10,7 @@ import {
   validateForm,
   validateMeasure,
   outcomesInForm,
+  mergeEmptyClientAnswers,
   prefillClientAnswers,
   scoreMeasure,
 } from './formModel'
@@ -68,6 +69,22 @@ describe('outcome scores', () => {
     ])
     expect(clientPatchFromAnswers(form, { meds: 'sertraline' })).toEqual({ medication: 'sertraline' })
     expect(prefillClientAnswers(form, { medication: 'sertraline' })).toEqual({ meds: 'sertraline' })
+  })
+
+  it('fills a blank name and date of birth, and leaves an answer already typed', () => {
+    const form = {
+      v: 1,
+      blocks: [
+        { id: 'name', type: 'client', bind: 'first_name', label: 'Name' },
+        { id: 'born', type: 'client', bind: 'dob', label: 'Date of birth' },
+      ],
+    }
+    const prefill = prefillClientAnswers(form, { first_name: 'Ada', dob: '2014-03-01' })
+    expect(mergeEmptyClientAnswers({ name: '  ' }, prefill)).toEqual({
+      answers: { name: 'Ada', born: '2014-03-01' },
+      changed: true,
+    })
+    expect(mergeEmptyClientAnswers({ name: 'Ada North', born: '2014-03-01' }, prefill).changed).toBe(false)
   })
 
   it('asks for a name and a statement before a questionnaire can be saved', () => {

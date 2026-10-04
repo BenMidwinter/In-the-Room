@@ -10,6 +10,7 @@ import {
   useFormsQuery,
   useMeasuresQuery,
   useSendFormMutation,
+  useSetFormScreenerMutation,
 } from '../../lib/formQueries'
 import { findActiveEpisode } from '../../lib/supabase/episodesRepo'
 import { formEmbedCode, formFillUrl, formStartUrl } from '../forms/downloadCsv'
@@ -38,6 +39,7 @@ export default function FormsSettingsPage() {
   const removeMeasure = useDeleteMeasureMutation(userId)
   const removeForm = useDeleteFormMutation(userId)
   const duplicate = useDuplicateFormMutation(userId)
+  const placeOnScreener = useSetFormScreenerMutation(userId)
   const send = useSendFormMutation('library')
   const measures = measuresQuery.data || []
   const forms = formsQuery.data || []
@@ -163,6 +165,18 @@ export default function FormsSettingsPage() {
     }
   }
 
+  const toggleScreener = async (form) => {
+    const next = !form.place_on_screener
+    try {
+      await placeOnScreener.mutateAsync({ id: form.id, placeOnScreener: next })
+      toast.saved(next
+        ? 'This form now places the person on the screener.'
+        : 'This form no longer places the person on the screener.')
+    } catch (err) {
+      toast.error(err.message || 'Could not update the screener setting')
+    }
+  }
+
   const formRows = forms.map((form) => {
     const shared = form.audience === 'public'
     const kind = shared
@@ -181,9 +195,14 @@ export default function FormsSettingsPage() {
       },
     })
     const duplicateItem = { label: 'Duplicate', onSelect: () => copyForm(form) }
+    const screenerItem = {
+      label: form.place_on_screener ? 'Take off the screener' : 'Place the person on the screener',
+      onSelect: () => toggleScreener(form),
+    }
     const items = shared
       ? [
         view,
+        screenerItem,
         share('Copy link', formStartUrl(form.id), 'Link copied.'),
         share('Copy embed', formEmbedCode(form.id, form.name), 'Embed code copied'),
         duplicateItem,
@@ -219,17 +238,17 @@ export default function FormsSettingsPage() {
         blockId="settings_measures"
         title="Questionnaires you track"
         description="Name the questionnaire, such as YP-CORE or CGAS. Save a draft while you design it, and publish it when it is ready to use."
-        actions={(
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => navigate('/settings/forms/questionnaires/new')}
-          >
-            Add a questionnaire
-          </button>
-        )}
       >
         <RecordTable
+          headerAction={(
+            <button
+              type="button"
+              className="secondary record-table__add"
+              onClick={() => navigate('/settings/forms/questionnaires/new')}
+            >
+              Add a questionnaire
+            </button>
+          )}
           columns={[
             { key: 'name', label: 'Questionnaire', filter: 'text', sort: 'text' },
             { key: 'kind', label: 'Scoring', filter: 'choice', sort: 'text' },
@@ -246,18 +265,18 @@ export default function FormsSettingsPage() {
       <SettingsSectionCard
         blockId="settings_forms"
         title="Forms"
-        description="A form you send is added on a course. A shared form can be copied as a link or an embed. Tick “Place the person on the screener” when sending it should create a client."
-        actions={(
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => navigate('/settings/forms/edit/new')}
-          >
-            Add a form
-          </button>
-        )}
+        description="A form you send is added on a course. A shared form can be copied as a link or an embed. Open a shared form, or use its menu, to place the person on the screener."
       >
         <RecordTable
+          headerAction={(
+            <button
+              type="button"
+              className="secondary record-table__add"
+              onClick={() => navigate('/settings/forms/edit/new')}
+            >
+              Add a form
+            </button>
+          )}
           columns={[
             { key: 'name', label: 'Form', filter: 'text', sort: 'text' },
             { key: 'kind', label: 'Kind', filter: 'choice', sort: 'text' },

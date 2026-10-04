@@ -3,10 +3,31 @@ import type { Json } from './database.types'
 
 export type TagKind = 'client' | 'waitlist'
 
+export const TAG_COLOURS = [
+  { value: '#c45c4a', label: 'Red' },
+  { value: '#d4a017', label: 'Gold' },
+  { value: '#3d7a5a', label: 'Green' },
+  { value: '#3d6f8f', label: 'Blue' },
+  { value: '#6b5b95', label: 'Purple' },
+  { value: '#8a6a4f', label: 'Brown' },
+  { value: '#5c6b73', label: 'Slate' },
+] as const
+
+export function tagColour(value: string | null | undefined): string {
+  const normalised = String(value || '').toLowerCase()
+  return TAG_COLOURS.find((row) => row.value === normalised)?.value || TAG_COLOURS[6].value
+}
+
+export function tagColourLabel(value: string | null | undefined): string {
+  const colour = tagColour(value)
+  return TAG_COLOURS.find((row) => row.value === colour)?.label || 'Slate'
+}
+
 export type TagRecord = {
   id: string
   kind: TagKind
   name: string
+  color: string
 }
 
 export type ScreenerPerson = {
@@ -39,7 +60,7 @@ function supabaseOrThrow() {
 
 export async function listTags(kind?: TagKind): Promise<TagRecord[]> {
   const supabase = supabaseOrThrow()
-  let query = supabase.from('tags').select('id, kind, name').order('name')
+  let query = supabase.from('tags').select('id, kind, name, color').order('name')
   if (kind) query = query.eq('kind', kind)
   const { data, error } = await query
   if (error) throw error
@@ -47,25 +68,32 @@ export async function listTags(kind?: TagKind): Promise<TagRecord[]> {
     id: row.id,
     kind: row.kind === 'waitlist' ? 'waitlist' : 'client',
     name: row.name,
+    color: tagColour(row.color),
   }))
 }
 
-export async function createTag(kind: TagKind, name: string): Promise<TagRecord> {
+export async function createTag(kind: TagKind, name: string, color: string): Promise<TagRecord> {
   const supabase = supabaseOrThrow()
   const trimmed = name.trim()
   if (!trimmed) throw new Error('Name the tag.')
+  const chosen = tagColour(color)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Sign in required')
   const { data, error } = await supabase
     .from('tags')
-    .insert({ owner_id: user.id, kind, name: trimmed })
-    .select('id, kind, name')
+    .insert({ owner_id: user.id, kind, name: trimmed, color: chosen })
+    .select('id, kind, name, color')
     .single()
   if (error) {
     if (error.code === '23505') throw new Error('That tag is already in the list.')
     throw error
   }
-  return { id: data.id, kind: data.kind === 'waitlist' ? 'waitlist' : 'client', name: data.name }
+  return {
+    id: data.id,
+    kind: data.kind === 'waitlist' ? 'waitlist' : 'client',
+    name: data.name,
+    color: tagColour(data.color),
+  }
 }
 
 export async function deleteTag(id: string): Promise<void> {
