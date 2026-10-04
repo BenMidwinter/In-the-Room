@@ -911,6 +911,82 @@ a.badge {
   gap: 0.5rem;
 }
 
+.course-page__episodes {
+  display: flex;
+  flex-direction: column;
+}
+
+.course-episode-actions {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.course-episode-actions .secondary,
+.course-episode-actions .danger {
+  padding: 0.28rem 0.65rem;
+  font-size: 0.8125rem;
+}
+
+.record-table__col--actions {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.course-accordion {
+  border-top: 1px solid var(--border-light);
+}
+
+.course-accordion:last-child {
+  border-bottom: 1px solid var(--border-light);
+}
+
+.course-accordion__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+  min-height: 2.75rem;
+  padding: 0.2rem 0;
+}
+
+.course-accordion__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 0;
+  background: transparent;
+  padding: 0.4rem 0;
+  font-family: var(--font-head);
+  font-size: 1.05rem;
+  font-weight: 560;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--col-accent);
+  cursor: pointer;
+}
+
+.course-accordion__mark {
+  width: 0.85rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  line-height: 1;
+  color: var(--txt-muted);
+}
+
+.course-accordion__body {
+  padding: 0 0 1rem;
+}
+
+.record-table__col--pick {
+  width: 2.75rem;
+}
+
 .course-page__body {
   display: grid;
   grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
