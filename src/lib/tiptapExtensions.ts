@@ -9,8 +9,9 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
-import { mergeFieldDisplay } from './mergeFields'
+import { mergeFieldDisplay, signatureRegistrationLine } from './mergeFields'
 import { fontCssForId, textColorHexForId } from './editorFormatting'
+import { signatureRegistrationLine } from './mergeFields'
 
 export const MergeContextExtension = Extension.create({
   name: 'mergeContext',
@@ -205,7 +206,7 @@ export const SignatureBlock = Node.create({
       children.push(['div', { class: 'doc-signature__line doc-signature__name' }, name])
     }
 
-    const credentials = [profTitle, hcpc ? `HCPC ${hcpc}` : ''].filter(Boolean).join(' · ')
+    const credentials = [profTitle, signatureRegistrationLine(hcpc)].filter(Boolean).join(' · ')
     if (credentials) {
       children.push(['div', { class: 'doc-signature__line doc-signature__credentials' }, credentials])
     }

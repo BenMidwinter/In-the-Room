@@ -2,7 +2,7 @@ import { useEditor, EditorContent, useEditorState } from '@tiptap/react'
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { buildEditorExtensions, publishMergeContext } from '../lib/tiptapExtensions'
 import { MERGE_FIELD_OPTIONS } from '../lib/mergeFields'
-import { usePrompt } from './ui'
+import { useChoose, usePrompt } from './ui'
 import {
   EDITOR_FONTS,
   EDITOR_TEXT_SIZES,
@@ -364,7 +364,7 @@ function placeSlashMenu(view, canvas) {
   }
 }
 
-function runSlashCommand(editor, command, pickArtworkFile) {
+async function runSlashCommand(editor, command, { pickArtworkFile, choose, prompt }) {
   if (!editor || editor.isDestroyed || !command) return
 
   switch (command.action) {
@@ -411,9 +411,51 @@ function runSlashCommand(editor, command, pickArtworkFile) {
       if (html) editor.chain().focus().insertContent(html).run()
       break
     }
+    case 'signature':
+      await insertSignatureFromSlash(editor, { choose, prompt })
+      break
     default:
       break
   }
+}
+
+async function insertSignatureFromSlash(editor, { choose, prompt }) {
+  const profile = editor.storage.clinicianProfile?.profile || {}
+  const hasFile = Boolean(profile.signature_image_url)
+  const choice = await choose?.({
+    title: 'Signature',
+    label: 'How should this sign?',
+    defaultValue: hasFile ? 'profile' : 'script',
+    options: [
+      {
+        value: 'profile',
+        label: hasFile ? 'Use the signature saved on your profile' : 'Use your name from your profile',
+      },
+      { value: 'script', label: 'Write your name in a handwritten style' },
+    ],
+  })
+  if (!choice || editor.isDestroyed) return
+  if (choice === 'script') {
+    const text = await prompt?.({
+      title: 'Handwritten signature',
+      label: 'Name to sign',
+      defaultValue: profile.signature_text || profile.full_name || '',
+    })
+    const name = String(text || '').trim()
+    if (!name || editor.isDestroyed) return
+    editor.chain().focus().insertSignature({ mode: 'script', signatureText: name }).run()
+    return
+  }
+  if (hasFile) {
+    editor.chain().focus().insertSignature({
+      mode: 'profile-image',
+      imageUrl: profile.signature_image_url,
+    }).run()
+    return
+  }
+  const signatureText = profile.signature_text || profile.full_name || ''
+  if (!signatureText) return
+  editor.chain().focus().insertSignature({ mode: 'script', signatureText }).run()
 }
 
 function DocToolbar({
@@ -560,6 +602,8 @@ function RichTextEditorSurface({
   pageHeader = null,
 }) {
   const immersive = layout === 'immersive'
+  const choose = useChoose()
+  const prompt = usePrompt()
   const [surfaceReady, setSurfaceReady] = useState(false)
   const [slashOpen, setSlashOpen] = useState(false)
   const [slashQuery, setSlashQuery] = useState('')
@@ -618,9 +662,13 @@ function RichTextEditorSurface({
       const to = editorInstance.state.selection.from
       editorInstance.chain().focus().deleteRange({ from, to }).run()
     }
-    runSlashCommand(editorInstance, command, () => pickArtworkFile(editorInstance))
     closeSlash()
-  }, [closeSlash, pickArtworkFile])
+    void runSlashCommand(editorInstance, command, {
+      pickArtworkFile: () => pickArtworkFile(editorInstance),
+      choose,
+      prompt,
+    })
+  }, [choose, closeSlash, pickArtworkFile, prompt])
 
   const editor = useEditor({
     immediatelyRender: true,

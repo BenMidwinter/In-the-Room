@@ -80,7 +80,7 @@ export const SLASH_COMMANDS = [
   { id: 'aside', label: 'Aside', hint: 'A quieter reflection in the sentence', group: 'Writing', action: 'voice', value: 'aside' },
   { id: 'land', label: 'Landing line', hint: 'The phrase to come back to', group: 'Writing', action: 'voice', value: 'land' },
   { id: 'mark', label: 'Mark to return', hint: 'A soft highlight', group: 'Writing', action: 'highlight', value: 'yellow-soft' },
-  { id: 'divider', label: 'Divider', hint: 'A line across the page', group: 'Insert', action: 'divider' },
+  { id: 'line', label: 'Horizontal line', hint: 'A line across the page', group: 'Insert', action: 'divider' },
   { id: 'table', label: 'Table', hint: 'Three columns', group: 'Insert', action: 'table', clinical: true },
   { id: 'image', label: 'Image', hint: 'A picture in the page', group: 'Insert', action: 'artwork' },
   { id: 'fill', label: 'Fill-in line', hint: 'A blank to complete', group: 'Insert', action: 'fill', clinical: true },
@@ -93,6 +93,7 @@ export const SLASH_COMMANDS = [
     value: field.key,
     clinical: true,
   })),
+  { id: 'signature', label: 'Signature', hint: 'The signature on your profile, or your name by hand', group: 'Modules', action: 'signature', clinical: true },
   { id: 'dapnotes', label: 'DAP notes', hint: 'Data, assessment, plan', group: 'Modules', action: 'insertSnippet', value: 'dapnotes', clinical: true },
   { id: 'consent', label: 'Consent record', hint: 'A consent section', group: 'Modules', action: 'insertSnippet', value: 'consent', clinical: true },
 ]

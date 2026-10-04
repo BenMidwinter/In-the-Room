@@ -61,6 +61,17 @@ export function registrationText(profile: ClinicianProfileSource | null | undefi
   return String(profile?.registration_number || '').trim()
 }
 
+/**
+ * Line under a signature. Membership text already names the body
+ * ("HCPC AS12345"). A bare stored number is the older shape, so that one still gets the HCPC label.
+ */
+export function signatureRegistrationLine(value: string | null | undefined): string {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (/\bHCPC\b/i.test(text) || /\s/.test(text)) return text
+  return `HCPC ${text}`
+}
+
 /** Shape the editor and signature menu expect, from the account profile. */
 export function clinicianProfileForEditor(
   remote: ClinicianProfileSource | null | undefined,
