@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import DiagnosisPicker from '../../components/DiagnosisPicker'
 import { updateClientClinicalDetails } from '../../lib/store'
 import { useToast } from '../../components/ui'
+import { joinDiagnosisList, parseDiagnosisList } from '../../lib/diagnosisList'
 
 export default function ClientDetailsEditModal({ client, onClose, onSaved }) {
   const [school, setSchool] = useState(client.school || '')
@@ -14,11 +15,7 @@ export default function ClientDetailsEditModal({ client, onClose, onSaved }) {
   useEffect(() => {
     setSchool(client.school || '')
     setMedication(client.medication || '')
-    setSelectedDiagnoses(
-      client.diagnosis
-        ? client.diagnosis.split(',').map(s => s.trim()).filter(Boolean)
-        : []
-    )
+    setSelectedDiagnoses(parseDiagnosisList(client.diagnosis))
   }, [client])
 
   const handleSubmit = (e) => {
@@ -29,7 +26,7 @@ export default function ClientDetailsEditModal({ client, onClose, onSaved }) {
       const updated = updateClientClinicalDetails(client.id, {
         school: school.trim(),
         medication: medication.trim(),
-        diagnosis: selectedDiagnoses.join(', '),
+        diagnosis: joinDiagnosisList(selectedDiagnoses),
       })
       onSaved?.(updated)
       toast.success('Client details saved.')

@@ -39,6 +39,16 @@ export function isProgressNoteSignedOff(note: ProgressNoteLockFields | null | un
   return (note?.status || 'draft') === 'signed_off'
 }
 
+export type ProcessNoteAppointmentStatus = 'Incomplete' | 'Draft' | 'Complete'
+
+/** Status shown on an appointment: no note, a draft, or a signed-off note. */
+export function processNoteAppointmentStatus(
+  note: ProgressNoteLockFields | null | undefined,
+): ProcessNoteAppointmentStatus {
+  if (!note) return 'Incomplete'
+  return isProgressNoteSignedOff(note) ? 'Complete' : 'Draft'
+}
+
 /** Notes history / list display label for draft vs signed-off notes. */
 export function progressNoteHistoryStatusLabel(
   note: ProgressNoteLockFields | null | undefined,

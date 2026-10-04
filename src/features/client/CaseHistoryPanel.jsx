@@ -12,7 +12,7 @@ import {
 } from '../../lib/episodeQueries'
 import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
 import { useEpisodeReportsQuery, useSaveReportMutation } from '../../lib/reportQueries'
-import { formatSessionDateTime } from '../../lib/appointmentUtils'
+import { formatSessionDateTime, isClientSessionAppointment } from '../../lib/appointmentUtils'
 import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
 
 function formatDate(iso) {
@@ -43,7 +43,11 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
     .filter((appt) => appt.client_id === clientId && !appt.parent_appointment_id)
     .sort((a, b) => String(b.session_date || '').localeCompare(String(a.session_date || ''))
       || String(b.start_time || '').localeCompare(String(a.start_time || '')))
-  const onThisEpisode = primaries.filter((appt) => appt.episode_id === episode.id)
+  const sessions = primaries.filter((appt) => isClientSessionAppointment(appt))
+  const onThisEpisode = sessions.filter((appt) => appt.episode_id === episode.id)
+  const keptWithCourse = primaries
+    .filter((appt) => appt.episode_id === episode.id && !isClientSessionAppointment(appt))
+    .map((appt) => appt.id)
 
   const episodeLabel = (episodeId) => {
     if (!episodeId || episodeId === episode.id) return ''
@@ -67,7 +71,7 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
       await saveMembership.mutateAsync({
         clientId,
         episodeId: episode.id,
-        appointmentIds: picked,
+        appointmentIds: [...picked, ...keptWithCourse],
       })
       setEditing(false)
       toast.saved('Appointments saved')
@@ -97,11 +101,11 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
       </div>
       <div className="episode-appointment-scroll" aria-label={editing ? 'All appointments' : 'Appointments on this episode'}>
         {editing ? (
-          primaries.length === 0 ? (
+          sessions.length === 0 ? (
             <p className="text-small text-muted">No appointments for this client yet.</p>
           ) : (
             <ul className="episode-appointment-list">
-              {primaries.map((appt) => {
+              {sessions.map((appt) => {
                 const elsewhere = episodeLabel(appt.episode_id)
                 return (
                   <li key={appt.id}>

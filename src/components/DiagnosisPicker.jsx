@@ -1,19 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-
-const PRESET_OPTIONS = [
-  'ADHD',
-  'Anxiety',
-  'Attachment Disorder',
-  'Autism Spectrum Condition (ASC)',
-  'Global Developmental Delay',
-  'Obsessive Compulsive Disorder (OCD)',
-  'Oppositional Defiant Disorder (ODD)',
-  'PDA Profile',
-  'PMLD',
-  'Social, Emotional and Mental Health (SEMH)',
-  'Speech, Language and Communication Needs (SLCN)',
-  'Trauma / ACEs',
-].sort()
+import { DIAGNOSIS_OPTIONS } from '../lib/diagnosisList'
 
 export default function DiagnosisPicker({ selected = [], onChange }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -40,12 +26,11 @@ export default function DiagnosisPicker({ selected = [], onChange }) {
   }
 
   const handleCustomAdd = () => {
-    if (filter.trim()) {
-      toggleSelection(filter.trim())
-    }
+    const next = filter.replace(/,/g, '').trim()
+    if (next) toggleSelection(next)
   }
 
-  const filteredOptions = PRESET_OPTIONS.filter(opt =>
+  const filteredOptions = DIAGNOSIS_OPTIONS.filter(opt =>
     opt.toLowerCase().includes(filter.toLowerCase()),
   )
 

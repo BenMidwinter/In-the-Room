@@ -672,10 +672,10 @@ function ProgressNotesPageContent() {
         letterhead,
       })
       if (!opened) {
-        toast.error('Could not open the print dialog. Please try again.')
+        toast.error('Could not create the PDF. Please try again.')
         return
       }
-      toast.info('Choose “Save as PDF” in the print dialog.')
+      toast.success('PDF downloaded.')
     } catch (err) {
       toast.error(err?.message || 'Could not prepare the letterhead.')
     }

@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { segment: '', label: 'Overview', end: true, section: 'overview' },
   { segment: 'case-history', label: 'Course', section: 'case-history' },
   { segment: 'appointments', label: 'Appointments', section: 'appointments' },
+  { segment: 'support', label: 'Support activities', section: 'support' },
   { segment: 'notes-history', label: 'Process Notes', section: 'notes-history' },
   { segment: 'documents', label: 'Documents', section: 'documents' },
   { segment: 'files', label: 'Files', section: 'files' },

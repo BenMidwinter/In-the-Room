@@ -25,6 +25,8 @@ describe('process note print', () => {
       { clientName: 'Selena Gauche', letterhead },
     )
 
+    expect(html).toContain('Fraunces')
+    expect(html).toContain('Karla')
     expect(html).toContain('letterhead__logo')
     expect(html).toContain('North Practice')
     expect(html).toContain('1 High Street')

@@ -7,6 +7,7 @@ import { useToast } from './ui'
 import { upsertClient, getClientById } from '../lib/store'
 import { upsertClientRemote } from '../lib/supabase/clientsRepo'
 import { isSupabaseConfigured } from '../lib/supabase/client'
+import { joinDiagnosisList, parseDiagnosisList } from '../lib/diagnosisList'
 
 export default function AddClient() {
   const navigate = useNavigate()
@@ -39,7 +40,7 @@ export default function AddClient() {
     setDob(existing.dob || '')
     setSchool(existing.school || '')
     if (existing.diagnosis) {
-      setSelectedDiagnoses(existing.diagnosis.split(',').map(s => s.trim()).filter(Boolean))
+      setSelectedDiagnoses(parseDiagnosisList(existing.diagnosis))
     }
   }, [clientId, isEditMode, session.user.id, navigate, toast])
 
@@ -62,7 +63,7 @@ export default function AddClient() {
         surname,
         dob,
         school,
-        diagnosis: selectedDiagnoses.join(', '),
+        diagnosis: joinDiagnosisList(selectedDiagnoses),
         workplace_id: null,
       }
       if (isSupabaseConfigured()) {

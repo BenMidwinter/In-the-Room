@@ -1,4 +1,4 @@
-import { tagsFromProfileValue } from '../../lib/clinicalProfile'
+import { parseDiagnosisList } from '../../lib/diagnosisList'
 
 function TagGroup({ label, tags }) {
   if (!tags.length) return null
@@ -49,7 +49,7 @@ export default function ClientClinicalProfileSummary({ client }) {
         <div className="client-profile-summary">
           <TextField label="School / setting" value={client.school} />
           {client.diagnosis && (
-            <TagGroup label="Diagnosis" tags={tagsFromProfileValue(client.diagnosis)} />
+            <TagGroup label="Diagnosis" tags={parseDiagnosisList(client.diagnosis)} />
           )}
           <TextField label="Medication" value={client.medication} />
           {profile.working_formulation?.trim() && (

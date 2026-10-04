@@ -7,6 +7,7 @@ import {
   formatLockCountdown,
   isProgressNoteEditable,
   lockUntilFromSignOff,
+  processNoteAppointmentStatus,
   progressNoteHistoryStatusLabel,
   PROGRESS_NOTE_LOCK_HOURS,
 } from './progressNoteLifecycle'
@@ -123,6 +124,13 @@ describe('progressNoteLifecycle', () => {
     const lockUntil = new Date(now + (47 * 60 + 12) * 60 * 1000).toISOString()
     expect(formatLockCountdown(lockUntil, now)).toBe('47h 12m')
     expect(formatLockCountdown(new Date(now - 1000).toISOString(), now)).toBeNull()
+  })
+
+  it('labels an appointment note as incomplete, draft, or complete', () => {
+    expect(processNoteAppointmentStatus(null)).toBe('Incomplete')
+    expect(processNoteAppointmentStatus(undefined)).toBe('Incomplete')
+    expect(processNoteAppointmentStatus({ status: 'draft' })).toBe('Draft')
+    expect(processNoteAppointmentStatus({ status: 'signed_off' })).toBe('Complete')
   })
 
   it('maps lifecycle status to notes history labels', () => {
