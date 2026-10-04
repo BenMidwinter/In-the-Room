@@ -3,7 +3,6 @@ export type StoreRecord = Record<string, unknown> & { id: string }
 
 export interface Db {
   clients: StoreRecord[]
-  bodyMaps: Record<string, StoreRecord>
   profiles: StoreRecord[]
   memberships: StoreRecord[]
   workplaces: StoreRecord[]

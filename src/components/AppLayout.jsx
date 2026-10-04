@@ -15,7 +15,6 @@ const NAV_ITEMS = [
   { to: '/journal', label: 'Journal' },
   { to: '/finance', label: '[Finance]' },
   { to: '/reporting', label: '[Reporting]' },
-  { to: '/lab/progress-note', label: '[Note lab]' },
 ]
 
 function GearIcon() {

@@ -29,7 +29,6 @@ export const CLINICIAN_PROFILES = [
 ]
 
 export const CLIENTS = []
-export const BODY_MAPS = {}
 export const WORKPLACE_AUDIT_LOGS = []
 export const MEMBERSHIP_REQUESTS = []
 export const TIMELINE_EVENTS = []

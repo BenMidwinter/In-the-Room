@@ -87,21 +87,6 @@ export function getClientRecord(clientId) {
   return client ? { ...client, clinical_profile: { ...(client.clinical_profile || {}) } } : null
 }
 
-export function getBodyMap(clientId) {
-  return db.bodyMaps[clientId] || null
-}
-
-export function saveBodyMap(clientId, { nodes, edges }) {
-  const existing = db.bodyMaps[clientId]
-  db.bodyMaps[clientId] = {
-    snapshotId: existing?.snapshotId || uid('snap'),
-    nodes: structuredClone(nodes),
-    edges: structuredClone(edges),
-    id: clientId,
-  } as StoreRecord
-  return db.bodyMaps[clientId]
-}
-
 function stripHtml(html) {
   return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }

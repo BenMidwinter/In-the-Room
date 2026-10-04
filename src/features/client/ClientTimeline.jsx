@@ -1,7 +1,8 @@
-import { useMemo, useRef, useEffect } from 'react'
+import { useMemo, useRef, useLayoutEffect } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
 import { getProfile } from '../../lib/store'
+import { todayYmd } from '../../lib/dateArchitecture'
 
 const TYPE_LABELS = {
   created: 'Record',
@@ -37,6 +38,32 @@ function formatDate(iso) {
   })
 }
 
+function eventStamp(event) {
+  const time = new Date(event.created_at).getTime()
+  return Number.isNaN(time) ? null : time
+}
+
+function isFutureEvent(event, today) {
+  const ymd = String(event.created_at || '').slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(ymd) && ymd > today
+}
+
+function closestToNowIndex(events) {
+  const now = Date.now()
+  let best = 0
+  let bestDelta = Infinity
+  events.forEach((event, index) => {
+    const time = eventStamp(event)
+    if (time == null) return
+    const delta = Math.abs(time - now)
+    if (delta < bestDelta) {
+      best = index
+      bestDelta = delta
+    }
+  })
+  return best
+}
+
 export default function ClientTimeline({ events = [], orientation = 'vertical' }) {
   const { id: routeClientId } = useParams()
   const overlay = useAppointmentOverlay()
@@ -55,6 +82,8 @@ export default function ClientTimeline({ events = [], orientation = 'vertical' }
     return null
   }
 
+  const today = todayYmd()
+
   const displayEvents = useMemo(() => {
     const sorted = [...events].sort(
       (a, b) => new Date(a.created_at) - new Date(b.created_at),
@@ -62,11 +91,19 @@ export default function ClientTimeline({ events = [], orientation = 'vertical' }
     return isHorizontal ? sorted : [...sorted].reverse()
   }, [events, isHorizontal])
 
-  useEffect(() => {
+  const presentIndex = useMemo(
+    () => closestToNowIndex(displayEvents),
+    [displayEvents],
+  )
+
+  useLayoutEffect(() => {
     if (!isHorizontal || !scrollRef.current) return
-    const el = scrollRef.current
-    el.scrollLeft = el.scrollWidth
-  }, [displayEvents, isHorizontal])
+    const scroller = scrollRef.current
+    const item = scroller.querySelector(`[data-timeline-index="${presentIndex}"]`)
+    if (!item) return
+    const left = item.getBoundingClientRect().left - scroller.getBoundingClientRect().left + scroller.scrollLeft
+    scroller.scrollLeft = Math.max(0, left - 8)
+  }, [displayEvents, isHorizontal, presentIndex])
 
   if (!events.length) {
     return (
@@ -90,8 +127,13 @@ export default function ClientTimeline({ events = [], orientation = 'vertical' }
           {displayEvents.map((event, i) => {
             const author = getProfile(event.author_id)
             const isLast = i === displayEvents.length - 1
+            const future = isFutureEvent(event, today)
             return (
-              <li key={event.id} className="timeline__item">
+              <li
+                key={event.id}
+                data-timeline-index={i}
+                className={`timeline__item${future ? ' timeline__item--future' : ''}`}
+              >
                 {isHorizontal ? (
                   <div className="timeline__rail" aria-hidden>
                     <div className="timeline__marker" />

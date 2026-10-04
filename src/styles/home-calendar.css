@@ -317,12 +317,9 @@
 
 .section-card {
   border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
   box-shadow: var(--elevation-paper-1);
-}
-
-.section-card--clinician {
-  border-left: 4px solid var(--col-primary);
 }
 
 /* Home practice dashboard — compact cards + horizontal upcoming */
@@ -340,6 +337,7 @@
 
 .home-stat-card {
   border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg-page) 55%, var(--bg-surface));
   padding: 0.9rem 1rem 1rem;
   min-height: 8.5rem;
@@ -399,6 +397,7 @@ button.home-stat-card__link {
 
 .home-upcoming-timeline {
   border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
   padding: 0.85rem 1rem 0.65rem;
 }
@@ -428,6 +427,17 @@ button.home-stat-card__link {
   background: color-mix(in srgb, var(--col-primary-light) 40%, var(--bg-zone-muted));
 }
 
+.home-upcoming-timeline__card--later {
+  background: color-mix(in srgb, var(--bg-muted) 78%, var(--bg-surface));
+  border-color: var(--border-light);
+}
+
+.home-upcoming-timeline__card--later .timeline__title,
+.home-upcoming-timeline__card--later .home-upcoming-timeline__when,
+.home-upcoming-timeline__card--later .timeline__summary {
+  color: var(--txt-muted);
+}
+
 .home-upcoming-timeline__when {
   font-size: 0.85rem;
   font-weight: 700;
@@ -449,6 +459,7 @@ button.home-stat-card__link {
 
 .home-caseload {
   border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
   padding: 0.85rem 1rem 0.75rem;
 }
@@ -495,50 +506,9 @@ button.home-stat-card__link {
   }
 }
 
-.section-card--administrator,
-.section-card--admin_finance {
-  border-left: 4px solid #8b7cb8;
-}
-
-.section-card--workplace_information {
-  border-left: 4px solid var(--col-primary);
-}
-
-.section-card--profile_identity {
-  border-left: 4px solid var(--col-primary);
-}
-
-.section-card--profile_workplace {
-  border-left: 4px solid #8b7cb8;
-}
-
-.section-card--profile_availability {
-  border-left: 4px solid #4a7c9e;
-}
-
-.section-card--profile_letterhead {
-  border-left: 4px solid #5c8a72;
-}
-
-.section-card--profile_journal {
-  border-left: 4px solid #c47a3a;
-}
-
 .section-card--profile_journal .section-card__badge {
   color: #6b4423;
   background: #f5e8dc;
-}
-
-.section-card--org_pulse {
-  border-left: 4px solid #b8860b;
-}
-
-.section-card--site_performance {
-  border-left: 4px solid #6b5b95;
-}
-
-.section-card--compliance_activity {
-  border-left: 4px solid #2d6b6b;
 }
 
 .section-card--org_pulse .section-card__badge {
@@ -567,30 +537,12 @@ button.home-stat-card__link {
   margin-top: 0.25rem;
 }
 
-.section-card--org_workplaces,
-.section-card--org_users {
-  border-left: 4px solid #5c6bc0;
-}
-
-.section-card--org_services {
-  border-left: 4px solid #7e57c2;
-}
-
-.section-card--org_note_templates,
-.section-card--org_letter_templates,
-.section-card--org_note_template_editor,
-.section-card--org_letter_template_editor {
-  border-left: 4px solid #00897b;
-}
-
-.section-card--org_outcome_forms {
-  border-left: 4px solid #6d4c41;
-}
-
 .section-card__header--actions-only {
   justify-content: flex-end;
   padding: 0.75rem 1.15rem;
   border-bottom: 1px solid var(--border-light);
+  border-top-left-radius: calc(var(--radius-md) - 1px);
+  border-top-right-radius: calc(var(--radius-md) - 1px);
 }
 
 .section-card__form {
@@ -605,6 +557,8 @@ button.home-stat-card__link {
   gap: 0.75rem 1rem;
   padding: 1rem 1.15rem;
   border-bottom: 1px solid var(--border-light);
+  border-top-left-radius: calc(var(--radius-md) - 1px);
+  border-top-right-radius: calc(var(--radius-md) - 1px);
   background: color-mix(in srgb, var(--bg-page) 55%, var(--bg-surface));
 }
 
@@ -1069,7 +1023,7 @@ button.home-stat-card__link {
   }
 }
 
-/* ── Calendar module — square corners throughout ── */
+/* ── Calendar module — round the frame, keep each block square ── */
 
 .calendar-module {
   --calendar-radius: 0;
@@ -1175,9 +1129,13 @@ button.home-stat-card__link {
   margin-left: auto;
 }
 
-.calendar-module,
-.calendar-module * {
-  border-radius: 0 !important;
+.calendar-module .calendar-event,
+.calendar-module .calendar-col__slot,
+.calendar-module .calendar-month__cell,
+.calendar-module .calendar-month__event,
+.calendar-module .calendar-time-grid__day-head,
+.calendar-module .room-time-slot {
+  border-radius: 0;
 }
 
 .calendar-module__body {
@@ -1385,7 +1343,7 @@ button.home-stat-card__link {
   text-align: left;
   padding: 0.35rem 0.45rem;
   margin-bottom: 0.25rem;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
   font-size: 0.72rem;
   line-height: 1.35;
   border: 1px solid transparent;
@@ -1531,7 +1489,7 @@ button.calendar-event {
   min-height: 0;
   overflow: auto;
   border: 1px solid var(--border-light);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
   box-shadow: none;
 }
@@ -1666,7 +1624,9 @@ button.calendar-event {
   flex-direction: column;
   width: 100%;
   min-height: 0;
+  overflow: hidden;
   border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
 }
 
@@ -1722,6 +1682,7 @@ button.calendar-event {
   background: var(--bg-page);
   border-bottom: 1px solid var(--calendar-hour-border);
   border-right: 1px solid var(--border-light);
+  border-radius: 0;
   cursor: pointer;
   transition: background 0.12s;
 }
@@ -2160,6 +2121,7 @@ button.calendar-event {
   max-width: none;
   width: 100%;
   border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
   overflow: hidden;
 }
@@ -2188,6 +2150,7 @@ button.calendar-event {
   flex: 1;
   min-height: 0;
   border: none;
+  border-radius: 0;
 }
 
 .calendar-day .calendar-time-grid-scroll {

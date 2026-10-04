@@ -26,6 +26,7 @@
   margin: auto;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md), 0 24px 48px rgba(0, 0, 0, 0.18);
 }
 
@@ -40,6 +41,8 @@
   gap: 1.5rem;
   padding: 1.35rem 1.75rem;
   border-bottom: 2px solid var(--col-primary);
+  border-top-left-radius: calc(var(--radius-lg) - 1px);
+  border-top-right-radius: calc(var(--radius-lg) - 1px);
   background: var(--bg-surface);
 }
 

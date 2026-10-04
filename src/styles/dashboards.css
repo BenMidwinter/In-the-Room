@@ -647,6 +647,25 @@ button.client-visit-card:disabled {
   min-height: 7.5rem;
 }
 
+.timeline__item--future .timeline__body {
+  background: color-mix(in srgb, var(--bg-muted) 82%, var(--bg-surface));
+  border-color: var(--border-light);
+}
+
+.timeline__item--future .timeline__title,
+.timeline__item--future .timeline__summary {
+  color: var(--txt-muted);
+}
+
+.timeline__item--future .timeline__marker {
+  background: var(--border-strong);
+  box-shadow: 0 0 0 2px var(--bg-muted);
+}
+
+.timeline--horizontal .timeline__item--future .timeline__line--horizontal {
+  background: color-mix(in srgb, var(--border-color) 65%, var(--bg-page));
+}
+
 .timeline__body--link {
   display: block;
   text-decoration: none;
@@ -1071,19 +1090,3 @@ button.timeline__body--link {
 
 
 
-/* Process Note lab sandbox */
-.page--progress-note-lab .progress-notes-page__meta-bar {
-  margin-bottom: 1.25rem;
-}
-
-.progress-note-lab__canvas {
-  background: var(--editor-canvas-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: var(--layout-space-lg);
-  min-height: 70vh;
-}
-
-.progress-note-lab__canvas .doc-editor--immersive {
-  min-height: 60vh;
-}
