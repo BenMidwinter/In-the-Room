@@ -165,7 +165,17 @@ function layoutDayEvents(appts, dayStartMin, dayEndMin) {
   return result
 }
 
-function EventChip({ appointment, compact = false, blurNames = false, onSelect, selected = false, style }) {
+function EventChip({
+  appointment,
+  compact = false,
+  blurNames = false,
+  onSelect,
+  onEdit,
+  onDragStart,
+  selected = false,
+  dimmed = false,
+  style,
+}) {
   const cancelled = isCancelled(appointment)
   const externalBusy = Boolean(appointment.is_external_busy)
   const timeRange = appointment.end_time
@@ -173,6 +183,7 @@ function EventChip({ appointment, compact = false, blurNames = false, onSelect, 
     : appointment.start_time
   const otherInfo = appointmentOtherInfo(appointment)
   const chipLabel = appointmentChipLabel(appointment, { blurNames })
+  const isAdmin = appointment.block_role === 'admin'
 
   const className = [
     'calendar-event',
@@ -180,6 +191,8 @@ function EventChip({ appointment, compact = false, blurNames = false, onSelect, 
     'calendar-event--block',
     'calendar-event--service',
     externalBusy && 'calendar-event--external-busy',
+    isAdmin && 'calendar-event--admin',
+    dimmed && 'calendar-event--dimmed',
     compact && 'calendar-event--compact',
     otherInfo && !externalBusy && 'calendar-event--has-info',
     selected && 'calendar-event--selected',
@@ -188,7 +201,7 @@ function EventChip({ appointment, compact = false, blurNames = false, onSelect, 
 
   const title = externalBusy
     ? `Busy · ${timeRange}`
-    : `${chipLabel} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''}`
+    : `${chipLabel} · ${timeRange}${otherInfo ? ` · ${otherInfo}` : ''}${cancelled ? ' · cancelled' : ''} · click to view, double-click to edit`
 
   const Tag = externalBusy ? 'div' : 'button'
   return (
@@ -197,10 +210,23 @@ function EventChip({ appointment, compact = false, blurNames = false, onSelect, 
       className={className}
       style={{ ...calendarEventStyleForAppointment(appointment), ...style }}
       title={title}
+      draggable={!externalBusy}
+      onDragStart={externalBusy ? undefined : (e) => {
+        e.stopPropagation()
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/appointment-id', appointment.id)
+        e.dataTransfer.setData('application/x-itr-appointment', appointment.id)
+        onDragStart?.(appointment)
+      }}
       onClick={externalBusy ? undefined : (e) => {
         e.preventDefault()
         e.stopPropagation()
         onSelect?.(appointment)
+      }}
+      onDoubleClick={externalBusy ? undefined : (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        onEdit?.(appointment)
       }}
     >
       <span className="calendar-event__time">{timeRange}</span>
@@ -210,6 +236,16 @@ function EventChip({ appointment, compact = false, blurNames = false, onSelect, 
       )}
     </Tag>
   )
+}
+
+const ADMIN_BLOCKS_KEY = 'in-the-room-calendar-show-admin'
+
+function readShowAdminBlocks() {
+  try {
+    return localStorage.getItem(ADMIN_BLOCKS_KEY) === '1'
+  } catch {
+    return false
+  }
 }
 
 function CalendarViewOptions({
@@ -224,6 +260,8 @@ function CalendarViewOptions({
   ownerOptions,
   showOwnerPicker,
   onOwnerChange,
+  showAdminBlocks = false,
+  onShowAdminBlocksChange,
 }) {
   const [intervalDraft, setIntervalDraft] = useState(String(prefs.intervalMinutes))
   const [prevInterval, setPrevInterval] = useState(prefs.intervalMinutes)
@@ -375,6 +413,14 @@ function CalendarViewOptions({
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitInterval() } }}
         />
       </div>
+      <label className="calendar-view-options__check">
+        <input
+          type="checkbox"
+          checked={showAdminBlocks}
+          onChange={(e) => onShowAdminBlocksChange?.(e.target.checked)}
+        />
+        <span>Show admin blocks (Notes)</span>
+      </label>
       <p className="calendar-view-options__hint text-small text-muted">
         Grid lines mark each interval; events still span their true length.
       </p>
@@ -398,7 +444,7 @@ function CalendarViewOptions({
   )
 }
 
-function MonthView({ activeDate, appointments, onSelectDate, blurNames = false, onSelectAppointment }) {
+function MonthView({ activeDate, appointments, onSelectDate, blurNames = false, onSelectAppointment, onEditAppointment }) {
   const cells = monthGridDays(activeDate)
   const monthStart = startOfMonthYmd(activeDate)
   const monthLabel = formatLongDate(monthStart).split(',')[1]?.trim() || formatDisplayDate(monthStart)
@@ -442,10 +488,14 @@ function MonthView({ activeDate, appointments, onSelectDate, blurNames = false, 
                       <button
                         key={appt.id}
                         type="button"
-                        className={`calendar-month__event calendar-event--interactive${isCancelled(appt) ? ' calendar-month__event--cancelled' : ''}`}
+                        className={`calendar-month__event calendar-event--interactive${isCancelled(appt) ? ' calendar-month__event--cancelled' : ''}${appt.block_role === 'admin' ? ' calendar-month__event--admin' : ''}`}
                         onClick={(e) => {
                           e.stopPropagation()
                           onSelectAppointment?.(appt)
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation()
+                          onEditAppointment?.(appt)
                         }}
                       >
                         <span className="calendar-month__dot" style={calendarDotStyle(appt.service_id || appt.therapy_modality)} />
@@ -480,8 +530,11 @@ function DayColumn({
   blurNames,
   compact,
   onSelectAppointment,
+  onEditAppointment,
+  onDragAppointment,
   selectedAppointmentId,
   onEmptySlotClick,
+  onDropOnSlot,
   weeklyHours,
   intervalMinutes,
   className,
@@ -511,6 +564,19 @@ function DayColumn({
                 key={slot}
                 className={`calendar-col__slot${available ? '' : ' calendar-col__slot--unavailable'}`}
                 onClick={() => onEmptySlotClick?.(ymd, slot)}
+                onDragOver={(e) => {
+                  if (!onDropOnSlot) return
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                }}
+                onDrop={(e) => {
+                  if (!onDropOnSlot) return
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const id = e.dataTransfer.getData('application/x-itr-appointment')
+                    || e.dataTransfer.getData('text/appointment-id')
+                  if (id) onDropOnSlot(id, ymd, slot)
+                }}
                 title={available ? `Book ${ymd} at ${slot}` : `Outside availability · ${ymd} at ${slot}`}
               />
             )
@@ -541,6 +607,9 @@ function DayColumn({
             compact={compact}
             blurNames={blurNames}
             onSelect={onSelectAppointment}
+            onEdit={onEditAppointment}
+            onDragStart={onDragAppointment}
+            dimmed={item.appt.block_role === 'admin'}
             selected={selectedAppointmentId === item.appt.id}
             style={{
               top: `${item.top}%`,
@@ -562,6 +631,9 @@ function TimeGridView({
   onSelectDate,
   blurNames = false,
   onSelectAppointment,
+  onEditAppointment,
+  onDragAppointment,
+  onDropOnSlot,
   selectedAppointmentId,
   hours,
   subSlotMinutes,
@@ -652,6 +724,9 @@ function TimeGridView({
               blurNames={blurNames}
               compact={colCount > 1}
               onSelectAppointment={onSelectAppointment}
+              onEditAppointment={onEditAppointment}
+              onDragAppointment={onDragAppointment}
+              onDropOnSlot={onDropOnSlot}
               selectedAppointmentId={selectedAppointmentId}
               onEmptySlotClick={onEmptySlotClick}
               weeklyHours={weeklyHours}
@@ -673,6 +748,9 @@ function DayView({
   appointments,
   blurNames = false,
   onSelectAppointment,
+  onEditAppointment,
+  onDragAppointment,
+  onDropOnSlot,
   selectedAppointmentId,
   hours,
   subSlotMinutes,
@@ -700,6 +778,9 @@ function DayView({
         onSelectDate={() => {}}
         blurNames={blurNames}
         onSelectAppointment={onSelectAppointment}
+        onEditAppointment={onEditAppointment}
+        onDragAppointment={onDragAppointment}
+        onDropOnSlot={onDropOnSlot}
         selectedAppointmentId={selectedAppointmentId}
         hours={hours}
         subSlotMinutes={subSlotMinutes}
@@ -732,6 +813,7 @@ export default function CalendarModule({ persona }) {
   const [deleteScopeFor, setDeleteScopeFor] = useState(null)
   const [scheduleDeleting, setScheduleDeleting] = useState(false)
   const [rescheduleTarget, setRescheduleTarget] = useState(null)
+  const [showAdminBlocks, setShowAdminBlocks] = useState(() => readShowAdminBlocks())
 
   const [availabilitySettings, setAvailabilitySettings] = useState(() => (
     getClinicianWorkplaceSettings(session.user.id)
@@ -861,8 +943,20 @@ export default function CalendarModule({ persona }) {
   const filtered = useMemo(() => {
     const roleScoped = filterAppointmentsForPersona(appointments, persona)
     const owned = filterAppointmentsByCalendarOwner(roleScoped, calendarOwner, persona)
-    return [...owned, ...googleBusy]
-  }, [appointments, calendarOwner, persona, googleBusy])
+    const visible = showAdminBlocks
+      ? owned
+      : owned.filter((a) => a.block_role !== 'admin')
+    return [...visible, ...googleBusy]
+  }, [appointments, calendarOwner, persona, googleBusy, showAdminBlocks])
+
+  const handleShowAdminBlocksChange = (next) => {
+    setShowAdminBlocks(next)
+    try {
+      localStorage.setItem(ADMIN_BLOCKS_KEY, next ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+  }
 
   const blurNames = shouldBlurClientIdentity(persona)
 
@@ -890,38 +984,42 @@ export default function CalendarModule({ persona }) {
 
   const selectAppointment = (appt) => {
     if (appt?.is_external_busy) return
-    // Leave reschedule mode if the clinician picks another event.
+    // Leave move mode if the clinician picks another event.
     if (rescheduleTarget) setRescheduleTarget(null)
     // View overlay (attendance / details). Edit is a separate overlay from there.
     setScheduleDraft(null)
     setSelectedAppointment((prev) => (prev?.id === appt.id ? null : appt))
   }
 
+  const applyMoveToSlot = (appt, sessionDate, startTime) => {
+    const duration = Math.max(
+      0,
+      parseMinutes(appt.end_time) - parseMinutes(appt.start_time),
+    ) || 60
+    const endTime = hhmm(
+      Math.floor((parseMinutes(startTime) + duration) / 60),
+      (parseMinutes(startTime) + duration) % 60,
+    )
+    const moved = {
+      ...appt,
+      session_date: sessionDate,
+      start_time: startTime,
+      end_time: endTime,
+    }
+    setRescheduleTarget(null)
+    setSelectedAppointment(null)
+    setScheduleDraft({
+      mode: 'edit',
+      appointment: moved,
+      session_date: sessionDate,
+      start_time: startTime,
+      manual: true,
+    })
+  }
+
   const openScheduleSlot = (sessionDate, startTime, manual = false) => {
     if (rescheduleTarget) {
-      const duration = Math.max(
-        0,
-        parseMinutes(rescheduleTarget.end_time) - parseMinutes(rescheduleTarget.start_time),
-      ) || 60
-      const endTime = hhmm(
-        Math.floor((parseMinutes(startTime) + duration) / 60),
-        (parseMinutes(startTime) + duration) % 60,
-      )
-      const moved = {
-        ...rescheduleTarget,
-        session_date: sessionDate,
-        start_time: startTime,
-        end_time: endTime,
-      }
-      setRescheduleTarget(null)
-      setSelectedAppointment(null)
-      setScheduleDraft({
-        mode: 'edit',
-        appointment: moved,
-        session_date: sessionDate,
-        start_time: startTime,
-        manual: true,
-      })
+      applyMoveToSlot(rescheduleTarget, sessionDate, startTime)
       return
     }
     setSelectedAppointment(null)
@@ -1140,7 +1238,7 @@ export default function CalendarModule({ persona }) {
   }
 
   const handleEditAppointment = (appt) => {
-    // Close the right-hand drawer first; edit always uses the centred overlay.
+    // Edit always uses the centred overlay.
     setRescheduleTarget(null)
     setSelectedAppointment(null)
     setScheduleDraft({
@@ -1170,7 +1268,7 @@ export default function CalendarModule({ persona }) {
     setScheduleDraft({ mode: 'recurring', source: appt })
   }
 
-  const handleReschedule = (appt) => {
+  const handleMove = (appt) => {
     setSelectedAppointment(null)
     setScheduleDraft(null)
     setRescheduleTarget(appt)
@@ -1178,9 +1276,18 @@ export default function CalendarModule({ persona }) {
     if (viewMode === 'month') setViewMode('week')
   }
 
+  const handleDropOnSlot = (appointmentId, sessionDate, startTime) => {
+    const appt = filtered.find((a) => a.id === appointmentId)
+      || appointments.find((a) => a.id === appointmentId)
+    if (!appt || appt.is_external_busy) return
+    applyMoveToSlot(appt, sessionDate, startTime)
+  }
+
   const gridHandlers = {
     blurNames,
     onSelectAppointment: selectAppointment,
+    onEditAppointment: handleEditAppointment,
+    onDropOnSlot: handleDropOnSlot,
     selectedAppointmentId: selectedAppointment?.id
       || (scheduleDraft?.mode === 'edit' ? scheduleDraft.appointment?.id : undefined),
     hours,
@@ -1201,6 +1308,7 @@ export default function CalendarModule({ persona }) {
           onSelectDate={(d) => { setActiveDate(d); setViewMode('day') }}
           blurNames={blurNames}
           onSelectAppointment={selectAppointment}
+          onEditAppointment={handleEditAppointment}
         />
       )}
       {viewMode === 'week' && (
@@ -1237,11 +1345,6 @@ export default function CalendarModule({ persona }) {
   const showViewOverlay = Boolean(selectedAppointment && !showScheduleOverlay && !showRecurringOverlay)
 
   const closeScheduleOverlay = () => {
-    if (scheduleDraft?.mode === 'edit' && scheduleDraft.appointment) {
-      setSelectedAppointment(scheduleDraft.appointment)
-      setScheduleDraft(null)
-      return
-    }
     closeSidePane()
   }
 
@@ -1253,8 +1356,8 @@ export default function CalendarModule({ persona }) {
       {rescheduleTarget && (
         <div className="calendar-reschedule-banner" role="status">
           <p>
-            Rescheduling <strong>{rescheduleTarget.client_name || rescheduleTarget.service_name || 'session'}</strong>
-            {' — '}click a calendar slot, then fine-tune in the edit panel.
+            Moving <strong>{rescheduleTarget.client_name || rescheduleTarget.service_name || 'session'}</strong>
+            {' — '}click or drop onto a slot, then fine-tune if needed.
           </p>
           <button type="button" className="secondary" onClick={cancelReschedule}>
             Cancel
@@ -1292,6 +1395,8 @@ export default function CalendarModule({ persona }) {
               ownerOptions={ownerOptions}
               showOwnerPicker={showOwnerPicker}
               onOwnerChange={setCalendarOwner}
+              showAdminBlocks={showAdminBlocks}
+              onShowAdminBlocksChange={handleShowAdminBlocksChange}
             />
           </div>
         </div>
@@ -1315,9 +1420,7 @@ export default function CalendarModule({ persona }) {
             onClose={closeSidePane}
             onAttendanceChange={handleAttendanceChange}
             onEdit={handleEditAppointment}
-            onBookAnother={handleBookAnother}
-            onRecurring={handleRecurring}
-            onReschedule={handleReschedule}
+            onMove={handleMove}
             onDelete={handleDeleteAppointment}
           />
         </ErrorBoundary>
@@ -1353,6 +1456,8 @@ export default function CalendarModule({ persona }) {
             presentation="overlay"
             onSave={handleScheduleSave}
             onDelete={handleDeleteAppointment}
+            onBookAnother={handleBookAnother}
+            onScheduleMore={handleRecurring}
             onCancel={closeScheduleOverlay}
             saving={scheduleSaving}
             deleting={scheduleDeleting}
