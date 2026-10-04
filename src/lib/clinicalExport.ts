@@ -1,4 +1,5 @@
 import type { PrintLetterhead } from './letterheadPrint'
+import { fillMergeFields } from './mergeFields'
 import type { WorkplaceBranding } from './workplaceBranding'
 import { formatWorkplaceAddress, getClinicalExportBranding } from './workplaceBranding'
 
@@ -50,6 +51,7 @@ const DOCUMENT_PRINT_STYLES = `
   .clinical-pdf .expr-hl--yellow-soft, .clinical-pdf .expr-hl--neon-lime { background: #f4e7b8; }
   .clinical-pdf .expr-hl--sage-wash { background: #e4eadf; }
   .clinical-pdf .expr-hl--clay-wash, .clinical-pdf .expr-hl--pink-soft, .clinical-pdf .expr-hl--neon-magenta { background: #f3e4dc; }
+  .clinical-pdf .merge-field { background: #e7f3ef; padding: 0 0.15em; border-radius: 0.15em; }
   .clinical-pdf .meta,
   .clinical-pdf .clinical-pdf__body { font-family: 'Karla', system-ui, sans-serif; color: #1a1818; }
   .clinical-pdf .meta { font-size: 0.9rem; margin: 0 0 1.1rem; }
@@ -314,20 +316,30 @@ function noteMetaHtml(note, clientName?: string) {
   </p>`
 }
 
+function withMergeFields(html, mergeContext) {
+  if (!mergeContext) return html || ''
+  return fillMergeFields(html || '', mergeContext, 'document')
+}
+
 export function renderProgressNoteDocument(
   note,
   {
     clientName,
     letterhead,
+    mergeContext,
   }: {
     clientName?: string
     letterhead?: PrintLetterhead
+    mergeContext?: Record<string, string>
   } = {},
 ) {
+  const addendums = mergeContext
+    ? (note.addendums || []).map((item) => ({ ...item, body: withMergeFields(item.body, mergeContext) }))
+    : note.addendums
   return buildClinicalDocumentPrintHtml({
     title: note.title,
     metaHtml: noteMetaHtml(note, clientName),
-    bodyHtml: `${note.content || ''}${addendumSectionHtml(note.addendums)}`,
+    bodyHtml: `${withMergeFields(note.content, mergeContext)}${addendumSectionHtml(addendums)}`,
     letterhead,
   })
 }
@@ -337,9 +349,11 @@ function buildLetterPrintHtml(
   {
     clientName,
     letterhead,
+    mergeContext,
   }: {
     clientName?: string
     letterhead?: PrintLetterhead
+    mergeContext?: Record<string, string>
   } = {},
 ) {
   const letterDate = letter.letter_date || letter.created_at?.split('T')[0] || ''
@@ -353,7 +367,7 @@ function buildLetterPrintHtml(
   return buildClinicalDocumentPrintHtml({
     title: letter.title,
     metaHtml,
-    bodyHtml: letter.content || '',
+    bodyHtml: withMergeFields(letter.content, mergeContext),
     letterhead,
   })
 }
@@ -364,6 +378,7 @@ export async function downloadProgressNotePdf(
   meta: {
     clientName?: string
     letterhead?: PrintLetterhead
+    mergeContext?: Record<string, string>
   } = {},
 ) {
   if (!note) return false
@@ -376,6 +391,7 @@ export async function downloadLetterPdf(
   meta: {
     clientName?: string
     letterhead?: PrintLetterhead
+    mergeContext?: Record<string, string>
   } = {},
 ) {
   if (!letter) return false

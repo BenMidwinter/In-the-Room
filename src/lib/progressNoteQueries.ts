@@ -1,7 +1,5 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
-import {
-  getAvailableProgressNoteTemplates,
-} from './store'
+import { listTemplates } from './supabase/templatesRepo'
 import {
   appendProgressNoteAddendumForUser,
   fetchProgressNote,
@@ -56,11 +54,10 @@ export function useProgressNoteByAppointmentQuery(appointmentId, { enabled = tru
   })
 }
 
-export function useAvailableProgressNoteTemplatesQuery(workplaceId) {
+export function useAvailableProgressNoteTemplatesQuery() {
   return useQuery({
-    queryKey: progressNoteQueryKeys.templates(workplaceId),
-    queryFn: () => getAvailableProgressNoteTemplates(workplaceId),
-    enabled: true,
+    queryKey: ['templates', 'progress_note'],
+    queryFn: () => listTemplates('progress_note'),
     placeholderData: keepPreviousData,
   })
 }

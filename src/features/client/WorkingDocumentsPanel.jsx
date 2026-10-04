@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
 import RichTextEditor from '../../components/RichTextEditor'
-import TemplatePicker, { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
+import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { useClientSession } from '../../lib/useClientSession'
-import { buildMergeContext } from '../../lib/mergeFields'
+import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
+import { useAuth } from '../../lib/auth/AuthProvider'
+import { useTemplatesQuery } from '../../lib/templateQueries'
 import {
   getWorkingDocuments,
   saveWorkingDocument,
-  getAvailableLetterTemplates,
   getProfile,
 } from '../../lib/store'
 import RecordListLayout from '../../components/RecordListLayout'
@@ -47,10 +48,11 @@ export default function WorkingDocumentsPanel() {
     return () => setEditorOpen(false)
   }, [selectedId, setEditorOpen])
 
-  const clinicianProfile = session?.user?.id ? getProfile(session.user.id) : null
-  const documentTemplates = useMemo(
-    () => getAvailableLetterTemplates(client?.workplace_id),
-    [client?.workplace_id],
+  const { profile: accountProfile } = useAuth()
+  const { data: documentTemplates = [] } = useTemplatesQuery('working_document')
+  const clinicianProfile = useMemo(
+    () => clinicianProfileForEditor(accountProfile, session?.user?.id ? getProfile(session.user.id) : null),
+    [accountProfile, session?.user?.id],
   )
 
   const mergeContext = useMemo(
@@ -86,7 +88,10 @@ export default function WorkingDocumentsPanel() {
     setEditorVersion(v => v + 1)
   }
 
-  const applyDocumentTemplate = async (template) => {
+  const applyDocumentTemplate = async (templateId) => {
+    if (!templateId) return
+    const template = documentTemplates.find((item) => item.id === templateId)
+    if (!template) return
     if (hasMeaningfulEditorContent(content)) {
       const ok = await confirm({
         title: 'Replace document content?',
@@ -161,12 +166,19 @@ export default function WorkingDocumentsPanel() {
             placeholder="e.g. Formulation draft"
           />
         </div>
-        <TemplatePicker
-          templates={documentTemplates}
-          onApply={applyDocumentTemplate}
-          label="Document template"
-          emptyLabel="Choose a template…"
-        />
+        <div className="form-group">
+          <label>Template</label>
+          <select
+            className="paper-input"
+            value=""
+            onChange={(event) => applyDocumentTemplate(event.target.value)}
+          >
+            <option value="">Choose a template…</option>
+            {documentTemplates.map((template) => (
+              <option key={template.id} value={template.id}>{template.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
       <RichTextEditor
         key={`${selectedId}-${editorVersion}`}

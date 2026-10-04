@@ -1,6 +1,6 @@
 import { useEditor, EditorContent, useEditorState } from '@tiptap/react'
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
-import { buildEditorExtensions } from '../lib/tiptapExtensions'
+import { buildEditorExtensions, publishMergeContext } from '../lib/tiptapExtensions'
 import { MERGE_FIELD_OPTIONS } from '../lib/mergeFields'
 import { usePrompt } from './ui'
 import {
@@ -553,6 +553,8 @@ function RichTextEditorSurface({
   layout = 'document',
   mode = 'basic',
   mergeContext = null,
+  mergeMode = 'document',
+  compact = false,
   clinicianProfile = null,
   onEditorReady = null,
 }) {
@@ -628,9 +630,7 @@ function RichTextEditorSurface({
     onUpdate: ({ editor: ed }) => onChange?.(ed.getHTML()),
     onCreate: ({ editor: ed }) => {
       if (mode !== 'clinical') return
-      if (ed.storage.mergeContext) {
-        ed.storage.mergeContext.values = mergeContext || {}
-      }
+      publishMergeContext(ed, mergeContext, mergeMode)
       if (ed.storage.clinicianProfile) {
         ed.storage.clinicianProfile.profile = clinicianProfile || {}
       }
@@ -737,13 +737,11 @@ function RichTextEditorSurface({
 
   useEffect(() => {
     if (!editor || editor.isDestroyed || mode !== 'clinical') return
-    if (editor.storage.mergeContext) {
-      editor.storage.mergeContext.values = mergeContext || {}
-    }
+    publishMergeContext(editor, mergeContext, mergeMode)
     if (editor.storage.clinicianProfile) {
       editor.storage.clinicianProfile.profile = clinicianProfile || {}
     }
-  }, [editor, mergeContext, clinicianProfile, mode])
+  }, [editor, mergeContext, mergeMode, clinicianProfile, mode])
 
   useEffect(() => {
     if (!editor || editor.isDestroyed) return
@@ -778,12 +776,14 @@ function RichTextEditorSurface({
         `doc-editor--${variant}`,
         !editable ? 'doc-editor--readonly' : '',
         mode === 'clinical' ? 'doc-editor--clinical' : '',
+        compact ? 'doc-editor--compact' : '',
       ].filter(Boolean).join(' ')
     : [
         EDITOR_ROOT,
         `doc-editor--${variant}`,
         !editable ? 'doc-editor--readonly' : '',
         mode === 'clinical' ? 'doc-editor--clinical' : '',
+        compact ? 'doc-editor--compact' : '',
       ].filter(Boolean).join(' ')
 
   const canvasClass = immersive
@@ -791,8 +791,10 @@ function RichTextEditorSurface({
     : [EDITOR_CANVAS, !editable ? 'bg-page' : ''].filter(Boolean).join(' ')
 
   const pageClass = [
-    EDITOR_PAGE,
-    variant === 'a4' ? 'w-[210mm] max-w-[min(210mm,100%)] min-h-[297mm]' : '',
+    compact
+      ? 'doc-editor__page mx-auto min-h-[16rem] w-full rounded-sm border border-line-light bg-editor-sheet shadow-md'
+      : EDITOR_PAGE,
+    !compact && variant === 'a4' ? 'w-[210mm] max-w-[min(210mm,100%)] min-h-[297mm]' : '',
     !editable ? 'shadow-none' : '',
   ].filter(Boolean).join(' ')
 

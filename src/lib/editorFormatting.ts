@@ -1,3 +1,5 @@
+import { MERGE_FIELD_OPTIONS } from './mergeFields'
+
 /** Faces the editor can apply. Body defaults to Karla; headings default to Fraunces. */
 export const EDITOR_FONTS = [
   { id: 'karla', label: 'Karla', css: "'Karla', system-ui, sans-serif" },
@@ -28,9 +30,18 @@ export const WRITING_VOICES = [
   { id: 'land', label: 'Landing line', hint: 'A phrase in the heading face', className: 'expr-size--land' },
 ]
 
-/** Kept so older notes still resolve a colour. The palette shows a shorter set. */
+/**
+ * Palette colours sit with the somatic language of the practice:
+ * settled breath, grounded green, warmth, open air, pulse.
+ * Older ids stay so saved notes still resolve a colour.
+ */
 export const EDITOR_TEXT_COLORS = [
   { id: 'default', label: 'Default', hex: null, className: '' },
+  { id: 'settled', label: 'Settled', hex: '#2a7a68', className: 'doc-color--settled' },
+  { id: 'grounded', label: 'Grounded', hex: '#3f7a4e', className: 'doc-color--grounded' },
+  { id: 'warmth', label: 'Warmth', hex: '#c4624e', className: 'doc-color--warmth' },
+  { id: 'open', label: 'Open', hex: '#3e6ea5', className: 'doc-color--open' },
+  { id: 'pulse', label: 'Pulse', hex: '#c45b78', className: 'doc-color--pulse' },
   { id: 'charcoal', label: 'Charcoal', hex: '#2d3439', className: 'doc-color--charcoal' },
   { id: 'teal', label: 'Teal', hex: '#3a6f62', className: 'doc-color--teal' },
   { id: 'clay', label: 'Clay', hex: '#8d5340', className: 'doc-color--clay' },
@@ -42,7 +53,7 @@ export const EDITOR_TEXT_COLORS = [
   { id: 'lime', label: 'Lime', hex: '#5a8f00', className: 'doc-color--lime' },
 ]
 
-export const EDITOR_COLOR_CHOICES = ['default', 'charcoal', 'teal', 'clay', 'sage', 'navy']
+export const EDITOR_COLOR_CHOICES = ['default', 'settled', 'grounded', 'warmth', 'open', 'pulse']
 
 export const EDITOR_HIGHLIGHTS = [
   { id: 'none', label: 'None', className: '', isClear: true },
@@ -73,9 +84,15 @@ export const SLASH_COMMANDS = [
   { id: 'table', label: 'Table', hint: 'Three columns', group: 'Insert', action: 'table', clinical: true },
   { id: 'image', label: 'Image', hint: 'A picture in the page', group: 'Insert', action: 'artwork' },
   { id: 'fill', label: 'Fill-in line', hint: 'A blank to complete', group: 'Insert', action: 'fill', clinical: true },
-  { id: 'field-name', label: 'Client name', hint: 'Filled from the record', group: 'Fields', action: 'field', value: 'client_name', clinical: true },
-  { id: 'field-date', label: 'Session date', hint: 'Filled from the appointment', group: 'Fields', action: 'field', value: 'session_date', clinical: true },
-  { id: 'field-clinician', label: 'Clinician name', hint: 'Your name', group: 'Fields', action: 'field', value: 'clinician_name', clinical: true },
+  ...MERGE_FIELD_OPTIONS.map((field) => ({
+    id: `field-${field.key}`,
+    label: field.label,
+    hint: 'Label here, filled in a note or report',
+    group: 'Fields',
+    action: 'field',
+    value: field.key,
+    clinical: true,
+  })),
   { id: 'dapnotes', label: 'DAP notes', hint: 'Data, assessment, plan', group: 'Modules', action: 'insertSnippet', value: 'dapnotes', clinical: true },
   { id: 'consent', label: 'Consent record', hint: 'A consent section', group: 'Modules', action: 'insertSnippet', value: 'consent', clinical: true },
 ]

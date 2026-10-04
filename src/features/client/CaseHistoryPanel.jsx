@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useConfirm, useToast } from '../../components/ui'
 import { useClientSession } from '../../lib/useClientSession'
@@ -14,6 +14,12 @@ import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
 import { useEpisodeReportsQuery, useSaveReportMutation } from '../../lib/reportQueries'
 import { formatSessionDateTime, isClientSessionAppointment } from '../../lib/appointmentUtils'
 import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
+import RichTextEditor from '../../components/RichTextEditor'
+import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
+import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
+import { useAuth } from '../../lib/auth/AuthProvider'
+import { useTemplatesQuery } from '../../lib/templateQueries'
+import { getProfile } from '../../lib/store'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -163,12 +169,20 @@ function EpisodeSection({ title, empty, newLabel }) {
   )
 }
 
-function EpisodeReports({ episode, clientId, userId, organizationId }) {
+function EpisodeReports({ episode, client, clientId, userId, organizationId }) {
   const toast = useToast()
+  const confirm = useConfirm()
+  const { profile: accountProfile } = useAuth()
+  const { data: reportTemplates = [] } = useTemplatesQuery('report')
   const { data: reports = [], isPending } = useEpisodeReportsQuery(episode.id)
   const saveReport = useSaveReportMutation()
   const [draft, setDraft] = useState(null)
   const [edits, setEdits] = useState({})
+  const [editorVersions, setEditorVersions] = useState({})
+  const clinicianProfile = useMemo(
+    () => clinicianProfileForEditor(accountProfile, userId ? getProfile(userId) : null),
+    [accountProfile, userId],
+  )
 
   const rows = draft ? [...reports, draft] : reports
 
@@ -187,6 +201,29 @@ function EpisodeReports({ episode, clientId, userId, organizationId }) {
     setEdits((current) => ({
       ...current,
       [report.id]: { ...base, ...current[report.id], ...patch },
+    }))
+  }
+
+  const applyTemplate = async (report, templateId) => {
+    if (!templateId) return
+    const template = reportTemplates.find((item) => item.id === templateId)
+    if (!template) return
+    const current = valueFor(report).body
+    if (hasMeaningfulEditorContent(current)) {
+      const ok = await confirm({
+        title: 'Replace report content?',
+        message: 'This replaces the current report with the selected template.',
+        confirmLabel: 'Replace',
+      })
+      if (!ok) return
+    }
+    update(report, {
+      body: template.content || '<p></p>',
+      title: valueFor(report).title || template.name,
+    })
+    setEditorVersions((currentVersions) => ({
+      ...currentVersions,
+      [report.id]: (currentVersions[report.id] || 0) + 1,
     }))
   }
 
@@ -264,13 +301,34 @@ function EpisodeReports({ episode, clientId, userId, organizationId }) {
               />
             </label>
             <label className="episode-report__body">
-              <span>Report</span>
-              <textarea
-                rows={5}
-                value={value.body}
-                onChange={(event) => update(report, { body: event.target.value })}
-              />
+              <span>Template</span>
+              <select
+                value=""
+                onChange={(event) => applyTemplate(report, event.target.value)}
+              >
+                <option value="">Choose a template…</option>
+                {reportTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{template.name}</option>
+                ))}
+              </select>
             </label>
+            <div className="episode-report__body episode-report__editor">
+              <span>Report</span>
+              <RichTextEditor
+                key={`${report.id}-${editorVersions[report.id] || 0}`}
+                content={value.body || '<p></p>'}
+                onChange={(html) => update(report, { body: html })}
+                mode="clinical"
+                mergeMode="document"
+                mergeContext={buildMergeContext({
+                  client,
+                  profile: clinicianProfile,
+                  sessionDate: value.report_date,
+                })}
+                clinicianProfile={clinicianProfile}
+                compact
+              />
+            </div>
             <button type="submit" className="primary" disabled={saveReport.isPending}>
               Save report
             </button>
@@ -477,6 +535,7 @@ export default function CaseHistoryPanel() {
                 <EpisodeReports
                   key={`reports-${selected.id}`}
                   episode={selected}
+                  client={client}
                   clientId={clientId}
                   userId={userId}
                   organizationId={client?.workplace_id || null}

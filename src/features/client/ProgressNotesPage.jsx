@@ -7,7 +7,8 @@ import {
 } from '../../components/LayoutComponents'
 import RichTextEditor from '../../components/RichTextEditor'
 import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
-import { buildMergeContext } from '../../lib/mergeFields'
+import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
+import { useAuth } from '../../lib/auth/AuthProvider'
 import { formatDisplayDate, DEMO_TODAY } from '../../lib/dateArchitecture'
 import {
   getAppointment,
@@ -227,7 +228,7 @@ function ProgressNotesPageContent() {
     && (noteFromUrlPlaceholder || noteFromUrlPending)
   const appointmentNotePending = Boolean(appointmentParam && client?.id)
     && (noteFromAppointmentPlaceholder || noteFromAppointmentPending)
-  const { data: noteTemplates = [] } = useAvailableProgressNoteTemplatesQuery(client?.workplace_id)
+  const { data: noteTemplates = [] } = useAvailableProgressNoteTemplatesQuery()
   const saveNoteMutation = useSaveProgressNoteMutation()
   const signOffMutation = useSignOffProgressNoteMutation()
   const addendumMutation = useAppendProgressNoteAddendumMutation()
@@ -303,7 +304,11 @@ function ProgressNotesPageContent() {
     : !linkedAppointment.episode_id
       ? 'Add this appointment to an episode before saving the Process Note.'
       : ''
-  const clinicianProfile = session?.user?.id ? getProfile(session.user.id) : null
+  const { profile: accountProfile } = useAuth()
+  const clinicianProfile = useMemo(
+    () => clinicianProfileForEditor(accountProfile, session?.user?.id ? getProfile(session.user.id) : null),
+    [accountProfile, session?.user?.id],
+  )
 
   const syncAutoSaveBaseline = useCallback((payload) => {
     autoSaveKeyRef.current = JSON.stringify(payload)
@@ -692,6 +697,7 @@ function ProgressNotesPageContent() {
       const opened = await downloadProgressNotePdf(note, {
         clientName: client.real_name,
         letterhead,
+        mergeContext,
       })
       if (!opened) {
         toast.error('Could not create the PDF. Please try again.')
@@ -880,6 +886,8 @@ function ProgressNotesPageContent() {
                 layout="immersive"
                 variant="a4"
                 mode="clinical"
+                mergeContext={mergeContext}
+                clinicianProfile={clinicianProfile}
               />
               <div className="progress-note-addendum__actions">
                 <button type="button" className="secondary" onClick={() => setAddingAddendum(false)}>

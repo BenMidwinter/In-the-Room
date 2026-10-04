@@ -32,19 +32,6 @@ export function FormsSettingsPage() {
   )
 }
 
-export function TemplateKindPage({ kind, title, blurb }) {
-  return (
-    <div className="section-card-stack">
-      <SettingsSectionCard blockId={`settings_templates_${kind}`} title={title}>
-        <p className="text-muted" style={{ marginTop: 0 }}>{blurb}</p>
-        <p className="text-small text-muted" style={{ marginBottom: 0 }}>
-          Templates persist to <code>templates</code> (<code>kind = {kind}</code>). Editor UX ships with the RTE workstream.
-        </p>
-      </SettingsSectionCard>
-    </div>
-  )
-}
-
 export function TwoFactorSettingsPage() {
   return (
     <div className="section-card-stack">

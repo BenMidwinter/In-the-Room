@@ -64,6 +64,32 @@
   margin-top: 0.75rem;
 }
 
+.template-studio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.template-studio__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.template-studio__canvas {
+  display: flex;
+  flex-direction: column;
+  min-height: 40rem;
+}
+
+.template-studio__canvas .doc-editor {
+  flex: 1 1 auto;
+  min-height: 40rem;
+}
+
 .settings-roadmap {
   margin: 0 0 1rem;
   padding-left: 1.15rem;

@@ -670,6 +670,16 @@ a.badge {
   margin-bottom: 0.65rem;
 }
 
+.doc-editor--compact .doc-editor__page {
+  min-height: 16rem;
+}
+
+.doc-editor--compact .doc-editor__prose,
+.doc-editor--compact .ProseMirror {
+  min-height: 12rem;
+  padding: 1.25rem 1.5rem 2rem;
+}
+
 .doc-editor .ProseMirror ul,
 .doc-editor .ProseMirror ol {
   padding-left: 1.5rem;
@@ -1066,7 +1076,8 @@ a.badge {
 }
 
 .episode-report input,
-.episode-report textarea {
+.episode-report textarea,
+.episode-report select {
   font: inherit;
   font-weight: 500;
   letter-spacing: 0;
@@ -1081,6 +1092,21 @@ a.badge {
 .episode-report__body,
 .episode-report button {
   grid-column: 1 / -1;
+}
+
+.episode-report__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-height: 18rem;
+}
+
+.episode-report__editor > span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
 }
 
 .episode-report button {

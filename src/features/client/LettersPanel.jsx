@@ -1,13 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import RichTextEditor from '../../components/RichTextEditor'
 import { useClientSession } from '../../lib/useClientSession'
-import { getLetters, saveLetter } from '../../lib/store'
+import { getLetters, saveLetter, getProfile } from '../../lib/store'
+import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
+import { useAuth } from '../../lib/auth/AuthProvider'
+import { useTemplatesQuery } from '../../lib/templateQueries'
+import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { downloadLetterPdf } from '../../lib/clinicalExport'
 import { loadClinicianPrintIdentity, resolveDownloadLetterhead } from '../../lib/letterheadPrint'
 import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
-import { useChoose, useToast } from '../../components/ui'
+import { useChoose, useConfirm, useToast } from '../../components/ui'
 import { useClientChrome } from './ClientChrome'
 
 function formatDocDate(iso) {
@@ -35,8 +39,25 @@ export default function LettersPanel() {
   const [recipient, setRecipient] = useState('')
   const [letterDate, setLetterDate] = useState(todayISO())
   const [saving, setSaving] = useState(false)
+  const [editorVersion, setEditorVersion] = useState(0)
   const toast = useToast()
+  const confirm = useConfirm()
   const chooseLetterhead = useChoose()
+  const { profile: accountProfile } = useAuth()
+  const { data: letterTemplates = [] } = useTemplatesQuery('letter')
+  const clinicianProfile = useMemo(
+    () => clinicianProfileForEditor(accountProfile, session?.user?.id ? getProfile(session.user.id) : null),
+    [accountProfile, session?.user?.id],
+  )
+  const mergeContext = useMemo(
+    () => buildMergeContext({
+      client,
+      appointment: null,
+      profile: clinicianProfile,
+      sessionDate: letterDate,
+    }),
+    [client, clinicianProfile, letterDate],
+  )
   const setEditorOpen = useClientChrome()?.setEditorOpen
 
   useEffect(() => {
@@ -60,6 +81,23 @@ export default function LettersPanel() {
     setContent(letter.content)
     setRecipient(letter.recipient || '')
     setLetterDate(letter.letter_date || todayISO())
+  }
+
+  const applyLetterTemplate = async (templateId) => {
+    if (!templateId) return
+    const template = letterTemplates.find((item) => item.id === templateId)
+    if (!template) return
+    if (hasMeaningfulEditorContent(content)) {
+      const ok = await confirm({
+        title: 'Replace letter content?',
+        message: 'This replaces the current letter with the selected template.',
+        confirmLabel: 'Replace',
+      })
+      if (!ok) return
+    }
+    setContent(template.content || '<p></p>')
+    if (!title.trim() || title === 'Untitled letter') setTitle(template.name)
+    setEditorVersion((value) => value + 1)
   }
 
   const handleNew = () => {
@@ -113,6 +151,7 @@ export default function LettersPanel() {
         {
           clientName: client?.real_name,
           letterhead,
+          mergeContext,
         },
       )
       if (!opened) {
@@ -181,9 +220,29 @@ export default function LettersPanel() {
               onChange={e => setLetterDate(e.target.value)}
             />
           </div>
+          <div className="form-group">
+            <label>Template</label>
+            <select
+              className="paper-input"
+              value=""
+              onChange={(event) => applyLetterTemplate(event.target.value)}
+            >
+              <option value="">Choose a template…</option>
+              {letterTemplates.map((template) => (
+                <option key={template.id} value={template.id}>{template.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
-      <RichTextEditor key={selectedId} content={content} onChange={setContent} />
+      <RichTextEditor
+        key={`${selectedId}-${editorVersion}`}
+        content={content}
+        onChange={setContent}
+        mode="clinical"
+        mergeContext={mergeContext}
+        clinicianProfile={clinicianProfile}
+      />
     </div>
   )
 
