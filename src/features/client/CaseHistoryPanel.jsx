@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useConfirm, useToast } from '../../components/ui'
 import { useClientSession } from '../../lib/useClientSession'
@@ -20,6 +20,8 @@ import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFie
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { useTemplatesQuery } from '../../lib/templateQueries'
 import { getProfile } from '../../lib/store'
+import { useClientChrome } from './ClientChrome'
+import DocumentWorkspace from './DocumentWorkspace'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -176,40 +178,44 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId }) {
   const { data: reportTemplates = [] } = useTemplatesQuery('report')
   const { data: reports = [], isPending } = useEpisodeReportsQuery(episode.id)
   const saveReport = useSaveReportMutation()
-  const [draft, setDraft] = useState(null)
-  const [edits, setEdits] = useState({})
-  const [editorVersions, setEditorVersions] = useState({})
+  const [openId, setOpenId] = useState(null)
+  const [title, setTitle] = useState('')
+  const [body, setBody] = useState('<p></p>')
+  const [reportDate, setReportDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [editorVersion, setEditorVersion] = useState(0)
+  const setEditorOpen = useClientChrome()?.setEditorOpen
   const clinicianProfile = useMemo(
     () => clinicianProfileForEditor(accountProfile, userId ? getProfile(userId) : null),
     [accountProfile, userId],
   )
 
-  const rows = draft ? [...reports, draft] : reports
+  useEffect(() => {
+    setEditorOpen?.(openId != null)
+    return () => setEditorOpen?.(false)
+  }, [openId, setEditorOpen])
 
-  const valueFor = (report) => edits[report.id] || {
-    title: report.title || '',
-    body: report.body || '',
-    report_date: report.report_date || new Date().toISOString().slice(0, 10),
+  const openReport = (report) => {
+    setOpenId(report.id)
+    setTitle(report.title || '')
+    setBody(report.body || '<p></p>')
+    setReportDate(String(report.report_date || new Date().toISOString()).slice(0, 10))
+    setEditorVersion((value) => value + 1)
   }
 
-  const update = (report, patch) => {
-    const base = edits[report.id] || {
-      title: report.title || '',
-      body: report.body || '',
-      report_date: report.report_date || new Date().toISOString().slice(0, 10),
-    }
-    setEdits((current) => ({
-      ...current,
-      [report.id]: { ...base, ...current[report.id], ...patch },
-    }))
+  const startReport = () => {
+    const today = new Date().toISOString().slice(0, 10)
+    setOpenId('new')
+    setTitle('')
+    setBody('<p></p>')
+    setReportDate(today)
+    setEditorVersion((value) => value + 1)
   }
 
-  const applyTemplate = async (report, templateId) => {
+  const applyTemplate = async (templateId) => {
     if (!templateId) return
     const template = reportTemplates.find((item) => item.id === templateId)
     if (!template) return
-    const current = valueFor(report).body
-    if (hasMeaningfulEditorContent(current)) {
+    if (hasMeaningfulEditorContent(body)) {
       const ok = await confirm({
         title: 'Replace report content?',
         message: 'This replaces the current report with the selected template.',
@@ -217,94 +223,73 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId }) {
       })
       if (!ok) return
     }
-    update(report, {
-      body: template.content || '<p></p>',
-      title: valueFor(report).title || template.name,
-    })
-    setEditorVersions((currentVersions) => ({
-      ...currentVersions,
-      [report.id]: (currentVersions[report.id] || 0) + 1,
-    }))
+    setBody(template.content || '<p></p>')
+    setTitle((current) => current.trim() || template.name)
+    setEditorVersion((value) => value + 1)
   }
 
-  const save = async (report) => {
-    const value = valueFor(report)
+  const save = async () => {
     try {
       const saved = await saveReport.mutateAsync({
-        id: String(report.id).startsWith('draft-') ? null : report.id,
+        id: openId === 'new' ? null : openId,
         clientId,
         episodeId: episode.id,
         userId,
         organizationId,
-        title: value.title,
-        body: value.body,
-        reportDate: value.report_date,
+        title,
+        body,
+        reportDate,
       })
-      setEdits((current) => {
-        const next = { ...current }
-        delete next[report.id]
-        return next
-      })
-      if (String(report.id).startsWith('draft-')) setDraft(null)
+      setOpenId(saved.id)
+      setTitle(saved.title || title)
       toast.saved(saved.title ? `Saved ${saved.title}` : 'Report saved')
     } catch (err) {
       toast.error(err?.message || 'Could not save the report')
     }
   }
 
-  return (
-    <div className="episode-detail__section">
-      <div className="episode-detail__reports-header">
-        <h4>Reports</h4>
-        <button
-          type="button"
-          className="secondary"
-          onClick={() => setDraft({
-            id: `draft-${crypto.randomUUID()}`,
-            title: '',
-            body: '',
-            report_date: new Date().toISOString().slice(0, 10),
-          })}
-          disabled={Boolean(draft)}
-        >
-          Add
-        </button>
-      </div>
-      {isPending && <p className="text-small text-muted">Loading reports…</p>}
-      {!isPending && rows.length === 0 && (
-        <p className="text-small text-muted">No reports on this course yet.</p>
-      )}
-      {rows.map((report) => {
-        const value = valueFor(report)
-        return (
-          <form
-            key={report.id}
-            className="episode-report"
-            onSubmit={(event) => {
-              event.preventDefault()
-              save(report)
-            }}
-          >
-            <label>
-              <span>Title</span>
+  const mergeContext = buildMergeContext({
+    client,
+    profile: clinicianProfile,
+    sessionDate: reportDate,
+  })
+
+  if (openId) {
+    return (
+      <DocumentWorkspace
+        title={title.trim() || 'Report'}
+        clientName={client?.real_name}
+        onBack={() => setOpenId(null)}
+        actions={(
+          <button type="button" className="primary" onClick={save} disabled={saveReport.isPending}>
+            {saveReport.isPending ? 'Saving…' : 'Save report'}
+          </button>
+        )}
+        meta={(
+          <>
+            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--title">
+              <span className="progress-notes-page__meta-label">Title</span>
               <input
-                value={value.title}
-                onChange={(event) => update(report, { title: event.target.value })}
+                className="progress-notes-page__meta-input"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
               />
             </label>
-            <label>
-              <span>Date</span>
+            <label className="progress-notes-page__meta-field">
+              <span className="progress-notes-page__meta-label">Date</span>
               <input
                 type="date"
-                value={String(value.report_date || '').slice(0, 10)}
-                onChange={(event) => update(report, { report_date: event.target.value })}
+                className="progress-notes-page__meta-input"
+                value={reportDate}
+                onChange={(event) => setReportDate(event.target.value)}
               />
             </label>
-            <label className="episode-report__body">
-              <span>Template</span>
+            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+              <span className="progress-notes-page__meta-label">Template</span>
               <select
+                className="progress-notes-page__meta-input"
                 value=""
-                onChange={(event) => applyTemplate(report, event.target.value)}
+                onChange={(event) => applyTemplate(event.target.value)}
               >
                 <option value="">Choose a template…</option>
                 {reportTemplates.map((template) => (
@@ -312,29 +297,48 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId }) {
                 ))}
               </select>
             </label>
-            <div className="episode-report__body episode-report__editor">
-              <span>Report</span>
-              <RichTextEditor
-                key={`${report.id}-${editorVersions[report.id] || 0}`}
-                content={value.body || '<p></p>'}
-                onChange={(html) => update(report, { body: html })}
-                mode="clinical"
-                mergeMode="document"
-                mergeContext={buildMergeContext({
-                  client,
-                  profile: clinicianProfile,
-                  sessionDate: value.report_date,
-                })}
-                clinicianProfile={clinicianProfile}
-                compact
-              />
-            </div>
-            <button type="submit" className="primary" disabled={saveReport.isPending}>
-              Save report
-            </button>
-          </form>
-        )
-      })}
+          </>
+        )}
+      >
+        <RichTextEditor
+          key={`${openId}-${editorVersion}`}
+          content={body}
+          onChange={setBody}
+          layout="immersive"
+          variant="a4"
+          mode="clinical"
+          mergeMode="document"
+          mergeContext={mergeContext}
+          clinicianProfile={clinicianProfile}
+        />
+      </DocumentWorkspace>
+    )
+  }
+
+  return (
+    <div className="episode-detail__section">
+      <div className="episode-detail__reports-header">
+        <h4>Reports</h4>
+        <button type="button" className="secondary" onClick={startReport}>
+          Add
+        </button>
+      </div>
+      {isPending && <p className="text-small text-muted">Loading reports…</p>}
+      {!isPending && reports.length === 0 && (
+        <p className="text-small text-muted">No reports on this course yet.</p>
+      )}
+      {reports.length > 0 && (
+        <ul className="episode-report-list">
+          {reports.map((report) => (
+            <li key={report.id}>
+              <button type="button" onClick={() => openReport(report)}>
+                <span>{report.title || 'Untitled report'}</span>
+                <span>{formatDate(report.report_date)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

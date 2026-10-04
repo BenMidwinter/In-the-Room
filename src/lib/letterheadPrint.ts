@@ -24,6 +24,11 @@ export function addressLinesFromLetterhead(row: Partial<LetterheadRow> | null | 
   ].map((line) => String(line || '').trim()).filter(Boolean)
 }
 
+export function preferredLetterhead<T extends { is_default?: boolean }>(rows: T[]): T | null {
+  if (!rows?.length) return null
+  return rows.find((row) => row.is_default) || rows[0]
+}
+
 export function printLetterheadFromRow(
   row: Partial<LetterheadRow> | null | undefined,
   identity: ClinicianPrintIdentity,

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import RichTextEditor from '../../components/RichTextEditor'
 import { useClientSession } from '../../lib/useClientSession'
 import { getLetters, saveLetter, getProfile } from '../../lib/store'
@@ -7,12 +8,14 @@ import { useAuth } from '../../lib/auth/AuthProvider'
 import { useTemplatesQuery } from '../../lib/templateQueries'
 import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { downloadLetterPdf } from '../../lib/clinicalExport'
-import { loadClinicianPrintIdentity, resolveDownloadLetterhead } from '../../lib/letterheadPrint'
+import { preferredLetterhead, printLetterheadFromRow } from '../../lib/letterheadPrint'
 import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
-import { useChoose, useConfirm, useToast } from '../../components/ui'
+import { useConfirm, useToast } from '../../components/ui'
 import { useClientChrome } from './ClientChrome'
+import DocumentWorkspace from './DocumentWorkspace'
+import LetterheadPreview from './LetterheadPreview'
 
 function formatDocDate(iso) {
   if (!iso) return '—'
@@ -42,8 +45,12 @@ export default function LettersPanel() {
   const [editorVersion, setEditorVersion] = useState(0)
   const toast = useToast()
   const confirm = useConfirm()
-  const chooseLetterhead = useChoose()
   const { profile: accountProfile } = useAuth()
+  const { data: letterheads = [] } = useQuery({
+    queryKey: ['letterheads'],
+    queryFn: listLetterheads,
+  })
+  const [letterheadId, setLetterheadId] = useState(null)
   const { data: letterTemplates = [] } = useTemplatesQuery('letter')
   const clinicianProfile = useMemo(
     () => clinicianProfileForEditor(accountProfile, session?.user?.id ? getProfile(session.user.id) : null),
@@ -57,6 +64,14 @@ export default function LettersPanel() {
       sessionDate: letterDate,
     }),
     [client, clinicianProfile, letterDate],
+  )
+  const letterheadRow = letterheads.find((row) => row.id === letterheadId) || preferredLetterhead(letterheads)
+  const printLetterhead = useMemo(
+    () => printLetterheadFromRow(letterheadRow, {
+      clinicianName: clinicianProfile.full_name || '',
+      professionalTitle: clinicianProfile.professional_title || '',
+    }),
+    [letterheadRow, clinicianProfile],
   )
   const setEditorOpen = useClientChrome()?.setEditorOpen
 
@@ -128,9 +143,8 @@ export default function LettersPanel() {
         letter_date: letterDate,
       }, session.user.id)
       refresh()
-      setSelectedId(null)
-      setTitle('')
-      setContent('<p></p>')
+      setSelectedId(saved.id)
+      toast.saved()
     } finally {
       setSaving(false)
     }
@@ -138,9 +152,7 @@ export default function LettersPanel() {
 
   const handleDownload = async () => {
     try {
-      const identity = await loadClinicianPrintIdentity(session?.user?.id)
-      const letterhead = await resolveDownloadLetterhead(await listLetterheads(), chooseLetterhead, identity)
-      if (!letterhead) return
+      const letterhead = printLetterhead
       const opened = await downloadLetterPdf(
         {
           title: title.trim() || 'Untitled letter',
@@ -187,80 +199,102 @@ export default function LettersPanel() {
   }))
 
   const editing = selectedId != null
-  const editorTitle = selectedId === 'new' ? 'New letter' : title || 'Edit letter'
+  const editorTitle = selectedId === 'new' ? 'New letter' : title || 'Letter'
 
-  const editor = (
-    <div className="record-editor split-layout__main split-layout__main--doc">
-      <div className="doc-meta-fields">
-        <div className="form-group doc-meta-fields__title">
-          <label>Title</label>
-          <input
-            className="paper-input doc-meta-fields__title-input"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. Letter to GP"
-          />
-        </div>
-        <div className="doc-meta-fields__extras">
-          <div className="form-group">
-            <label>Recipient</label>
-            <input
-              className="paper-input"
-              value={recipient}
-              onChange={e => setRecipient(e.target.value)}
-              placeholder="e.g. Dr Smith, Oak Medical Centre"
-            />
-          </div>
-          <div className="form-group">
-            <label>Letter date</label>
-            <input
-              type="date"
-              className="paper-input"
-              value={letterDate}
-              onChange={e => setLetterDate(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label>Template</label>
-            <select
-              className="paper-input"
-              value=""
-              onChange={(event) => applyLetterTemplate(event.target.value)}
-            >
-              <option value="">Choose a template…</option>
-              {letterTemplates.map((template) => (
-                <option key={template.id} value={template.id}>{template.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
-      <RichTextEditor
-        key={`${selectedId}-${editorVersion}`}
-        content={content}
-        onChange={setContent}
-        mode="clinical"
-        mergeContext={mergeContext}
-        clinicianProfile={clinicianProfile}
-      />
-    </div>
-  )
+  if (editing) {
+    return (
+      <DocumentWorkspace
+        letter
+        title={editorTitle}
+        clientName={client?.real_name}
+        onBack={handleCancel}
+        actions={(
+          <>
+            <button type="button" className="secondary" onClick={handleDownload}>Download</button>
+            <button type="button" className="primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save letter'}
+            </button>
+          </>
+        )}
+        meta={(
+          <>
+            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--title">
+              <span className="progress-notes-page__meta-label">Title</span>
+              <input
+                className="progress-notes-page__meta-input"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </label>
+            <label className="progress-notes-page__meta-field">
+              <span className="progress-notes-page__meta-label">Recipient</span>
+              <input
+                className="progress-notes-page__meta-input"
+                value={recipient}
+                onChange={(event) => setRecipient(event.target.value)}
+                placeholder="e.g. Dr Smith"
+              />
+            </label>
+            <label className="progress-notes-page__meta-field">
+              <span className="progress-notes-page__meta-label">Letter date</span>
+              <input
+                type="date"
+                className="progress-notes-page__meta-input"
+                value={letterDate}
+                onChange={(event) => setLetterDate(event.target.value)}
+              />
+            </label>
+            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+              <span className="progress-notes-page__meta-label">Template</span>
+              <select
+                className="progress-notes-page__meta-input"
+                value=""
+                onChange={(event) => applyLetterTemplate(event.target.value)}
+              >
+                <option value="">Choose a template…</option>
+                {letterTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{template.name}</option>
+                ))}
+              </select>
+            </label>
+            {letterheads.length > 1 && (
+              <label className="progress-notes-page__meta-field">
+                <span className="progress-notes-page__meta-label">Letterhead</span>
+                <select
+                  className="progress-notes-page__meta-input"
+                  value={letterheadRow?.id || ''}
+                  onChange={(event) => setLetterheadId(event.target.value)}
+                >
+                  {letterheads.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {row.practice_name || row.name || 'Letterhead'}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </>
+        )}
+      >
+        <RichTextEditor
+          key={`${selectedId}-${editorVersion}`}
+          content={content}
+          onChange={setContent}
+          variant="a4"
+          mode="clinical"
+          mergeContext={mergeContext}
+          clinicianProfile={clinicianProfile}
+          pageHeader={<LetterheadPreview letterhead={printLetterhead} />}
+        />
+      </DocumentWorkspace>
+    )
+  }
 
   return (
     <RecordListLayout
-      title={editing ? editorTitle : 'Letters'}
-      newLabel={editing ? undefined : 'letter'}
-      onNew={editing ? undefined : handleNew}
-      headerActions={editing ? (
-        <>
-          <button type="button" className="secondary" onClick={handleCancel}>Back</button>
-          <button type="button" className="secondary" onClick={handleDownload}>Download</button>
-          <button type="button" className="primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save letter'}
-          </button>
-        </>
-      ) : undefined}
-      editor={editing ? editor : undefined}
+      title="Letters"
+      newLabel="letter"
+      onNew={handleNew}
     >
       {!editing && (
         <RecordTable

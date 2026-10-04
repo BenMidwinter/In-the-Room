@@ -14,6 +14,7 @@ import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import { useToast, useConfirm } from '../../components/ui'
 import { useClientChrome } from './ClientChrome'
+import DocumentWorkspace from './DocumentWorkspace'
 
 function formatDocDate(iso) {
   if (!iso) return '—'
@@ -118,16 +119,15 @@ export default function WorkingDocumentsPanel() {
     }
     setSaving(true)
     try {
-      saveWorkingDocument({
+      const saved = saveWorkingDocument({
         id: selectedId === 'new' ? undefined : selectedId,
         client_id: clientId,
         title: title.trim(),
         content,
       }, session.user.id)
       refresh()
-      setSelectedId(null)
-      setTitle('')
-      setContent('<p></p>')
+      setSelectedId(saved.id)
+      toast.saved()
     } finally {
       setSaving(false)
     }
@@ -152,60 +152,64 @@ export default function WorkingDocumentsPanel() {
   }))
 
   const editing = selectedId != null
-  const editorTitle = selectedId === 'new' ? 'New working document' : title || 'Edit document'
+  const editorTitle = selectedId === 'new' ? 'New working document' : title || 'Working document'
 
-  const editor = (
-    <div className="record-editor split-layout__main split-layout__main--doc">
-      <div className="doc-meta-fields">
-        <div className="form-group doc-meta-fields__title">
-          <label>Document title</label>
-          <input
-            className="paper-input doc-meta-fields__title-input"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="e.g. Formulation draft"
-          />
-        </div>
-        <div className="form-group">
-          <label>Template</label>
-          <select
-            className="paper-input"
-            value=""
-            onChange={(event) => applyDocumentTemplate(event.target.value)}
-          >
-            <option value="">Choose a template…</option>
-            {documentTemplates.map((template) => (
-              <option key={template.id} value={template.id}>{template.name}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <RichTextEditor
-        key={`${selectedId}-${editorVersion}`}
-        content={content}
-        onChange={setContent}
-        variant="a4"
-        mode="clinical"
-        mergeContext={mergeContext}
-        clinicianProfile={clinicianProfile}
-      />
-    </div>
-  )
-
-  return (
-    <RecordListLayout
-      title={editing ? editorTitle : 'Working documents'}
-      newLabel={editing ? undefined : 'working document'}
-      onNew={editing ? undefined : handleNew}
-      headerActions={editing ? (
-        <>
-          <button type="button" className="secondary" onClick={handleCancel}>Back</button>
+  if (editing) {
+    return (
+      <DocumentWorkspace
+        title={editorTitle}
+        clientName={client?.real_name}
+        onBack={handleCancel}
+        actions={(
           <button type="button" className="primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save document'}
           </button>
-        </>
-      ) : undefined}
-      editor={editing ? editor : undefined}
+        )}
+        meta={(
+          <>
+            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--title">
+              <span className="progress-notes-page__meta-label">Title</span>
+              <input
+                className="progress-notes-page__meta-input"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+              />
+            </label>
+            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+              <span className="progress-notes-page__meta-label">Template</span>
+              <select
+                className="progress-notes-page__meta-input"
+                value=""
+                onChange={(event) => applyDocumentTemplate(event.target.value)}
+              >
+                <option value="">Choose a template…</option>
+                {documentTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>{template.name}</option>
+                ))}
+              </select>
+            </label>
+          </>
+        )}
+      >
+        <RichTextEditor
+          key={`${selectedId}-${editorVersion}`}
+          content={content}
+          onChange={setContent}
+          layout="immersive"
+          variant="a4"
+          mode="clinical"
+          mergeContext={mergeContext}
+          clinicianProfile={clinicianProfile}
+        />
+      </DocumentWorkspace>
+    )
+  }
+
+  return (
+    <RecordListLayout
+      title="Working documents"
+      newLabel="working document"
+      onNew={handleNew}
     >
       {!editing && (
         <RecordTable

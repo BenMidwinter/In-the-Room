@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { addressLinesFromLetterhead, resolveDownloadLetterhead } from './letterheadPrint'
+import { addressLinesFromLetterhead, preferredLetterhead, resolveDownloadLetterhead } from './letterheadPrint'
 
 const identity = { clinicianName: 'Ada North', professionalTitle: 'Clinical Psychologist' }
 
@@ -66,6 +66,16 @@ describe('letterhead print', () => {
       defaultValue: 'a',
       confirmLabel: 'Download',
     }))
+  })
+
+  it('uses the default letterhead for the page preview', () => {
+    const rows = [
+      row({ id: 'a', name: 'North Practice', is_default: false }),
+      row({ id: 'b', name: 'School clinic', is_default: true }),
+    ]
+    expect(preferredLetterhead(rows)?.id).toBe('b')
+    expect(preferredLetterhead([])).toBeNull()
+    expect(preferredLetterhead([row({ id: 'only', is_default: false })])?.id).toBe('only')
   })
 
   it('prints the letterhead that was chosen', async () => {

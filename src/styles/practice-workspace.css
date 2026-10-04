@@ -1235,3 +1235,159 @@ select.progress-notes-page__meta-input {
   margin-bottom: 0.85em;
 }
 
+/* Reports, letters, and working documents open into this full writing space. */
+.main-content:has(.clinical-doc-overlay) {
+  position: relative;
+}
+
+.clinical-doc-overlay {
+  position: absolute;
+  z-index: 30;
+  top: var(--nav-height);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.clinical-doc-overlay .progress-notes-page__header {
+  position: sticky;
+  top: 0;
+}
+
+.clinical-doc-overlay .room-workspace,
+.clinical-doc-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  background: var(--bg-surface);
+}
+
+.clinical-doc-page .doc-editor--immersive {
+  border: none;
+  border-radius: 0;
+  background: var(--bg-surface);
+}
+
+.clinical-doc-page .doc-editor--immersive .doc-editor__toolbar {
+  width: 100%;
+  padding: 0.5rem var(--space-inline);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+  background: var(--editor-chrome-bg);
+}
+
+.clinical-doc-page .doc-editor--immersive .doc-editor__canvas {
+  padding: 0;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  background: var(--editor-sheet-bg);
+}
+
+.clinical-doc-page .doc-editor--immersive .doc-editor__write {
+  max-width: none;
+  width: 100%;
+  padding: 1.75rem var(--space-inline) 3rem;
+}
+
+.clinical-doc-page .doc-editor--immersive .doc-editor__prose,
+.clinical-doc-page .doc-editor--immersive .ProseMirror {
+  min-height: calc(100vh - var(--nav-height) - 11rem);
+  padding: 0;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--editor-prose-color);
+  background: transparent;
+}
+
+.clinical-doc-page--letter .doc-editor {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  min-height: 0;
+}
+
+.clinical-doc-page--letter .doc-editor__toolbar {
+  padding: 0.45rem var(--space-inline);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.clinical-doc-page--letter .doc-editor__canvas {
+  background: color-mix(in srgb, var(--border-light) 65%, var(--bg-page));
+  padding: 1.5rem 1rem 2.5rem;
+}
+
+.clinical-doc-page--letter .doc-editor__page {
+  width: 210mm;
+  max-width: min(210mm, 100%);
+  min-height: 297mm;
+}
+
+.doc-editor__page--headed .doc-editor__prose,
+.doc-editor__page--headed .ProseMirror {
+  padding-top: 0.85rem;
+}
+
+.letterhead-preview {
+  padding: 16mm 22mm 0;
+}
+
+.letterhead-preview__brand {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+
+.letterhead-preview__identity {
+  text-align: left;
+}
+
+.letterhead-preview__logo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin: 0 0 0.4rem;
+}
+
+.letterhead-preview__clinician,
+.letterhead-preview__role,
+.letterhead-preview__line {
+  font-family: var(--font-body);
+  font-size: 11pt;
+  line-height: 1.35;
+}
+
+.letterhead-preview__role,
+.letterhead-preview__line {
+  color: var(--txt-muted);
+}
+
+.letterhead-preview__practice {
+  text-align: right;
+}
+
+.letterhead-preview__name {
+  font-family: var(--font-head);
+  font-variation-settings: var(--font-head-variation);
+  font-weight: 600;
+  font-size: 1.6rem;
+  line-height: 1.15;
+  color: var(--col-accent);
+  margin: 0 0 0.3rem;
+}
+
+.letterhead-preview__rule {
+  border: 0;
+  border-top: 1px solid var(--col-accent);
+  margin: 0.7rem 0 0;
+}
+
