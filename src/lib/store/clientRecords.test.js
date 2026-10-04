@@ -1,10 +1,20 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   resetStore,
+  upsertClient,
+  saveProgressNote,
   getClientTimeline,
   updateClientClinicalProfile,
   updateClientClinicalDetails,
 } from '../store'
+
+function seedClient() {
+  return upsertClient({
+    first_name: 'Ada',
+    surname: 'Client',
+    dob: '2012-01-01',
+  }, 'user-1')
+}
 
 beforeEach(() => {
   resetStore()
@@ -12,7 +22,14 @@ beforeEach(() => {
 
 describe('getClientTimeline', () => {
   it('merges timeline events, progress notes, and working documents', () => {
-    const events = getClientTimeline('client-1')
+    const client = seedClient()
+    saveProgressNote({
+      client_id: client.id,
+      title: 'Session note',
+      content: '<p>Held the room quietly.</p>',
+      session_date: '2026-10-01',
+    }, 'user-1')
+    const events = getClientTimeline(client.id)
     expect(events.length).toBeGreaterThan(0)
     const types = new Set(events.map(e => e.type))
     expect(types.has('note') || types.has('document') || types.has('event')).toBe(true)
@@ -22,7 +39,14 @@ describe('getClientTimeline', () => {
   })
 
   it('strips HTML from note summaries', () => {
-    const events = getClientTimeline('client-1')
+    const client = seedClient()
+    saveProgressNote({
+      client_id: client.id,
+      title: 'Session note',
+      content: '<p>Held the room quietly.</p>',
+      session_date: '2026-10-01',
+    }, 'user-1')
+    const events = getClientTimeline(client.id)
     const noteEvent = events.find(e => e.type === 'note')
     if (noteEvent?.summary) {
       expect(noteEvent.summary).not.toMatch(/<[^>]+>/)
@@ -65,10 +89,11 @@ describe('getClientTimeline', () => {
 
 describe('updateClientClinicalProfile', () => {
   it('deep-merges profile fields without dropping existing keys', () => {
-    updateClientClinicalProfile('client-1', {
+    const client = seedClient()
+    updateClientClinicalProfile(client.id, {
       recurring_themes: 'water, journey',
     })
-    const updated = updateClientClinicalProfile('client-1', {
+    const updated = updateClientClinicalProfile(client.id, {
       clinical_goals: 'regulation',
     })
     expect(updated.clinical_profile?.recurring_themes).toContain('water')
@@ -84,7 +109,8 @@ describe('updateClientClinicalProfile', () => {
 
 describe('updateClientClinicalDetails', () => {
   it('updates diagnosis and medication fields', () => {
-    const updated = updateClientClinicalDetails('client-1', {
+    const client = seedClient()
+    const updated = updateClientClinicalDetails(client.id, {
       diagnosis: 'Updated diagnosis',
       medication: 'None',
     })

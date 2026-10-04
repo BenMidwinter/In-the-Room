@@ -12,7 +12,7 @@ export default function AccountSettingsPage() {
   }
 
   return (
-    <div className="role-block-stack">
+    <div className="section-card-stack">
       <ProfileIdentityBlock session={session} onSaved={refreshClients} />
       <ProfileLetterheadBlock />
     </div>

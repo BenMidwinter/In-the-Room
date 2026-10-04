@@ -5,17 +5,13 @@ import { canAccessClient, filterClientsForUser, type Client } from '../permissio
 import { sortLatestFirst } from '../dateArchitecture'
 import { parseOrThrow, clientInputSchema, clientClinicalDetailsSchema, clinicalProfileInputSchema } from '../schemas'
 
-export function getOrganisationClients() {
-  return [...db.clients]
-}
-
 export function getClientsForUser(userId, myWorkplace) {
   return filterClientsForUser(db.clients as Client[], userId, myWorkplace)
 }
 
-export function getClientById(clientId, userId, myWorkplace) {
+export function getClientById(clientId, userId, _myWorkplace = null) {
   const client = db.clients.find(c => c.id === clientId)
-  return canAccessClient(client as Client | null, userId, myWorkplace) ? client : null
+  return canAccessClient(client as Client | null, userId) ? client : null
 }
 
 export function upsertClient(payload, userId) {

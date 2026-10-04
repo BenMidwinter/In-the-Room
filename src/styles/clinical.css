@@ -46,8 +46,7 @@
   padding: 1.25rem 1.5rem;
 }
 
-.page--client,
-.page--service-lead {
+.page--client {
   padding: 0;
   display: flex;
   flex-direction: column;

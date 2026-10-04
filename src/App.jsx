@@ -47,7 +47,6 @@ export default function App() {
       <Route path="/profile" element={<Navigate to="/settings/account" replace />} />
       <Route path="/profile/*" element={<Navigate to="/settings/account" replace />} />
       <Route path="/workplace" element={<Navigate to="/home" replace />} />
-      <Route path="/service-lead/*" element={<Navigate to="/home" replace />} />
 
       <Route element={<AppLayout />}>
         <Route path="home" element={<Home />} />

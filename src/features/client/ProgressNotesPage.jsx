@@ -10,7 +10,6 @@ import RichTextEditor from '../../components/RichTextEditor'
 import TemplatePicker, { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import ClinicalInsightsSidebar from './ClinicalInsightsSidebar'
 import ArtworkAttachmentZone from './ArtworkAttachmentZone'
-import { usePermissions } from '../../lib/usePermissions'
 import { buildMergeContext } from '../../lib/mergeFields'
 import { MODALITY_OPTIONS } from '../../lib/intakeForm'
 import { formatDisplayDate, DEMO_TODAY } from '../../lib/dateArchitecture'
@@ -178,7 +177,6 @@ function ProgressNotesPageContent() {
   const noteParam = searchParams.get('note')
   const navigate = useNavigate()
   const { client, session, refreshClients } = useClientSession()
-  const perms = usePermissions(client)
   const toast = useToast()
   const confirm = useConfirm()
 
@@ -572,26 +570,6 @@ function ProgressNotesPageContent() {
 
   if (!prefillReady) return null
 
-  if (!perms.canWriteProgressNotes) {
-    return (
-      <div className="progress-notes-page">
-        <header className="progress-notes-page__header">
-          <div className="progress-notes-page__header-main">
-            <button type="button" className="secondary" onClick={() => navigate(`/clients/${client?.id}`)}>
-              ← Back to client
-            </button>
-            <h1>Progress notes</h1>
-          </div>
-        </header>
-        <div className="progress-notes-page__body progress-notes-page__body--centered">
-          <div className="permission-notice">
-            <p><strong>{perms.roleLabel}s cannot write progress notes.</strong></p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <WorkspaceLayout className="progress-notes-page">
       <StickyContextBar
@@ -730,7 +708,7 @@ function ProgressNotesPageContent() {
 
       <SplitWorkspace
         paneOpen
-        className="progress-notes-page__workspace split-layout split-layout--note ck-split ck-split--pane-open"
+        className="progress-notes-page__workspace split-layout split-layout--note room-split room-split--pane-open"
         main={(
           <main className="split-layout__main progress-notes-page__editor">
             <div className="progress-notes-page__artwork-strip">

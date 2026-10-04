@@ -36,26 +36,26 @@ export default function FinancePage() {
         toolbar={<span className="finance-page__xero-pill">Xero sync soon</span>}
       />
 
-      <div className="role-block__stat-row finance-page__stats">
-        <div className="role-block__stat">
-          <span className="role-block__stat-value">{data.summary.hoursSubmitted}h</span>
-          <span className="role-block__stat-label">Hours submitted</span>
+      <div className="section-card__stat-row finance-page__stats">
+        <div className="section-card__stat">
+          <span className="section-card__stat-value">{data.summary.hoursSubmitted}h</span>
+          <span className="section-card__stat-label">Hours submitted</span>
         </div>
-        <div className="role-block__stat">
-          <span className="role-block__stat-value">{data.summary.hoursDraft}h</span>
-          <span className="role-block__stat-label">Hours in draft</span>
+        <div className="section-card__stat">
+          <span className="section-card__stat-value">{data.summary.hoursDraft}h</span>
+          <span className="section-card__stat-label">Hours in draft</span>
         </div>
-        <div className="role-block__stat">
-          <span className="role-block__stat-value">{data.summary.expensesPending}</span>
-          <span className="role-block__stat-label">Expenses pending</span>
+        <div className="section-card__stat">
+          <span className="section-card__stat-value">{data.summary.expensesPending}</span>
+          <span className="section-card__stat-label">Expenses pending</span>
         </div>
-        <div className="role-block__stat">
-          <span className="role-block__stat-value">{data.summary.invoicesDraft}</span>
-          <span className="role-block__stat-label">Invoices to send</span>
+        <div className="section-card__stat">
+          <span className="section-card__stat-value">{data.summary.invoicesDraft}</span>
+          <span className="section-card__stat-label">Invoices to send</span>
         </div>
-        <div className="role-block__stat">
-          <span className="role-block__stat-value">{formatGbp(data.summary.invoiceValueOpen || 0)}</span>
-          <span className="role-block__stat-label">Open invoice value</span>
+        <div className="section-card__stat">
+          <span className="section-card__stat-value">{formatGbp(data.summary.invoiceValueOpen || 0)}</span>
+          <span className="section-card__stat-label">Open invoice value</span>
         </div>
       </div>
 

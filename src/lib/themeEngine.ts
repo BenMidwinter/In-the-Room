@@ -84,17 +84,7 @@ export function getStoredThemeId() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
     if (isValidThemeId(saved)) return saved as string
-    // Migrate retired themes to practice linen
-    if (
-      saved === 'light-clinical'
-      || saved === 'light-chroma'
-      || saved === 'dark-studio'
-      || saved === 'muted-somatic'
-      || saved === 'vibrant-expressive'
-      || saved === 'neon-signal'
-    ) {
-      return DEFAULT_THEME_ID
-    }
+    if (saved) return DEFAULT_THEME_ID
     const legacySomatic = localStorage.getItem('in-the-room-somatic-scheme')
     if (legacySomatic && legacySomatic !== 'none') {
       const migrated = `somatic-${legacySomatic}`

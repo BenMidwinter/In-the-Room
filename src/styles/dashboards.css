@@ -1,4 +1,4 @@
-/* Service Lead — organisation services */
+/* Service catalogue */
 .svc-type-picker {
   display: flex;
   flex-wrap: wrap;
@@ -984,7 +984,7 @@
   .notes-bulk-bar { left: 0.75rem; right: 0.75rem; transform: none; min-width: 0; }
 }
 
-/* Service Lead privacy — blur client/clinician names while keeping counts visible */
+/* Retired name-blur styles kept so old markup does not flash unstyled text. */
 .identity-blur {
   filter: blur(5px);
   opacity: 0.88;

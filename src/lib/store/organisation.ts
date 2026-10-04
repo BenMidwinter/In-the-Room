@@ -8,13 +8,6 @@ import {
   PRIVATE_PRACTICE_LOCATION_ID,
 } from '../clinicianAvailability'
 import { defaultBrandingFieldsForWorkplace } from '../workplaceBranding'
-import {
-  canManageWorkplace,
-  canManageTeamMembership,
-  canViewFullWorkplaceCaseload,
-  normalizeRole,
-  ROLES,
-} from '../permissions'
 import { normalizeServiceColor, serviceNameToSlug } from '../serviceColors'
 
 /* ── Workplace context & profiles ─────────────────────────────────────── */
@@ -107,15 +100,6 @@ export function getClinicianSettingAtWorkplace(userId, workplaceId) {
   return settings.find(s => s.workplace_id === workplaceId) || null
 }
 
-export function getOrganisationWorkplaceContexts() {
-  return db.workplaces.map(wp => ({
-    id: wp.id,
-    name: wp.name,
-    role: 'clinical_lead',
-    join_code: wp.join_code,
-  }))
-}
-
 export function getWorkplacesForUser(userId) {
   return db.memberships
     .filter(m => m.user_id === userId)
@@ -147,11 +131,7 @@ export function getWorkplaceMembers(workplaceId, myWorkplace) {
 
 export function getWorkplaceClinicians(workplaceId) {
   return db.memberships
-    .filter(m => {
-      if (m.workplace_id !== workplaceId) return false
-      const role = normalizeRole(String(m.role))
-      return role === ROLES.CLINICAL_LEAD || role === ROLES.CLINICIAN
-    })
+    .filter(m => m.workplace_id === workplaceId)
     .map(m => {
       const profile = db.profiles.find(p => p.id === m.user_id)
       return {
@@ -168,13 +148,12 @@ export function getAssignedClientsAtWorkplace(userId, workplaceId) {
 
 export function getWorkplaceClients(workplaceId, myWorkplace) {
   if (!workplaceId || myWorkplace?.id !== workplaceId) return []
-  if (!canViewFullWorkplaceCaseload(myWorkplace)) return []
+  if (!myWorkplace) return []
   return db.clients.filter(c => c.workplace_id === workplaceId)
 }
 
-export function getAuditLogs(workplaceId, myWorkplace) {
-  if (!canManageWorkplace(myWorkplace) || myWorkplace?.id !== workplaceId) return []
-  return db.auditLogs.filter(l => l.workplace_id === workplaceId)
+export function getAuditLogs(_workplaceId, _myWorkplace) {
+  return []
 }
 
 /* ── Workplaces ───────────────────────────────────────────────────────── */
@@ -203,13 +182,12 @@ export function addWorkplace(payload) {
 
 export function getWorkplaceRecord(workplaceId, myWorkplace) {
   if (!workplaceId || myWorkplace?.id !== workplaceId) return null
-  if (!canManageWorkplace(myWorkplace)) return null
   return db.workplaces.find(w => w.id === workplaceId) || null
 }
 
 export function updateWorkplaceBranding(workplaceId, payload, actorId, myWorkplace) {
-  if (!canManageWorkplace(myWorkplace) || myWorkplace?.id !== workplaceId) {
-    throw new Error('Only a clinical lead or administrator can update workplace branding.')
+  if (!myWorkplace || myWorkplace?.id !== workplaceId) {
+    throw new Error('Workplace administration is not part of this practice.')
   }
   const idx = db.workplaces.findIndex(w => w.id === workplaceId)
   if (idx === -1) throw new Error('Workplace not found.')
@@ -342,8 +320,8 @@ export function requestWorkplaceMembership(userId, workplaceId, message = '') {
 }
 
 export function approveMembershipRequest(requestId, actorId, myWorkplace, role = 'clinician') {
-  if (!canManageTeamMembership(myWorkplace)) {
-    throw new Error('Only a clinical lead or administrator can approve join requests.')
+  if (!myWorkplace) {
+    throw new Error('Workplace administration is not part of this practice.')
   }
   const idx = db.membershipRequests.findIndex(r => r.id === requestId)
   if (idx === -1) throw new Error('Request not found.')
@@ -381,8 +359,8 @@ export function approveMembershipRequest(requestId, actorId, myWorkplace, role =
 }
 
 export function declineMembershipRequest(requestId, actorId, myWorkplace) {
-  if (!canManageTeamMembership(myWorkplace)) {
-    throw new Error('Only a clinical lead or administrator can decline join requests.')
+  if (!myWorkplace) {
+    throw new Error('Workplace administration is not part of this practice.')
   }
   const idx = db.membershipRequests.findIndex(r => r.id === requestId)
   if (idx === -1) throw new Error('Request not found.')
@@ -409,8 +387,8 @@ export function declineMembershipRequest(requestId, actorId, myWorkplace) {
 }
 
 export function inviteClinicianToWorkplace(workplaceId, userId, actorId, myWorkplace, role = 'clinician') {
-  if (!canManageTeamMembership(myWorkplace) || myWorkplace?.id !== workplaceId) {
-    throw new Error('Only a clinical lead or administrator can invite clinicians.')
+  if (!myWorkplace || myWorkplace?.id !== workplaceId) {
+    throw new Error('Workplace administration is not part of this practice.')
   }
   if (isWorkplaceMember(userId, workplaceId)) {
     throw new Error('This clinician is already on the team.')
@@ -448,12 +426,12 @@ export function inviteClinicianToWorkplace(workplaceId, userId, actorId, myWorkp
 }
 
 export function updateWorkplaceMemberRole(workplaceId, memberUserId, newRole, actorId, myWorkplace) {
-  if (!canManageTeamMembership(myWorkplace) || myWorkplace?.id !== workplaceId) {
-    throw new Error('Only a clinical lead or administrator can change team roles.')
+  if (!myWorkplace || myWorkplace?.id !== workplaceId) {
+    throw new Error('Workplace administration is not part of this practice.')
   }
-  const role = normalizeRole(newRole)
-  if (!([ROLES.CLINICIAN, ROLES.ADMINISTRATOR, ROLES.CLINICAL_LEAD] as readonly string[]).includes(role)) {
-    throw new Error('Invalid role.')
+  const role = String(newRole || '').trim()
+  if (!role) {
+    throw new Error('Invalid membership label.')
   }
 
   const idx = db.memberships.findIndex(m => m.user_id === memberUserId && m.workplace_id === workplaceId)

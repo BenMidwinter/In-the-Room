@@ -66,13 +66,12 @@ export function clientInitials(name) {
 }
 
 /** Calendar chip title: "SG: Music Therapy". */
-export function appointmentChipLabel(appointment, { blurNames = false } = {}) {
+export function appointmentChipLabel(appointment) {
   if (appointment?.is_external_busy) return 'Busy'
   const embeddedName = String(appointment?.service_name || '').trim()
   const service = embeddedName || appointmentServiceLabel(
     appointment?.service_id || appointment?.therapy_modality,
   )
-  if (blurNames) return service
   if (appointment?.block_role === 'support' || appointment?.block_role === 'admin') {
     return service
   }

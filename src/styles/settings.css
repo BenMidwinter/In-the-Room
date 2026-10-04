@@ -163,18 +163,18 @@
   font-weight: 600;
 }
 
-.role-block--settings_coming_soon,
-.role-block--settings_forms,
-.role-block--settings_password,
-.role-block--settings_2fa,
-.role-block--settings_services,
-.role-block--settings_services_add,
-.role-block--settings_integrations_google,
-.role-block--settings_integrations_feed,
-.role-block--settings_templates_progress_note,
-.role-block--settings_templates_letter,
-.role-block--settings_templates_report,
-.role-block--settings_templates_working_document {
+.section-card--settings_coming_soon,
+.section-card--settings_forms,
+.section-card--settings_password,
+.section-card--settings_2fa,
+.section-card--settings_services,
+.section-card--settings_services_add,
+.section-card--settings_integrations_google,
+.section-card--settings_integrations_feed,
+.section-card--settings_templates_progress_note,
+.section-card--settings_templates_letter,
+.section-card--settings_templates_report,
+.section-card--settings_templates_working_document {
   border-left: 4px solid var(--col-primary);
 }
 

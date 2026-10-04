@@ -21,10 +21,10 @@ const NAV_SECTIONS = [
     items: [
       { segment: 'letters', label: 'Letters', section: 'letters' },
       { segment: 'documents', label: 'Working documents', section: 'documents' },
-      { segment: 'files', label: 'Files', section: 'files' },
-      { segment: 'forms', label: 'Forms', section: 'forms' },
-      { segment: 'contacts', label: 'Contacts', section: 'contacts' },
-      { segment: 'outcomes', label: 'Outcome measures', section: 'outcomes' },
+      { segment: 'files', label: '[Files]', section: 'files' },
+      { segment: 'forms', label: '[Forms]', section: 'forms' },
+      { segment: 'contacts', label: '[Contacts]', section: 'contacts' },
+      { segment: 'outcomes', label: '[Outcome measures]', section: 'outcomes' },
     ],
   },
 ]
@@ -34,12 +34,12 @@ const linkClass = ({ isActive }) =>
 
 export default function ClientNav({ clientId, client }) {
   const base = `/clients/${clientId}`
-  const { session, myWorkplace } = useAppSession()
+  const { session } = useAppSession()
   const userId = session?.user?.id
 
   const isVisible = (section) => {
     if (section === 'overview') return true
-    return canAccessClientNavSection(section, myWorkplace, client, userId)
+    return canAccessClientNavSection(section, null, client, userId)
   }
 
   return (

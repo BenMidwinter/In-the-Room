@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { appointmentMatchesPersona, filterAppointmentsForPersona } from './calendarAccess'
-import { ROLES } from './permissions'
 
 const persona = {
-  id: 'clinician',
-  userId: 'user-ben',
-  name: 'Ben Richardson',
-  role: ROLES.CLINICIAN,
+  id: 'user-1',
+  userId: 'user-1',
+  name: 'Alex Rivera',
 }
 
 describe('appointmentMatchesPersona', () => {
-  it('matches by clinician_id even when assigned_therapist is a stale fallback', () => {
+  it('matches by clinician id even when the display name is stale', () => {
     expect(appointmentMatchesPersona({
-      clinician_id: 'user-ben',
+      clinician_id: 'user-1',
       assigned_therapist: 'Clinician',
     }, persona)).toBe(true)
   })
@@ -20,11 +18,11 @@ describe('appointmentMatchesPersona', () => {
   it('matches full display name or first name', () => {
     expect(appointmentMatchesPersona({
       clinician_id: 'other',
-      assigned_therapist: 'Ben Richardson',
+      assigned_therapist: 'Alex Rivera',
     }, persona)).toBe(true)
     expect(appointmentMatchesPersona({
       clinician_id: 'other',
-      assigned_therapist: 'Ben',
+      assigned_therapist: 'Alex',
     }, persona)).toBe(true)
   })
 
@@ -34,19 +32,12 @@ describe('appointmentMatchesPersona', () => {
       assigned_therapist: 'Clinician',
     }, persona)).toBe(false)
   })
-
-  it('lets leads see every appointment', () => {
-    expect(appointmentMatchesPersona(
-      { clinician_id: 'x', assigned_therapist: 'Y' },
-      { ...persona, role: ROLES.SERVICE_LEAD },
-    )).toBe(true)
-  })
 })
 
 describe('filterAppointmentsForPersona', () => {
   it('keeps own sessions and drops others', () => {
     const rows = [
-      { id: '1', clinician_id: 'user-ben', assigned_therapist: 'Clinician' },
+      { id: '1', clinician_id: 'user-1', assigned_therapist: 'Clinician' },
       { id: '2', clinician_id: 'user-other', assigned_therapist: 'Clinician' },
     ]
     expect(filterAppointmentsForPersona(rows, persona).map((r) => r.id)).toEqual(['1'])

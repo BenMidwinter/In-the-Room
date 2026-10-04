@@ -853,25 +853,6 @@ select.progress-notes-page__meta-input {
   margin-top: 0.25rem;
 }
 
-.service-lead-sidebar__brand {
-  padding: 0.65rem 0.85rem 0.5rem;
-  border-bottom: 1px solid var(--border-light);
-  margin-bottom: 0.25rem;
-}
-
-.service-lead-sidebar__title {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--col-accent);
-}
-
-.service-lead-sidebar__subtitle {
-  margin: 0.1rem 0 0;
-  font-size: 0.7rem;
-  color: var(--txt-muted);
-}
-
 .progress-notes-page__preview {
   background: transparent;
   padding: 0;
@@ -1056,12 +1037,12 @@ select.progress-notes-page__meta-input {
   background: var(--bg-surface);
 }
 
-.progress-notes-page .ck-clinical-paper__canvas {
+.progress-notes-page .room-clinical-paper__canvas {
   padding: 0;
   background: var(--bg-surface);
 }
 
-.progress-notes-page .ck-clinical-paper__sheet {
+.progress-notes-page .room-clinical-paper__sheet {
   max-width: var(--paper-width-letter);
   margin-inline: auto;
   min-height: calc(100vh - var(--nav-height) - 14rem);
@@ -1105,11 +1086,5 @@ select.progress-notes-page__meta-input {
 
 .progress-notes-page .doc-editor:not(.doc-editor--immersive) .doc-editor .ProseMirror p {
   margin-bottom: 0.85em;
-}
-
-/* .service-lead layout / shell / nav styles — see ServiceLeadLayout.jsx, home-calendar.css */
-
-.service-lead-sidebar {
-  display: none;
 }
 

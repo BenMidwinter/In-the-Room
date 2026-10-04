@@ -210,7 +210,7 @@ export default function ProfileAvailabilityPanel({ userId, onSaved }) {
   }
 
   if (!locations.length) {
-    return <p className="text-muted role-block__empty">No locations to configure yet.</p>
+    return <p className="text-muted section-card__empty">No locations to configure yet.</p>
   }
 
   return (

@@ -20,7 +20,7 @@ describe('progressNoteLifecycle', () => {
       title: 'Test note',
       content: '<p>Hello</p>',
       session_date: '2026-07-03',
-    }, 'user-sarah')
+    }, 'user-1')
 
     expect(note.status).toBe('draft')
     expect(note.is_locked).toBe(false)
@@ -33,7 +33,7 @@ describe('progressNoteLifecycle', () => {
       title: 'Sign-off test',
       content: '<p>Body</p>',
       session_date: '2026-07-03',
-    }, 'user-sarah')
+    }, 'user-1')
 
     const signed = signOffProgressNote({
       id: draft.id,
@@ -41,7 +41,7 @@ describe('progressNoteLifecycle', () => {
       title: draft.title,
       content: draft.content,
       session_date: draft.session_date,
-    }, 'user-sarah')
+    }, 'user-1')
 
     expect(signed.status).toBe('signed_off')
     expect(signed.signed_off_at).toBeTruthy()
@@ -62,7 +62,7 @@ describe('progressNoteLifecycle', () => {
       title: 'Locked note',
       content: '<p>Body</p>',
       session_date: '2026-07-03',
-    }, 'user-sarah')
+    }, 'user-1')
 
     const signed = signOffProgressNote({
       id: draft.id,
@@ -70,7 +70,7 @@ describe('progressNoteLifecycle', () => {
       title: draft.title,
       content: draft.content,
       session_date: draft.session_date,
-    }, 'user-sarah')
+    }, 'user-1')
 
     const idx = db.progressNotes.findIndex(n => n.id === signed.id)
     db.progressNotes[idx].lock_until = new Date(Date.now() - 60_000).toISOString()
@@ -81,7 +81,7 @@ describe('progressNoteLifecycle', () => {
       title: 'Changed',
       content: '<p>Changed</p>',
       session_date: draft.session_date,
-    }, 'user-sarah')).toThrow(/locked/)
+    }, 'user-1')).toThrow(/locked/)
   })
 
   it(`lock deadline is ${PROGRESS_NOTE_LOCK_HOURS} hours after sign-off`, () => {

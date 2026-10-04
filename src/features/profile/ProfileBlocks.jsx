@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import RoleBlockShell from '../../components/RoleBlockShell'
+import SectionCard from '../../components/SectionCard'
 import { getProfile, updateProfile } from '../../lib/store'
 import { profileInitials } from '../../lib/clinicianAvailability'
 import ProfileAvailabilityPanel from './ProfileAvailabilityPanel'
@@ -130,8 +130,8 @@ export function ProfileIdentityBlock({ session, onSaved }) {
   const initials = profileInitials(fullName)
 
   return (
-    <RoleBlockShell blockId="profile_identity" title="Account details">
-      <form onSubmit={handleSave} className="role-block__panel">
+    <SectionCard blockId="profile_identity" title="Account details">
+      <form onSubmit={handleSave} className="section-card__panel">
         <div className="profile-identity__layout">
           <div className="profile-identity__photo">
             <div className="profile-identity__photo-frame" aria-hidden={!photoUrl}>
@@ -179,7 +179,7 @@ export function ProfileIdentityBlock({ session, onSaved }) {
 
               <div className="form-group profile-identity__field--full">
                 <span className="profile-identity__photo-label">Registration numbers</span>
-                <p className="text-small text-muted role-block__intro" style={{ marginTop: '0.35rem' }}>
+                <p className="text-small text-muted section-card__intro" style={{ marginTop: '0.35rem' }}>
                   Add each register you hold (HCPC, BACP, UKCP, NMC, etc.) with its number.
                 </p>
                 <div className="registration-list">
@@ -257,17 +257,17 @@ export function ProfileIdentityBlock({ session, onSaved }) {
           </button>
         </div>
       </form>
-    </RoleBlockShell>
+    </SectionCard>
   )
 }
 
 export function ProfileAvailabilityBlock({ userId, onSaved }) {
   return (
-    <RoleBlockShell blockId="profile_availability" title="Availability & services">
-      <div className="role-block__panel">
+    <SectionCard blockId="profile_availability" title="Availability & services">
+      <div className="section-card__panel">
         <ProfileAvailabilityPanel userId={userId} onSaved={onSaved} />
       </div>
-    </RoleBlockShell>
+    </SectionCard>
   )
 }
 

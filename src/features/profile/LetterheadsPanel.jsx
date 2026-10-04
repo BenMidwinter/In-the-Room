@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import RoleBlockShell from '../../components/RoleBlockShell'
+import SectionCard from '../../components/SectionCard'
 import LetterheadBrandingForm from '../../components/LetterheadBrandingForm'
 import { resolvePracticeBranding } from '../../lib/workplaceBranding'
 import {
@@ -143,18 +143,18 @@ export default function LetterheadsPanel() {
     <>
       <button
         type="button"
-        className="btn btn-secondary role-block__toolbar-new"
+        className="btn btn-secondary section-card__toolbar-new"
         onClick={openNew}
         disabled={busy || !isSupabaseConfigured()}
       >
         + New Letterhead
       </button>
-      <div className="role-block__toolbar-list">
+      <div className="section-card__toolbar-list">
         {rows.map((row) => (
           <button
             key={row.id}
             type="button"
-            className={`role-block__toolbar-item${form?.id === row.id ? ' role-block__toolbar-item--active' : ''}`}
+            className={`section-card__toolbar-item${form?.id === row.id ? ' section-card__toolbar-item--active' : ''}`}
             onClick={() => openExisting(row)}
           >
             {row.name || row.practice_name || 'Letterhead'}
@@ -165,13 +165,13 @@ export default function LetterheadsPanel() {
   )
 
   return (
-    <RoleBlockShell
+    <SectionCard
       blockId="profile_letterhead"
       title="Letterheads"
       description="Practice letterheads for letters and clinical exports. Select one to edit, or create another."
       toolbar={toolbar}
     >
-      <div className="role-block__panel">
+      <div className="section-card__panel">
         {!isSupabaseConfigured() && (
           <p className="auth-page__alert">Supabase env vars required to manage letterheads.</p>
         )}
@@ -254,6 +254,6 @@ export default function LetterheadsPanel() {
           </div>
         )}
       </div>
-    </RoleBlockShell>
+    </SectionCard>
   )
 }

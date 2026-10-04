@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useStoreRefreshers } from '../lib/queries'
-import { ROLES } from '../lib/permissions'
 import ThemeToggle from './ThemeToggle'
 import { RouteErrorBoundary } from './ErrorBoundary'
 import { AppSessionProvider } from '../lib/AppSessionContext'
@@ -14,9 +13,9 @@ const NAV_ITEMS = [
   { to: '/active-cases', label: 'Active Cases' },
   { to: '/clients', label: 'All Clients' },
   { to: '/journal', label: 'Journal' },
-  { to: '/finance', label: 'Finance' },
-  { to: '/reporting', label: 'Reporting' },
-  { to: '/lab/progress-note', label: 'Note lab' },
+  { to: '/finance', label: '[Finance]' },
+  { to: '/reporting', label: '[Reporting]' },
+  { to: '/lab/progress-note', label: '[Note lab]' },
 ]
 
 function GearIcon() {
@@ -50,27 +49,18 @@ function AppShell() {
       email: user.email,
       name: displayName,
       full_name: displayName,
-      isAdmin: false,
-      isServiceLead: false,
     },
   }), [user, displayName])
 
   const activePersona = useMemo(() => ({
-    id: 'clinician',
+    id: user.id,
     userId: user.id,
     name: displayName,
-    role: ROLES.CLINICIAN,
   }), [user.id, displayName])
 
   const appSession = useMemo(() => ({
     session,
     activePersona,
-    personaId: 'clinician',
-    demoRole: ROLES.CLINICIAN,
-    myWorkplace: null,
-    myWorkplaces: [],
-    activeWorkplaceId: null,
-    setActiveWorkplaceId: () => {},
     refreshClients: () => {
       refreshClients()
       refreshProfile()

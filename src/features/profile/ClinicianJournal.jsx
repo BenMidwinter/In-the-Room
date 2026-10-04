@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react'
 import { useAppSession } from '../../lib/AppSessionContext'
-import RoleBlockShell from '../../components/RoleBlockShell'
+import SectionCard from '../../components/SectionCard'
 import RichTextEditor from '../../components/RichTextEditor'
 import { IconMic } from '../../components/EditorToolbarIcons'
 import { getJournalEntries, saveJournalEntry } from '../../lib/store'
@@ -118,8 +118,8 @@ export default function ClinicianJournal() {
   }
 
   return (
-    <div className="role-block-stack profile-hub">
-      <RoleBlockShell blockId="profile_journal">
+    <div className="section-card-stack profile-hub">
+      <SectionCard blockId="profile_journal">
         <div className="journal journal--in-block">
       <div className="journal__mobile-bar">
         <button
@@ -231,7 +231,7 @@ export default function ClinicianJournal() {
         )}
       </div>
         </div>
-      </RoleBlockShell>
+      </SectionCard>
     </div>
   )
 }

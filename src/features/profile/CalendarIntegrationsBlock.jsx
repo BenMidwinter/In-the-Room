@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import RoleBlockShell from '../../components/RoleBlockShell'
+import SectionCard from '../../components/SectionCard'
 import { isSupabaseConfigured } from '../../lib/supabase/client'
 import {
   listCalendarConnections,
@@ -48,8 +48,8 @@ export default function CalendarIntegrationsBlock() {
   const google = connections.find((row) => row.provider === 'google')
 
   return (
-    <RoleBlockShell blockId="profile_calendar_integrations">
-      <div className="role-block__panel">
+    <SectionCard blockId="profile_calendar_integrations">
+      <div className="section-card__panel">
         {!isSupabaseConfigured() && (
           <p className="text-muted">
             Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> to enable sync.
@@ -65,7 +65,7 @@ export default function CalendarIntegrationsBlock() {
         {isSupabaseConfigured() && !loading && !error && (
           <>
             <div className="form-group" style={{ marginBottom: '1rem' }}>
-              <h3 className="role-block__panel-title">Google Calendar</h3>
+              <h3 className="section-card__panel-title">Google Calendar</h3>
               {google ? (
                 <p>
                   Status: <strong>{google.status}</strong>
@@ -91,7 +91,7 @@ export default function CalendarIntegrationsBlock() {
             </div>
 
             <div className="form-group">
-              <h3 className="role-block__panel-title">Calendar feed (ICS)</h3>
+              <h3 className="section-card__panel-title">Calendar feed (ICS)</h3>
               <p className="text-muted text-small" style={{ marginTop: 0 }}>
                 Same pattern Splose uses for phone/Outlook: a private feed URL you subscribe to in
                 Google Calendar. Active feeds: {feeds.length}.
@@ -103,6 +103,6 @@ export default function CalendarIntegrationsBlock() {
           </>
         )}
       </div>
-    </RoleBlockShell>
+    </SectionCard>
   )
 }

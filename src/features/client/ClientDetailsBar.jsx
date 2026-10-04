@@ -11,7 +11,7 @@ export default function ClientDetailsBar({ client, onClientUpdated, embedded = f
   const lead = getProfile(client.user_id)
 
   const items = [
-    { label: 'Lead clinician', value: lead?.full_name || 'Unassigned' },
+    { label: 'Clinician', value: lead?.full_name || 'Unassigned' },
     { label: 'School / setting', value: client.school || '—' },
     { label: 'Diagnosis', value: client.diagnosis || '—' },
     { label: 'Medication', value: client.medication || '—' },

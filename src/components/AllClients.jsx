@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppClients } from '../lib/queries'
 import PageHeader, { PageHeaderFilter } from './PageHeader'
-import { usePermissions } from '../lib/usePermissions'
-import BlurredName from './BlurredName'
 import RecordTable from './RecordTable'
 
 const CLIENT_COLUMNS = [
@@ -15,7 +13,6 @@ const CLIENT_COLUMNS = [
 
 export default function AllClients() {
   const { clients } = useAppClients()
-  const perms = usePermissions()
   const navigate = useNavigate()
   const [filterContext, setFilterContext] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -56,7 +53,7 @@ export default function AllClients() {
       status: c.is_active ? 'Active' : 'Discharged',
     },
     cells: {
-      name: <strong><BlurredName name={c.real_name} blur={perms.blurClientIdentity} /></strong>,
+      name: <strong>{c.real_name}</strong>,
       context: c.workplace_id
         ? <span className="badge badge-blue">{c.workplace_name}</span>
         : <span className="badge badge-grey">Private</span>,
@@ -72,11 +69,9 @@ export default function AllClients() {
       <PageHeader
         title="All clients"
         subtitle="Full caseload history, including discharged clients."
-        actions={
-          (perms.canAddPrivateClient || perms.canAddWorkplaceClient) && (
-            <button type="button" className="primary" onClick={() => navigate('/clients/add')}>+ New client</button>
-          )
-        }
+        actions={(
+          <button type="button" className="primary" onClick={() => navigate('/clients/add')}>+ New client</button>
+        )}
         toolbar={(
           <>
             <PageHeaderFilter id="all-clients-context" label="Context">
@@ -115,7 +110,7 @@ export default function AllClients() {
           columns={CLIENT_COLUMNS}
           rows={rows}
           emptyMessage="No clients found."
-          onRowClick={perms.blurClientIdentity ? undefined : (row) => navigate(`/clients/${row.id}`)}
+          onRowClick={(row) => navigate(`/clients/${row.id}`)}
         />
       </div>
     </div>
