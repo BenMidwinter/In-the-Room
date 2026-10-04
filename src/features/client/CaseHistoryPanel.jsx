@@ -1,13 +1,25 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { getEpisodes } from '../../lib/store'
+import { useNavigate, useParams } from 'react-router-dom'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
-import { useToast } from '../../components/ui'
+import { useConfirm, useToast } from '../../components/ui'
+import { useClientSession } from '../../lib/useClientSession'
+import {
+  useClientEpisodesQuery,
+  useDischargeEpisodeMutation,
+  useOpenEpisodeMutation,
+} from '../../lib/episodeQueries'
+import { useClientProgressNotesQuery } from '../../lib/progressNoteQueries'
+import { useEpisodeReportsQuery, useSaveReportMutation } from '../../lib/reportQueries'
 
 function formatDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  const date = String(iso).slice(0, 10)
+  return new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 const STATUS_LABELS = {
@@ -18,52 +30,227 @@ const STATUS_LABELS = {
 
 const EPISODE_COLUMNS = [
   { key: 'episode', label: 'Episode' },
-  { key: 'referral', label: 'Referral date', filter: { type: 'text', placeholder: 'Filter date…' } },
+  { key: 'start', label: 'Started' },
+  { key: 'end', label: 'Ended' },
   { key: 'status', label: 'Status', filter: { type: 'select', allLabel: 'All statuses' } },
-  { key: 'source', label: 'Referral source', filter: { type: 'text', placeholder: 'Filter source…' } },
-  { key: 'issue', label: 'Presenting issue', filter: { type: 'text', placeholder: 'Filter issue…' } },
 ]
+
+function EpisodeReports({ episode, clientId, userId, organizationId }) {
+  const toast = useToast()
+  const { data: reports = [], isPending } = useEpisodeReportsQuery(episode.id)
+  const saveReport = useSaveReportMutation()
+  const [draft, setDraft] = useState(null)
+  const [edits, setEdits] = useState({})
+
+  const rows = draft ? [...reports, draft] : reports
+
+  const valueFor = (report) => edits[report.id] || {
+    title: report.title || '',
+    body: report.body || '',
+    report_date: report.report_date || new Date().toISOString().slice(0, 10),
+  }
+
+  const update = (report, patch) => {
+    const base = edits[report.id] || {
+      title: report.title || '',
+      body: report.body || '',
+      report_date: report.report_date || new Date().toISOString().slice(0, 10),
+    }
+    setEdits((current) => ({
+      ...current,
+      [report.id]: { ...base, ...current[report.id], ...patch },
+    }))
+  }
+
+  const save = async (report) => {
+    const value = valueFor(report)
+    try {
+      const saved = await saveReport.mutateAsync({
+        id: String(report.id).startsWith('draft-') ? null : report.id,
+        clientId,
+        episodeId: episode.id,
+        userId,
+        organizationId,
+        title: value.title,
+        body: value.body,
+        reportDate: value.report_date,
+      })
+      setEdits((current) => {
+        const next = { ...current }
+        delete next[report.id]
+        return next
+      })
+      if (String(report.id).startsWith('draft-')) setDraft(null)
+      toast.saved(saved.title ? `Saved ${saved.title}` : 'Report saved')
+    } catch (err) {
+      toast.error(err?.message || 'Could not save the report')
+    }
+  }
+
+  return (
+    <div className="episode-detail__reports">
+      <div className="episode-detail__reports-header">
+        <h4>Reports</h4>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => setDraft({
+            id: `draft-${crypto.randomUUID()}`,
+            title: '',
+            body: '',
+            report_date: new Date().toISOString().slice(0, 10),
+          })}
+          disabled={Boolean(draft)}
+        >
+          Add report
+        </button>
+      </div>
+      {isPending && <p className="text-small text-muted">Loading reports…</p>}
+      {!isPending && rows.length === 0 && (
+        <p className="text-small text-muted">No reports on this course yet.</p>
+      )}
+      {rows.map((report) => {
+        const value = valueFor(report)
+        return (
+          <form
+            key={report.id}
+            className="episode-report"
+            onSubmit={(event) => {
+              event.preventDefault()
+              save(report)
+            }}
+          >
+            <label>
+              <span>Title</span>
+              <input
+                value={value.title}
+                onChange={(event) => update(report, { title: event.target.value })}
+              />
+            </label>
+            <label>
+              <span>Date</span>
+              <input
+                type="date"
+                value={String(value.report_date || '').slice(0, 10)}
+                onChange={(event) => update(report, { report_date: event.target.value })}
+              />
+            </label>
+            <label className="episode-report__body">
+              <span>Report</span>
+              <textarea
+                rows={5}
+                value={value.body}
+                onChange={(event) => update(report, { body: event.target.value })}
+              />
+            </label>
+            <button type="submit" className="primary" disabled={saveReport.isPending}>
+              Save report
+            </button>
+          </form>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function CaseHistoryPanel() {
   const { id: clientId } = useParams()
+  const navigate = useNavigate()
   const toast = useToast()
-  const episodes = getEpisodes(clientId)
-  const [selectedId, setSelectedId] = useState(episodes[0]?.id ?? null)
-  const selected = episodes.find(e => e.id === selectedId)
+  const confirm = useConfirm()
+  const { client, session } = useClientSession()
+  const episodesQuery = useClientEpisodesQuery(clientId)
+  const openEpisode = useOpenEpisodeMutation()
+  const dischargeEpisode = useDischargeEpisodeMutation()
+  const { data: notes = [] } = useClientProgressNotesQuery(clientId)
+  const episodes = episodesQuery.data || []
+  const [selectedId, setSelectedId] = useState(null)
+  const selected = episodes.find((episode) => episode.id === selectedId) || episodes[0] || null
+  const active = episodes.find((episode) => episode.status === 'active') || null
+  const userId = session?.user?.id
 
-  const rows = episodes.map(ep => ({
-    id: ep.id,
-    episode: ep,
-    muted: ep.status === 'discharged',
+  const openNew = async () => {
+    if (!clientId || !userId) {
+      toast.error('Session unavailable — please refresh the page.')
+      return
+    }
+    try {
+      const opened = await openEpisode.mutateAsync({
+        clientId,
+        ownerId: userId,
+        organizationId: client?.workplace_id || null,
+      })
+      setSelectedId(opened.id)
+      toast.saved(`Episode ${opened.episode_number} opened`)
+    } catch (err) {
+      toast.error(err?.message || 'Could not open an episode')
+    }
+  }
+
+  const discharge = async () => {
+    if (!active || !clientId) return
+    const ok = await confirm({
+      title: `Discharge episode ${active.episode_number}?`,
+      message: 'This closes the course. Sessions and notes stay on the record, and you can still add a Process Note or a report to this episode afterwards.',
+      confirmLabel: 'Discharge',
+    })
+    if (!ok) return
+    try {
+      const closed = await dischargeEpisode.mutateAsync({ episodeId: active.id, clientId })
+      setSelectedId(closed.id)
+      toast.saved(`Episode ${closed.episode_number} discharged`)
+    } catch (err) {
+      toast.error(err?.message || 'Could not discharge this episode')
+    }
+  }
+
+  const headerActions = episodesQuery.isPending || episodesQuery.isError ? null : active ? (
+    <button
+      type="button"
+      className="secondary"
+      onClick={discharge}
+      disabled={dischargeEpisode.isPending}
+    >
+      Discharge
+    </button>
+  ) : (
+    <button
+      type="button"
+      className="primary"
+      onClick={openNew}
+      disabled={openEpisode.isPending}
+    >
+      Open new episode
+    </button>
+  )
+
+  const rows = episodes.map((episode) => ({
+    id: episode.id,
+    muted: episode.status === 'discharged',
     filterValues: {
-      referral: formatDate(ep.referral_date),
-      status: STATUS_LABELS[ep.status] || ep.status,
-      source: ep.referral_source || '—',
-      issue: ep.presenting_issue || '—',
+      status: STATUS_LABELS[episode.status] || episode.status,
     },
     cells: {
-      episode: <span className="record-table__primary">Episode {ep.episode_number}</span>,
-      referral: formatDate(ep.referral_date),
+      episode: <span className="record-table__primary">Episode {episode.episode_number}</span>,
+      start: formatDate(episode.start_date),
+      end: formatDate(episode.end_date),
       status: (
-        <span className={`badge ${ep.status === 'active' ? 'badge-green' : 'badge-grey'}`}>
-          {STATUS_LABELS[ep.status] || ep.status}
-        </span>
-      ),
-      source: ep.referral_source || '—',
-      issue: (
-        <span className="record-table__cell-muted">
-          {(ep.presenting_issue || '—').slice(0, 80)}{(ep.presenting_issue?.length > 80 ? '…' : '')}
+        <span className={`badge ${episode.status === 'active' ? 'badge-green' : 'badge-grey'}`}>
+          {STATUS_LABELS[episode.status] || episode.status}
         </span>
       ),
     },
   }))
 
+  const episodeNotes = selected
+    ? notes.filter((note) => note.episode_id === selected.id)
+    : []
+
   return (
     <RecordListLayout
       title="Case history"
-      subtitle="Referral episodes and care pathways for this client."
-      newLabel="case"
-      onNew={() => toast.info('Start new case — episode creation will connect to Supabase.')}
+      subtitle="Each course of treatment is its own episode. A discharged course stays open for notes and reports."
+      headerActions={headerActions}
       editor={selected && (
         <div className="card episode-detail">
           <div className="episode-detail__header">
@@ -72,43 +259,72 @@ export default function CaseHistoryPanel() {
               {STATUS_LABELS[selected.status] || selected.status}
             </span>
           </div>
+          {selected.status === 'discharged' && (
+            <p className="episode-detail__banner">
+              This course is closed. You can still add a Process Note or a report.
+            </p>
+          )}
           <dl className="episode-detail__grid">
             <div>
-              <dt>Referral date</dt>
-              <dd>{formatDate(selected.referral_date)}</dd>
-            </div>
-            <div>
-              <dt>Referral source</dt>
-              <dd>{selected.referral_source || '—'}</dd>
-            </div>
-            <div>
-              <dt>Episode start</dt>
+              <dt>Started</dt>
               <dd>{formatDate(selected.start_date)}</dd>
             </div>
             <div>
-              <dt>Episode end</dt>
+              <dt>Ended</dt>
               <dd>{formatDate(selected.end_date)}</dd>
             </div>
-            <div className="episode-detail__full">
-              <dt>Presenting issue</dt>
-              <dd>{selected.presenting_issue || '—'}</dd>
-            </div>
-            {selected.discharge_summary && (
-              <div className="episode-detail__full">
-                <dt>Discharge summary</dt>
-                <dd>{selected.discharge_summary}</dd>
-              </div>
-            )}
           </dl>
+          <div className="episode-detail__note">
+            <div className="episode-detail__reports-header">
+              <h4>Process Notes</h4>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => navigate(`/clients/${clientId}/progress-notes?episode=${selected.id}`)}
+              >
+                Add Process Note
+              </button>
+            </div>
+            {episodeNotes.length === 0 ? (
+              <p className="text-small text-muted">No Process Notes on this course yet.</p>
+            ) : (
+              <ul className="episode-note-list">
+                {episodeNotes.map((note) => (
+                  <li key={note.id}>
+                    <button
+                      type="button"
+                      className="linkish"
+                      onClick={() => navigate(`/clients/${clientId}/progress-notes?note=${note.id}&episode=${selected.id}`)}
+                    >
+                      {note.title || 'Untitled Process Note'}
+                    </button>
+                    <span className="text-small text-muted">{formatDate(note.session_date)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {userId && (
+            <EpisodeReports
+              key={selected.id}
+              episode={selected}
+              clientId={clientId}
+              userId={userId}
+              organizationId={client?.workplace_id || null}
+            />
+          )}
         </div>
       )}
     >
+      {episodesQuery.isError && (
+        <p className="text-small text-muted">Episodes could not be loaded. Refresh the page and try again.</p>
+      )}
       <RecordTable
         columns={EPISODE_COLUMNS}
         rows={rows}
-        emptyMessage="No episodes recorded yet. Referrals will create new episodes automatically."
+        emptyMessage="No episodes yet. Open a new episode, or book a client session and the first course opens with it."
         onRowClick={(row) => setSelectedId(row.id)}
-        selectedId={selectedId}
+        selectedId={selected?.id}
       />
     </RecordListLayout>
   )

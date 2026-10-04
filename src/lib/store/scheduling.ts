@@ -11,6 +11,8 @@ import {
   planFollowOnWrite,
   type ServiceFollowOnSource,
 } from '../scheduling/appointmentHygiene'
+import { resolveEpisodeAttachment } from '../scheduling/episodes'
+import { activeLocalEpisode, openLocalEpisode } from './episodes'
 
 export { APPOINTMENT_TYPES, ATTENDANCE_STATUSES } from '../mockData'
 
@@ -164,13 +166,36 @@ export function saveAppointment(payload, userId) {
   }
 
   const startTime = schedule.start_time
+  const blockRole = payload.block_role || blockRoleForServiceType(
+    db.orgServices.find((row) => row.id === payload.service_id)?.service_type as string | undefined,
+  )
+  const clientId = typeof payload.client_id === 'string' && payload.client_id ? payload.client_id : null
+  const requestedEpisodeId = typeof payload.episode_id === 'string' ? payload.episode_id : null
+  const active = clientId ? activeLocalEpisode(clientId) : null
+  const attachment = resolveEpisodeAttachment({
+    blockRole,
+    clientId,
+    isCreate: true,
+    requestedEpisodeId,
+    existingEpisodeId: null,
+    activeEpisodeId: active?.id ?? null,
+  })
+  const workplaceId = typeof client?.workplace_id === 'string' ? client.workplace_id : null
+  const episodeId = attachment.open && clientId
+    ? openLocalEpisode({
+      clientId,
+      ownerId: String(payload.clinician_id || userId),
+      organizationId: workplaceId,
+    }).id
+    : attachment.episodeId
+
   const created = {
     id: uid('appt'),
-    client_id: payload.client_id || null,
+    client_id: clientId,
     client_name: client?.real_name
       || `${client?.first_name || ''} ${client?.surname || ''}`.trim()
-      || (payload.client_id ? 'Client' : 'No client'),
-    episode_id: payload.episode_id || null,
+      || (clientId ? 'Client' : 'No client'),
+    episode_id: episodeId,
     clinician_id: payload.clinician_id || userId,
     service_id: payload.service_id || null,
     service_name: payload.service_name || undefined,
@@ -185,9 +210,7 @@ export function saveAppointment(payload, userId) {
     location: payload.location ?? '',
     notes: payload.notes || '',
     other_info: payload.other_info?.trim() || '',
-    block_role: payload.block_role || blockRoleForServiceType(
-      db.orgServices.find((row) => row.id === payload.service_id)?.service_type as string | undefined,
-    ),
+    block_role: blockRole,
     parent_appointment_id: null,
     series_id: payload.series_id || null,
     created_at: now,

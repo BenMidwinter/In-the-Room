@@ -40,6 +40,7 @@ export const progressNoteInputSchema = z
     id: z.string().optional(),
     client_id: z.string().optional(),
     appointment_id: z.string().nullish(),
+    episode_id: z.string().nullish(),
     title: optionalText,
     content: z.string().optional(),
     session_date: dateString.optional(),

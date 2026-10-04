@@ -92,6 +92,9 @@ export function useSaveAppointmentMutation() {
       if (saved?.id) {
         queryClient.setQueryData(appointmentQueryKeys.detail(String(saved.id)), saved)
       }
+      if (saved?.client_id) {
+        queryClient.invalidateQueries({ queryKey: ['episodes', 'client', saved.client_id] })
+      }
     },
   })
 }

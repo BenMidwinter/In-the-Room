@@ -22,6 +22,8 @@ import {
   planFollowOnBlock,
   planFollowOnWrite,
 } from '../scheduling/appointmentHygiene'
+import { resolveEpisodeAttachment } from '../scheduling/episodes'
+import { findActiveEpisode, openEpisode } from './episodesRepo'
 
 type AppointmentExtras = {
   v: 0
@@ -417,14 +419,38 @@ export async function upsertAppointmentRemote(
     ? (payload.attendance_status as string | null)
     : (existingLocal?.attendance_status ?? null)
 
+  let episodeId: string | null = payload.episode_id !== undefined
+    ? (payload.episode_id ? String(payload.episode_id) : null)
+    : (existingLocal?.episode_id || null)
+
+  if (!existingId) {
+    const active = clientId ? await findActiveEpisode(clientId) : null
+    const attachment = resolveEpisodeAttachment({
+      blockRole,
+      clientId,
+      isCreate: true,
+      requestedEpisodeId: payload.episode_id ? String(payload.episode_id) : null,
+      existingEpisodeId: null,
+      activeEpisodeId: active?.id ?? null,
+    })
+    if (attachment.open && clientId) {
+      const opened = await openEpisode({
+        clientId,
+        ownerId: userId,
+        organizationId: client?.workplace_id || null,
+      })
+      episodeId = opened.id
+    } else {
+      episodeId = attachment.episodeId
+    }
+  }
+
   const row = {
     owner_id: userId,
     organization_id: client?.workplace_id || null,
     client_id: clientId,
     clinician_id: clinicianId,
-    episode_id: payload.episode_id !== undefined
-      ? (payload.episode_id ? String(payload.episode_id) : null)
-      : (existingLocal?.episode_id || null),
+    episode_id: episodeId,
     service_id: serviceId,
     appointment_type: String(
       payload.appointment_type

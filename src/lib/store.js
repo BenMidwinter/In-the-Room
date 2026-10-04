@@ -11,6 +11,8 @@
 
 export * from './store/clientRecords'
 export * from './store/clinicalDocs'
+export * from './store/episodes'
+export * from './store/reports'
 export * from './store/scheduling'
 export * from './store/organisation'
 export * from './store/templates'

@@ -69,6 +69,9 @@ export function saveProgressNote(payload, userId) {
       appointment_id: payload.appointment_id !== undefined
         ? payload.appointment_id
         : db.progressNotes[idx].appointment_id,
+      episode_id: payload.episode_id !== undefined
+        ? payload.episode_id
+        : db.progressNotes[idx].episode_id,
       updated_at: today,
     }
     return enrichProgressNoteLock(db.progressNotes[idx])
@@ -79,6 +82,7 @@ export function saveProgressNote(payload, userId) {
     client_id: payload.client_id,
     author_id: userId,
     appointment_id: payload.appointment_id || null,
+    episode_id: payload.episode_id || null,
     title: payload.title || 'Untitled Process Note',
     content: payload.content || '<p></p>',
     session_date: payload.session_date || today,

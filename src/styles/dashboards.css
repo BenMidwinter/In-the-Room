@@ -482,7 +482,7 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-/* Client overview — clinical profile (top) + horizontal timeline (below) */
+/* Client overview — last/next appointment, then the timeline */
 .client-overview {
   display: flex;
   flex-direction: column;
@@ -490,19 +490,48 @@
   min-width: 0;
 }
 
-.client-overview__profile {
-  min-width: 0;
+.client-overview__visits {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
 }
 
-.client-overview__profile .client-profile-summary {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 0.85rem 1.35rem;
+.client-visit-card {
+  display: flex;
+  flex-direction: column;
   align-items: flex-start;
+  gap: 0.35rem;
+  text-align: left;
+  cursor: pointer;
 }
 
-.client-overview__profile .client-profile-summary__formulation {
-  flex: 1 1 100%;
+.client-visit-card:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.client-visit-card__label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
+}
+
+.client-visit-card__when {
+  font-size: 1.05rem;
+  color: var(--col-accent);
+}
+
+.client-visit-card__service {
+  color: var(--txt-muted);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 700px) {
+  .client-overview__visits {
+    grid-template-columns: 1fr;
+  }
 }
 
 .client-overview__timeline {

@@ -176,6 +176,7 @@ function ProgressNotesPageContent() {
   const [searchParams] = useSearchParams()
   const appointmentParam = searchParams.get('appointment')
   const noteParam = searchParams.get('note')
+  const episodeParam = searchParams.get('episode')
   const navigate = useNavigate()
   const overlay = useAppointmentOverlay()
   const { client, session, refreshClients } = useClientSession()
@@ -186,6 +187,7 @@ function ProgressNotesPageContent() {
   const [sessionDate, setSessionDate] = useState(DEMO_TODAY)
   const [content, setContent] = useState('<p></p>')
   const [activeNoteId, setActiveNoteId] = useState(null)
+  const [boundEpisodeId, setBoundEpisodeId] = useState(episodeParam || null)
   const [previewNoteId, setPreviewNoteId] = useState(null)
   const [prefillReady, setPrefillReady] = useState(false)
   const [editorVersion, setEditorVersion] = useState(0)
@@ -226,6 +228,7 @@ function ProgressNotesPageContent() {
 
   const applySavedNote = useCallback((saved) => {
     setActiveNoteId(saved.id)
+    if (saved.episode_id) setBoundEpisodeId(saved.episode_id)
     setNoteMeta({
       status: saved.status || 'draft',
       signed_off_at: saved.signed_off_at || null,
@@ -238,6 +241,7 @@ function ProgressNotesPageContent() {
     id: activeNoteId || undefined,
     client_id: client.id,
     appointment_id: linkedAppointment?.id ?? null,
+    episode_id: boundEpisodeId || episodeParam || linkedAppointment?.episode_id || null,
     title: title.trim() || `Session note — ${sessionDate}`,
     content,
     session_date: sessionDate,
@@ -248,6 +252,9 @@ function ProgressNotesPageContent() {
     activeNoteId,
     client.id,
     linkedAppointment?.id,
+    boundEpisodeId,
+    episodeParam,
+    linkedAppointment?.episode_id,
     title,
     content,
     sessionDate,
@@ -279,11 +286,13 @@ function ProgressNotesPageContent() {
         setTherapeuticTheme(existing.therapeutic_theme || '')
         setArtworkAttachments(existing.artwork_attachments || [])
         setActiveNoteId(existing.id)
+        setBoundEpisodeId(existing.episode_id || episodeParam || null)
         applySavedNote(existing)
         syncAutoSaveBaseline({
           id: existing.id,
           client_id: client.id,
           appointment_id: existing.appointment_id,
+          episode_id: existing.episode_id || episodeParam || null,
           title: existing.title,
           content: existing.content,
           session_date: existing.session_date,
@@ -305,6 +314,7 @@ function ProgressNotesPageContent() {
         setTherapeuticTheme('')
         setArtworkAttachments([])
         setActiveNoteId(null)
+        setBoundEpisodeId(episodeParam || null)
         setNoteMeta({ status: 'draft', signed_off_at: null, lock_until: null, is_locked: false })
         autoSaveKeyRef.current = ''
       }
@@ -329,11 +339,13 @@ function ProgressNotesPageContent() {
       setTherapeuticTheme(existing.therapeutic_theme || '')
       setArtworkAttachments(existing.artwork_attachments || [])
       setActiveNoteId(existing.id)
+      setBoundEpisodeId(existing.episode_id || episodeParam || appt.episode_id || null)
       applySavedNote(existing)
       syncAutoSaveBaseline({
         id: existing.id,
         client_id: client.id,
         appointment_id: existing.appointment_id,
+        episode_id: existing.episode_id || episodeParam || appt.episode_id || null,
         title: existing.title,
         content: existing.content,
         session_date: existing.session_date,
@@ -353,6 +365,7 @@ function ProgressNotesPageContent() {
     setTherapeuticTheme('')
     setArtworkAttachments([])
     setActiveNoteId(null)
+    setBoundEpisodeId(episodeParam || appt.episode_id || null)
     setNoteMeta({ status: 'draft', signed_off_at: null, lock_until: null, is_locked: false })
     autoSaveKeyRef.current = ''
     setPrefillReady(true)
@@ -365,6 +378,7 @@ function ProgressNotesPageContent() {
     noteFromUrlPending,
     noteFromAppointment,
     noteFromAppointmentPending,
+    episodeParam,
     applySavedNote,
     syncAutoSaveBaseline,
   ])
@@ -453,7 +467,7 @@ function ProgressNotesPageContent() {
           if (redirectAfterSave) {
             navigate(`/clients/${client.id}/notes-history`)
           } else if (isStandalone && !noteParam && saved.id) {
-            navigate(`/clients/${client.id}/progress-notes?note=${saved.id}`, { replace: true })
+            navigate(`/clients/${client.id}/progress-notes?note=${saved.id}${saved.episode_id ? `&episode=${saved.episode_id}` : ''}`, { replace: true })
           }
           onSuccess?.(saved)
         },
