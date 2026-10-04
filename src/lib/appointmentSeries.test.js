@@ -25,9 +25,11 @@ describe('appointmentSeries', () => {
     expect(countSeriesScope(series[1], series, 'following')).toBe(2)
   })
 
-  it('uses heuristic match when series_id is missing', () => {
+  it('treats matching times without series_id as separate sessions', () => {
     const loose = series.map((a) => ({ ...a, series_id: null }))
-    expect(appointmentBelongsToSeries(loose[0], loose)).toBe(true)
-    expect(resolveSeriesScopeIds(loose[0], loose, 'all')).toHaveLength(3)
+    expect(appointmentBelongsToSeries(loose[0], loose)).toBe(false)
+    expect(findSeriesSiblings(loose[0], loose).map((a) => a.id)).toEqual(['a1'])
+    expect(resolveSeriesScopeIds(loose[0], loose, 'all')).toEqual(['a1'])
+    expect(resolveSeriesScopeIds(loose[0], loose, 'following')).toEqual(['a1'])
   })
 })

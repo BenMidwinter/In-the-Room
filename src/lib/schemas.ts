@@ -1,5 +1,6 @@
 import { z, type ZodType } from 'zod'
 import { APPOINTMENT_TYPES, ATTENDANCE_STATUSES } from './mockData'
+import { BLOCK_ROLES, SERVICE_TYPES } from './scheduling/appointmentHygiene'
 
 /**
  * Validation boundary for everything that writes into the store. Today the store
@@ -101,7 +102,7 @@ export const appointmentInputSchema = z
     other_info: z.string().optional(),
     create_meet_link: z.boolean().optional(),
     /** support/admin/busy blocks may be booked without a client */
-    block_role: z.enum(['client_session', 'support', 'admin', 'busy', 'primary', 'appointment']).optional(),
+    block_role: z.enum(BLOCK_ROLES).optional(),
   })
   .refine((p) => {
     if (p.id || p.client_id) return true
@@ -177,7 +178,7 @@ export const clinicianUserInputSchema = z.object({
 })
 
 export const orgServiceInputSchema = z.object({
-  service_type: z.enum(['appointment', 'admin', 'busy']).optional(),
+  service_type: z.enum(SERVICE_TYPES).optional(),
   name: requiredText('Service name'),
   description: z.string().optional(),
   color: z.string().optional(),

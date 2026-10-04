@@ -11,6 +11,7 @@ describe('defaultServiceColor', () => {
   it('returns per-type defaults', () => {
     expect(defaultServiceColor('busy')).toBe(DEFAULT_SERVICE_COLORS.busy)
     expect(defaultServiceColor('admin')).toBe(DEFAULT_SERVICE_COLORS.admin)
+    expect(defaultServiceColor('support')).toBe(DEFAULT_SERVICE_COLORS.support)
   })
   it('falls back to the first preset for unknown types', () => {
     expect(defaultServiceColor('nope')).toBe(SERVICE_COLOR_PRESETS[0])

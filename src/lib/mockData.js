@@ -43,6 +43,7 @@ export const LETTER_TEMPLATES = []
 /** Organisation services — trackable inputs classified by time type. */
 export const ORG_SERVICE_TYPES = {
   appointment: 'Appointment',
+  support: 'Support',
   admin: 'Admin',
   busy: 'Busy',
 }

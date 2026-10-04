@@ -24,6 +24,7 @@ import SeriesScopeDialog from './SeriesScopeDialog'
 import {
   appointmentBelongsToSeries,
   countSeriesScope,
+  newSeriesId,
 } from '../lib/appointmentSeries'
 
 function cx(...parts) {
@@ -567,6 +568,22 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
               value={appointmentOtherInfo(appointment)}
             />
           )}
+          {appointment.meet_url && (
+            <li className="room-stacked-row">
+              <div className="room-stacked-row__icon" aria-hidden>🎥</div>
+              <div className="room-stacked-row__body">
+                <span className="room-stacked-row__label">Meet</span>
+                <a
+                  className="room-stacked-row__value"
+                  href={appointment.meet_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Join Google Meet
+                </a>
+              </div>
+            </li>
+          )}
         </StackedDataList>
       </section>
 
@@ -1040,9 +1057,7 @@ export function ScheduleSessionPanel({
       ? Array.from({ length: recurWeeks }, (_, i) => addDaysYmd(sessionDate, i * 7))
       : undefined
     const seriesId = bookDates?.length > 1
-      ? (typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `series-${Date.now()}`)
+      ? newSeriesId()
       : (appointment?.series_id || undefined)
     return {
       ...(appointment?.id ? { id: appointment.id } : {}),
@@ -1448,9 +1463,7 @@ export function RecurringSchedulePanel({
   const handleSubmit = (e) => {
     e.preventDefault()
     const seriesId = dates.length > 1
-      ? (source.series_id || (typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `series-${Date.now()}`))
+      ? (source.series_id || newSeriesId())
       : source.series_id || undefined
     onSave?.({
       dates,

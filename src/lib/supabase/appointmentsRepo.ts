@@ -14,7 +14,14 @@ import { appointmentSchedule, fromDatetimeLocalValue, type AppointmentLike } fro
 import { parseOrThrow, appointmentInputSchema } from '../schemas'
 import { sortAppointmentsLatestFirst } from '../calendarAccess'
 import { getClientsForUser } from '../store/clientRecords'
-import { getServiceById } from './servicesRepo'
+import { getServiceById, type ServiceRow } from './servicesRepo'
+import { createMeetForAppointment, deleteGoogleEventsForAppointments } from './googleMeet'
+import {
+  assertWritableAppointment,
+  blockRoleForServiceType,
+  planFollowOnBlock,
+  planFollowOnWrite,
+} from '../scheduling/appointmentHygiene'
 
 type AppointmentExtras = {
   v: 0
@@ -173,7 +180,7 @@ export async function listAppointmentsFromSupabase(): Promise<AppAppointment[]> 
     .order('starts_at', { ascending: false })
 
   if (error) throw error
-  const mapped = (data || []).map((row) => toAppAppointment(row))
+  const mapped = await attachMeetUrls((data || []).map((row) => toAppAppointment(row)))
   hydrateLocal(mapped)
   return mapped
 }
@@ -205,7 +212,9 @@ export async function fetchAppointment(appointmentId: string): Promise<AppAppoin
     .eq('id', appointmentId)
     .maybeSingle()
   if (error) throw error
-  return data ? toAppAppointment(data) : null
+  if (!data) return null
+  const [mapped] = await attachMeetUrls([toAppAppointment(data)])
+  return mapped
 }
 
 export async function fetchUpcomingAppointments(
@@ -239,11 +248,41 @@ export async function fetchUpcomingAppointments(
   ).reverse() as AppAppointment[]
 }
 
-function blockRoleFromServiceType(serviceType: string | null | undefined): string {
-  if (serviceType === 'admin') return 'admin'
-  if (serviceType === 'busy') return 'busy'
-  if (serviceType === 'support') return 'support'
-  return 'client_session'
+const APPOINTMENT_COLUMNS = 'id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at'
+
+async function attachMeetUrls(rows: AppAppointment[]): Promise<AppAppointment[]> {
+  const supabase = getSupabase()
+  if (!supabase || !rows.length) return rows
+  const ids = rows.map((row) => row.id).filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+  if (!ids.length) return rows
+  const { data, error } = await supabase
+    .from('appointment_external_links')
+    .select('appointment_id, meet_url')
+    .in('appointment_id', ids)
+  if (error || !data?.length) return rows
+  const urls = new Map<string, string>()
+  for (const link of data) {
+    if (link.meet_url) urls.set(link.appointment_id, link.meet_url)
+  }
+  if (!urls.size) return rows
+  return rows.map((row) => {
+    const meetUrl = urls.get(row.id)
+    return meetUrl ? { ...row, meet_url: meetUrl } : row
+  })
+}
+
+function rememberLocal(appointment: AppAppointment) {
+  const idx = db.appointments.findIndex((row) => row.id === appointment.id)
+  if (idx === -1) db.appointments.push(appointment as unknown as StoreRecord)
+  else db.appointments[idx] = appointment as unknown as StoreRecord
+}
+
+function forgetLocal(ids: string[]) {
+  if (!ids.length) return
+  const drop = new Set(ids)
+  const kept = db.appointments.filter((row) => !drop.has(String(row.id)))
+  db.appointments.length = 0
+  for (const row of kept) db.appointments.push(row)
 }
 
 export async function upsertAppointmentRemote(
@@ -253,6 +292,7 @@ export async function upsertAppointmentRemote(
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
 
+  assertWritableAppointment(payload)
   payload = parseOrThrow(appointmentInputSchema, payload, 'Appointment') as Record<string, unknown>
 
   const existingId = payload.id && /^[0-9a-f-]{36}$/i.test(String(payload.id))
@@ -316,17 +356,17 @@ export async function upsertAppointmentRemote(
     || existingLocal?.therapy_modality
     || 'music_therapy',
   )
-  let serviceType: string | null = null
+  let primaryService: ServiceRow | null = null
+  let serviceLookupFailed = false
   if (serviceId) {
     try {
-      const primary = await getServiceById(serviceId)
-      if (primary) {
-        serviceName = primary.name
-        therapyModality = primary.slug || therapyModality
-        serviceType = primary.service_type || null
+      primaryService = await getServiceById(serviceId)
+      if (primaryService) {
+        serviceName = primaryService.name
+        therapyModality = primaryService.slug || therapyModality
       }
     } catch {
-      /* keep payload modality */
+      serviceLookupFailed = true
     }
   }
 
@@ -362,15 +402,13 @@ export async function upsertAppointmentRemote(
     end_time: endTime,
   }
 
-  const selectCols = 'id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at'
-
   const seriesId = payload.series_id && /^[0-9a-f-]{36}$/i.test(String(payload.series_id))
     ? String(payload.series_id)
     : undefined
 
   const blockRole = String(
     payload.block_role
-    || (serviceType ? blockRoleFromServiceType(serviceType) : null)
+    || (primaryService ? blockRoleForServiceType(primaryService.service_type) : null)
     || existingLocal?.block_role
     || 'client_session',
   )
@@ -406,43 +444,54 @@ export async function upsertAppointmentRemote(
       .from('appointments')
       .update(row)
       .eq('id', existingId)
-      .select(selectCols)
+      .select(APPOINTMENT_COLUMNS)
       .single()
     if (error) throw error
-    const mapped = toAppAppointment(data)
-    const idx = db.appointments.findIndex((a) => a.id === mapped.id)
-    if (idx === -1) db.appointments.push(mapped as unknown as StoreRecord)
-    else db.appointments[idx] = mapped as unknown as StoreRecord
+    let mapped = toAppAppointment(data)
+    rememberLocal(mapped)
+    if (!data.parent_appointment_id && !serviceLookupFailed) {
+      await syncRemoteFollowOn({
+        parent: mapped,
+        ownerId: userId,
+        clinicianId,
+        organizationId: row.organization_id,
+        clientName,
+        assignedTherapist,
+        primary: blockRole === 'client_session' ? primaryService : null,
+      })
+    }
+    mapped = await finishMeetLink(mapped, Boolean(payload.create_meet_link))
     return mapped
   }
 
   const { data, error } = await supabase
     .from('appointments')
     .insert(row)
-    .select(selectCols)
+    .select(APPOINTMENT_COLUMNS)
     .single()
   if (error) throw error
-  const mapped = toAppAppointment(data)
-  db.appointments.push(mapped as unknown as StoreRecord)
-
-  // Auto-create linked follow-on support/admin block from service settings.
-  if (serviceId && row.block_role === 'client_session') {
-    try {
-      await createFollowOnBlock({
-        parent: mapped,
-        parentRow: data,
-        ownerId: userId,
-        clinicianId,
-        organizationId: row.organization_id,
-        clientName,
-        assignedTherapist,
-      })
-    } catch (err) {
-      console.error('Failed to create follow-on block for appointment', mapped.id, err)
-    }
+  let mapped = toAppAppointment(data)
+  rememberLocal(mapped)
+  if (!serviceLookupFailed) {
+    await syncRemoteFollowOn({
+      parent: mapped,
+      ownerId: userId,
+      clinicianId,
+      organizationId: row.organization_id,
+      clientName,
+      assignedTherapist,
+      primary: blockRole === 'client_session' ? primaryService : null,
+    })
   }
-
+  mapped = await finishMeetLink(mapped, Boolean(payload.create_meet_link))
   return mapped
+}
+
+async function finishMeetLink(appointment: AppAppointment, requested: boolean): Promise<AppAppointment> {
+  if (requested) return ensureMeetLink(appointment, true)
+  const [withMeet] = await attachMeetUrls([appointment])
+  if (withMeet.meet_url) rememberLocal(withMeet)
+  return withMeet
 }
 
 function parseMinutesSafe(time: string | undefined): number {
@@ -451,86 +500,137 @@ function parseMinutesSafe(time: string | undefined): number {
   return (h || 0) * 60 + (m || 0)
 }
 
-async function createFollowOnBlock(opts: {
+async function syncRemoteFollowOn(opts: {
   parent: AppAppointment
-  parentRow: { id: string; service_id?: string | null }
   ownerId: string
   clinicianId: string
   organizationId: string | null
   clientName: string
   assignedTherapist: string
+  primary: ServiceRow | null
 }) {
   const supabase = getSupabase()
-  if (!supabase || !opts.parentRow.service_id) return
+  if (!supabase) return
 
-  const primary = await getServiceById(opts.parentRow.service_id)
-  if (!primary?.follow_on_service_id) return
+  const { data: existing, error: listError } = await supabase
+    .from('appointments')
+    .select('id')
+    .eq('parent_appointment_id', opts.parent.id)
+  if (listError) throw listError
 
-  const followOn = await getServiceById(primary.follow_on_service_id)
-  if (!followOn || followOn.is_active === false) return
-
-  const duration = Number(
-    primary.follow_on_duration_minutes
-    || followOn.default_duration_minutes
-    || 10,
+  const followOn = opts.primary?.follow_on_service_id
+    ? await getServiceById(opts.primary.follow_on_service_id)
+    : null
+  const write = planFollowOnWrite(
+    (existing || []).map((row) => row.id),
+    planFollowOnBlock(opts.primary, followOn),
   )
-  if (!Number.isFinite(duration) || duration <= 0) return
+
+  if (write.deleteIds.length) {
+    const { error } = await supabase.from('appointments').delete().in('id', write.deleteIds)
+    if (error) throw error
+    forgetLocal(write.deleteIds)
+  }
+
+  if (!write.plan) return
 
   const startTime = opts.parent.end_time
-  const endTime = addMinutesToTime(startTime, duration)
+  const endTime = addMinutesToTime(startTime, write.plan.durationMinutes)
   const sessionDate = opts.parent.session_date
-  const startsAt = new Date(`${sessionDate}T${startTime}:00`).toISOString()
-  const endsAt = new Date(`${sessionDate}T${endTime}:00`).toISOString()
-
-  const blockRole = followOn.service_type === 'admin'
-    ? 'admin'
-    : followOn.service_type === 'busy'
-      ? 'busy'
-      : 'support'
-
   const extras: AppointmentExtras = {
     v: 0,
     client_name: opts.clientName,
     assigned_therapist: opts.assignedTherapist,
-    therapy_modality: followOn.slug,
-    service_name: followOn.name,
+    therapy_modality: write.plan.therapyModality,
+    service_name: write.plan.serviceName,
     location: opts.parent.location || '',
     notes: '',
-    other_info: followOn.name,
+    other_info: write.plan.serviceName,
     session_date: sessionDate,
     start_time: startTime,
     end_time: endTime,
   }
+  const childRow = {
+    owner_id: opts.ownerId,
+    organization_id: opts.organizationId,
+    client_id: opts.parent.client_id,
+    clinician_id: opts.clinicianId,
+    episode_id: opts.parent.episode_id,
+    service_id: write.plan.serviceId,
+    parent_appointment_id: opts.parent.id,
+    appointment_type: 'one_to_one',
+    starts_at: new Date(`${sessionDate}T${startTime}:00`).toISOString(),
+    ends_at: new Date(`${sessionDate}T${endTime}:00`).toISOString(),
+    attendance_status: null,
+    encrypted_payload: extras as unknown as Json,
+    block_role: write.plan.blockRole,
+  }
+
+  if (write.keepId) {
+    const { data, error } = await supabase
+      .from('appointments')
+      .update(childRow)
+      .eq('id', write.keepId)
+      .select(APPOINTMENT_COLUMNS)
+      .single()
+    if (error) throw error
+    rememberLocal(toAppAppointment(data))
+    return
+  }
 
   const { data, error } = await supabase
     .from('appointments')
-    .insert({
-      owner_id: opts.ownerId,
-      organization_id: opts.organizationId,
-      client_id: opts.parent.client_id,
-      clinician_id: opts.clinicianId,
-      episode_id: opts.parent.episode_id,
-      service_id: followOn.id,
-      parent_appointment_id: opts.parent.id,
-      appointment_type: 'one_to_one',
-      starts_at: startsAt,
-      ends_at: endsAt,
-      attendance_status: null,
-      encrypted_payload: extras as unknown as Json,
-      block_role: blockRole,
-    })
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
+    .insert(childRow)
+    .select(APPOINTMENT_COLUMNS)
     .single()
-
   if (error) throw error
-  const mapped = toAppAppointment(data)
-  db.appointments.push(mapped as unknown as StoreRecord)
+  rememberLocal(toAppAppointment(data))
+}
+
+async function ensureMeetLink(appointment: AppAppointment, requested: boolean): Promise<AppAppointment> {
+  if (!requested) return appointment
+  if (appointment.parent_appointment_id) return appointment
+  if (appointment.block_role && appointment.block_role !== 'client_session') return appointment
+  if (!/^[0-9a-f-]{36}$/i.test(appointment.id)) return appointment
+
+  const supabase = getSupabase()
+  if (!supabase) return appointment
+
+  const { data } = await supabase
+    .from('appointment_external_links')
+    .select('meet_url')
+    .eq('appointment_id', appointment.id)
+    .not('meet_url', 'is', null)
+    .limit(1)
+  const existing = data?.find((row) => row.meet_url)?.meet_url
+  if (existing) {
+    const next = { ...appointment, meet_url: existing }
+    rememberLocal(next)
+    return next
+  }
+
+  try {
+    const meet = await createMeetForAppointment({
+      appointmentId: appointment.id,
+      startsAt: new Date(`${appointment.session_date}T${appointment.start_time}:00`).toISOString(),
+      endsAt: new Date(`${appointment.session_date}T${appointment.end_time}:00`).toISOString(),
+      summary: appointment.service_name || 'In the Room session',
+    })
+    if (!meet.meetUrl) return appointment
+    const next = { ...appointment, meet_url: meet.meetUrl }
+    rememberLocal(next)
+    return next
+  } catch (err) {
+    console.error('Meet link was not created for appointment', appointment.id, err)
+    return appointment
+  }
 }
 
 export async function saveAppointmentForUser(
   payload: Record<string, unknown>,
   userId: string,
 ): Promise<AppAppointment> {
+  assertWritableAppointment(payload)
   if (!isSupabaseConfigured()) {
     return saveLocalAppointment(payload, userId) as AppAppointment
   }
@@ -539,7 +639,11 @@ export async function saveAppointmentForUser(
 
 /** Delete primary appointments by id (follow-on children cascade via FK). */
 export async function deleteAppointmentsByIds(ids: string[]): Promise<number> {
-  const unique = [...new Set(ids.filter((id) => /^[0-9a-f-]{36}$/i.test(id)))]
+  const requested = [...new Set(ids.map((id) => String(id)).filter(Boolean))]
+  if (requested.length && requested.every((id) => id.startsWith('ext-'))) {
+    throw new Error('Google busy time is read-only and is not stored as an appointment.')
+  }
+  const unique = requested.filter((id) => /^[0-9a-f-]{36}$/i.test(id))
   if (!unique.length) return 0
 
   const purgeLocal = (ids: string[]) => {
@@ -560,12 +664,18 @@ export async function deleteAppointmentsByIds(ids: string[]): Promise<number> {
     return before - db.appointments.length
   }
 
+  const withChildren = new Set(unique)
+  for (const row of db.appointments) {
+    const parentId = String((row as { parent_appointment_id?: string }).parent_appointment_id || '')
+    if (withChildren.has(parentId)) withChildren.add(String(row.id))
+  }
+
   // Remove linked Google Calendar events before the DB rows (and their link cascade) go away.
   try {
-    const { deleteGoogleEventsForAppointments } = await import('./googleMeet')
-    await deleteGoogleEventsForAppointments(unique)
+    const googleIds = [...withChildren].filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+    await deleteGoogleEventsForAppointments(googleIds)
   } catch {
-    // Best-effort — local delete must still succeed.
+    // Best-effort — the appointment delete must still succeed.
   }
 
   const supabase = getSupabase()

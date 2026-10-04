@@ -10,7 +10,7 @@ import {
   useSaveAppointmentMutation,
 } from '../../lib/appointmentQueries'
 import { useConfirm, useToast } from '../../components/ui'
-import { appointmentBelongsToSeries, countSeriesScope } from '../../lib/appointmentSeries'
+import { appointmentBelongsToSeries, countSeriesScope, newSeriesId } from '../../lib/appointmentSeries'
 import SeriesScopeDialog from '../../components/SeriesScopeDialog'
 import {
   externalBlocksAsAppointments,
@@ -1078,12 +1078,7 @@ export default function CalendarModule({ persona }) {
     setScheduleSaving(true)
     try {
       const dates = payload.dates?.length ? payload.dates : [payload.session_date]
-      const seriesId = payload.series_id
-        || (dates.length > 1
-          ? (typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `series-${Date.now()}`)
-          : undefined)
+      const seriesId = payload.series_id || (dates.length > 1 ? newSeriesId() : undefined)
 
       // Editing an existing session (possibly a series scope).
       if (payload.id && !payload.dates?.length) {
@@ -1123,25 +1118,6 @@ export default function CalendarModule({ persona }) {
           userId: session.user.id,
         })
         if (!first) first = last
-        if (last?.id && /^[0-9a-f-]{36}$/i.test(last.id) && payload.create_meet_link) {
-          try {
-            const { createMeetForAppointment } = await import('../../lib/supabase/googleMeet')
-            const startsAt = `${last.session_date}T${last.start_time}:00`
-            const endsAt = `${last.session_date}T${last.end_time}:00`
-            const meet = await createMeetForAppointment({
-              appointmentId: last.id,
-              startsAt: new Date(startsAt).toISOString(),
-              endsAt: new Date(endsAt).toISOString(),
-              summary: 'In the Room session',
-            })
-            if (meet.meetUrl) {
-              last = { ...last, meet_url: meet.meetUrl }
-              if (first?.id === last.id) first = last
-            }
-          } catch {
-            // Meet is best-effort; booking still succeeds.
-          }
-        }
       }
       setScheduleDraft(null)
       setSelectedAppointment(null)
@@ -1196,12 +1172,7 @@ export default function CalendarModule({ persona }) {
   const handleRecurringSave = async (payload) => {
     setScheduleSaving(true)
     try {
-      const seriesId = payload.series_id
-        || (payload.dates?.length > 1
-          ? (typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `series-${Date.now()}`)
-          : undefined)
+      const seriesId = payload.series_id || (payload.dates?.length > 1 ? newSeriesId() : undefined)
       let first = null
       for (const date of payload.dates) {
         const saved = await saveAppointmentMutation.mutateAsync({
