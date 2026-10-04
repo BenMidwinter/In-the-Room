@@ -66,6 +66,9 @@ export function saveProgressNote(payload, userId) {
       modality_used: payload.modality_used ?? db.progressNotes[idx].modality_used,
       therapeutic_theme: payload.therapeutic_theme ?? db.progressNotes[idx].therapeutic_theme,
       artwork_attachments: payload.artwork_attachments ?? db.progressNotes[idx].artwork_attachments,
+      template_id: payload.template_id !== undefined
+        ? payload.template_id
+        : db.progressNotes[idx].template_id,
       appointment_id: payload.appointment_id !== undefined
         ? payload.appointment_id
         : db.progressNotes[idx].appointment_id,
@@ -89,6 +92,8 @@ export function saveProgressNote(payload, userId) {
     modality_used: payload.modality_used || null,
     therapeutic_theme: payload.therapeutic_theme || '',
     artwork_attachments: payload.artwork_attachments || [],
+    template_id: payload.template_id || null,
+    addendums: [],
     status: 'draft',
     signed_off_at: null,
     lock_until: null,
@@ -112,6 +117,29 @@ export function signOffProgressNote(payload, userId) {
     signed_off_at: now.toISOString(),
     lock_until: lockUntilFromSignOff(now),
     updated_at: now.toISOString().split('T')[0],
+  }
+  return enrichProgressNoteLock(db.progressNotes[idx])
+}
+
+/** Append text under a note after the 48-hour window has locked the signed record. */
+export function appendProgressNoteAddendum(noteId: string, body: string) {
+  const idx = db.progressNotes.findIndex(n => n.id === noteId)
+  if (idx === -1) throw new Error('Note not found')
+  const note = enrichProgressNoteLock(db.progressNotes[idx] as Record<string, unknown>)
+  if (!note.is_locked) throw new Error('An addendum is added after the note locks.')
+  const html = String(body || '').trim()
+  const text = html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim()
+  if (!text) throw new Error('Write the addendum before saving.')
+  const current = db.progressNotes[idx].addendums
+  const addendums = Array.isArray(current) ? current : []
+  const entry = {
+    id: uid('addendum'),
+    body: html,
+    created_at: new Date().toISOString(),
+  }
+  db.progressNotes[idx] = {
+    ...db.progressNotes[idx],
+    addendums: [...addendums, entry],
   }
   return enrichProgressNoteLock(db.progressNotes[idx])
 }

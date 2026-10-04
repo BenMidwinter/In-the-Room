@@ -46,6 +46,18 @@ export function progressNoteHistoryStatusLabel(
   return isProgressNoteSignedOff(note) ? 'COMPLETE' : 'DRAFT'
 }
 
+/** Remaining time until a signed-off note locks, for example "47h 12m". */
+export function formatLockCountdown(lockUntil: string | null | undefined, now: number = Date.now()): string | null {
+  if (!lockUntil) return null
+  const remaining = new Date(lockUntil).getTime() - now
+  if (!Number.isFinite(remaining) || remaining <= 0) return null
+  const hours = Math.floor(remaining / (60 * 60 * 1000))
+  const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000))
+  if (hours > 0) return `${hours}h ${minutes}m`
+  if (minutes > 0) return `${minutes}m`
+  return 'under a minute'
+}
+
 export function formatLockDeadline(lockUntil: string | null | undefined): string | null {
   if (!lockUntil) return null
   try {

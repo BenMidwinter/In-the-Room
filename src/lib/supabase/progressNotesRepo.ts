@@ -9,6 +9,7 @@ import {
   lockUntilFromSignOff,
 } from '../progressNoteLifecycle'
 import {
+  appendProgressNoteAddendum,
   getProgressNote,
   getProgressNoteByAppointment,
   getProgressNotes,
@@ -23,6 +24,12 @@ const NOTE_NEEDS_EPISODE = 'Add this appointment to an episode before saving the
 
 const NOTE_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, appointment_id, author_id, note_number, session_date, noted_at, status, signed_off_at, lock_until, template_id, encrypted_payload, created_at, updated_at'
 
+type NoteAddendum = {
+  id: string
+  body: string
+  created_at: string
+}
+
 type NotePayload = {
   v: 0
   title: string
@@ -30,6 +37,8 @@ type NotePayload = {
   modality_used: string | null
   therapeutic_theme: string
   artwork_attachments: unknown[]
+  template_id: string | null
+  addendums: NoteAddendum[]
 }
 
 type NoteRow = {
@@ -46,6 +55,7 @@ type NoteRow = {
   status: string
   signed_off_at: string | null
   lock_until: string | null
+  template_id: string | null
   encrypted_payload: Json
   created_at: string
   updated_at: string
@@ -60,6 +70,22 @@ function isUuid(value: unknown): value is string {
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }
 
+function parseAddendums(raw: unknown): NoteAddendum[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const row = item as Record<string, unknown>
+    const id = asId(row.id)
+    const body = String(row.body || '')
+    if (!id || !body.trim()) return []
+    return [{
+      id,
+      body,
+      created_at: String(row.created_at || ''),
+    }]
+  })
+}
+
 function parseNotePayload(raw: Json | null | undefined): NotePayload {
   const row = raw && typeof raw === 'object' && !Array.isArray(raw)
     ? raw as Record<string, unknown>
@@ -71,6 +97,8 @@ function parseNotePayload(raw: Json | null | undefined): NotePayload {
     modality_used: row.modality_used ? String(row.modality_used) : null,
     therapeutic_theme: String(row.therapeutic_theme || ''),
     artwork_attachments: Array.isArray(row.artwork_attachments) ? row.artwork_attachments : [],
+    template_id: asId(row.template_id),
+    addendums: parseAddendums(row.addendums),
   }
 }
 
@@ -89,6 +117,8 @@ function toAppNote(row: NoteRow) {
     modality_used: payload.modality_used,
     therapeutic_theme: payload.therapeutic_theme,
     artwork_attachments: payload.artwork_attachments,
+    template_id: payload.template_id || row.template_id || null,
+    addendums: payload.addendums,
     status: row.status === 'signed_off' ? 'signed_off' : 'draft',
     signed_off_at: row.signed_off_at,
     lock_until: row.lock_until,
@@ -215,12 +245,17 @@ export async function saveProgressNoteForUser(payload: Record<string, unknown>, 
     modality_used: parsed.modality_used ? String(parsed.modality_used) : null,
     therapeutic_theme: String(parsed.therapeutic_theme || ''),
     artwork_attachments: Array.isArray(parsed.artwork_attachments) ? parsed.artwork_attachments : [],
+    template_id: asId(parsed.template_id),
+    addendums: Array.isArray((current as { addendums?: NoteAddendum[] } | null)?.addendums)
+      ? (current as { addendums: NoteAddendum[] }).addendums
+      : [],
   }
   const shared = {
     client_id: clientId,
     episode_id: remoteEpisodeId,
     appointment_id: isUuid(remoteAppointmentId) ? remoteAppointmentId : null,
     session_date: String(parsed.session_date || today),
+    template_id: isUuid(parsed.template_id) ? String(parsed.template_id) : null,
     encrypted_payload: extras as unknown as Json,
     organization_id: await organizationFor(clientId, remoteEpisodeId),
   }
@@ -246,6 +281,41 @@ export async function saveProgressNoteForUser(payload: Record<string, unknown>, 
       noted_at: new Date().toISOString(),
       status: 'draft',
     })
+    .select(NOTE_COLUMNS)
+    .single()
+  if (error) throw error
+  return remember(toAppNote(data as NoteRow))
+}
+
+export async function appendProgressNoteAddendumForUser(noteId: string, body: string) {
+  if (!isSupabaseConfigured() || !isUuid(noteId)) return appendProgressNoteAddendum(noteId, body)
+  const supabase = getSupabase()
+  if (!supabase) return appendProgressNoteAddendum(noteId, body)
+
+  const html = String(body || '').trim()
+  const text = html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim()
+  if (!text) throw new Error('Write the addendum before saving.')
+
+  const { data: row, error: readError } = await supabase
+    .from('progress_notes')
+    .select(NOTE_COLUMNS)
+    .eq('id', noteId)
+    .maybeSingle()
+  if (readError) throw readError
+  if (!row) throw new Error('Note not found')
+  const noteRow = row as NoteRow
+  if (!enrichProgressNoteLock(noteRow).is_locked) {
+    throw new Error('An addendum is added after the note locks.')
+  }
+  const payload = parseNotePayload(noteRow.encrypted_payload)
+  payload.addendums = [
+    ...payload.addendums,
+    { id: crypto.randomUUID(), body: html, created_at: new Date().toISOString() },
+  ]
+  const { data, error } = await supabase
+    .from('progress_notes')
+    .update({ encrypted_payload: payload as unknown as Json })
+    .eq('id', noteId)
     .select(NOTE_COLUMNS)
     .single()
   if (error) throw error
