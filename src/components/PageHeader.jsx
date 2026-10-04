@@ -4,7 +4,7 @@ export default function PageHeader({
   actions,
   toolbar,
   className = '',
-  /** When false, skip negative horizontal margins (e.g. `page--service-lead` has no inline padding). */
+  /** When false, skip negative horizontal margins. */
   bleed = true,
 }) {
   const withToolbar = Boolean(toolbar)
@@ -14,7 +14,7 @@ export default function PageHeader({
       className={[
         'page-header',
         withToolbar ? 'page-header--with-toolbar' : '',
-        bleed ? '' : 'page-header--service-lead',
+        bleed ? '' : 'page-header--flush',
         className,
       ].filter(Boolean).join(' ')}
     >

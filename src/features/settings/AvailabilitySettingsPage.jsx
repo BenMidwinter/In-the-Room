@@ -5,7 +5,7 @@ export default function AvailabilitySettingsPage() {
   const { session, refreshClients } = useAppSession()
   if (!session) return <p className="text-muted">Sign in to edit availability.</p>
   return (
-    <div className="role-block-stack">
+    <div className="section-card-stack">
       <ProfileAvailabilityBlock userId={session.user.id} onSaved={refreshClients} />
     </div>
   )

@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { useClientSession } from '../../lib/useClientSession'
 import { getEpisodes } from '../../lib/store'
-import { usePermissions } from '../../lib/usePermissions'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import { useToast } from '../../components/ui'
@@ -28,8 +26,6 @@ const EPISODE_COLUMNS = [
 
 export default function CaseHistoryPanel() {
   const { id: clientId } = useParams()
-  const { client } = useClientSession()
-  const perms = usePermissions(client)
   const toast = useToast()
   const episodes = getEpisodes(clientId)
   const [selectedId, setSelectedId] = useState(episodes[0]?.id ?? null)
@@ -66,13 +62,8 @@ export default function CaseHistoryPanel() {
     <RecordListLayout
       title="Case history"
       subtitle="Referral episodes and care pathways for this client."
-      newLabel={perms.canStartNewCase ? 'case' : undefined}
-      onNew={perms.canStartNewCase
-        ? () => toast.info('Start new case — episode creation will connect to Supabase.')
-        : undefined}
-      headerActions={!perms.canStartNewCase ? (
-        <span className="text-small text-muted">New workplace cases require clinical lead or administrator</span>
-      ) : undefined}
+      newLabel="case"
+      onNew={() => toast.info('Start new case — episode creation will connect to Supabase.')}
       editor={selected && (
         <div className="card episode-detail">
           <div className="episode-detail__header">

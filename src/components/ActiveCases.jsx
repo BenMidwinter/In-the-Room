@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppClients } from '../lib/queries'
 import PageHeader, { PageHeaderFilter } from './PageHeader'
-import { usePermissions } from '../lib/usePermissions'
-import BlurredName from './BlurredName'
 import RecordTable from './RecordTable'
 
 const CLIENT_COLUMNS = [
@@ -16,7 +14,6 @@ const CLIENT_COLUMNS = [
 
 export default function ActiveCases() {
   const { clients } = useAppClients()
-  const perms = usePermissions()
   const navigate = useNavigate()
   const [filterContext, setFilterContext] = useState('all')
   const [sortType, setSortType] = useState('date_desc')
@@ -50,7 +47,7 @@ export default function ActiveCases() {
       status: 'Active',
     },
     cells: {
-      name: <strong><BlurredName name={c.real_name} blur={perms.blurClientIdentity} /></strong>,
+      name: <strong>{c.real_name}</strong>,
       context: c.workplace_id
         ? <span className="badge badge-blue">{c.workplace_name}</span>
         : <span className="badge badge-grey">Private</span>,
@@ -63,12 +60,10 @@ export default function ActiveCases() {
     <div className="page">
       <PageHeader
         title="Active cases"
-        subtitle="Your current caseload across private practice and workplace contexts."
-        actions={
-          (perms.canAddPrivateClient || perms.canAddWorkplaceClient) && (
-            <button type="button" className="primary" onClick={() => navigate('/clients/add')}>+ New client</button>
-          )
-        }
+        subtitle="Your current caseload."
+        actions={(
+          <button type="button" className="primary" onClick={() => navigate('/clients/add')}>+ New client</button>
+        )}
         toolbar={(
           <>
             <PageHeaderFilter id="active-cases-context" label="Context">
@@ -97,7 +92,7 @@ export default function ActiveCases() {
           columns={CLIENT_COLUMNS}
           rows={rows}
           emptyMessage="No active clients found."
-          onRowClick={perms.blurClientIdentity ? undefined : (row) => navigate(`/clients/${row.id}`)}
+          onRowClick={(row) => navigate(`/clients/${row.id}`)}
         />
       </div>
     </div>

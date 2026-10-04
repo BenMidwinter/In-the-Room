@@ -4,25 +4,12 @@
  * this in-memory layer starts blank (no demo / fake records).
  */
 
-export const DEMO_PERSONA_ACCOUNTS = {
-  clinician: {
-    userId: 'user-local',
-    name: 'Clinician',
-    serviceLead: false,
-    memberships: [],
-  },
-}
-
-export const DEMO_CLINICAL_LEAD_USER_ID = DEMO_PERSONA_ACCOUNTS.clinician.userId
-export const DEMO_SERVICE_LEAD_USER_ID = 'user-unused-service-lead'
-export const DEFAULT_DEMO_PERSONA_ID = 'clinician'
+export const LOCAL_PROFILE_ID = 'user-local'
 
 export const CURRENT_USER = {
-  id: DEMO_CLINICAL_LEAD_USER_ID,
+  id: LOCAL_PROFILE_ID,
   email: '',
-  name: DEMO_PERSONA_ACCOUNTS.clinician.name,
-  isAdmin: false,
-  isServiceLead: false,
+  name: 'Clinician',
 }
 
 export const CLINICIAN_WORKPLACES = []
@@ -31,7 +18,7 @@ export const WORKPLACES = []
 
 export const CLINICIAN_PROFILES = [
   {
-    id: DEMO_CLINICAL_LEAD_USER_ID,
+    id: LOCAL_PROFILE_ID,
     full_name: '',
     job_title: 'Creative Arts Therapist',
     hcpc_number: '',

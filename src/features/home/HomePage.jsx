@@ -14,9 +14,7 @@ import {
 import { appointmentDisplayName } from '../../lib/calendarServiceStyles'
 import { todayYmd } from '../../lib/dateArchitecture'
 import PageHeader from '../../components/PageHeader'
-import RoleBlockShell from '../../components/RoleBlockShell'
-import BlurredName from '../../components/BlurredName'
-import { usePermissions } from '../../lib/usePermissions'
+import SectionCard from '../../components/SectionCard'
 
 function clientLabel(clients, clientId) {
   return clients.find((c) => c.id === clientId)?.real_name || 'Client'
@@ -31,7 +29,7 @@ function HomeStatCard({ title, children }) {
   )
 }
 
-function UpcomingTimeline({ appointments, clients, blurNames }) {
+function UpcomingTimeline({ appointments, clients }) {
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -41,7 +39,7 @@ function UpcomingTimeline({ appointments, clients, blurNames }) {
 
   if (!appointments.length) {
     return (
-      <p className="role-block__empty">
+      <p className="section-card__empty">
         Nothing scheduled yet.{' '}
         <Link to="/calendar">Open the calendar</Link>
         {' '}to book a session, or{' '}
@@ -70,9 +68,8 @@ function UpcomingTimeline({ appointments, clients, blurNames }) {
                   {!isLast && <div className="timeline__line timeline__line--horizontal" />}
                 </div>
                 <Link
-                  to={blurNames ? '#' : `/clients/${appt.client_id}/appointments/${appt.id}`}
+                  to={`/clients/${appt.client_id}/appointments/${appt.id}`}
                   className="timeline__body home-upcoming-timeline__card"
-                  onClick={blurNames ? (e) => e.preventDefault() : undefined}
                 >
                   <div className="timeline__meta">
                     <time className="home-upcoming-timeline__when">
@@ -83,7 +80,7 @@ function UpcomingTimeline({ appointments, clients, blurNames }) {
                     </span>
                   </div>
                   <p className="timeline__title">
-                    <BlurredName name={clientLabel(clients, appt.client_id)} blur={blurNames} />
+                    {clientLabel(clients, appt.client_id)}
                   </p>
                   <p className="timeline__summary text-muted">
                     {service}
@@ -100,17 +97,15 @@ function UpcomingTimeline({ appointments, clients, blurNames }) {
 }
 
 export default function HomePage() {
-  const { session, activePersona, myWorkplace } = useAppSession()
+  const { session, activePersona } = useAppSession()
   const { clients } = useAppClients()
-  const perms = usePermissions()
-  const blurNames = perms.blurClientIdentity
   const name = activePersona?.name && activePersona.name !== 'Clinician'
     ? activePersona.name
     : null
 
   const { data: upcoming = [], isLoading: upcomingLoading } = useUpcomingAppointmentsQuery({
     userId: session.user.id,
-    myWorkplace,
+    myWorkplace: null,
     organisationWide: false,
   })
   const { data: allAppointments = [] } = useAllAppointmentsQuery()
@@ -135,8 +130,8 @@ export default function HomePage() {
     <div className="page page--home">
       <PageHeader title={name ? `Welcome back, ${name}` : 'Welcome'} />
 
-      <div className="role-block-stack">
-        <RoleBlockShell
+      <div className="section-card-stack">
+        <SectionCard
           blockId="clinician"
           actions={(
             <>
@@ -149,15 +144,14 @@ export default function HomePage() {
             <div className="home-dashboard__stats">
               <HomeStatCard title="Next session">
                 {upcomingLoading && !nextSession ? (
-                  <p className="role-block__empty">Loading schedule…</p>
+                  <p className="section-card__empty">Loading schedule…</p>
                 ) : nextSession ? (
                   <Link
-                    to={blurNames ? '#' : `/clients/${nextSession.client_id}/appointments/${nextSession.id}`}
+                    to={`/clients/${nextSession.client_id}/appointments/${nextSession.id}`}
                     className="home-stat-card__link"
-                    onClick={blurNames ? (e) => e.preventDefault() : undefined}
                   >
                     <p className="home-stat-card__primary">
-                      <BlurredName name={clientLabel(clients, nextSession.client_id)} blur={blurNames} />
+                      {clientLabel(clients, nextSession.client_id)}
                     </p>
                     <p className="home-stat-card__meta">
                       {formatAppointmentDate(nextSession)} · {formatAppointmentTime(nextSession)}
@@ -168,22 +162,21 @@ export default function HomePage() {
                     </p>
                   </Link>
                 ) : (
-                  <p className="role-block__empty">No upcoming sessions on your diary.</p>
+                  <p className="section-card__empty">No upcoming sessions on your diary.</p>
                 )}
               </HomeStatCard>
 
               <HomeStatCard title="Next task">
                 {nextTask && nextTaskHref ? (
                   <Link
-                    to={blurNames ? '#' : nextTaskHref}
+                    to={nextTaskHref}
                     className="home-stat-card__link"
-                    onClick={blurNames ? (e) => e.preventDefault() : undefined}
                   >
                     <p className="home-stat-card__primary">
                       {nextTaskNote ? 'Finish progress note' : 'Write progress note'}
                     </p>
                     <p className="home-stat-card__meta">
-                      <BlurredName name={clientLabel(clients, nextTask.client_id)} blur={blurNames} />
+                      {clientLabel(clients, nextTask.client_id)}
                       {' · '}
                       {formatSessionDateTime(nextTask) || appointmentSchedule(nextTask).session_date}
                     </p>
@@ -192,7 +185,7 @@ export default function HomePage() {
                     </p>
                   </Link>
                 ) : (
-                  <p className="role-block__empty">No progress notes waiting — you&apos;re up to date.</p>
+                  <p className="section-card__empty">No progress notes waiting — you&apos;re up to date.</p>
                 )}
               </HomeStatCard>
             </div>
@@ -200,10 +193,9 @@ export default function HomePage() {
             <UpcomingTimeline
               appointments={timelineAppointments}
               clients={clients}
-              blurNames={blurNames}
             />
           </div>
-        </RoleBlockShell>
+        </SectionCard>
       </div>
     </div>
   )

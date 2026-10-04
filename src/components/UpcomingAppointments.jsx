@@ -11,22 +11,18 @@ import {
   attendanceLabel,
   attendanceBadgeClass,
 } from '../lib/appointmentUtils'
-import { usePermissions } from '../lib/usePermissions'
-import BlurredName from './BlurredName'
-
-function AgendaEvent({ appt, clientName, blurNames }) {
+function AgendaEvent({ appt, clientName }) {
   return (
     <Link
-      to={blurNames ? '#' : `/clients/${appt.client_id}/appointments/${appt.id}`}
+      to={`/clients/${appt.client_id}/appointments/${appt.id}`}
       className="agenda-event"
-      onClick={blurNames ? e => e.preventDefault() : undefined}
     >
       <time className="agenda-event__time" dateTime={appt.scheduled_at}>
         {formatAppointmentTime(appt.scheduled_at)}
       </time>
       <div className="agenda-event__body">
         <span className="agenda-event__client">
-          <BlurredName name={clientName} blur={blurNames} />
+          {clientName}
         </span>
         <span className="agenda-event__meta">
           {APPOINTMENT_TYPES[appt.appointment_type]}
@@ -40,7 +36,7 @@ function AgendaEvent({ appt, clientName, blurNames }) {
   )
 }
 
-function LaterGroup({ items, clientName, blurNames }) {
+function LaterGroup({ items, clientName }) {
   if (!items.length) return null
 
   const byDate = items.reduce((acc, appt) => {
@@ -61,7 +57,7 @@ function LaterGroup({ items, clientName, blurNames }) {
           <ul className="agenda-day__events">
             {dayItems.map(appt => (
               <li key={appt.id}>
-                <AgendaEvent appt={appt} clientName={clientName(appt.client_id)} blurNames={blurNames} />
+                <AgendaEvent appt={appt} clientName={clientName(appt.client_id)} />
               </li>
             ))}
           </ul>
@@ -72,13 +68,12 @@ function LaterGroup({ items, clientName, blurNames }) {
 }
 
 export default function UpcomingAppointments() {
-  const { session, myWorkplace } = useAppSession()
+  const { session } = useAppSession()
   const { clients } = useAppClients()
-  const perms = usePermissions()
   const { data: upcoming = [] } = useUpcomingAppointmentsQuery({
     userId: session.user.id,
-    myWorkplace,
-    organisationWide: perms.isServiceLeadView,
+    myWorkplace: null,
+    organisationWide: false,
   })
   const sections = groupAppointmentsForAgenda(upcoming)
 
@@ -110,7 +105,7 @@ export default function UpcomingAppointments() {
                 <ul className="agenda-day__events">
                   {section.items.map(appt => (
                     <li key={appt.id}>
-                      <AgendaEvent appt={appt} clientName={clientName(appt.client_id)} blurNames={perms.blurClientIdentity} />
+                      <AgendaEvent appt={appt} clientName={clientName(appt.client_id)} />
                     </li>
                   ))}
                 </ul>
@@ -118,7 +113,7 @@ export default function UpcomingAppointments() {
             </section>
           ))}
 
-          <LaterGroup items={laterSection.items} clientName={clientName} blurNames={perms.blurClientIdentity} />
+          <LaterGroup items={laterSection.items} clientName={clientName} />
         </div>
       )}
     </div>

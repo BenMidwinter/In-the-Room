@@ -65,7 +65,6 @@ import {
 } from '../../lib/calendarServiceStyles'
 import { listServices } from '../../lib/supabase/servicesRepo'
 import { db } from '../../lib/data/collections'
-import { shouldBlurClientIdentity } from '../../lib/demoPersonas'
 import { CalendarWorkspaceFrame, CalendarTimeSlot, EventDrawer, ScheduleSessionPanel, RecurringSchedulePanel } from '../../components/LayoutComponents'
 
 const VIEW_MODES = [
@@ -796,7 +795,7 @@ function DayView({
 }
 
 export default function CalendarModule({ persona }) {
-  const { myWorkplace, session } = useAppSession()
+  const { session } = useAppSession()
   const { clients: remoteClients = [] } = useAppClients()
   const [viewMode, setViewMode] = useState('week')
   const [activeDate, setActiveDate] = useState(DEMO_TODAY)
@@ -908,8 +907,8 @@ export default function CalendarModule({ persona }) {
   }, [weeklyHours])
 
   const ownerOptions = useMemo(
-    () => getCalendarOwnerOptions(persona, myWorkplace),
-    [persona, myWorkplace],
+    () => getCalendarOwnerOptions(persona),
+    [persona],
   )
   const [calendarOwner, setCalendarOwner] = useState(() => getDefaultCalendarOwner(persona))
   const [prevPersona, setPrevPersona] = useState(persona)
@@ -958,7 +957,7 @@ export default function CalendarModule({ persona }) {
     }
   }
 
-  const blurNames = shouldBlurClientIdentity(persona)
+  const blurNames = false
 
   const weekDates = weekDatesYmd(activeDate)
   const workingDates = workingWeekDatesYmd(activeDate)
@@ -1450,7 +1449,7 @@ export default function CalendarModule({ persona }) {
             clients={assignedClients}
             allAppointments={filtered}
             sessionUserId={session.user.id}
-            myWorkplace={myWorkplace}
+            myWorkplace={null}
             calendarOwner={calendarOwner}
             showDateField={Boolean(scheduleDraft.manual) || scheduleDraft.mode === 'book_another' || scheduleDraft.mode === 'edit'}
             presentation="overlay"

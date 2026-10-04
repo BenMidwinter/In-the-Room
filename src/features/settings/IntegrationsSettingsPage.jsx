@@ -145,7 +145,7 @@ export default function IntegrationsSettingsPage() {
   }
 
   return (
-    <div className="role-block-stack">
+    <div className="section-card-stack">
       <SettingsSectionCard blockId="settings_integrations_google" title="Google Calendar">
         {!isSupabaseConfigured() && (
           <p className="auth-page__alert">Supabase env vars required.</p>

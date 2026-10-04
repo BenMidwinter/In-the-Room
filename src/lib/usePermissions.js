@@ -1,13 +1,8 @@
-import { buildPermissions, ROLES } from './permissions'
+import { buildPermissions } from './permissions'
 import { useAppSession } from './AppSessionContext'
 
-/** Permissions for the current user, optional client, and demo role override. */
+/** Access flags for the signed-in clinician, optionally scoped to one client. */
 export function usePermissions(client = null) {
-  const { session, myWorkplace, demoRole } = useAppSession()
-  const base = buildPermissions(myWorkplace, client, session?.user?.id, demoRole)
-  return {
-    ...base,
-    blurClientIdentity: demoRole === ROLES.SERVICE_LEAD,
-    isServiceLeadView: demoRole === ROLES.SERVICE_LEAD,
-  }
+  const { session } = useAppSession()
+  return buildPermissions(null, client, session?.user?.id)
 }

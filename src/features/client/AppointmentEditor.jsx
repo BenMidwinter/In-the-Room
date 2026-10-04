@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useClientSession } from '../../lib/useClientSession'
-import { useAppSession } from '../../lib/AppSessionContext'
 import {
   useAllAppointmentsQuery,
   useAppointmentQuery,
@@ -23,7 +22,6 @@ export default function AppointmentEditor() {
   const location = useLocation()
   const navigate = useNavigate()
   const { clientId, client, session } = useClientSession()
-  const { myWorkplace } = useAppSession()
   const toast = useToast()
   const confirm = useConfirm()
   // Nested route path="new" has no :appointmentId param — treat missing/`new` as create.
@@ -163,7 +161,7 @@ export default function AppointmentEditor() {
         clients={client ? [client] : []}
         allAppointments={clientAppointments}
         sessionUserId={session.user.id}
-        myWorkplace={myWorkplace}
+        myWorkplace={null}
         showDateField
         presentation="overlay"
         lockedClient

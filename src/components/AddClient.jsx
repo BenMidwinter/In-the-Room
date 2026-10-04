@@ -3,17 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAppSession } from '../lib/AppSessionContext'
 import DiagnosisPicker from './DiagnosisPicker'
 import PageHeader from './PageHeader'
-import { usePermissions } from '../lib/usePermissions'
 import { useToast } from './ui'
-import { getWorkplacesForUser, upsertClient, getClientById } from '../lib/store'
+import { upsertClient, getClientById } from '../lib/store'
 import { upsertClientRemote } from '../lib/supabase/clientsRepo'
 import { isSupabaseConfigured } from '../lib/supabase/client'
 
 export default function AddClient() {
   const navigate = useNavigate()
   const { clientId } = useParams()
-  const { session, myWorkplace, refreshClients } = useAppSession()
-  const perms = usePermissions()
+  const { session, refreshClients } = useAppSession()
   const toast = useToast()
   const isEditMode = !!clientId
 
@@ -22,8 +20,6 @@ export default function AddClient() {
   const [dob, setDob] = useState('')
   const [school, setSchool] = useState('')
   const [selectedDiagnoses, setSelectedDiagnoses] = useState([])
-  const [myWorkplaces, setMyWorkplaces] = useState([])
-  const [selectedWorkplaceId, setSelectedWorkplaceId] = useState('private')
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
 
@@ -31,21 +27,8 @@ export default function AddClient() {
     setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev))
 
   useEffect(() => {
-    setMyWorkplaces(getWorkplacesForUser(session.user.id))
-  }, [session.user.id])
-
-  useEffect(() => {
-    if (isEditMode) return
-    if (perms.canAddPrivateClient) {
-      setSelectedWorkplaceId('private')
-    } else if (perms.canAddWorkplaceClient && myWorkplaces.length) {
-      setSelectedWorkplaceId(myWorkplaces[0].id)
-    }
-  }, [isEditMode, perms.canAddPrivateClient, perms.canAddWorkplaceClient, myWorkplaces])
-
-  useEffect(() => {
     if (!isEditMode) return
-    const existing = getClientById(clientId, session.user.id, myWorkplace)
+    const existing = getClientById(clientId, session.user.id, null)
     if (!existing) {
       toast.error('Could not load client.')
       navigate('/clients')
@@ -55,11 +38,10 @@ export default function AddClient() {
     setSurname(existing.surname || '')
     setDob(existing.dob || '')
     setSchool(existing.school || '')
-    setSelectedWorkplaceId(existing.workplace_id || 'private')
     if (existing.diagnosis) {
       setSelectedDiagnoses(existing.diagnosis.split(',').map(s => s.trim()).filter(Boolean))
     }
-  }, [clientId, isEditMode, session.user.id, myWorkplace, navigate, toast])
+  }, [clientId, isEditMode, session.user.id, navigate, toast])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -67,11 +49,6 @@ export default function AddClient() {
     if (!firstName.trim()) nextErrors.firstName = 'First name is required.'
     if (!surname.trim()) nextErrors.surname = 'Surname is required.'
     if (!dob) nextErrors.dob = 'Date of birth is required.'
-    if (selectedWorkplaceId === 'private' && !perms.canAddPrivateClient) {
-      nextErrors.form = 'Your role cannot add private practice clients.'
-    } else if (selectedWorkplaceId !== 'private' && !perms.canAddWorkplaceClient) {
-      nextErrors.form = 'Your role cannot add workplace clients.'
-    }
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors)
       return
@@ -86,7 +63,7 @@ export default function AddClient() {
         dob,
         school,
         diagnosis: selectedDiagnoses.join(', '),
-        workplace_id: selectedWorkplaceId === 'private' ? null : selectedWorkplaceId,
+        workplace_id: null,
       }
       if (isSupabaseConfigured()) {
         await upsertClientRemote(payload, session.user.id)
@@ -102,21 +79,6 @@ export default function AddClient() {
       setLoading(false)
     }
   }
-
-  if (!isEditMode && !perms.canAddPrivateClient && !perms.canAddWorkplaceClient) {
-    return (
-      <div className="page">
-        <PageHeader title="New client" subtitle="Add a client to your caseload." />
-        <div className="card permission-notice">
-          <p><strong>Your current role cannot add new clients.</strong></p>
-          <p className="text-muted text-small">Administrators start new cases for existing clients. Clinicians and clinical leads can add clients.</p>
-        </div>
-      </div>
-    )
-  }
-
-  const showContextPicker = (perms.canAddPrivateClient && perms.canAddWorkplaceClient) || myWorkplaces.length > 1
-  const workplaceOptions = perms.canAddWorkplaceClient ? myWorkplaces : []
 
   return (
     <div className="page">
@@ -174,19 +136,8 @@ export default function AddClient() {
           <DiagnosisPicker selected={selectedDiagnoses} onChange={setSelectedDiagnoses} />
         </div>
         <div className="form-group">
-          <label>Portfolio context</label>
-          {showContextPicker ? (
-            <select className="paper-input" value={selectedWorkplaceId} onChange={e => setSelectedWorkplaceId(e.target.value)}>
-              {perms.canAddPrivateClient && <option value="private">Private practice</option>}
-              {workplaceOptions.map(wp => (
-                <option key={wp.id} value={wp.id}>{wp.name}</option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-muted">
-              {selectedWorkplaceId === 'private' ? 'Private practice' : myWorkplaces.find(w => w.id === selectedWorkplaceId)?.name}
-            </p>
-          )}
+          <label>Context</label>
+          <p className="text-muted">Private practice</p>
         </div>
         <div className="form-actions">
           <button type="submit" className="primary" disabled={loading}>{loading ? 'Saving…' : 'Save client'}</button>

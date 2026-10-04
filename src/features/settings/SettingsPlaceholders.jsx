@@ -1,18 +1,18 @@
-import RoleBlockShell from '../../components/RoleBlockShell'
+import SectionCard from '../../components/SectionCard'
 
 export function SettingsSectionCard({ blockId, title, children }) {
   return (
-    <RoleBlockShell blockId={blockId} title={title}>
-      <div className="role-block__panel">
+    <SectionCard blockId={blockId} title={title}>
+      <div className="section-card__panel">
         {children}
       </div>
-    </RoleBlockShell>
+    </SectionCard>
   )
 }
 
 export function FormsSettingsPage() {
   return (
-    <div className="role-block-stack">
+    <div className="section-card-stack">
       <SettingsSectionCard blockId="settings_forms" title="Forms">
         <p className="text-muted" style={{ marginTop: 0 }}>
           Clinician-designed forms (intake/onboarding that can create clients, plus information-gathering)
@@ -34,7 +34,7 @@ export function FormsSettingsPage() {
 
 export function TemplateKindPage({ kind, title, blurb }) {
   return (
-    <div className="role-block-stack">
+    <div className="section-card-stack">
       <SettingsSectionCard blockId={`settings_templates_${kind}`} title={title}>
         <p className="text-muted" style={{ marginTop: 0 }}>{blurb}</p>
         <p className="text-small text-muted" style={{ marginBottom: 0 }}>
@@ -47,7 +47,7 @@ export function TemplateKindPage({ kind, title, blurb }) {
 
 export function TwoFactorSettingsPage() {
   return (
-    <div className="role-block-stack">
+    <div className="section-card-stack">
       <SettingsSectionCard blockId="settings_2fa" title="Two-factor authentication">
         <p className="text-muted" style={{ marginTop: 0 }}>
           TOTP-based 2FA via Supabase Auth MFA will live here. Enrollment UI follows once Google connect is testable.

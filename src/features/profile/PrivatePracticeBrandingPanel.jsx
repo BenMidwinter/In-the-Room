@@ -64,7 +64,7 @@ export default function PrivatePracticeBrandingPanel({ userId }) {
   }
 
   return (
-    <div className="role-block__panel">
+    <div className="section-card__panel">
       <LetterheadBrandingForm
         displayName={previewBranding.name}
         logoUrl={logoUrl}

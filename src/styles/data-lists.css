@@ -251,14 +251,14 @@
   font-size: 0.75rem;
 }
 
-.appointment-editor .ck-schedule-times {
+.appointment-editor .room-schedule-times {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem 0.65rem;
   margin-bottom: 0.5rem;
 }
 
-.appointment-editor .ck-schedule-times .form-group {
+.appointment-editor .room-schedule-times .form-group {
   margin-bottom: 0;
 }
 
@@ -273,7 +273,7 @@
 }
 
 @media (max-width: 540px) {
-  .appointment-editor .ck-schedule-times {
+  .appointment-editor .room-schedule-times {
     grid-template-columns: 1fr;
   }
 }

@@ -11,7 +11,7 @@
 @import "./styles/auth.css" layer(components);
 @import "./styles/settings.css" layer(components);
 @import "./styles/clinical.css" layer(components);
-@import "./styles/rbac-workspace.css" layer(components);
+@import "./styles/practice-workspace.css" layer(components);
 @import "./styles/dashboards.css" layer(components);
 @import "./styles/home-calendar.css" layer(components);
 @import "./styles/overlays-editor.css" layer(components);

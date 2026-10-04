@@ -17,7 +17,6 @@ import { getBookableOrgServices } from '../lib/store'
 import { db } from '../lib/data/collections'
 import { addDaysYmd } from '../lib/dateArchitecture'
 import { canAssignAppointmentClinician } from '../lib/permissions'
-import { CALENDAR_OWNER_ALL, CALENDAR_OWNER_ALL_TEAM } from '../lib/calendarOwners'
 import { listServices } from '../lib/supabase/servicesRepo'
 import { isSupabaseConfigured } from '../lib/supabase/client'
 import FormOverlay from './FormOverlay'
@@ -37,13 +36,13 @@ function cx(...parts) {
 export function WorkspaceLayout({ className, children, scroll = false, ...props }) {
   if (scroll) {
     return (
-      <div className={cx('ck-workspace', className)} {...props}>
-        <div className="ck-workspace__scroll">{children}</div>
+      <div className={cx('room-workspace', className)} {...props}>
+        <div className="room-workspace__scroll">{children}</div>
       </div>
     )
   }
   return (
-    <div className={cx('ck-workspace', className)} {...props}>
+    <div className={cx('room-workspace', className)} {...props}>
       {children}
     </div>
   )
@@ -61,13 +60,13 @@ export function StickyContextBar({
 }) {
   return (
     <header
-      className={cx('ck-sticky-bar', sub && 'ck-sticky-bar--sub', className)}
+      className={cx('room-sticky-bar', sub && 'room-sticky-bar--sub', className)}
       {...props}
     >
-      {leading && <div className="ck-sticky-bar__leading">{leading}</div>}
-      {meta && <div className="ck-sticky-bar__meta">{meta}</div>}
+      {leading && <div className="room-sticky-bar__leading">{leading}</div>}
+      {meta && <div className="room-sticky-bar__meta">{meta}</div>}
       {children}
-      {trailing && <div className="ck-sticky-bar__trailing">{trailing}</div>}
+      {trailing && <div className="room-sticky-bar__trailing">{trailing}</div>}
     </header>
   )
 }
@@ -84,16 +83,16 @@ export function ClinicalPaper({
   return (
     <Tag
       className={cx(
-        'ck-clinical-paper',
-        variant === 'a4' && 'ck-clinical-paper--a4',
-        variant === 'optimal' && 'ck-clinical-paper--optimal',
-        flat && 'ck-clinical-paper--flat',
+        'room-clinical-paper',
+        variant === 'a4' && 'room-clinical-paper--a4',
+        variant === 'optimal' && 'room-clinical-paper--optimal',
+        flat && 'room-clinical-paper--flat',
         className,
       )}
       {...props}
     >
-      <div className="ck-clinical-paper__canvas">
-        <div className="ck-clinical-paper__sheet">{children}</div>
+      <div className="room-clinical-paper__canvas">
+        <div className="room-clinical-paper__sheet">{children}</div>
       </div>
     </Tag>
   )
@@ -114,9 +113,9 @@ export function SplitWorkspace({
     return (
       <div
         className={cx(
-          'ck-split',
-          paneOpen && 'ck-split--pane-open',
-          paneSize === 'lg' && 'ck-split--pane-lg',
+          'room-split',
+          paneOpen && 'room-split--pane-open',
+          paneSize === 'lg' && 'room-split--pane-lg',
           className,
         )}
       >
@@ -128,15 +127,15 @@ export function SplitWorkspace({
   return (
     <div
       className={cx(
-        'ck-split',
-        paneOpen && 'ck-split--pane-open',
-        paneSize === 'lg' && 'ck-split--pane-lg',
+        'room-split',
+        paneOpen && 'room-split--pane-open',
+        paneSize === 'lg' && 'room-split--pane-lg',
         className,
       )}
     >
-      <div className={cx('ck-split__main', mainClassName)}>{main}</div>
+      <div className={cx('room-split__main', mainClassName)}>{main}</div>
       {paneOpen && accessory && (
-        <aside className={cx('ck-split__accessory', accessoryClassName)} aria-label="Accessory panel">
+        <aside className={cx('room-split__accessory', accessoryClassName)} aria-label="Accessory panel">
           {accessory}
         </aside>
       )}
@@ -155,17 +154,17 @@ export function AccessoryPane({
   closeLabel = 'Close panel',
 }) {
   return (
-    <div className={cx('ck-accessory-pane', className)}>
+    <div className={cx('room-accessory-pane', className)}>
       {(title || onClose) && (
-        <div className="ck-accessory-pane__head">
+        <div className="room-accessory-pane__head">
           <div>
-            {title && <h2 className="ck-accessory-pane__title">{title}</h2>}
-            {subtitle && <p className="ck-accessory-pane__subtitle">{subtitle}</p>}
+            {title && <h2 className="room-accessory-pane__title">{title}</h2>}
+            {subtitle && <p className="room-accessory-pane__subtitle">{subtitle}</p>}
           </div>
           {onClose && (
             <button
               type="button"
-              className="secondary ck-accessory-pane__close"
+              className="secondary room-accessory-pane__close"
               onClick={onClose}
               aria-label={closeLabel}
             >
@@ -174,7 +173,7 @@ export function AccessoryPane({
           )}
         </div>
       )}
-      <div className={cx('ck-accessory-pane__body', bodyClassName)}>{children}</div>
+      <div className={cx('room-accessory-pane__body', bodyClassName)}>{children}</div>
     </div>
   )
 }
@@ -183,7 +182,7 @@ export function AccessoryPane({
 
 export function StackedDataList({ children, className, as: Tag = 'ul', ...props }) {
   return (
-    <Tag className={cx('ck-stacked-list', className)} {...props}>
+    <Tag className={cx('room-stacked-list', className)} {...props}>
       {children}
     </Tag>
   )
@@ -202,27 +201,27 @@ export function StackedDataRow({
 }) {
   const body = (
     <>
-      <div className="ck-stacked-row__icon" aria-hidden>
+      <div className="room-stacked-row__icon" aria-hidden>
         {icon}
       </div>
-      <div className="ck-stacked-row__body">
-        {label && <span className="ck-stacked-row__label">{label}</span>}
+      <div className="room-stacked-row__body">
+        {label && <span className="room-stacked-row__label">{label}</span>}
         {value && (
           href ? (
-            <Link to={href} className="ck-stacked-row__value">{value}</Link>
+            <Link to={href} className="room-stacked-row__value">{value}</Link>
           ) : (
-            <span className="ck-stacked-row__value">{value}</span>
+            <span className="room-stacked-row__value">{value}</span>
           )
         )}
-        {meta && <span className="ck-stacked-row__meta">{meta}</span>}
-        {tags && <div className="ck-stacked-row__tags">{tags}</div>}
+        {meta && <span className="room-stacked-row__meta">{meta}</span>}
+        {tags && <div className="room-stacked-row__tags">{tags}</div>}
         {children}
       </div>
     </>
   )
 
   return (
-    <Tag className={cx('ck-stacked-row', className)}>
+    <Tag className={cx('room-stacked-row', className)}>
       {body}
     </Tag>
   )
@@ -230,7 +229,7 @@ export function StackedDataRow({
 
 export function DataTag({ variant = 'draft', children, className }) {
   return (
-    <span className={cx('ck-tag', `ck-tag--${variant}`, className)}>
+    <span className={cx('room-tag', `room-tag--${variant}`, className)}>
       {children}
     </span>
   )
@@ -246,21 +245,21 @@ export function ContextBanner({
   className,
 }) {
   return (
-    <div className={cx('ck-context-banner', `ck-context-banner--${variant}`, className)} role="status">
-      {title && <p className="ck-context-banner__title">{title}</p>}
-      {children && <div className="ck-context-banner__body">{children}</div>}
-      {actions && <div className="ck-context-banner__actions">{actions}</div>}
+    <div className={cx('room-context-banner', `room-context-banner--${variant}`, className)} role="status">
+      {title && <p className="room-context-banner__title">{title}</p>}
+      {children && <div className="room-context-banner__body">{children}</div>}
+      {actions && <div className="room-context-banner__actions">{actions}</div>}
     </div>
   )
 }
 
 export function SafetyLock({ locked = false, reason, children, className }) {
   return (
-    <div className={cx('ck-safety-lock', locked && 'ck-safety-lock--locked', className)}>
+    <div className={cx('room-safety-lock', locked && 'room-safety-lock--locked', className)}>
       {locked && reason && (
-        <p className="ck-safety-lock__overlay" role="note">{reason}</p>
+        <p className="room-safety-lock__overlay" role="note">{reason}</p>
       )}
-      <div className="ck-safety-lock__content">{children}</div>
+      <div className="room-safety-lock__content">{children}</div>
     </div>
   )
 }
@@ -278,12 +277,12 @@ export function CalendarWorkspaceFrame({
 }) {
   return (
     <div
-      className={cx('ck-calendar-frame', paneOpen && 'ck-calendar-frame--pane-open', className)}
+      className={cx('room-calendar-frame', paneOpen && 'room-calendar-frame--pane-open', className)}
       style={style}
     >
-      <div className={cx('ck-calendar-frame__grid', gridClassName)}>{grid}</div>
+      <div className={cx('room-calendar-frame__grid', gridClassName)}>{grid}</div>
       {paneOpen && accessory && (
-        <aside className={cx('ck-calendar-frame__accessory', accessoryClassName)} aria-label="Calendar context">
+        <aside className={cx('room-calendar-frame__accessory', accessoryClassName)} aria-label="Calendar context">
           {accessory}
         </aside>
       )}
@@ -302,9 +301,9 @@ export function CalendarTimeSlot({
   return (
     <div
       className={cx(
-        'ck-time-slot',
-        droppable && 'ck-time-slot--droppable',
-        dragOver && 'ck-time-slot--drag-over',
+        'room-time-slot',
+        droppable && 'room-time-slot--droppable',
+        dragOver && 'room-time-slot--drag-over',
         className,
       )}
       onClick={onClick}
@@ -385,9 +384,7 @@ function resolveBookingClinicianId({
   workplaceClinicians,
 }) {
   if (appointment?.clinician_id) return appointment.clinician_id
-  if (calendarOwner && calendarOwner !== CALENDAR_OWNER_ALL && calendarOwner !== CALENDAR_OWNER_ALL_TEAM) {
-    return calendarOwner
-  }
+  if (calendarOwner) return calendarOwner
   if (selectedClient?.user_id) return selectedClient.user_id
   return workplaceClinicians[0]?.id || sessionUserId
 }
@@ -448,7 +445,7 @@ function EventDrawerActions({
 }) {
   const editLabel = kind === 'busy' || kind === 'support' ? 'Edit block' : 'Edit'
   return (
-    <section className="ck-event-drawer__actions">
+    <section className="room-event-drawer__actions">
       <button type="button" className="primary" onClick={onEdit} disabled={locked}>
         {editLabel}
       </button>
@@ -471,11 +468,11 @@ const ATTENDANCE_OPTIONS = ['attended', 'did_not_attend', 'cancelled']
 export function AttendanceMarking({ value, onChange, locked = false, compact = false }) {
   if (compact) {
     return (
-      <div className="ck-attendance-row">
-        <label htmlFor="drawer-attendance" className="ck-attendance-row__label">Attendance</label>
+      <div className="room-attendance-row">
+        <label htmlFor="drawer-attendance" className="room-attendance-row__label">Attendance</label>
         <select
           id="drawer-attendance"
-          className="paper-input ck-attendance-row__select"
+          className="paper-input room-attendance-row__select"
           value={value || ''}
           disabled={locked}
           onChange={e => onChange?.(e.target.value || null)}
@@ -490,9 +487,9 @@ export function AttendanceMarking({ value, onChange, locked = false, compact = f
   }
 
   return (
-    <section className="ck-event-drawer__section">
-      <h3 className="ck-event-drawer__section-title">Mark attendance</h3>
-      <p className="text-small text-muted ck-attendance-hint">
+    <section className="room-event-drawer__section">
+      <h3 className="room-event-drawer__section-title">Mark attendance</h3>
+      <p className="text-small text-muted room-attendance-hint">
         {value ? `Logged as ${attendanceLabel(value)}` : 'Record attendance after the session'}
       </p>
       <div className="attendance-actions">
@@ -539,8 +536,8 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
       locked={locked}
       reason="This session is locked — invoice finalized or note signed off."
     >
-      <section className="ck-event-drawer__section ck-event-drawer__section--compact">
-        <StackedDataList className="ck-stacked-list--compact">
+      <section className="room-event-drawer__section room-event-drawer__section--compact">
+        <StackedDataList className="room-stacked-list--compact">
           {showAttendance && (
             <StackedDataRow
               icon="👤"
@@ -583,8 +580,8 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
       )}
 
       {showAttendance && (linkedNote || noteHref) ? (
-        <section className="ck-event-drawer__section ck-event-drawer__section--compact">
-          <StackedDataList className="ck-stacked-list--compact">
+        <section className="room-event-drawer__section room-event-drawer__section--compact">
+          <StackedDataList className="room-stacked-list--compact">
             <StackedDataRow
               icon="📝"
               label="Note"
@@ -607,9 +604,9 @@ function GroupEventBody({ appointment, locked }) {
   const [openId, setOpenId] = useState(attendees[0]?.id || null)
 
   return (
-    <SafetyLock locked={locked} reason="Group session billing is finalized — edits are disabled.">
-      <section className="ck-event-drawer__section">
-        <h3 className="ck-event-drawer__section-title">Group session</h3>
+    <SafetyLock locked={locked} reason="This session is locked.">
+      <section className="room-event-drawer__section">
+        <h3 className="room-event-drawer__section-title">Group session</h3>
         <StackedDataList>
           <StackedDataRow
             icon="👥"
@@ -620,22 +617,22 @@ function GroupEventBody({ appointment, locked }) {
         </StackedDataList>
       </section>
 
-      <section className="ck-event-drawer__section">
-        <h3 className="ck-event-drawer__section-title">Individual records</h3>
-        <div className="ck-group-accordion">
+      <section className="room-event-drawer__section">
+        <h3 className="room-event-drawer__section-title">Individual records</h3>
+        <div className="room-group-accordion">
           {attendees.map(person => {
             const isOpen = openId === person.id
             const noteHref = `/clients/${person.id}/progress-notes?appointment=${appointment.id}`
             return (
-              <div key={person.id} className="ck-group-accordion__item">
+              <div key={person.id} className="room-group-accordion__item">
                 <button
                   type="button"
-                  className="ck-group-accordion__trigger"
+                  className="room-group-accordion__trigger"
                   aria-expanded={isOpen}
                   onClick={() => setOpenId(isOpen ? null : person.id)}
                 >
-                  <span className="ck-group-accordion__name">{person.name}</span>
-                  <span className="ck-stacked-row__tags">
+                  <span className="room-group-accordion__name">{person.name}</span>
+                  <span className="room-stacked-row__tags">
                     {person.attendance
                       ? <DataTag variant="sent">{attendanceLabel(person.attendance)}</DataTag>
                       : <DataTag variant="draft">Pending</DataTag>}
@@ -643,7 +640,7 @@ function GroupEventBody({ appointment, locked }) {
                   </span>
                 </button>
                 {isOpen && (
-                  <div className="ck-group-accordion__panel">
+                  <div className="room-group-accordion__panel">
                     <StackedDataList>
                       <StackedDataRow
                         icon="📝"
@@ -654,7 +651,7 @@ function GroupEventBody({ appointment, locked }) {
                       <StackedDataRow
                         icon="£"
                         label="Invoice"
-                        value={person.invoice === 'sent' ? 'Sent to accounts' : 'Draft — not yet billed'}
+                        value={person.invoice === 'sent' ? 'Sent' : 'Draft'}
                         tags={invoiceTag(person.invoice || 'draft')}
                       />
                     </StackedDataList>
@@ -674,9 +671,9 @@ function BusyEventBody({ appointment, locked }) {
   const [blockType, setBlockType] = useState(appointment.block_type || 'admin')
 
   return (
-    <SafetyLock locked={locked} reason="This block is synced to payroll — contact admin to edit.">
-      <section className="ck-event-drawer__section">
-        <h3 className="ck-event-drawer__section-title">Practitioner busy time</h3>
+    <SafetyLock locked={locked} reason="This block is locked.">
+      <section className="room-event-drawer__section">
+        <h3 className="room-event-drawer__section-title">Practitioner busy time</h3>
         <StackedDataList>
           <StackedDataRow
             icon="🚫"
@@ -687,8 +684,8 @@ function BusyEventBody({ appointment, locked }) {
         </StackedDataList>
       </section>
 
-      <section className="ck-event-drawer__section">
-        <h3 className="ck-event-drawer__section-title">Block type</h3>
+      <section className="room-event-drawer__section">
+        <h3 className="room-event-drawer__section-title">Block type</h3>
         <select
           className="paper-input"
           value={blockType}
@@ -702,14 +699,14 @@ function BusyEventBody({ appointment, locked }) {
         </select>
       </section>
 
-      <section className="ck-event-drawer__section">
-        <h3 className="ck-event-drawer__section-title">Calendar colour</h3>
-        <div className="ck-busy-controls" role="list">
+      <section className="room-event-drawer__section">
+        <h3 className="room-event-drawer__section-title">Calendar colour</h3>
+        <div className="room-busy-controls" role="list">
           {BUSY_COLORS.map(c => (
             <button
               key={c}
               type="button"
-              className={cx('ck-color-swatch', color === c && 'ck-color-swatch--active')}
+              className={cx('room-color-swatch', color === c && 'room-color-swatch--active')}
               style={{ backgroundColor: c }}
               aria-label={`Set block colour ${c}`}
               aria-pressed={color === c}
@@ -725,8 +722,7 @@ function BusyEventBody({ appointment, locked }) {
 
 /**
  * Polymorphic appointment viewer — standard, group, or busy practitioner blocks.
- * `presentation="overlay"` (default for calendar) shows a centred view modal;
- * `presentation="pane"` keeps the legacy right-rail accessory.
+ * Centred view modal. The side-rail accessory is retired.
  */
 export function EventDrawer({
   appointment,
@@ -813,7 +809,7 @@ export function EventDrawer({
         onClose={onClose}
         size="md"
       >
-        <div className={cx('ck-event-drawer', 'ck-event-drawer--overlay', className)}>
+        <div className={cx('room-event-drawer', 'room-event-drawer--overlay', className)}>
           {body}
         </div>
       </FormOverlay>
@@ -825,8 +821,8 @@ export function EventDrawer({
       title={title}
       subtitle={subtitle}
       onClose={onClose}
-      className={cx('ck-event-drawer', className)}
-      bodyClassName="ck-event-drawer__body"
+      className={cx('room-event-drawer', className)}
+      bodyClassName="room-event-drawer__body"
     >
       {body}
     </AccessoryPane>
@@ -853,7 +849,7 @@ export function ScheduleSessionPanel({
   deleting = false,
   showDateField = false,
   /** `pane` = calendar side accessory; `overlay` = centred modal editor */
-  presentation = 'pane',
+  presentation = 'overlay',
   lockedClient = false,
 }) {
   const seed = appointmentFormSeed(appointment) || appointmentFormSeed(prefill)
@@ -1095,7 +1091,7 @@ export function ScheduleSessionPanel({
   const showDate = showDateField || isEdit || Boolean(prefill)
   const sessionCount = recurringWeekly && !isEdit ? recurWeeks : 1
   const formBody = (
-      <form className="ck-schedule-form" onSubmit={handleSubmit}>
+      <form className="room-schedule-form" onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="schedule-service">Service</label>
           <select
@@ -1116,7 +1112,7 @@ export function ScheduleSessionPanel({
             ))}
           </select>
           {servicesError && (
-            <p className="text-small ck-schedule-warning">{servicesError}</p>
+            <p className="text-small room-schedule-warning">{servicesError}</p>
           )}
           {!services.length && !servicesError && (
             <p className="text-small text-muted">
@@ -1139,7 +1135,7 @@ export function ScheduleSessionPanel({
           </div>
         )}
 
-        <div className="ck-schedule-times ck-schedule-times--start-only">
+        <div className="room-schedule-times room-schedule-times--start-only">
           <div className="form-group">
             <label htmlFor="schedule-start">Start</label>
             <input
@@ -1153,7 +1149,7 @@ export function ScheduleSessionPanel({
           </div>
           <div className="form-group">
             <label>Ends</label>
-            <p className="ck-schedule-derived">
+            <p className="room-schedule-derived">
               <strong>{computedEnd}</strong>
               <span className="text-muted"> · {finalDuration} min from service</span>
             </p>
@@ -1177,7 +1173,7 @@ export function ScheduleSessionPanel({
               />
             </div>
 
-            <div className="ck-schedule-client-list" role="listbox" aria-label="Assigned clients">
+            <div className="room-schedule-client-list" role="listbox" aria-label="Assigned clients">
               {filteredClients.length === 0 && (
                 <p className="text-small text-muted">No clients match — try another name or school.</p>
               )}
@@ -1187,11 +1183,11 @@ export function ScheduleSessionPanel({
                   type="button"
                   role="option"
                   aria-selected={clientId === client.id}
-                  className={`ck-schedule-client${clientId === client.id ? ' ck-schedule-client--active' : ''}`}
+                  className={`room-schedule-client${clientId === client.id ? ' room-schedule-client--active' : ''}`}
                   onClick={() => setClientId(client.id)}
                 >
-                  <span className="ck-schedule-client__name">{client.real_name}</span>
-                  <span className="ck-schedule-client__meta">
+                  <span className="room-schedule-client__name">{client.real_name}</span>
+                  <span className="room-schedule-client__meta">
                     {client.school || client.workplace_name || 'Caseload'}
                   </span>
                 </button>
@@ -1200,7 +1196,7 @@ export function ScheduleSessionPanel({
             {!clientRequired && clientId && (
               <button
                 type="button"
-                className="secondary ck-schedule-clear-client"
+                className="secondary room-schedule-clear-client"
                 onClick={() => setClientId('')}
               >
                 Clear client
@@ -1210,12 +1206,12 @@ export function ScheduleSessionPanel({
         )}
 
         {selectedClient && (
-          <p className="text-small ck-schedule-selected">
+          <p className="text-small room-schedule-selected">
             {lockedClient ? 'Client' : 'Selected'}: <strong>{selectedClient.real_name}</strong>
           </p>
         )}
         {!clientRequired && !selectedClient && (
-          <p className="text-small text-muted ck-schedule-selected">
+          <p className="text-small text-muted room-schedule-selected">
             No client linked — this {serviceType === 'admin' ? 'admin' : 'support'} block can stand alone.
           </p>
         )}
@@ -1229,7 +1225,7 @@ export function ScheduleSessionPanel({
 
         <button
           type="button"
-          className="ck-schedule-advanced-toggle"
+          className="room-schedule-advanced-toggle"
           aria-expanded={showAdvanced}
           onClick={() => setShowAdvanced((v) => !v)}
         >
@@ -1237,9 +1233,9 @@ export function ScheduleSessionPanel({
         </button>
 
         {showAdvanced && (
-          <div className="ck-schedule-advanced">
+          <div className="room-schedule-advanced">
             {selectedService?.create_meet_link && (
-              <label className="ck-schedule-meet">
+              <label className="room-schedule-meet">
                 <input
                   type="checkbox"
                   checked={createMeetLink}
@@ -1295,8 +1291,8 @@ export function ScheduleSessionPanel({
             )}
 
             {!isEdit && (
-              <div className="ck-recurring-inline">
-                <label className="ck-recurring-inline__toggle">
+              <div className="room-recurring-inline">
+                <label className="room-recurring-inline__toggle">
                   <input
                     type="checkbox"
                     checked={recurringWeekly}
@@ -1305,7 +1301,7 @@ export function ScheduleSessionPanel({
                   Repeat weekly
                 </label>
                 {recurringWeekly && (
-                  <div className="ck-recurring-inline__weeks">
+                  <div className="room-recurring-inline__weeks">
                     <label htmlFor="schedule-weeks">For</label>
                     <input
                       id="schedule-weeks"
@@ -1325,10 +1321,10 @@ export function ScheduleSessionPanel({
         )}
 
         {isEdit && appointment && (onBookAnother || onScheduleMore) && (
-          <section className="ck-schedule-more">
-            <h3 className="ck-schedule-more__title">Schedule more</h3>
+          <section className="room-schedule-more">
+            <h3 className="room-schedule-more__title">Schedule more</h3>
             <p className="text-small text-muted">Book follow-up sessions without leaving the editor.</p>
-            <div className="ck-schedule-more__actions">
+            <div className="room-schedule-more__actions">
               {onBookAnother && (
                 <button
                   type="button"
@@ -1407,7 +1403,7 @@ export function ScheduleSessionPanel({
           onClose={onCancel}
           size="md"
         >
-          <div className="ck-schedule-panel">{formBody}</div>
+          <div className="room-schedule-panel">{formBody}</div>
         </FormOverlay>
         {scopeDialog}
       </>
@@ -1420,7 +1416,7 @@ export function ScheduleSessionPanel({
         title={panelTitle}
         subtitle={`${sessionDate} · ${start}–${computedEnd}`}
         onClose={onCancel}
-        bodyClassName="ck-schedule-panel"
+        bodyClassName="room-schedule-panel"
       >
         {formBody}
       </AccessoryPane>
@@ -1476,13 +1472,13 @@ export function RecurringSchedulePanel({
   }
 
   const formBody = (
-    <form className="ck-schedule-form" onSubmit={handleSubmit}>
-      <p className="text-small text-muted ck-recurring-intro">
+    <form className="room-schedule-form" onSubmit={handleSubmit}>
+      <p className="text-small text-muted room-recurring-intro">
         Create additional sessions using the same client, time, and duration as this appointment.
       </p>
 
-      <div className="ck-recurring-pattern" role="radiogroup" aria-label="Recurrence pattern">
-        <label className={`ck-recurring-option${pattern === 'once' ? ' ck-recurring-option--active' : ''}`}>
+      <div className="room-recurring-pattern" role="radiogroup" aria-label="Recurrence pattern">
+        <label className={`room-recurring-option${pattern === 'once' ? ' room-recurring-option--active' : ''}`}>
           <input
             type="radio"
             name="recurrence"
@@ -1490,10 +1486,10 @@ export function RecurringSchedulePanel({
             checked={pattern === 'once'}
             onChange={() => setPattern('once')}
           />
-          <span className="ck-recurring-option__title">One-off future date</span>
-          <span className="ck-recurring-option__desc text-small text-muted">Book a single session on a chosen date</span>
+          <span className="room-recurring-option__title">One-off future date</span>
+          <span className="room-recurring-option__desc text-small text-muted">Book a single session on a chosen date</span>
         </label>
-        <label className={`ck-recurring-option${pattern === 'weekly' ? ' ck-recurring-option--active' : ''}`}>
+        <label className={`room-recurring-option${pattern === 'weekly' ? ' room-recurring-option--active' : ''}`}>
           <input
             type="radio"
             name="recurrence"
@@ -1501,8 +1497,8 @@ export function RecurringSchedulePanel({
             checked={pattern === 'weekly'}
             onChange={() => setPattern('weekly')}
           />
-          <span className="ck-recurring-option__title">Weekly</span>
-          <span className="ck-recurring-option__desc text-small text-muted">Same day and time each week</span>
+          <span className="room-recurring-option__title">Weekly</span>
+          <span className="room-recurring-option__desc text-small text-muted">Same day and time each week</span>
         </label>
       </div>
 
@@ -1533,8 +1529,8 @@ export function RecurringSchedulePanel({
         </div>
       )}
 
-      <div className="ck-recurring-preview">
-        <span className="ck-recurring-preview__label">Will create</span>
+      <div className="room-recurring-preview">
+        <span className="room-recurring-preview__label">Will create</span>
         <strong>{dates.length} session{dates.length === 1 ? '' : 's'}</strong>
         {dates.length <= 6 && (
           <span className="text-small text-muted"> — {dates.join(', ')}</span>
@@ -1559,7 +1555,7 @@ export function RecurringSchedulePanel({
         onClose={onCancel}
         size="md"
       >
-        <div className="ck-schedule-panel">{formBody}</div>
+        <div className="room-schedule-panel">{formBody}</div>
       </FormOverlay>
     )
   }
@@ -1569,7 +1565,7 @@ export function RecurringSchedulePanel({
       title="Recurring session"
       subtitle={`${source.client_name} · ${timeLabel}`}
       onClose={onCancel}
-      bodyClassName="ck-schedule-panel"
+      bodyClassName="room-schedule-panel"
     >
       {formBody}
     </AccessoryPane>

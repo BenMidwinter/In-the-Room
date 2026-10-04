@@ -167,7 +167,7 @@ export default function ServicesSettingsPage() {
   }
 
   return (
-    <div className="role-block-stack">
+    <div className="section-card-stack">
       <SettingsSectionCard blockId="settings_services" title="Services">
         <div className="settings-services-toolbar">
           <p className="text-muted" style={{ margin: 0 }}>

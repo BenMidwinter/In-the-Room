@@ -1,14 +1,14 @@
 import { createContext, useContext, type ReactNode } from 'react'
 
+export interface AppPersona {
+  id: string
+  userId: string
+  name: string
+}
+
 export interface AppSessionValue {
   session: { user: { id: string; [key: string]: unknown }; [key: string]: unknown }
-  activePersona: unknown
-  personaId: string
-  demoRole: string
-  myWorkplace: unknown
-  myWorkplaces: unknown[]
-  activeWorkplaceId: string | null
-  setActiveWorkplaceId: (id: string | null) => void
+  activePersona: AppPersona
   refreshClients: () => void
   refreshMemberships: () => void
 }
@@ -29,7 +29,7 @@ export function AppSessionProvider({
   )
 }
 
-/** App shell session — persona, workplace context, and cache refreshers. */
+/** Signed-in practice session and cache refreshers. */
 export function useAppSession(): AppSessionValue {
   const ctx = useContext(AppSessionContext)
   if (!ctx) {

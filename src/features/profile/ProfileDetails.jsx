@@ -14,7 +14,7 @@ export default function ProfileDetails() {
   }
 
   return (
-    <div className="role-block-stack profile-hub">
+    <div className="section-card-stack profile-hub">
       <ProfileIdentityBlock session={session} onSaved={refreshClients} />
       <ProfileAvailabilityBlock userId={session.user.id} onSaved={refreshClients} />
       <CalendarIntegrationsBlock />
