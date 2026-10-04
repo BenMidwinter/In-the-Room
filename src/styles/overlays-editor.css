@@ -595,10 +595,18 @@
   line-height: 1;
 }
 
-.doc-editor__palette-preview.expr-size--standard { font-size: 0.85rem; }
-.doc-editor__palette-preview.expr-size--loud { font-size: 1.15rem; }
-.doc-editor__palette-preview.expr-size--bold-bright { font-size: 1.25rem; color: var(--col-primary); }
-.doc-editor__palette-preview.expr-size--fluid { font-size: 1rem; font-style: italic; }
+.doc-editor__palette-preview.expr-size--voice {
+  font-family: var(--font-head);
+  font-style: italic;
+}
+.doc-editor__palette-preview.expr-size--aside {
+  font-style: italic;
+  color: var(--txt-muted);
+}
+.doc-editor__palette-preview.expr-size--land {
+  font-family: var(--font-head);
+  font-weight: 600;
+}
 
 .doc-editor__palette-swatch {
   display: block;
@@ -613,70 +621,33 @@
 .doc-editor__palette-swatch.expr-hl--violet-wash {
   background: linear-gradient(90deg, rgba(155, 143, 217, 0.15), rgba(155, 143, 217, 0.55));
 }
+.doc-editor__palette-swatch.expr-hl--yellow-soft {
+  background: #f4e7b8;
+}
 .doc-editor__palette-swatch.expr-hl--clay-wash {
-  background: linear-gradient(90deg, rgba(198, 123, 92, 0.15), rgba(198, 123, 92, 0.5));
+  background: #f3e4dc;
 }
 .doc-editor__palette-swatch.expr-hl--sage-wash {
-  background: linear-gradient(90deg, rgba(138, 154, 123, 0.15), rgba(138, 154, 123, 0.5));
+  background: #e4eadf;
 }
 .doc-editor__palette-swatch.expr-hl--neon-lime {
-  background: linear-gradient(90deg, #b8ff3c, #63bde0);
+  background: #f4e7b8;
 }
 .doc-editor__palette-swatch.expr-hl--neon-magenta {
-  background: linear-gradient(90deg, #ff4fd8, #7c3aed);
-}
-
-/* Audio hub */
-
-.doc-editor__audio-hub {
-  display: flex;
-  align-items: center;
-  gap: 0.15rem;
-}
-
-.doc-editor__mic {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  margin-right: 0.25rem;
-}
-
-.doc-editor__mic-pulse {
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid var(--col-primary);
-  animation: mic-pulse 1.2s ease-out infinite;
-}
-
-@keyframes mic-pulse {
-  0% { transform: scale(0.85); opacity: 0.85; }
-  100% { transform: scale(1.45); opacity: 0; }
-}
-
-.doc-editor__btn--dictating {
-  color: var(--col-primary-dark);
-  background: color-mix(in srgb, var(--col-primary) 22%, transparent);
-}
-
-.doc-editor--dictating .doc-editor__toolbar {
-  box-shadow: inset 0 -2px 0 var(--col-primary);
+  background: #f3ddd4;
 }
 
 /* Slash command palette */
 
 .doc-editor__slash {
   position: absolute;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 15;
-  width: min(320px, calc(100% - 2rem));
-  padding: 0.5rem;
+  z-index: 20;
+  width: min(20rem, calc(100% - 1rem));
+  padding: 0.4rem;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--elevation-paper-3);
 }
 
 .doc-editor__slash-hint {
@@ -700,17 +671,17 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  max-height: 240px;
+  max-height: 18rem;
   overflow-y: auto;
 }
 
 .doc-editor__slash-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.05rem;
   width: 100%;
-  padding: 0.45rem 0.5rem;
+  padding: 0.4rem 0.55rem;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -730,32 +701,183 @@
   color: var(--col-accent);
 }
 
+.doc-editor__slash-detail {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--txt-muted);
+  line-height: 1.3;
+}
+
 .doc-editor__slash-group {
-  font-size: 0.68rem;
+  margin: 0.45rem 0.45rem 0.1rem;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
+}
+
+.doc-editor__slash-list > li:first-child .doc-editor__slash-group {
+  margin-top: 0.15rem;
+}
+
+.doc-editor__slash-cue {
+  margin-left: auto;
+  padding: 0 0.2rem;
+  font-size: 0.75rem;
   color: var(--txt-muted);
   white-space: nowrap;
+}
+
+.doc-editor__style-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.55rem;
+  min-width: 7.5rem;
+  min-height: 1.85rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--col-accent);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.doc-editor__style-btn--open,
+.doc-editor__style-btn:hover {
+  border-color: color-mix(in srgb, var(--col-primary) 45%, var(--border-color));
+}
+
+.doc-editor__style-caret {
+  width: 0;
+  height: 0;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.5;
+}
+
+.doc-editor__style-label--h1,
+.doc-editor__style-label--h2,
+.doc-editor__style-label--h3,
+.doc-editor__style-option--h1,
+.doc-editor__style-option--h2,
+.doc-editor__style-option--h3 {
+  font-family: var(--font-head);
+  font-variation-settings: var(--font-head-variation);
+}
+
+.doc-editor__style-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 13.5rem;
+  margin: 0;
+  padding: 0.3rem;
+  list-style: none;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--elevation-paper-3);
+}
+
+.doc-editor__style-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--col-accent);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.95rem;
+}
+
+.doc-editor__style-option--h1 { font-size: 1.2rem; }
+.doc-editor__style-option--h3 { font-size: 0.92rem; }
+
+.doc-editor__style-option:hover,
+.doc-editor__style-option--on {
+  background: color-mix(in srgb, var(--col-primary) 12%, transparent);
+}
+
+.doc-editor__style-face {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--txt-muted);
 }
 
 /* Expressive inline marks */
 
 .doc-editor .ProseMirror .expr-size--standard { font-size: inherit; }
-.doc-editor .ProseMirror .expr-size--loud {
-  font-size: 1.35em;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-.doc-editor .ProseMirror .expr-size--bold-bright {
-  font-size: 1.55em;
-  font-weight: 800;
-  background: var(--expr-gradient-a);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.doc-editor .ProseMirror .expr-size--fluid {
-  font-size: 1.12em;
+
+.doc-editor .ProseMirror .expr-size--voice,
+.doc-editor .ProseMirror .expr-size--loud,
+.clinical-prose .expr-size--voice,
+.clinical-prose .expr-size--loud {
+  font-family: var(--font-head);
+  font-variation-settings: var(--font-head-variation);
   font-style: italic;
-  line-height: 1.85;
+  font-weight: 500;
+  font-size: 1.08em;
+  letter-spacing: -0.01em;
+  color: var(--col-accent);
+}
+
+.doc-editor .ProseMirror .expr-size--voice::before,
+.doc-editor .ProseMirror .expr-size--loud::before,
+.clinical-prose .expr-size--voice::before,
+.clinical-prose .expr-size--loud::before {
+  content: open-quote;
+}
+
+.doc-editor .ProseMirror .expr-size--voice::after,
+.doc-editor .ProseMirror .expr-size--loud::after,
+.clinical-prose .expr-size--voice::after,
+.clinical-prose .expr-size--loud::after {
+  content: close-quote;
+}
+
+.doc-editor .ProseMirror .expr-size--aside,
+.doc-editor .ProseMirror .expr-size--fluid,
+.clinical-prose .expr-size--aside,
+.clinical-prose .expr-size--fluid {
+  font-family: var(--font-body);
+  font-size: 0.94em;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--txt-muted);
+  background: color-mix(in srgb, var(--bg-zone-muted) 88%, var(--bg-surface));
+  border-radius: 0.2em;
+  padding: 0.04em 0.28em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.doc-editor .ProseMirror .expr-size--land,
+.doc-editor .ProseMirror .expr-size--bold-bright,
+.clinical-prose .expr-size--land,
+.clinical-prose .expr-size--bold-bright {
+  font-family: var(--font-head);
+  font-variation-settings: var(--font-head-variation);
+  font-style: normal;
+  font-weight: 600;
+  font-size: 1.02em;
+  letter-spacing: -0.015em;
+  color: var(--col-accent);
+  background: none;
+  box-shadow: inset 0 -0.08em 0 color-mix(in srgb, var(--col-accent) 28%, transparent);
 }
 
 .doc-editor .ProseMirror mark.expr-hl {
@@ -773,23 +895,31 @@
   background: linear-gradient(120deg, rgba(155, 143, 217, 0.12) 0%, rgba(155, 143, 217, 0.42) 100%);
   color: inherit;
 }
-.doc-editor .ProseMirror .expr-hl--clay-wash {
-  background: linear-gradient(120deg, rgba(198, 123, 92, 0.12) 0%, rgba(198, 123, 92, 0.38) 100%);
+.doc-editor .ProseMirror .expr-hl--clay-wash,
+.clinical-prose .expr-hl--clay-wash {
+  background: #f3e4dc;
   color: inherit;
 }
-.doc-editor .ProseMirror .expr-hl--sage-wash {
-  background: linear-gradient(120deg, rgba(138, 154, 123, 0.12) 0%, rgba(138, 154, 123, 0.38) 100%);
+.doc-editor .ProseMirror .expr-hl--sage-wash,
+.clinical-prose .expr-hl--sage-wash {
+  background: #e4eadf;
   color: inherit;
 }
-.doc-editor .ProseMirror .expr-hl--neon-lime {
-  background: linear-gradient(120deg, rgba(184, 255, 60, 0.35) 0%, rgba(99, 189, 224, 0.45) 100%);
+.doc-editor .ProseMirror .expr-hl--neon-lime,
+.doc-editor .ProseMirror .expr-hl--yellow-soft,
+.clinical-prose .expr-hl--neon-lime,
+.clinical-prose .expr-hl--yellow-soft {
+  background: #f4e7b8;
   color: inherit;
-  box-shadow: 0 0 12px rgba(184, 255, 60, 0.25);
+  box-shadow: none;
 }
-.doc-editor .ProseMirror .expr-hl--neon-magenta {
-  background: linear-gradient(120deg, rgba(255, 79, 216, 0.35) 0%, rgba(124, 58, 237, 0.45) 100%);
+.doc-editor .ProseMirror .expr-hl--neon-magenta,
+.doc-editor .ProseMirror .expr-hl--pink-soft,
+.clinical-prose .expr-hl--neon-magenta,
+.clinical-prose .expr-hl--pink-soft {
+  background: #f3ddd4;
   color: inherit;
-  box-shadow: 0 0 12px rgba(255, 79, 216, 0.2);
+  box-shadow: none;
 }
 
 /* Audio fragment block */
@@ -1032,12 +1162,12 @@
 .doc-editor .ProseMirror .doc-size--xlarge { font-size: 1.35em; font-weight: 600; }
 
 .doc-editor .ProseMirror .expr-hl--yellow-soft {
-  background: linear-gradient(120deg, rgba(255, 230, 120, 0.2) 0%, rgba(255, 210, 80, 0.45) 100%);
+  background: #f4e7b8;
   color: inherit;
 }
 
 .doc-editor .ProseMirror .expr-hl--pink-soft {
-  background: linear-gradient(120deg, rgba(255, 180, 210, 0.2) 0%, rgba(255, 140, 190, 0.4) 100%);
+  background: #f3ddd4;
   color: inherit;
 }
 

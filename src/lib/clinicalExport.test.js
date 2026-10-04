@@ -27,6 +27,8 @@ describe('process note print', () => {
 
     expect(html).toContain('Fraunces')
     expect(html).toContain('Karla')
+    expect(html).toContain('.clinical-pdf blockquote')
+    expect(html).toContain('.expr-size--voice')
     expect(html).toContain('letterhead__identity')
     expect(html).toContain('letterhead__logo')
     expect(html).toContain('clinical-pdf__body')

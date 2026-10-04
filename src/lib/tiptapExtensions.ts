@@ -256,7 +256,7 @@ export const FontFamily = Mark.create({
   name: 'fontFamily',
 
   addAttributes() {
-    return { family: { default: 'nunito' } }
+    return { family: { default: 'karla' } }
   },
 
   parseHTML() {
@@ -264,7 +264,7 @@ export const FontFamily = Mark.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    const family = HTMLAttributes.family || 'nunito'
+    const family = HTMLAttributes.family || 'karla'
     return [
       'span',
       mergeAttributes(HTMLAttributes, {
@@ -655,7 +655,7 @@ const BASE_EXTENSIONS = [
   }),
   Underline,
   Placeholder.configure({
-    placeholder: 'Start writing…',
+    placeholder: 'Write, or type / to insert',
     emptyEditorClass: 'is-editor-empty',
   }),
 ]
@@ -666,7 +666,7 @@ const BASIC_EXTENSIONS = [
   }),
   Underline,
   Placeholder.configure({
-    placeholder: 'Start writing…',
+    placeholder: 'Write, or type / to insert',
     emptyEditorClass: 'is-editor-empty',
   }),
 ]

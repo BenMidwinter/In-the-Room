@@ -7,8 +7,10 @@ import {
   EDITOR_FONTS,
   EDITOR_TEXT_SIZES,
   EDITOR_TEXT_COLORS,
+  EDITOR_COLOR_CHOICES,
   EDITOR_HIGHLIGHTS,
-  EXPRESSIVE_SIZES,
+  EDITOR_HIGHLIGHT_CHOICES,
+  WRITING_VOICES,
   filterSlashCommands,
   getSlashSnippet,
 } from '../lib/editorFormatting'
@@ -23,12 +25,7 @@ import {
   IconLink,
   IconImage,
   IconTable,
-  IconHorizontalRule,
-  IconFillLine,
   IconFormat,
-  IconMic,
-  IconAudioWave,
-  IconHeading,
 } from './EditorToolbarIcons'
 import SignatureMenu from './SignatureMenu'
 import ErrorBoundary from './ErrorBoundary'
@@ -173,7 +170,7 @@ function FormatMenu({ editor }) {
           <section className="doc-editor__palette-section">
             <h4 className="doc-editor__palette-title">Text colour</h4>
             <div className="doc-editor__palette-colors">
-              {EDITOR_TEXT_COLORS.map(color => (
+              {EDITOR_COLOR_CHOICES.map(id => EDITOR_TEXT_COLORS.find(color => color.id === id)).filter(Boolean).map(color => (
                 <button
                   key={color.id}
                   type="button"
@@ -187,9 +184,9 @@ function FormatMenu({ editor }) {
             </div>
           </section>
           <section className="doc-editor__palette-section">
-            <h4 className="doc-editor__palette-title">Highlight</h4>
+            <h4 className="doc-editor__palette-title">Mark</h4>
             <div className="doc-editor__palette-grid">
-              {EDITOR_HIGHLIGHTS.map(hl => (
+              {EDITOR_HIGHLIGHT_CHOICES.map(id => EDITOR_HIGHLIGHTS.find(hl => hl.id === id)).filter(Boolean).map(hl => (
                 <button
                   key={hl.id}
                   type="button"
@@ -207,17 +204,17 @@ function FormatMenu({ editor }) {
             </div>
           </section>
           <section className="doc-editor__palette-section">
-            <h4 className="doc-editor__palette-title">Expressive presence</h4>
+            <h4 className="doc-editor__palette-title">Writing</h4>
             <div className="doc-editor__palette-grid">
-              {EXPRESSIVE_SIZES.filter(s => s.id !== 'standard').map(size => (
+              {WRITING_VOICES.map(voice => (
                 <button
-                  key={size.id}
+                  key={voice.id}
                   type="button"
                   className="doc-editor__palette-chip"
-                  onClick={() => apply(() => editor.chain().focus().setExpressiveSize(size.id).run())}
+                  onClick={() => apply(() => editor.chain().focus().setExpressiveSize(voice.id).run())}
                 >
-                  <span className={`doc-editor__palette-preview ${size.className}`}>Aa</span>
-                  {size.label}
+                  <span className={`doc-editor__palette-preview ${voice.className}`}>Aa</span>
+                  {voice.label}
                 </button>
               ))}
             </div>
@@ -228,49 +225,54 @@ function FormatMenu({ editor }) {
   )
 }
 
-function AudioHub({ isDictating, onToggleDictate, onAddFragment }) {
-  return (
-    <div className="doc-editor__audio-hub">
-      <ToolbarButton
-        onClick={onToggleDictate}
-        active={isDictating}
-        title={isDictating ? 'Stop dictation (mock)' : 'Dictate'}
-        className={isDictating ? 'doc-editor__btn--dictating' : ''}
-      >
-        <span className="doc-editor__mic" aria-hidden>
-          {isDictating && <span className="doc-editor__mic-pulse" />}
-          <IconMic />
-        </span>
-      </ToolbarButton>
-      <ToolbarButton onClick={onAddFragment} title="Add audio fragment block">
-        <IconAudioWave />
-      </ToolbarButton>
-    </div>
-  )
+const BLOCK_STYLES = [
+  { id: 'paragraph', label: 'Body', face: 'Karla', apply: (editor) => editor.chain().focus().setParagraph().run() },
+  { id: 'h1', label: 'Title', face: 'Fraunces', apply: (editor) => editor.chain().focus().setHeading({ level: 1 }).run() },
+  { id: 'h2', label: 'Heading', face: 'Fraunces', apply: (editor) => editor.chain().focus().setHeading({ level: 2 }).run() },
+  { id: 'h3', label: 'Subheading', face: 'Fraunces', apply: (editor) => editor.chain().focus().setHeading({ level: 3 }).run() },
+]
+
+function currentBlockStyle(toolbar) {
+  if (toolbar.isH1) return BLOCK_STYLES[1]
+  if (toolbar.isH2) return BLOCK_STYLES[2]
+  if (toolbar.isH3) return BLOCK_STYLES[3]
+  return BLOCK_STYLES[0]
 }
 
-function SlashCommandPalette({ open, query, items, selectedIndex, onPick, onHover }) {
-  if (!open) return null
+function StyleMenu({ editor, toolbar }) {
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef(null)
+  useCloseOnOutsideClick(open, menuRef, () => setOpen(false))
+  const current = currentBlockStyle(toolbar)
 
   return (
-    <div className="doc-editor__slash" role="listbox" aria-label="Slash commands">
-      <p className="doc-editor__slash-hint">Formatting & media blocks</p>
-      {items.length === 0 ? (
-        <p className="doc-editor__slash-empty">No matching commands</p>
-      ) : (
-        <ul className="doc-editor__slash-list">
-          {items.map((item, index) => (
-            <li key={item.id}>
+    <div className="doc-editor__menu doc-editor__style" ref={menuRef}>
+      <button
+        type="button"
+        className={`doc-editor__style-btn${open ? ' doc-editor__style-btn--open' : ''}`}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className={`doc-editor__style-label doc-editor__style-label--${current.id}`}>{current.label}</span>
+        <span className="doc-editor__style-caret" aria-hidden />
+      </button>
+      {open && (
+        <ul className="doc-editor__style-list" role="listbox" aria-label="Text style">
+          {BLOCK_STYLES.map(style => (
+            <li key={style.id}>
               <button
                 type="button"
                 role="option"
-                aria-selected={index === selectedIndex}
-                className={`doc-editor__slash-item${index === selectedIndex ? ' doc-editor__slash-item--active' : ''}`}
-                onMouseEnter={() => onHover(index)}
-                onClick={() => onPick(item)}
+                aria-selected={current.id === style.id}
+                className={`doc-editor__style-option doc-editor__style-option--${style.id}${current.id === style.id ? ' doc-editor__style-option--on' : ''}`}
+                onClick={() => {
+                  style.apply(editor)
+                  setOpen(false)
+                }}
               >
-                <span className="doc-editor__slash-label">{item.label}</span>
-                <span className="doc-editor__slash-group">{item.group}</span>
+                <span>{style.label}</span>
+                <span className="doc-editor__style-face">{style.face}</span>
               </button>
             </li>
           ))}
@@ -280,6 +282,88 @@ function SlashCommandPalette({ open, query, items, selectedIndex, onPick, onHove
   )
 }
 
+function SlashCommandPalette({ open, query, items, selectedIndex, position, onPick, onHover }) {
+  const listRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    listRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [open, selectedIndex, query])
+
+  if (!open) return null
+  let lastGroup = ''
+
+  return (
+    <div
+      className="doc-editor__slash"
+      role="listbox"
+      aria-label="Insert"
+      style={position || undefined}
+    >
+      <p className="doc-editor__slash-hint">{query ? `/${query}` : 'Insert'}</p>
+      {items.length === 0 ? (
+        <p className="doc-editor__slash-empty">Nothing matches.</p>
+      ) : (
+        <ul className="doc-editor__slash-list" ref={listRef}>
+          {items.map((item, index) => {
+            const showGroup = item.group !== lastGroup
+            lastGroup = item.group
+            return (
+              <li key={item.id}>
+                {showGroup && <p className="doc-editor__slash-group">{item.group}</p>}
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={index === selectedIndex}
+                  className={`doc-editor__slash-item${index === selectedIndex ? ' doc-editor__slash-item--active' : ''}`}
+                  onMouseEnter={() => onHover(index)}
+                  onClick={() => onPick(item)}
+                >
+                  <span className="doc-editor__slash-label">{item.label}</span>
+                  <span className="doc-editor__slash-detail">{item.hint}</span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function readSlashQuery(editor, from) {
+  if (!editor || editor.isDestroyed || typeof from !== 'number') return null
+  const { from: cursor, empty } = editor.state.selection
+  if (!empty || cursor < from) return null
+  let text = ''
+  try {
+    text = editor.state.doc.textBetween(from, cursor, '\n', '\0')
+  } catch {
+    return null
+  }
+  if (!text.startsWith('/') || text.includes('\n') || text.includes('\0')) return null
+  return text.slice(1)
+}
+
+function placeSlashMenu(view, canvas) {
+  if (!canvas) return null
+  const coords = view.coordsAtPos(view.state.selection.from)
+  const rect = canvas.getBoundingClientRect()
+  const width = 320
+  let left = coords.left - rect.left
+  if (left + width > canvas.clientWidth - 12) left = Math.max(8, canvas.clientWidth - width - 12)
+  const below = rect.bottom - coords.bottom
+  const above = coords.top - rect.top
+  const openUp = below < 220 && above > below
+  return {
+    top: openUp
+      ? coords.top - rect.top + canvas.scrollTop - 6
+      : coords.bottom - rect.top + canvas.scrollTop + 6,
+    left: Math.max(8, left),
+    transform: openUp ? 'translateY(-100%)' : undefined,
+  }
+}
+
 function runSlashCommand(editor, command, pickArtworkFile) {
   if (!editor || editor.isDestroyed || !command) return
 
@@ -287,26 +371,40 @@ function runSlashCommand(editor, command, pickArtworkFile) {
     case 'textSize':
       editor.chain().focus().setStandardTextSize(command.value).run()
       break
-    case 'size':
+    case 'voice':
       editor.chain().focus().setExpressiveSize(command.value).run()
-      break
-    case 'textColor':
-      editor.chain().focus().setTextColor(command.value).run()
       break
     case 'highlight':
       editor.chain().focus().setExpressiveHighlight(command.value).run()
-      break
-    case 'audio':
-      editor.chain().focus().insertAudioFragment({ label: 'Verbal reflection', duration: '0:38' }).run()
       break
     case 'artwork':
       pickArtworkFile?.()
       break
     case 'heading':
-      editor.chain().focus().toggleHeading({ level: command.value }).run()
+      editor.chain().focus().setHeading({ level: command.value }).run()
+      break
+    case 'bullet':
+      editor.chain().focus().toggleBulletList().run()
+      break
+    case 'ordered':
+      editor.chain().focus().toggleOrderedList().run()
+      break
+    case 'blockquote':
+      editor.chain().focus().toggleBlockquote().run()
       break
     case 'divider':
       editor.chain().focus().setHorizontalRule().run()
+      break
+    case 'table':
+      editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+      break
+    case 'fill':
+      editor.chain().focus().insertContent(
+        '<p class="fill-line"><span class="fill-line__blank">_______________________________________________</span></p>',
+      ).run()
+      break
+    case 'field':
+      editor.chain().focus().insertMergeField(command.value).run()
       break
     case 'insertSnippet': {
       const html = getSlashSnippet(command.value)
@@ -322,9 +420,6 @@ function DocToolbar({
   editor,
   mode,
   clinicianProfile,
-  isDictating,
-  onToggleDictate,
-  onAddAudioFragment,
   onAddArtwork,
   toolbarClassName = EDITOR_TOOLBAR,
 }) {
@@ -339,6 +434,7 @@ function DocToolbar({
         isUnderline: ed.isActive('underline'),
         isH1: ed.isActive('heading', { level: 1 }),
         isH2: ed.isActive('heading', { level: 2 }),
+        isH3: ed.isActive('heading', { level: 3 }),
         isParagraph: ed.isActive('paragraph'),
         isBullet: ed.isActive('bulletList'),
         isOrdered: ed.isActive('orderedList'),
@@ -387,17 +483,7 @@ function DocToolbar({
         </ToolbarButton>
       </div>
       <ToolbarDivider />
-      <div className={EDITOR_TOOLBAR_GROUP}>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={toolbar.isH1} title="Title">
-          <IconHeading level={1} />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={toolbar.isH2} title="Heading">
-          <IconHeading level={2} />
-        </ToolbarButton>
-        <ToolbarButton onClick={() => editor.chain().focus().setParagraph().run()} active={toolbar.isParagraph} title="Normal text">
-          <span className="doc-editor__icon-text">P</span>
-        </ToolbarButton>
-      </div>
+      <StyleMenu editor={editor} toolbar={toolbar} />
       <ToolbarDivider />
       <div className={EDITOR_TOOLBAR_GROUP}>
         <ToolbarButton onClick={() => editor.chain().focus().toggleBold().run()} active={toolbar.isBold} title="Bold">
@@ -422,53 +508,35 @@ function DocToolbar({
         </ToolbarButton>
       </div>
       <ToolbarDivider />
-      <AudioHub
-        isDictating={isDictating}
-        onToggleDictate={onToggleDictate}
-        onAddFragment={onAddAudioFragment}
-      />
-
+      <div className={EDITOR_TOOLBAR_GROUP}>
+        <ToolbarButton onClick={addLink} active={toolbar.isLink} title="Link">
+          <IconLink />
+        </ToolbarButton>
+        <ToolbarButton onClick={onAddArtwork} title="Image">
+          <IconImage />
+        </ToolbarButton>
+        {isClinical && (
+          <ToolbarButton
+            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+            title="Table"
+          >
+            <IconTable />
+          </ToolbarButton>
+        )}
+      </div>
       {isClinical && (
         <>
           <ToolbarDivider />
           <div className={EDITOR_TOOLBAR_GROUP}>
-            <ToolbarButton onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal line">
-              <IconHorizontalRule />
-            </ToolbarButton>
             <ToolbarButton onClick={insertFillLine} title="Fill-in line">
-              <IconFillLine />
-            </ToolbarButton>
-            <ToolbarButton onClick={addLink} active={toolbar.isLink} title="Link">
-              <IconLink />
-            </ToolbarButton>
-            <ToolbarButton onClick={onAddArtwork} title="Embed artwork">
-              <IconImage />
-            </ToolbarButton>
-            <ToolbarButton
-              onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-              title="Insert table"
-            >
-              <IconTable />
+              <span className="doc-editor__icon-text">___</span>
             </ToolbarButton>
             <MergeFieldMenu editor={editor} />
             <SignatureMenu editor={editor} clinicianProfile={clinicianProfile} />
           </div>
         </>
       )}
-
-      {!isClinical && (
-        <>
-          <ToolbarDivider />
-          <div className={EDITOR_TOOLBAR_GROUP}>
-            <ToolbarButton onClick={addLink} active={toolbar.isLink} title="Link">
-              <IconLink />
-            </ToolbarButton>
-            <ToolbarButton onClick={onAddArtwork} title="Embed artwork">
-              <IconImage />
-            </ToolbarButton>
-          </div>
-        </>
-      )}
+      <span className="doc-editor__slash-cue">Type / to insert</span>
     </div>
   )
 }
@@ -490,10 +558,10 @@ function RichTextEditorSurface({
 }) {
   const immersive = layout === 'immersive'
   const [surfaceReady, setSurfaceReady] = useState(false)
-  const [isDictating, setIsDictating] = useState(false)
   const [slashOpen, setSlashOpen] = useState(false)
   const [slashQuery, setSlashQuery] = useState('')
   const [slashIndex, setSlashIndex] = useState(0)
+  const [slashPos, setSlashPos] = useState(null)
   const slashFromRef = useRef(null)
   const canvasRef = useRef(null)
   const editorRef = useRef(null)
@@ -502,7 +570,7 @@ function RichTextEditorSurface({
   const slashIndexRef = useRef(0)
 
   const extensions = useMemo(() => buildEditorExtensions(mode), [mode])
-  const slashItems = useMemo(() => filterSlashCommands(slashQuery), [slashQuery])
+  const slashItems = useMemo(() => filterSlashCommands(slashQuery, mode), [slashQuery, mode])
 
   useEffect(() => { slashOpenRef.current = slashOpen }, [slashOpen])
   useEffect(() => { slashQueryRef.current = slashQuery }, [slashQuery])
@@ -573,10 +641,10 @@ function RichTextEditorSurface({
         spellcheck: 'true',
       },
       handleKeyDown: (_view, event) => {
-        if (!editable) return false
+        if (!_view.editable) return false
 
         if (slashOpenRef.current) {
-          const items = filterSlashCommands(slashQueryRef.current)
+          const items = filterSlashCommands(slashQueryRef.current, mode)
 
           if (event.key === 'Escape') {
             closeSlash()
@@ -584,59 +652,33 @@ function RichTextEditorSurface({
           }
           if (event.key === 'ArrowDown') {
             event.preventDefault()
-            setSlashIndex(i => {
-              const next = (i + 1) % Math.max(items.length, 1)
-              slashIndexRef.current = next
-              return next
-            })
+            const next = (slashIndexRef.current + 1) % Math.max(items.length, 1)
+            slashIndexRef.current = next
+            setSlashIndex(next)
             return true
           }
           if (event.key === 'ArrowUp') {
             event.preventDefault()
-            setSlashIndex(i => {
-              const next = (i - 1 + Math.max(items.length, 1)) % Math.max(items.length, 1)
-              slashIndexRef.current = next
-              return next
-            })
+            const count = Math.max(items.length, 1)
+            const next = (slashIndexRef.current - 1 + count) % count
+            slashIndexRef.current = next
+            setSlashIndex(next)
             return true
           }
-          if (event.key === 'Enter') {
+          if (event.key === 'Enter' || event.key === 'Tab') {
             event.preventDefault()
             const cmd = items[slashIndexRef.current]
             if (cmd && editorRef.current) executeSlash(cmd, editorRef.current)
             return true
           }
-          if (event.key === 'Backspace') {
-            if (slashQueryRef.current.length === 0) {
-              closeSlash()
-              return false
-            }
-            event.preventDefault()
-            setSlashQuery(q => {
-              const next = q.slice(0, -1)
-              slashQueryRef.current = next
-              return next
-            })
-            setSlashIndex(0)
-            return true
-          }
-          if (event.key.length === 1 && !event.metaKey && !event.ctrlKey) {
-            event.preventDefault()
-            setSlashQuery(q => {
-              const next = q + event.key
-              slashQueryRef.current = next
-              return next
-            })
-            setSlashIndex(0)
-            return true
-          }
         }
 
-        if (event.key === '/' && !event.shiftKey) {
+        if (event.key === '/' && !event.shiftKey && !event.metaKey && !event.ctrlKey) {
           const { $from } = _view.state.selection
           const textBefore = $from.parent.textBetween(0, $from.parentOffset, undefined, '\ufffc')
           if (textBefore === '' || /\s$/.test(textBefore)) {
             slashFromRef.current = $from.pos
+            setSlashPos(placeSlashMenu(_view, canvasRef.current))
             setSlashOpen(true)
             slashOpenRef.current = true
             setSlashQuery('')
@@ -655,6 +697,29 @@ function RichTextEditorSurface({
   useEffect(() => {
     editorRef.current = editor
   }, [editor])
+
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return
+    const syncSlash = () => {
+      if (!slashOpenRef.current) return
+      const query = readSlashQuery(editor, slashFromRef.current)
+      if (query === null) {
+        closeSlash()
+        return
+      }
+      if (query === slashQueryRef.current) return
+      slashQueryRef.current = query
+      slashIndexRef.current = 0
+      setSlashQuery(query)
+      setSlashIndex(0)
+    }
+    editor.on('update', syncSlash)
+    editor.on('selectionUpdate', syncSlash)
+    return () => {
+      editor.off('update', syncSlash)
+      editor.off('selectionUpdate', syncSlash)
+    }
+  }, [editor, closeSlash])
 
   useEffect(() => {
     setSurfaceReady(false)
@@ -686,24 +751,6 @@ function RichTextEditorSurface({
     return () => onEditorReady?.(null)
   }, [editor, onEditorReady])
 
-  useEffect(() => {
-    if (!isDictating || !editor || editor.isDestroyed) return
-    const id = window.setInterval(() => {
-      editor.chain().focus().insertContent(' spoken reflection ').run()
-    }, 2800)
-    return () => window.clearInterval(id)
-  }, [isDictating, editor])
-
-  const handleToggleDictate = () => setIsDictating(d => !d)
-
-  const handleAddAudioFragment = () => {
-    if (!editor || editor.isDestroyed) return
-    editor.chain().focus().insertAudioFragment({
-      label: isDictating ? 'Live dictation capture' : 'Session audio fragment',
-      duration: isDictating ? '0:12' : '0:42',
-    }).run()
-  }
-
   const handleAddArtwork = () => pickArtworkFile(editor)
 
   if (!editor || editor.isDestroyed || !surfaceReady) {
@@ -731,14 +778,12 @@ function RichTextEditorSurface({
         `doc-editor--${variant}`,
         !editable ? 'doc-editor--readonly' : '',
         mode === 'clinical' ? 'doc-editor--clinical' : '',
-        isDictating ? 'doc-editor--dictating' : '',
       ].filter(Boolean).join(' ')
     : [
         EDITOR_ROOT,
         `doc-editor--${variant}`,
         !editable ? 'doc-editor--readonly' : '',
         mode === 'clinical' ? 'doc-editor--clinical' : '',
-        isDictating ? 'doc-editor--dictating' : '',
       ].filter(Boolean).join(' ')
 
   const canvasClass = immersive
@@ -758,9 +803,6 @@ function RichTextEditorSurface({
           editor={editor}
           mode={mode}
           clinicianProfile={clinicianProfile}
-          isDictating={isDictating}
-          onToggleDictate={handleToggleDictate}
-          onAddAudioFragment={handleAddAudioFragment}
           onAddArtwork={handleAddArtwork}
           toolbarClassName={immersive ? EDITOR_TOOLBAR_IMMERSIVE : EDITOR_TOOLBAR}
         />
@@ -771,6 +813,7 @@ function RichTextEditorSurface({
           query={slashQuery}
           items={slashItems}
           selectedIndex={slashIndex}
+          position={slashPos}
           onPick={(cmd) => executeSlash(cmd, editor)}
           onHover={setSlashIndex}
         />
