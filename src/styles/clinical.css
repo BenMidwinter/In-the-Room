@@ -1063,6 +1063,38 @@ a.badge {
   text-align: left;
 }
 
+.episode-report-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.episode-report-list li + li {
+  border-top: 1px solid var(--border-light);
+}
+
+.episode-report-list button {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.15rem;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-weight: 650;
+  color: var(--col-accent);
+  cursor: pointer;
+}
+
+.episode-report-list button span:last-child {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--txt-muted);
+}
+
 .episode-report {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(9rem, 1fr);

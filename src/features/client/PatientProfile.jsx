@@ -33,6 +33,7 @@ function PatientProfileFrame({ client: initialClient }) {
 
   return (
     <div className="page page--client">
+      {!editorOpen && (
       <header className="client-shell__header">
         <div className="client-shell__identity">
           <h1>
@@ -53,12 +54,13 @@ function PatientProfileFrame({ client: initialClient }) {
           <button type="button" className="secondary" onClick={() => navigate('/home')}>Home</button>
         </div>
       </header>
+      )}
 
       {!editorOpen && <ClientNav clientId={client.id} client={client} />}
 
-      <ClientClinicalAlerts clientId={client.id} />
+      {!editorOpen && <ClientClinicalAlerts clientId={client.id} />}
 
-      <div className="client-layout">
+      <div className={`client-layout${editorOpen ? ' client-layout--writing' : ''}`}>
         <div className="client-layout__main">
           <Outlet context={{ client }} />
         </div>

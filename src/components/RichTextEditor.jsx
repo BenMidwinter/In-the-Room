@@ -557,6 +557,7 @@ function RichTextEditorSurface({
   compact = false,
   clinicianProfile = null,
   onEditorReady = null,
+  pageHeader = null,
 }) {
   const immersive = layout === 'immersive'
   const [surfaceReady, setSurfaceReady] = useState(false)
@@ -795,6 +796,7 @@ function RichTextEditorSurface({
       ? 'doc-editor__page mx-auto min-h-[16rem] w-full rounded-sm border border-line-light bg-editor-sheet shadow-md'
       : EDITOR_PAGE,
     !compact && variant === 'a4' ? 'w-[210mm] max-w-[min(210mm,100%)] min-h-[297mm]' : '',
+    pageHeader ? 'doc-editor__page--headed' : '',
     !editable ? 'shadow-none' : '',
   ].filter(Boolean).join(' ')
 
@@ -825,6 +827,7 @@ function RichTextEditorSurface({
           </div>
         ) : (
           <div className={pageClass}>
+            {pageHeader}
             <EditorContent editor={editor} />
           </div>
         )}
