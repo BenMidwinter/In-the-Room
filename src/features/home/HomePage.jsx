@@ -12,7 +12,6 @@ import {
   appointmentSchedule,
 } from '../../lib/appointmentUtils'
 import { appointmentDisplayName } from '../../lib/calendarServiceStyles'
-import { modalityLabel } from '../../lib/calendarConstants'
 import { todayYmd } from '../../lib/dateArchitecture'
 import PageHeader from '../../components/PageHeader'
 import RoleBlockShell from '../../components/RoleBlockShell'
