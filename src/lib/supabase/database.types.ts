@@ -541,6 +541,39 @@ export type Database = {
           },
         ]
       }
+      cpd_entries: {
+        Row: {
+          created_at: string
+          encrypted_payload: Json
+          id: string
+          label: string
+          minutes: number
+          occurred_on: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_payload: Json
+          id?: string
+          label: string
+          minutes: number
+          occurred_on: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_payload?: Json
+          id?: string
+          label?: string
+          minutes?: number
+          occurred_on?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       episodes: {
         Row: {
           client_id: string
@@ -1423,6 +1456,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      supervision_entries: {
+        Row: {
+          created_at: string
+          direction: string
+          encrypted_payload: Json
+          id: string
+          label: string
+          minutes: number
+          occurred_on: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          direction: string
+          encrypted_payload: Json
+          id?: string
+          label: string
+          minutes: number
+          occurred_on: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          direction?: string
+          encrypted_payload?: Json
+          id?: string
+          label?: string
+          minutes?: number
+          occurred_on?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       templates: {
         Row: {

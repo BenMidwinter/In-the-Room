@@ -7,6 +7,8 @@ const linkClass = ({ isActive }) =>
 const SECTIONS = [
   { to: '/practice/documents', label: 'My Documents' },
   { to: '/practice/journal', label: 'Journal' },
+  { to: '/practice/cpd', label: 'CPD log' },
+  { to: '/practice/supervision', label: 'Supervision log' },
 ]
 
 export default function PracticeLayout() {

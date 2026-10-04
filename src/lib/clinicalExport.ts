@@ -61,6 +61,11 @@ const DOCUMENT_PRINT_STYLES = `
   .clinical-pdf .clinical-pdf__body ol { margin: 0 0 0.75rem 1.25rem; }
   .clinical-pdf .addendum { margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px solid #c8c2b8; }
   .clinical-pdf .addendum__label { margin: 0 0 0.4rem; font-size: 0.85rem; color: #404b54; }
+  .clinical-pdf .clinical-pdf__body hr { border: none; border-top: 1px solid #c8c2b8; margin: 1rem 0; }
+  .clinical-pdf .doc-signature { margin-top: 1.25rem; color: #1a1818; }
+  .clinical-pdf .doc-signature__image { display: block; max-height: 3.5rem; max-width: 14rem; object-fit: contain; margin-bottom: 0.35rem; }
+  .clinical-pdf .doc-signature__script { font-family: 'Caveat', cursive; font-size: 28px; line-height: 1.15; margin-bottom: 0.2rem; }
+  .clinical-pdf .doc-signature__name { font-weight: 600; }
 `
 
 function formatPrintDate(value: string | undefined) {
@@ -196,6 +201,7 @@ async function waitForBrandFonts() {
   await Promise.all([
     document.fonts?.load("600 26px Fraunces"),
     document.fonts?.load('16px Karla'),
+    document.fonts?.load('28px Caveat'),
   ].filter(Boolean))
 }
 

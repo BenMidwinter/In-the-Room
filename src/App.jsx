@@ -32,6 +32,7 @@ import LoginSettingsPage from './features/settings/LoginSettingsPage'
 import JournalPage from './features/journal/JournalPage'
 import PracticeLayout from './features/practice/PracticeLayout'
 import PracticeDocumentsPage from './features/practice/PracticeDocumentsPage'
+import PracticeLogPage from './features/practice/PracticeLogPage'
 import Resources from './components/Resources'
 import About from './components/About'
 import NotesHistoryPanel from './features/client/NotesHistoryPanel'
@@ -58,6 +59,8 @@ export default function App() {
           <Route index element={<Navigate to="journal" replace />} />
           <Route path="documents" element={<PracticeDocumentsPage />} />
           <Route path="journal" element={<JournalPage />} />
+          <Route path="cpd" element={<PracticeLogPage kind="cpd" />} />
+          <Route path="supervision" element={<PracticeLogPage kind="supervision" />} />
         </Route>
         <Route path="lab/progress-note" element={<Navigate to="/home" replace />} />
         <Route path="upcoming-appointments" element={<Navigate to="/calendar?view=upcoming" replace />} />

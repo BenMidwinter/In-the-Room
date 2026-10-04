@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import RichTextEditor from '../../components/RichTextEditor'
 import { SettingsSectionCard } from './SettingsPlaceholders'
 import { useToast, useConfirm } from '../../components/ui'
@@ -8,10 +8,15 @@ import {
   useTemplatesQuery,
 } from '../../lib/templateQueries'
 import { isSupabaseConfigured } from '../../lib/supabase/client'
+import { useAuth } from '../../lib/auth/AuthProvider'
+import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
+import { getProfile } from '../../lib/store'
+import DocumentWorkspace from '../client/DocumentWorkspace'
 
 export default function TemplatesSettingsPage({ kind, title }) {
   const toast = useToast()
   const confirm = useConfirm()
+  const { profile: accountProfile, user } = useAuth()
   const { data: templates = [], isPending, error } = useTemplatesQuery(kind)
   const saveTemplate = useSaveTemplateMutation(kind)
   const removeTemplate = useDeleteTemplateMutation(kind)
@@ -19,6 +24,15 @@ export default function TemplatesSettingsPage({ kind, title }) {
   const [name, setName] = useState('')
   const [content, setContent] = useState('<p></p>')
   const [version, setVersion] = useState(0)
+
+  const clinicianProfile = useMemo(
+    () => clinicianProfileForEditor(accountProfile, user ? getProfile(user.id) : null),
+    [accountProfile, user],
+  )
+  const mergeContext = useMemo(
+    () => buildMergeContext({ profile: clinicianProfile }),
+    [clinicianProfile],
+  )
 
   const openNew = () => {
     setSelectedId('new')
@@ -72,6 +86,48 @@ export default function TemplatesSettingsPage({ kind, title }) {
 
   const editing = selectedId != null
 
+  if (editing) {
+    return (
+      <DocumentWorkspace
+        title={name.trim() || title}
+        onBack={() => setSelectedId(null)}
+        actions={(
+          <>
+            <button type="button" className="secondary" onClick={remove} disabled={removeTemplate.isPending}>
+              Delete
+            </button>
+            <button type="button" className="primary" onClick={save} disabled={saveTemplate.isPending}>
+              {saveTemplate.isPending ? 'Saving…' : 'Save template'}
+            </button>
+          </>
+        )}
+        meta={(
+          <label className="progress-notes-page__meta-field progress-notes-page__meta-field--title">
+            <span className="progress-notes-page__meta-label">Name</span>
+            <input
+              className="progress-notes-page__meta-input"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="e.g. First session"
+            />
+          </label>
+        )}
+      >
+        <RichTextEditor
+          key={`${selectedId}-${version}`}
+          content={content}
+          onChange={setContent}
+          layout="immersive"
+          variant="a4"
+          mode="clinical"
+          mergeMode="template"
+          mergeContext={mergeContext}
+          clinicianProfile={clinicianProfile}
+        />
+      </DocumentWorkspace>
+    )
+  }
+
   return (
     <div className="section-card-stack">
       <SettingsSectionCard blockId={`settings_templates_${kind}`} title={title}>
@@ -98,39 +154,8 @@ export default function TemplatesSettingsPage({ kind, title }) {
         </div>
 
         {isPending && <p className="text-small text-muted">Loading templates…</p>}
-        {!isPending && !editing && templates.length === 0 && (
+        {!isPending && templates.length === 0 && (
           <p className="text-muted" style={{ margin: 0 }}>No templates yet.</p>
-        )}
-
-        {editing && (
-          <div className="template-studio">
-            <label className="settings-form__field">
-              <span>Name</span>
-              <input
-                className="paper-input"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="e.g. First session"
-              />
-            </label>
-            <div className="template-studio__canvas">
-              <RichTextEditor
-                key={`${selectedId}-${version}`}
-                content={content}
-                onChange={setContent}
-                mode="clinical"
-                mergeMode="template"
-              />
-            </div>
-            <div className="settings-form__actions">
-              <button type="button" className="primary" onClick={save} disabled={saveTemplate.isPending}>
-                {saveTemplate.isPending ? 'Saving…' : 'Save template'}
-              </button>
-              <button type="button" className="secondary" onClick={remove} disabled={removeTemplate.isPending}>
-                Delete
-              </button>
-            </div>
-          </div>
         )}
       </SettingsSectionCard>
     </div>
