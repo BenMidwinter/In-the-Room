@@ -4,6 +4,13 @@ import { appointmentSchedule, fromDatetimeLocalValue, type AppointmentLike } fro
 import { todayYmd, addMinutesToTime } from '../dateArchitecture'
 import { parseOrThrow, appointmentInputSchema } from '../schemas'
 import { getClientsForUser } from './clientRecords'
+import {
+  assertWritableAppointment,
+  blockRoleForServiceType,
+  planFollowOnBlock,
+  planFollowOnWrite,
+  type ServiceFollowOnSource,
+} from '../scheduling/appointmentHygiene'
 
 export { APPOINTMENT_TYPES, ATTENDANCE_STATUSES } from '../mockData'
 
@@ -39,7 +46,77 @@ export function getUpcomingAppointments(userId, myWorkplace, options: { organisa
   ).reverse()
 }
 
+function asService(row: { id: string } | undefined): ServiceFollowOnSource | null {
+  if (!row) return null
+  return row as ServiceFollowOnSource
+}
+
+function syncLocalFollowOn(parent) {
+  if (!parent?.id || parent.parent_appointment_id) return
+  const existingIds = db.appointments
+    .filter((row) => row.parent_appointment_id === parent.id)
+    .map((row) => String(row.id))
+  const role = parent.block_role || 'client_session'
+  const primary = role === 'client_session'
+    ? asService(db.orgServices.find((row) => row.id === parent.service_id))
+    : null
+  const followOn = primary?.follow_on_service_id
+    ? asService(db.orgServices.find((row) => row.id === primary.follow_on_service_id))
+    : null
+  const write = planFollowOnWrite(existingIds, planFollowOnBlock(primary, followOn))
+
+  if (write.deleteIds.length) {
+    const drop = new Set(write.deleteIds)
+    const kept = db.appointments.filter((row) => !drop.has(String(row.id)))
+    db.appointments.length = 0
+    for (const row of kept) db.appointments.push(row)
+  }
+
+  if (!write.plan) return
+
+  const startTime = parent.end_time
+  const endTime = addMinutesToTime(startTime, write.plan.durationMinutes)
+  const child = {
+    client_id: parent.client_id,
+    client_name: parent.client_name,
+    episode_id: parent.episode_id ?? null,
+    clinician_id: parent.clinician_id,
+    service_id: write.plan.serviceId,
+    service_name: write.plan.serviceName,
+    assigned_therapist: parent.assigned_therapist,
+    session_date: parent.session_date,
+    start_time: startTime,
+    end_time: endTime,
+    scheduled_at: `${parent.session_date}T${startTime}:00`,
+    therapy_modality: write.plan.therapyModality,
+    appointment_type: 'one_to_one',
+    attendance_status: null,
+    location: parent.location || '',
+    notes: '',
+    other_info: write.plan.serviceName,
+    block_role: write.plan.blockRole,
+    parent_appointment_id: parent.id,
+    series_id: null,
+    updated_at: parent.updated_at,
+  }
+
+  if (write.keepId) {
+    const idx = db.appointments.findIndex((row) => row.id === write.keepId)
+    if (idx !== -1) {
+      db.appointments[idx] = { ...db.appointments[idx], ...child }
+      return
+    }
+  }
+
+  db.appointments.push({
+    id: uid('appt'),
+    created_at: parent.updated_at,
+    ...child,
+  })
+}
+
 export function saveAppointment(payload, userId) {
+  assertWritableAppointment(payload)
   payload = parseOrThrow(appointmentInputSchema, payload, 'Appointment')
   const now = new Date().toISOString().split('T')[0]
   const schedule = payload.session_date
@@ -75,12 +152,15 @@ export function saveAppointment(payload, userId) {
       notes: payload.notes !== undefined ? payload.notes : prev.notes,
       other_info: payload.other_info !== undefined ? payload.other_info : prev.other_info ?? '',
       block_role: payload.block_role ?? prev.block_role,
+      series_id: payload.series_id !== undefined ? (payload.series_id || null) : prev.series_id,
       client_name: client?.real_name ?? prev.client_name,
       assigned_therapist: String(clinicianProfile?.full_name || '').split(' ')[0]
         || prev.assigned_therapist,
       updated_at: now,
     }
-    return db.appointments[idx]
+    const saved = db.appointments[idx]
+    syncLocalFollowOn(saved)
+    return saved
   }
 
   const startTime = schedule.start_time
@@ -105,11 +185,15 @@ export function saveAppointment(payload, userId) {
     location: payload.location ?? '',
     notes: payload.notes || '',
     other_info: payload.other_info?.trim() || '',
-    block_role: payload.block_role || 'client_session',
+    block_role: payload.block_role || blockRoleForServiceType(
+      db.orgServices.find((row) => row.id === payload.service_id)?.service_type as string | undefined,
+    ),
+    parent_appointment_id: null,
     series_id: payload.series_id || null,
     created_at: now,
     updated_at: now,
   }
   db.appointments.push(created)
+  syncLocalFollowOn(created)
   return created
 }

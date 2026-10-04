@@ -13,56 +13,27 @@ function isPrimarySession(appointment: {
   return role === 'client_session'
 }
 
-function seriesKey(appointment: {
-  client_id?: string | null
-  clinician_id?: string | null
-  start_time?: string | null
-  end_time?: string | null
-  service_id?: string | null
-  therapy_modality?: string | null
-}) {
-  return [
-    appointment.client_id || '',
-    appointment.clinician_id || '',
-    appointment.start_time || '',
-    appointment.end_time || '',
-    appointment.service_id || appointment.therapy_modality || '',
-  ].join('|')
-}
-
-/** Primary sessions that belong with this appointment (explicit series_id or heuristic). */
+/** Primary sessions that share this appointment's series_id. No series_id means this row only. */
 export function findSeriesSiblings<T extends {
   id: string
   series_id?: string | null
   session_date?: string
-  client_id?: string | null
-  clinician_id?: string | null
-  start_time?: string | null
-  end_time?: string | null
-  service_id?: string | null
-  therapy_modality?: string | null
   block_role?: string | null
   parent_appointment_id?: string | null
+  is_external_busy?: boolean
 }>(appointment: T | null | undefined, allAppointments: T[] = []): T[] {
   if (!appointment?.id) return []
   const pool = allAppointments.filter(isPrimarySession)
-
-  if (appointment.series_id) {
-    return pool
-      .filter((a) => a.series_id === appointment.series_id)
-      .sort((a, b) => compareYmd(a.session_date || '', b.session_date || ''))
-  }
-
-  const key = seriesKey(appointment)
-  const siblings = pool
-    .filter((a) => seriesKey(a) === key)
-    .sort((a, b) => compareYmd(a.session_date || '', b.session_date || ''))
-
-  // Only treat as a series when there is more than one matching session.
-  if (siblings.length < 2) {
+  if (!appointment.series_id) {
     return pool.filter((a) => a.id === appointment.id)
   }
-  return siblings
+  return pool
+    .filter((a) => a.series_id === appointment.series_id)
+    .sort((a, b) => compareYmd(a.session_date || '', b.session_date || ''))
+}
+
+export function newSeriesId(): string {
+  return crypto.randomUUID()
 }
 
 export function appointmentBelongsToSeries(

@@ -44,6 +44,18 @@ describe('appointmentInputSchema', () => {
     expect(() => parseOrThrow(appointmentInputSchema, { session_date: '2026-07-02' }, 'Appointment'))
       .toThrow(/client is required/i)
   })
+  it('rejects retired block roles', () => {
+    expect(() => parseOrThrow(appointmentInputSchema, {
+      client_id: 'client-1',
+      session_date: '2026-07-02',
+      block_role: 'primary',
+    }, 'Appointment')).toThrow()
+    expect(() => parseOrThrow(appointmentInputSchema, {
+      client_id: 'client-1',
+      session_date: '2026-07-02',
+      block_role: 'appointment',
+    }, 'Appointment')).toThrow()
+  })
   it('allows support/admin blocks without a client', () => {
     const out = parseOrThrow(appointmentInputSchema, {
       session_date: '2026-07-02',

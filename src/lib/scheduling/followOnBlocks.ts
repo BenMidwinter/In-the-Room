@@ -1,8 +1,9 @@
 /**
  * Derive clinician calendar blocks from a service definition.
- * Client-facing duration stays on the session; optional follow-on support
- * (e.g. report writing) is appended for SaaS/Google occupancy.
+ * Client-facing duration stays on the session; optional follow-on work
+ * is appended and takes its block role from the follow-on service.
  */
+import { followOnBlockRole } from './appointmentHygiene'
 
 export type ServiceLike = {
   id: string
@@ -63,7 +64,7 @@ export function planAppointmentBlocks(
     blocks.push({
       tempKey: 'support',
       parentTempKey: 'session',
-      blockRole: 'support',
+      blockRole: followOnBlockRole(followOnService.service_type),
       serviceId: followOnService.id,
       startsAt: sessionEnd,
       endsAt: addMinutes(sessionEnd, supportMinutes),

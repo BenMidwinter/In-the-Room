@@ -31,6 +31,11 @@ describe('org mutation schemas', () => {
       name: 'Notetaking',
     }, 'Service')
     expect(parsed.service_type).toBe('admin')
+    const support = parseOrThrow(orgServiceInputSchema, {
+      service_type: 'support',
+      name: 'Report writing',
+    }, 'Service')
+    expect(support.service_type).toBe('support')
   })
 
   it('requires template name on save', () => {

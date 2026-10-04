@@ -10,7 +10,7 @@ import {
 import { ScheduleSessionPanel } from '../../components/LayoutComponents'
 import FormOverlay from '../../components/FormOverlay'
 import { useConfirm, useToast } from '../../components/ui'
-import { appointmentBelongsToSeries, countSeriesScope } from '../../lib/appointmentSeries'
+import { appointmentBelongsToSeries, countSeriesScope, newSeriesId } from '../../lib/appointmentSeries'
 import SeriesScopeDialog from '../../components/SeriesScopeDialog'
 import { DEMO_TODAY } from '../../lib/dateArchitecture'
 
@@ -51,12 +51,7 @@ export default function AppointmentEditor() {
     setSaving(true)
     try {
       const dates = payload.dates?.length ? payload.dates : [payload.session_date]
-      const seriesId = payload.series_id
-        || (dates.length > 1
-          ? (typeof crypto !== 'undefined' && crypto.randomUUID
-            ? crypto.randomUUID()
-            : `series-${Date.now()}`)
-          : undefined)
+      const seriesId = payload.series_id || (dates.length > 1 ? newSeriesId() : undefined)
 
       if (payload.id && !payload.dates?.length) {
         await saveAppointmentMutation.mutateAsync({

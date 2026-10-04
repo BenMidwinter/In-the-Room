@@ -9,10 +9,13 @@ export const SERVICE_COLOR_PRESETS = [
   '#0f766e',
 ] as const
 
-export type ServiceType = 'appointment' | 'admin' | 'busy'
+import type { ServiceType } from './scheduling/appointmentHygiene'
+
+export type { ServiceType }
 
 export const DEFAULT_SERVICE_COLORS: Record<ServiceType, string> = {
   appointment: '#557a61',
+  support: '#8b5a7a',
   admin: '#4a7c9e',
   busy: '#6b7280',
 }
