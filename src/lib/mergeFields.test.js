@@ -4,6 +4,7 @@ import {
   MERGE_FIELD_OPTIONS,
   fillMergeFields,
   mergeFieldDisplay,
+  signatureRegistrationLine,
 } from './mergeFields'
 
 describe('buildMergeContext', () => {
@@ -52,6 +53,10 @@ describe('buildMergeContext', () => {
     expect(ctx.clinician_name).toBe('Ada North')
     expect(ctx.clinician_title).toBe('Dramatherapist')
     expect(ctx.clinician_hcpc).toBe('HCPC AS12345')
+    expect(signatureRegistrationLine(ctx.clinician_hcpc)).toBe('HCPC AS12345')
+    expect(signatureRegistrationLine('AS12345')).toBe('HCPC AS12345')
+    expect(signatureRegistrationLine('BACP 12345')).toBe('BACP 12345')
+    expect(signatureRegistrationLine('HCPC AS12345, BACP 123')).toBe('HCPC AS12345, BACP 123')
     const keys = MERGE_FIELD_OPTIONS.map((option) => option.key)
     expect(keys).not.toContain('recurring_themes')
     expect(keys).not.toContain('sensory_considerations')
