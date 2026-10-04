@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useAppClients } from '../../lib/queries'
@@ -11,11 +11,37 @@ import {
   formatAppointmentTime,
   formatSessionDateTime,
   appointmentSchedule,
+  appointmentInstant,
+  isClientSessionAppointment,
 } from '../../lib/appointmentUtils'
 import { appointmentDisplayName } from '../../lib/calendarServiceStyles'
-import { todayYmd } from '../../lib/dateArchitecture'
+import { formatDisplayDate, todayYmd } from '../../lib/dateArchitecture'
 import PageHeader from '../../components/PageHeader'
 import SectionCard from '../../components/SectionCard'
+import RecordTable from '../../components/RecordTable'
+
+const CASELOAD_COLUMNS = [
+  { key: 'name', label: 'Name', filter: 'text' },
+  { key: 'dob', label: 'Date of birth', sort: 'date' },
+  { key: 'next', label: 'Next', sort: 'date', sortFirst: 'asc' },
+]
+
+function nextSessionByClient(appointments, today) {
+  const next = new Map()
+  appointments.forEach((appt) => {
+    if (!appt.client_id) return
+    if (!isClientSessionAppointment(appt)) return
+    if (appt.parent_appointment_id) return
+    if (appt.attendance_status === 'cancelled') return
+    const date = appointmentSchedule(appt).session_date
+    if (!date || date < today) return
+    const current = next.get(appt.client_id)
+    if (!current || appointmentInstant(appt) < appointmentInstant(current)) {
+      next.set(appt.client_id, appt)
+    }
+  })
+  return next
+}
 
 function clientLabel(clients, clientId) {
   return clients.find((c) => c.id === clientId)?.real_name || 'Client'
@@ -101,6 +127,7 @@ function UpcomingTimeline({ appointments, clients, onSelect }) {
 export default function HomePage() {
   const { session, activePersona } = useAppSession()
   const overlay = useAppointmentOverlay()
+  const navigate = useNavigate()
   const { clients } = useAppClients()
   const name = activePersona?.name && activePersona.name !== 'Clinician'
     ? activePersona.name
@@ -128,6 +155,45 @@ export default function HomePage() {
   const nextTaskHref = nextTask
     ? `/clients/${nextTask.client_id}/progress-notes?appointment=${nextTask.id}`
     : null
+
+  const upcomingByClient = useMemo(
+    () => nextSessionByClient(allAppointments, todayYmd()),
+    [allAppointments],
+  )
+
+  const caseloadRows = useMemo(
+    () => clients.filter((client) => client.is_active).map((client) => {
+      const next = upcomingByClient.get(client.id) || null
+      return {
+        id: client.id,
+        filterValues: { name: client.real_name },
+        sortValues: {
+          name: client.real_name,
+          dob: client.dob || '',
+          next: next ? appointmentInstant(next) : '',
+        },
+        cells: {
+          name: <span className="record-table__primary">{client.real_name}</span>,
+          dob: formatDisplayDate(client.dob) || '—',
+          next: next ? (
+            <button
+              type="button"
+              className="record-table__inline"
+              onClick={(event) => {
+                event.stopPropagation()
+                overlay.openView(next)
+              }}
+            >
+              {formatAppointmentDate(next)} · {formatAppointmentTime(next)}
+            </button>
+          ) : (
+            <span className="record-table__cell-muted">None booked</span>
+          ),
+        },
+      }
+    }),
+    [clients, upcomingByClient, overlay],
+  )
 
   return (
     <div className="page page--home">
@@ -199,6 +265,28 @@ export default function HomePage() {
               clients={clients}
               onSelect={overlay.openView}
             />
+
+            <section className="home-caseload" aria-labelledby="home-caseload-title">
+              <div className="home-caseload__bar">
+                <div>
+                  <h3 id="home-caseload-title" className="card__title">Active cases</h3>
+                  <p className="text-small text-muted">Your current clients. Open one to start work.</p>
+                </div>
+                <div className="home-caseload__actions">
+                  <Link to="/clients" className="secondary">All clients</Link>
+                  <Link to="/clients/add" className="primary">New client</Link>
+                </div>
+              </div>
+              <RecordTable
+                columns={CASELOAD_COLUMNS}
+                rows={caseloadRows}
+                defaultSort={{ key: 'next', direction: 'asc' }}
+                countNoun="clients"
+                scroll
+                emptyMessage="No active clients yet."
+                onRowClick={(row) => navigate(`/clients/${row.id}`)}
+              />
+            </section>
           </div>
         </SectionCard>
       </div>

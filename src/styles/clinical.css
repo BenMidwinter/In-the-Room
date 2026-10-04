@@ -351,6 +351,10 @@ select.paper-input {
   font-weight: 600;
 }
 
+a.badge {
+  text-decoration: none;
+}
+
 .badge-green { background: #e6f4ea; color: #1e7e34; border: 1px solid #b7dfc4; }
 .badge-grey { background: var(--bg-page); color: var(--txt-muted); border: 1px solid var(--border-color); }
 .badge-blue { background: var(--col-primary-light); color: var(--col-primary-dark); border: 1px solid #b8e4f2; }

@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useClientSession } from '../../lib/useClientSession'
-import { getProfile, getAppointment } from '../../lib/store'
+import { getAppointment } from '../../lib/store'
 import { useProgressNotesFeedQuery } from '../../lib/progressNoteQueries'
 import { formatDisplayDate } from '../../lib/dateArchitecture'
 import { progressNoteHistoryStatusLabel } from '../../lib/progressNoteLifecycle'
@@ -19,12 +19,11 @@ function NoteStatusTag({ status }) {
 }
 
 const NOTE_COLUMNS = [
-  { key: 'title', label: 'Note title', filter: { type: 'text', placeholder: 'Filter title…' } },
-  { key: 'status', label: 'Status', filter: { type: 'select', allLabel: 'All statuses' } },
-  { key: 'template', label: 'Note template', filter: { type: 'select', allLabel: 'All templates' } },
-  { key: 'date', label: 'Date of note', filter: { type: 'text', placeholder: 'Filter date…' } },
-  { key: 'appointment', label: 'Linked appointment', filter: { type: 'text', placeholder: 'Filter appointment…' } },
-  { key: 'author', label: 'Created by', filter: { type: 'select', allLabel: 'All authors' } },
+  { key: 'title', label: 'Note', filter: 'text' },
+  { key: 'status', label: 'Status', filter: 'choice' },
+  { key: 'template', label: 'Template', filter: 'choice' },
+  { key: 'date', label: 'Date', filter: 'text', sort: 'date' },
+  { key: 'appointment', label: 'Appointment', filter: 'text', sort: 'date' },
 ]
 
 export default function NotesHistoryPanel() {
@@ -33,29 +32,33 @@ export default function NotesHistoryPanel() {
   const { data: notes = [] } = useProgressNotesFeedQuery(clientId)
 
   const rows = useMemo(() => notes.map(note => {
-    const author = getProfile(note.author_id)
     const appt = note.appointment_id ? getAppointment(note.appointment_id) : null
     const status = progressNoteHistoryStatusLabel(note)
+    const when = formatDisplayDate(note.session_date)
+    const appointmentLabel = appt ? formatSessionDateTime(appt) : ''
     return {
       id: note.id,
       note,
       filterValues: {
         status,
         title: note.title,
-        template: note.template_name || '—',
-        date: formatDisplayDate(note.session_date),
-        appointment: appt ? formatSessionDateTime(appt) : 'None',
-        author: author?.full_name || '—',
+        template: note.template_name || '',
+        date: when,
+        appointment: appointmentLabel || 'None',
+      },
+      sortValues: {
+        title: note.title,
+        date: note.session_date || '',
+        appointment: appt ? `${appt.session_date || ''}T${appt.start_time || ''}` : '',
       },
       cells: {
         title: <span className="record-table__primary">{note.title}</span>,
         status: <NoteStatusTag status={status} />,
-        template: note.template_name || '—',
-        date: formatDisplayDate(note.session_date),
-        appointment: appt
-          ? formatSessionDateTime(appt)
+        template: note.template_name || <span className="record-table__cell-muted">—</span>,
+        date: when,
+        appointment: appointmentLabel
+          ? appointmentLabel
           : <span className="record-table__cell-muted">None</span>,
-        author: author?.full_name || '—',
       },
     }
   }), [notes])
@@ -76,6 +79,8 @@ export default function NotesHistoryPanel() {
       <RecordTable
         columns={NOTE_COLUMNS}
         rows={rows}
+        countNoun="notes"
+        defaultSort={{ key: 'date', direction: 'desc' }}
         emptyMessage="No Process Notes recorded yet."
         onRowClick={openNote}
       />

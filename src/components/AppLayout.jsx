@@ -11,7 +11,6 @@ import RequireAuth from './RequireAuth'
 const NAV_ITEMS = [
   { to: '/home', label: 'Home', end: true },
   { to: '/calendar', label: 'Calendar' },
-  { to: '/active-cases', label: 'Active Cases' },
   { to: '/clients', label: 'All Clients' },
   { to: '/journal', label: 'Journal' },
   { to: '/finance', label: '[Finance]' },

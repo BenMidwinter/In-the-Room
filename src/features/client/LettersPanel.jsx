@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import RichTextEditor from '../../components/RichTextEditor'
 import { useClientSession } from '../../lib/useClientSession'
-import { getLetters, saveLetter, getProfile } from '../../lib/store'
+import { getLetters, saveLetter } from '../../lib/store'
 import { downloadLetterPdf } from '../../lib/clinicalExport'
 import { loadClinicianPrintIdentity, resolveDownloadLetterhead } from '../../lib/letterheadPrint'
 import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
@@ -20,11 +20,10 @@ function todayISO() {
 }
 
 const LETTER_COLUMNS = [
-  { key: 'title', label: 'Title', filter: { type: 'text', placeholder: 'Filter title…' } },
-  { key: 'recipient', label: 'Recipient', filter: { type: 'text', placeholder: 'Filter recipient…' } },
-  { key: 'date', label: 'Letter date', filter: { type: 'text', placeholder: 'Filter date…' } },
-  { key: 'author', label: 'Created by', filter: { type: 'select', allLabel: 'All authors' } },
-  { key: 'updated', label: 'Last updated' },
+  { key: 'title', label: 'Title', filter: 'text' },
+  { key: 'recipient', label: 'Recipient', filter: 'text' },
+  { key: 'date', label: 'Letter date', sort: 'date' },
+  { key: 'updated', label: 'Updated', sort: 'date' },
 ]
 
 export default function LettersPanel() {
@@ -131,15 +130,19 @@ export default function LettersPanel() {
     letter,
     filterValues: {
       title: letter.title,
-      recipient: letter.recipient || '—',
+      recipient: letter.recipient || '',
       date: formatDocDate(letter.letter_date),
-      author: getProfile(letter.author_id)?.full_name || '—',
+    },
+    sortValues: {
+      title: letter.title,
+      recipient: letter.recipient || '',
+      date: letter.letter_date || '',
+      updated: letter.updated_at || '',
     },
     cells: {
       title: <span className="record-table__primary">{letter.title}</span>,
-      recipient: letter.recipient || '—',
+      recipient: letter.recipient || <span className="record-table__cell-muted">—</span>,
       date: formatDocDate(letter.letter_date),
-      author: getProfile(letter.author_id)?.full_name || '—',
       updated: formatDocDate(letter.updated_at),
     },
   }))
@@ -204,6 +207,8 @@ export default function LettersPanel() {
         <RecordTable
           columns={LETTER_COLUMNS}
           rows={rows}
+          countNoun="letters"
+          defaultSort={{ key: 'updated', direction: 'desc' }}
           emptyMessage="No letters yet."
           onRowClick={(row) => selectLetter(row.letter)}
         />

@@ -447,9 +447,51 @@ button.home-stat-card__link {
   text-decoration: none;
 }
 
+.home-caseload {
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface);
+  padding: 0.85rem 1rem 0.75rem;
+}
+
+.home-caseload__bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.home-caseload__bar .card__title {
+  margin: 0;
+  font-family: var(--font-head);
+  font-size: 1rem;
+  font-weight: 600;
+  font-variation-settings: var(--font-head-variation);
+  color: var(--col-accent);
+}
+
+.home-caseload__bar p {
+  margin: 0.2rem 0 0;
+}
+
+.home-caseload__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.home-caseload__actions a {
+  text-decoration: none;
+}
+
 @media (max-width: 720px) {
   .home-dashboard__stats {
     grid-template-columns: 1fr;
+  }
+
+  .home-caseload__bar {
+    flex-direction: column;
   }
 }
 
