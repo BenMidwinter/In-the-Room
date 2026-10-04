@@ -136,10 +136,6 @@ export default function AddClient() {
           <label>Diagnosis</label>
           <DiagnosisPicker selected={selectedDiagnoses} onChange={setSelectedDiagnoses} />
         </div>
-        <div className="form-group">
-          <label>Context</label>
-          <p className="text-muted">Private practice</p>
-        </div>
         <div className="form-actions">
           <button type="submit" className="primary" disabled={loading}>{loading ? 'Saving…' : 'Save client'}</button>
         </div>

@@ -37,17 +37,21 @@ export default function LetterheadBrandingForm({
     <div className="letterhead-branding">
       <div className="letterhead-branding__preview" aria-label="Letterhead preview">
         <div className="letterhead-branding__brand">
-          {logoUrl || previewBranding?.logo_url ? (
-            <img
-              className="letterhead-branding__logo"
-              src={logoUrl || previewBranding.logo_url}
-              alt={practiceName ? `${practiceName} logo` : 'Practice logo'}
-            />
-          ) : (
-            <div className="letterhead-branding__logo letterhead-branding__logo--empty" aria-hidden>
-              No logo
-            </div>
-          )}
+          <div className="letterhead-branding__identity">
+            {logoUrl || previewBranding?.logo_url ? (
+              <img
+                className="letterhead-branding__logo"
+                src={logoUrl || previewBranding.logo_url}
+                alt={practiceName ? `${practiceName} logo` : 'Practice logo'}
+              />
+            ) : (
+              <div className="letterhead-branding__logo letterhead-branding__logo--empty" aria-hidden>
+                No logo
+              </div>
+            )}
+            {clinicianName ? <p className="letterhead-branding__clinician">{clinicianName}</p> : null}
+            {professionalTitle ? <p className="letterhead-branding__role">{professionalTitle}</p> : null}
+          </div>
           <div className="letterhead-branding__practice">
             {practiceName ? <strong>{practiceName}</strong> : null}
             <span className="letterhead-branding__address">
@@ -55,8 +59,6 @@ export default function LetterheadBrandingForm({
             </span>
           </div>
         </div>
-        {clinicianName ? <p className="letterhead-branding__clinician">{clinicianName}</p> : null}
-        {professionalTitle ? <p className="letterhead-branding__role">{professionalTitle}</p> : null}
         <hr className="letterhead-branding__rule" />
       </div>
 

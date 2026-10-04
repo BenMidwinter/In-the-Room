@@ -632,19 +632,6 @@ function StandardEventBody({
     >
       <section className="room-event-drawer__section room-event-drawer__section--compact">
         <StackedDataList className="room-stacked-list--compact">
-          {showAttendance && (
-            <StackedDataRow
-              icon="👤"
-              label="Client"
-              value={appointment.client_name}
-              href={appointment.client_id ? `/clients/${appointment.client_id}` : undefined}
-              meta={[
-                formatDisplayDate(appointment.session_date) || appointment.session_date,
-                timeRange,
-                appointment.location,
-              ].filter(Boolean).join(' · ')}
-            />
-          )}
           {!showAttendance && (
             <StackedDataRow
               icon="🕐"
@@ -654,16 +641,13 @@ function StandardEventBody({
             />
           )}
           <li className={cx('room-stacked-row', showProcessNote && 'appointment-card__service')}>
-            <div className="room-stacked-row__icon" aria-hidden>🎨</div>
+            {!showProcessNote && <div className="room-stacked-row__icon" aria-hidden>🎨</div>}
             <div className="room-stacked-row__body">
               <span className="room-stacked-row__label">Service</span>
               <span className="room-stacked-row__value">{serviceLabel}</span>
               <span className="room-stacked-row__meta">
                 {showAttendance ? appointmentTypeLabel(appointment.appointment_type) : 'Follow-on block'}
               </span>
-              {showAttendance && (
-                <div className="room-stacked-row__tags">{invoiceTag(appointment.invoice_status || 'draft')}</div>
-              )}
             </div>
             {showProcessNote && (
               <ProcessNoteBadge
@@ -870,6 +854,14 @@ export function EventDrawer({
 
   const serviceLabel = appointment.service_name
     || appointmentServiceLabel(appointment.service_id || appointment.therapy_modality)
+  const timeRange = appointment.end_time
+    ? `${appointment.start_time}–${appointment.end_time}`
+    : appointment.start_time
+  const whenLine = [
+    formatDisplayDate(appointment.session_date) || appointment.session_date,
+    timeRange,
+    appointment.location,
+  ].filter(Boolean).join(' · ')
   const title = kind === 'busy'
     ? 'Busy block'
     : kind === 'support'
@@ -881,8 +873,8 @@ export function EventDrawer({
   const subtitle = kind === 'busy'
     ? APPOINTMENT_TYPES[appointment.appointment_type] || 'Practitioner unavailable'
     : kind === 'support'
-      ? `${appointment.client_name || 'No client'} · follow-on`
-      : `${serviceLabel} · ${appointment.assigned_therapist}`
+      ? `${appointment.client_name || 'No client'} · ${whenLine}`
+      : whenLine
 
   const body = (
     <>

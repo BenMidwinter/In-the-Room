@@ -104,7 +104,7 @@ export default function LettersPanel() {
       const identity = await loadClinicianPrintIdentity(session?.user?.id)
       const letterhead = await resolveDownloadLetterhead(await listLetterheads(), chooseLetterhead, identity)
       if (!letterhead) return
-      const opened = downloadLetterPdf(
+      const opened = await downloadLetterPdf(
         {
           title: title.trim() || 'Untitled letter',
           content,

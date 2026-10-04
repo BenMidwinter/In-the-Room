@@ -825,8 +825,11 @@
 }
 
 .appointment-card__service {
-  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
-  align-items: center;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  grid-template-columns: none;
 }
 
 .appointment-card__note {

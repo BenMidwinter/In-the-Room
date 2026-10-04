@@ -67,7 +67,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
             <p className="client-profile-overlay__eyebrow">Client clinical profile</p>
             <h2 id="client-profile-overlay-title" className="client-profile-overlay__title">{client.real_name}</h2>
             <p className="client-profile-overlay__meta">
-              DOB {client.dob} · Private practice
+              DOB {client.dob}
             </p>
           </div>
           <button type="button" className="client-profile-overlay__close secondary" onClick={onClose} aria-label="Close">

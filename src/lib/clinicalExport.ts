@@ -24,23 +24,29 @@ function escapeHtml(text) {
 }
 
 const DOCUMENT_PRINT_STYLES = `
-  html, body { margin: 0; padding: 0; background: #fff; }
-  body { box-sizing: border-box; width: 794px; font-family: 'Karla', system-ui, sans-serif; color: #1a1818; padding: 1.75cm 2cm; line-height: 1.65; }
-  .letterhead { margin: 0 0 1.25rem; }
-  .letterhead__brand { width: 100%; border-collapse: collapse; margin: 0 0 0.85rem; }
-  .letterhead__logo-cell { width: 88px; vertical-align: top; padding: 0 16px 0 0; }
-  .letterhead__logo { width: 72px; height: 72px; object-fit: contain; display: block; }
-  .letterhead__practice { vertical-align: top; text-align: right; }
-  .letterhead__name { display: block; margin: 0 0 0.55rem; padding: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 22px; line-height: 1.3; color: #1f2528; }
-  .letterhead__line { display: block; margin: 0; padding: 0; font-family: 'Karla', system-ui, sans-serif; font-size: 13px; line-height: 1.45; color: #404b54; }
-  .letterhead__clinician, .letterhead__role { margin: 0.15rem 0 0; font-family: 'Karla', system-ui, sans-serif; font-size: 11pt; }
-  .letterhead__rule { border: 0; border-top: 1px solid #1a1818; margin: 0.75rem 0 0; }
-  h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 22px; line-height: 1.3; margin: 1rem 0 0.35rem; }
-  .meta, .content { font-family: 'Karla', system-ui, sans-serif; }
-  .meta { font-size: 0.9rem; color: #333; margin: 0 0 1.25rem; }
-  .content { font-size: 11pt; }
-  .content p { margin: 0 0 0.75rem; }
-  .content ul, .content ol { margin: 0 0 0.75rem 1.25rem; }
+  .clinical-pdf { box-sizing: border-box; width: 794px; margin: 0; background: #fff; font-family: 'Karla', system-ui, sans-serif; color: #1a1818; padding: 1.75cm 2cm; line-height: 1.65; }
+  .clinical-pdf * { box-sizing: border-box; }
+  .clinical-pdf .letterhead { margin: 0 0 1rem; }
+  .clinical-pdf .letterhead__brand { width: 100%; border-collapse: collapse; margin: 0; }
+  .clinical-pdf .letterhead__identity { width: 46%; vertical-align: top; text-align: left; padding: 0 18px 0 0; }
+  .clinical-pdf .letterhead__logo { width: 64px; height: 64px; object-fit: contain; display: block; margin: 0 0 0.4rem; }
+  .clinical-pdf .letterhead__clinician,
+  .clinical-pdf .letterhead__role { display: block; margin: 0; padding: 0; font-family: 'Karla', system-ui, sans-serif; font-size: 11pt; line-height: 1.35; color: #1a1818; }
+  .clinical-pdf .letterhead__role { color: #404b54; }
+  .clinical-pdf .letterhead__practice { vertical-align: top; text-align: right; }
+  .clinical-pdf .letterhead__name { display: block; margin: 0 0 0.3rem; padding: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 26px; line-height: 1.15; color: #1f2528; }
+  .clinical-pdf .letterhead__line { display: block; margin: 0; padding: 0; font-family: 'Karla', system-ui, sans-serif; font-size: 12px; line-height: 1.35; color: #404b54; }
+  .clinical-pdf .letterhead__rule { border: 0; border-top: 1px solid #1a1818; margin: 0.55rem 0 0; }
+  .clinical-pdf h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 22px; line-height: 1.3; margin: 1rem 0 0.35rem; color: #1a1818; }
+  .clinical-pdf .meta,
+  .clinical-pdf .clinical-pdf__body { font-family: 'Karla', system-ui, sans-serif; color: #1a1818; }
+  .clinical-pdf .meta { font-size: 0.9rem; margin: 0 0 1.1rem; }
+  .clinical-pdf .clinical-pdf__body { display: block; font-size: 11pt; }
+  .clinical-pdf .clinical-pdf__body p { margin: 0 0 0.75rem; }
+  .clinical-pdf .clinical-pdf__body ul,
+  .clinical-pdf .clinical-pdf__body ol { margin: 0 0 0.75rem 1.25rem; }
+  .clinical-pdf .addendum { margin-top: 1.25rem; padding-top: 0.75rem; border-top: 1px solid #c8c2b8; }
+  .clinical-pdf .addendum__label { margin: 0 0 0.4rem; font-size: 0.85rem; color: #404b54; }
 `
 
 function formatPrintDate(value: string | undefined) {
@@ -75,6 +81,15 @@ function buildLetterheadHtml(letterhead?: PrintLetterhead) {
   const logo = logoUrl
     ? `<img class="letterhead__logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(practiceName || 'Practice logo')}" crossorigin="anonymous" />`
     : ''
+  const clinician = clinicianName
+    ? `<div class="letterhead__clinician">${escapeHtml(clinicianName)}</div>`
+    : ''
+  const role = professionalTitle
+    ? `<div class="letterhead__role">${escapeHtml(professionalTitle)}</div>`
+    : ''
+  const identity = logo || clinician || role
+    ? `<td class="letterhead__identity">${logo}${clinician}${role}</td>`
+    : ''
   const name = practiceName
     ? `<div class="letterhead__name">${escapeHtml(practiceName)}</div>`
     : ''
@@ -82,17 +97,10 @@ function buildLetterheadHtml(letterhead?: PrintLetterhead) {
   const practice = name || address
     ? `<td class="letterhead__practice">${name}${address}</td>`
     : ''
-  const logoCell = logo ? `<td class="letterhead__logo-cell">${logo}</td>` : ''
-  const brand = logoCell || practice
-    ? `<table class="letterhead__brand"><tr>${logoCell}${practice}</tr></table>`
+  const brand = identity || practice
+    ? `<table class="letterhead__brand"><tr>${identity}${practice}</tr></table>`
     : ''
-  const clinician = clinicianName
-    ? `<p class="letterhead__clinician">${escapeHtml(clinicianName)}</p>`
-    : ''
-  const role = professionalTitle
-    ? `<p class="letterhead__role">${escapeHtml(professionalTitle)}</p>`
-    : ''
-  return `<header class="letterhead">${brand}${clinician}${role}<hr class="letterhead__rule" /></header>`
+  return `<header class="letterhead">${brand}<hr class="letterhead__rule" /></header>`
 }
 
 function buildClinicalDocumentPrintHtml({
@@ -111,13 +119,18 @@ function buildClinicalDocumentPrintHtml({
 <head>
   <meta charset="utf-8" />
   <title>${escapeHtml(title)}</title>
-  <style>${DOCUMENT_PRINT_STYLES}</style>
+  <style>
+    html, body { margin: 0; padding: 0; background: #fff; }
+    ${DOCUMENT_PRINT_STYLES}
+  </style>
 </head>
 <body>
-  ${buildLetterheadHtml(letterhead)}
-  <h1>${escapeHtml(title)}</h1>
-  ${metaHtml}
-  <div class="content">${bodyHtml || ''}</div>
+  <div class="clinical-pdf">
+    ${buildLetterheadHtml(letterhead)}
+    <h1>${escapeHtml(title)}</h1>
+    ${metaHtml}
+    <div class="clinical-pdf__body">${bodyHtml || ''}</div>
+  </div>
 </body>
 </html>`
 }
@@ -144,30 +157,6 @@ function blobToDataUrl(blob: Blob) {
   })
 }
 
-async function inlineDocumentImages(doc: Document) {
-  const images = [...doc.images]
-  await Promise.all(images.map(async (img) => {
-    const src = img.getAttribute('src') || ''
-    if (!src || src.startsWith('data:')) return
-    try {
-      const response = await fetch(src)
-      if (!response.ok) throw new Error('Logo could not be loaded')
-      img.src = await blobToDataUrl(await response.blob())
-      if (img.decode) await img.decode()
-    } catch {
-      img.remove()
-    }
-  }))
-}
-
-function waitForFrame(iframe: HTMLIFrameElement, html: string) {
-  return new Promise<void>((resolve, reject) => {
-    iframe.onload = () => resolve()
-    iframe.onerror = () => reject(new Error('Could not prepare the document'))
-    iframe.srcdoc = html
-  })
-}
-
 async function embeddedBrandFontCss() {
   const [{ default: fraunces600 }, { default: karla400 }, { default: karla700 }] = await Promise.all([
     import('@fontsource/fraunces/files/fraunces-latin-600-normal.woff2?url'),
@@ -188,12 +177,18 @@ async function embeddedBrandFontCss() {
   return rules.join('\n')
 }
 
-async function waitForBrandFonts(doc: Document) {
-  await doc.fonts?.ready
+async function waitForBrandFonts() {
+  await document.fonts?.ready
   await Promise.all([
-    doc.fonts?.load('600 22px Fraunces'),
-    doc.fonts?.load('16px Karla'),
+    document.fonts?.load("600 26px Fraunces"),
+    document.fonts?.load('16px Karla'),
   ].filter(Boolean))
+}
+
+function nextFrame() {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => requestAnimationFrame(resolve))
+  })
 }
 
 /** Download a real PDF of the document. The file has no browser address or page chrome. */
@@ -202,23 +197,41 @@ async function downloadDocumentPdf(html: string, filename: string) {
     import('html-to-image'),
     import('pdf-lib'),
   ])
-  const iframe = document.createElement('iframe')
-  iframe.setAttribute('title', 'Document export')
-  iframe.setAttribute('aria-hidden', 'true')
-  iframe.style.cssText = `position:fixed;left:0;top:0;width:${PDF_CSS_WIDTH}px;height:${Math.round(PDF_CSS_WIDTH * PDF_PAGE_HEIGHT / PDF_PAGE_WIDTH)}px;border:0;opacity:0;pointer-events:none;`
-  document.body.appendChild(iframe)
+  const parsed = new DOMParser().parseFromString(html, 'text/html')
+  const sheet = parsed.querySelector('.clinical-pdf')
+  if (!sheet) throw new Error('Could not prepare the document')
+
+  const fontCss = await embeddedBrandFontCss()
+  const style = document.createElement('style')
+  style.setAttribute('data-clinical-pdf', 'true')
+  style.textContent = `${DOCUMENT_PRINT_STYLES}\n${fontCss}`
+  const host = document.createElement('div')
+  host.setAttribute('aria-hidden', 'true')
+  host.style.cssText = `position:fixed;left:0;top:0;width:${PDF_CSS_WIDTH}px;z-index:-1;pointer-events:none;background:#fff;`
+  host.appendChild(document.importNode(sheet, true))
+  document.head.appendChild(style)
+  document.body.appendChild(host)
 
   try {
-    const fontCss = await embeddedBrandFontCss()
-    const htmlWithFonts = html.replace('</style>', `${fontCss}</style>`)
-    await waitForFrame(iframe, htmlWithFonts)
-    const doc = iframe.contentDocument
-    if (!doc?.body) throw new Error('Could not prepare the document')
-    await waitForBrandFonts(doc)
-    await inlineDocumentImages(doc)
-    const height = Math.max(doc.body.scrollHeight, doc.documentElement.scrollHeight)
-    iframe.style.height = `${height}px`
-    const canvas = await toCanvas(doc.body, {
+    await waitForBrandFonts()
+    const images = [...host.querySelectorAll('img')]
+    await Promise.all(images.map(async (img) => {
+      const src = img.getAttribute('src') || ''
+      if (!src || src.startsWith('data:')) return
+      try {
+        const response = await fetch(src)
+        if (!response.ok) throw new Error('Logo could not be loaded')
+        img.src = await blobToDataUrl(await response.blob())
+        if (img.decode) await img.decode()
+      } catch {
+        img.remove()
+      }
+    }))
+    await nextFrame()
+    const target = host.querySelector('.clinical-pdf')
+    if (!target) throw new Error('Could not prepare the document')
+    const height = Math.max(target.scrollHeight, target.getBoundingClientRect().height)
+    const canvas = await toCanvas(target as HTMLElement, {
       pixelRatio: 2,
       backgroundColor: '#ffffff',
       width: PDF_CSS_WIDTH,
@@ -252,7 +265,8 @@ async function downloadDocumentPdf(html: string, filename: string) {
     const copy = new Uint8Array(bytes)
     downloadBlob(filename, new Blob([copy], { type: 'application/pdf' }))
   } finally {
-    iframe.remove()
+    host.remove()
+    style.remove()
   }
   return true
 }
@@ -264,6 +278,15 @@ function noteToPlainBlock(note, profileName, branding?: WorkplaceBranding) {
     : ''
   const author = profileName ? `\nAuthor: ${profileName}` : ''
   return `${header}${note.title}\nDate: ${date}${author}\n\n${stripHtml(note.content)}`
+}
+
+function addendumSectionHtml(addendums) {
+  if (!Array.isArray(addendums) || addendums.length === 0) return ''
+  return addendums.map((item) => {
+    const when = item?.created_at ? formatPrintDateTime(item.created_at) : ''
+    const label = when ? `Addendum · ${when}` : 'Addendum'
+    return `<section class="addendum"><p class="addendum__label">${escapeHtml(label)}</p><div class="clinical-pdf__body">${item?.body || ''}</div></section>`
+  }).join('')
 }
 
 function noteMetaHtml(note, clientName?: string) {
@@ -292,7 +315,7 @@ export function renderProgressNoteDocument(
   return buildClinicalDocumentPrintHtml({
     title: note.title,
     metaHtml: noteMetaHtml(note, clientName),
-    bodyHtml: note.content || '',
+    bodyHtml: `${note.content || ''}${addendumSectionHtml(note.addendums)}`,
     letterhead,
   })
 }
