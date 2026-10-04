@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Outlet, useNavigate, useParams } from 'react-router-dom'
 import { getProfile, getProgressNoteByAppointment } from '../../lib/store'
 import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
-import { modalityLabel } from '../../lib/calendarConstants'
+import { appointmentDisplayName } from '../../lib/calendarServiceStyles'
 import {
   formatSessionDateTime,
   attendanceLabel,
@@ -34,12 +34,13 @@ export default function ClientAppointmentsIndex() {
     return sorted.map(appt => {
       const linkedNote = getProgressNoteByAppointment(appt.id)
       const isCancelled = appt.attendance_status === 'cancelled'
+      const serviceLabel = appointmentDisplayName(appt)
       return {
         id: appt.id,
         appt,
         muted: isCancelled,
         filterValues: {
-          service: modalityLabel(appt.therapy_modality),
+          service: serviceLabel,
           date: formatSessionDateTime(appt),
           clinician: getProfile(appt.clinician_id)?.full_name || appt.assigned_therapist || '—',
           attendance: attendanceLabel(appt.attendance_status),
@@ -48,7 +49,7 @@ export default function ClientAppointmentsIndex() {
         cells: {
           service: (
             <span className="record-table__primary">
-              {modalityLabel(appt.therapy_modality)}
+              {serviceLabel}
             </span>
           ),
           date: formatSessionDateTime(appt),

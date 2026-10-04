@@ -441,49 +441,22 @@ function invoiceTag(status) {
 
 function EventDrawerActions({
   onEdit,
-  onBookAnother,
-  onRecurring,
-  onReschedule,
+  onMove,
   onDelete,
   locked = false,
   kind = 'standard',
 }) {
-  if (kind === 'busy' || kind === 'support') {
-    return (
-      <section className="ck-event-drawer__actions">
-        <button type="button" className="secondary" onClick={onEdit} disabled={locked}>
-          Edit block
-        </button>
-        {onReschedule && (
-          <button type="button" className="secondary" onClick={onReschedule} disabled={locked}>
-            Reschedule
-          </button>
-        )}
-        {onDelete && (
-          <button type="button" className="secondary" onClick={onDelete} disabled={locked}>
-            Delete
-          </button>
-        )}
-      </section>
-    )
-  }
-
+  const editLabel = kind === 'busy' || kind === 'support' ? 'Edit block' : 'Edit'
   return (
     <section className="ck-event-drawer__actions">
       <button type="button" className="primary" onClick={onEdit} disabled={locked}>
-        Edit
+        {editLabel}
       </button>
-      {onReschedule && (
-        <button type="button" className="secondary" onClick={onReschedule} disabled={locked}>
-          Reschedule
+      {onMove && (
+        <button type="button" className="secondary" onClick={onMove} disabled={locked}>
+          Move
         </button>
       )}
-      <button type="button" className="secondary" onClick={onBookAnother}>
-        Book another
-      </button>
-      <button type="button" className="secondary" onClick={onRecurring}>
-        Recurring
-      </button>
       {onDelete && (
         <button type="button" className="secondary" onClick={onDelete} disabled={locked}>
           Delete
@@ -761,13 +734,9 @@ export function EventDrawer({
   onClose,
   onAttendanceChange,
   onEdit,
-  onBookAnother,
-  onRecurring,
-  onReschedule,
+  onMove,
   onDelete,
   locked: lockedProp,
-  waitlistSuggestion,
-  fundingWarning,
   className,
   presentation = 'overlay',
 }) {
@@ -810,33 +779,11 @@ export function EventDrawer({
         </ContextBanner>
       )}
 
-      {(waitlistSuggestion || conflicts.length > 0) && (
-        <ContextBanner
-          variant="waitlist"
-          title="Waitlist match"
-          actions={(
-            <button type="button" className="secondary">
-              Review waitlist
-            </button>
-          )}
-        >
-          {waitlistSuggestion || 'Taylor Brooks requested this slot — consider offering a cancellation fill.'}
-        </ContextBanner>
-      )}
-
-      {(fundingWarning || appointment.funding_exceeded) && (
-        <ContextBanner variant="financial" title="Funding boundary">
-          {fundingWarning || 'This booking may exceed the client\'s current funding period allocation. Verify before confirming attendance.'}
-        </ContextBanner>
-      )}
-
       <EventDrawerActions
         kind={kind}
         locked={locked}
         onEdit={() => onEdit?.(appointment)}
-        onBookAnother={() => onBookAnother?.(appointment)}
-        onRecurring={() => onRecurring?.(appointment)}
-        onReschedule={onReschedule ? () => onReschedule?.(appointment) : undefined}
+        onMove={onMove ? () => onMove?.(appointment) : undefined}
         onDelete={onDelete ? () => onDelete?.(appointment) : undefined}
       />
 
@@ -900,6 +847,8 @@ export function ScheduleSessionPanel({
   onSave,
   onCancel,
   onDelete,
+  onBookAnother,
+  onScheduleMore,
   saving = false,
   deleting = false,
   showDateField = false,
@@ -934,6 +883,9 @@ export function ScheduleSessionPanel({
   const [createMeetLink, setCreateMeetLink] = useState(Boolean(seed?.createMeetLink))
   const [services, setServices] = useState(() => getBookableOrgServices())
   const [servicesError, setServicesError] = useState(null)
+  const [showAdvanced, setShowAdvanced] = useState(() => Boolean(
+    seed?.location || seed?.otherInfo || seed?.createMeetLink,
+  ))
 
   useEffect(() => {
     let cancelled = false
@@ -1144,6 +1096,35 @@ export function ScheduleSessionPanel({
   const sessionCount = recurringWeekly && !isEdit ? recurWeeks : 1
   const formBody = (
       <form className="ck-schedule-form" onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="schedule-service">Service</label>
+          <select
+            id="schedule-service"
+            className="paper-input"
+            value={serviceId}
+            onChange={e => applyService(e.target.value)}
+            required
+            disabled={!services.length}
+          >
+            {!services.length && <option value="">No services configured</option>}
+            {services.map(svc => (
+              <option key={svc.id} value={svc.id}>
+                {svc.name}
+                {svc.service_type && svc.service_type !== 'appointment' ? ` · ${svc.service_type}` : ''}
+                {' '}({svc.default_duration_minutes || 50} min)
+              </option>
+            ))}
+          </select>
+          {servicesError && (
+            <p className="text-small ck-schedule-warning">{servicesError}</p>
+          )}
+          {!services.length && !servicesError && (
+            <p className="text-small text-muted">
+              Add services under Settings → Services to book sessions.
+            </p>
+          )}
+        </div>
+
         {showDate && (
           <div className="form-group">
             <label htmlFor="schedule-date">Date</label>
@@ -1158,17 +1139,38 @@ export function ScheduleSessionPanel({
           </div>
         )}
 
+        <div className="ck-schedule-times ck-schedule-times--start-only">
+          <div className="form-group">
+            <label htmlFor="schedule-start">Start</label>
+            <input
+              id="schedule-start"
+              type="time"
+              step={300}
+              className="paper-input"
+              value={start}
+              onChange={e => handleStartChange(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>Ends</label>
+            <p className="ck-schedule-derived">
+              <strong>{computedEnd}</strong>
+              <span className="text-muted"> · {finalDuration} min from service</span>
+            </p>
+          </div>
+        </div>
+
         {!lockedClient && (
           <>
             <div className="form-group">
               <label htmlFor="schedule-client-search">
-                Find client{clientRequired ? '' : ' (optional)'}
+                {clientRequired ? 'Client' : 'Client (optional)'}
               </label>
               <input
                 id="schedule-client-search"
                 type="search"
                 className="paper-input"
-                placeholder={clientRequired ? 'Search your caseload…' : 'Optional — search caseload…'}
+                placeholder={clientRequired ? 'Search caseload…' : 'Optional — search caseload…'}
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 autoComplete="off"
@@ -1218,70 +1220,6 @@ export function ScheduleSessionPanel({
           </p>
         )}
 
-        <div className="form-group">
-          <label htmlFor="schedule-service">Service</label>
-          <select
-            id="schedule-service"
-            className="paper-input"
-            value={serviceId}
-            onChange={e => applyService(e.target.value)}
-            required
-            disabled={!services.length}
-          >
-            {!services.length && <option value="">No services configured</option>}
-            {services.map(svc => (
-              <option key={svc.id} value={svc.id}>
-                {svc.name}
-                {svc.service_type && svc.service_type !== 'appointment' ? ` · ${svc.service_type}` : ''}
-                {' '}({svc.default_duration_minutes || 50} min)
-              </option>
-            ))}
-          </select>
-          {servicesError && (
-            <p className="text-small ck-schedule-warning">{servicesError}</p>
-          )}
-          {!services.length && !servicesError && (
-            <p className="text-small text-muted">
-              Add services under Settings → Services to book sessions.
-            </p>
-          )}
-        </div>
-
-        <div className="ck-schedule-times ck-schedule-times--start-only">
-          <div className="form-group">
-            <label htmlFor="schedule-start">Start</label>
-            <input
-              id="schedule-start"
-              type="time"
-              step={300}
-              className="paper-input"
-              value={start}
-              onChange={e => handleStartChange(e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label>Ends</label>
-            <p className="ck-schedule-derived">
-              <strong>{computedEnd}</strong>
-              <span className="text-muted"> · {finalDuration} min from service</span>
-            </p>
-          </div>
-        </div>
-
-        {selectedService?.create_meet_link && (
-          <label className="ck-schedule-meet">
-            <input
-              type="checkbox"
-              checked={createMeetLink}
-              onChange={e => setCreateMeetLink(e.target.checked)}
-            />
-            <span>
-              Create Google Meet link
-              <span className="text-small text-muted"> — adds a Meet URL when you book</span>
-            </span>
-          </label>
-        )}
-
         {conflicts.length > 0 && (
           <ContextBanner variant="conflict" title="Schedule overlap">
             This slot overlaps {conflicts.length} existing booking{conflicts.length === 1 ? '' : 's'}
@@ -1289,74 +1227,130 @@ export function ScheduleSessionPanel({
           </ContextBanner>
         )}
 
-        <div className="form-group">
-          <label htmlFor="schedule-location">Location</label>
-          <input
-            id="schedule-location"
-            type="text"
-            className="paper-input"
-            placeholder="e.g. Oak Academy — music room"
-            value={location}
-            onChange={e => setLocation(e.target.value)}
-          />
-        </div>
+        <button
+          type="button"
+          className="ck-schedule-advanced-toggle"
+          aria-expanded={showAdvanced}
+          onClick={() => setShowAdvanced((v) => !v)}
+        >
+          {showAdvanced ? 'Hide details' : 'More details'}
+        </button>
 
-        <div className="form-group">
-          <label htmlFor="schedule-other-info">Other info</label>
-          <textarea
-            id="schedule-other-info"
-            className="paper-input"
-            rows={2}
-            placeholder="e.g. Parent attending, room change, equipment needed"
-            value={otherInfo}
-            onChange={e => setOtherInfo(e.target.value)}
-          />
-          <p className="text-small text-muted">Shown on the calendar block for this session.</p>
-        </div>
-
-        {showClinicianPicker && (
-          <div className="form-group">
-            <label htmlFor="schedule-clinician">Book with</label>
-            <select
-              id="schedule-clinician"
-              className="paper-input"
-              value={clinicianId}
-              onChange={e => setClinicianId(e.target.value)}
-              required
-            >
-              {workplaceClinicians.map(clinician => (
-                <option key={clinician.id} value={clinician.id}>{clinician.full_name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {!isEdit && (
-          <div className="ck-recurring-inline">
-            <label className="ck-recurring-inline__toggle">
-              <input
-                type="checkbox"
-                checked={recurringWeekly}
-                onChange={e => setRecurringWeekly(e.target.checked)}
-              />
-              Repeat weekly
-            </label>
-            {recurringWeekly && (
-              <div className="ck-recurring-inline__weeks">
-                <label htmlFor="schedule-weeks">For</label>
+        {showAdvanced && (
+          <div className="ck-schedule-advanced">
+            {selectedService?.create_meet_link && (
+              <label className="ck-schedule-meet">
                 <input
-                  id="schedule-weeks"
-                  type="number"
-                  min={2}
-                  max={52}
-                  className="paper-input"
-                  value={recurWeeks}
-                  onChange={e => setRecurWeeks(Math.min(52, Math.max(2, Number(e.target.value) || 2)))}
+                  type="checkbox"
+                  checked={createMeetLink}
+                  onChange={e => setCreateMeetLink(e.target.checked)}
                 />
-                <span className="text-small text-muted">weeks starting {sessionDate}</span>
+                <span>
+                  Create Google Meet link
+                  <span className="text-small text-muted"> — adds a Meet URL when you book</span>
+                </span>
+              </label>
+            )}
+
+            <div className="form-group">
+              <label htmlFor="schedule-location">Location</label>
+              <input
+                id="schedule-location"
+                type="text"
+                className="paper-input"
+                placeholder="e.g. Oak Academy — music room"
+                value={location}
+                onChange={e => setLocation(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="schedule-other-info">Other info</label>
+              <textarea
+                id="schedule-other-info"
+                className="paper-input"
+                rows={2}
+                placeholder="e.g. Parent attending, room change, equipment needed"
+                value={otherInfo}
+                onChange={e => setOtherInfo(e.target.value)}
+              />
+              <p className="text-small text-muted">Shown on the calendar block for this session.</p>
+            </div>
+
+            {showClinicianPicker && (
+              <div className="form-group">
+                <label htmlFor="schedule-clinician">Book with</label>
+                <select
+                  id="schedule-clinician"
+                  className="paper-input"
+                  value={clinicianId}
+                  onChange={e => setClinicianId(e.target.value)}
+                  required
+                >
+                  {workplaceClinicians.map(clinician => (
+                    <option key={clinician.id} value={clinician.id}>{clinician.full_name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {!isEdit && (
+              <div className="ck-recurring-inline">
+                <label className="ck-recurring-inline__toggle">
+                  <input
+                    type="checkbox"
+                    checked={recurringWeekly}
+                    onChange={e => setRecurringWeekly(e.target.checked)}
+                  />
+                  Repeat weekly
+                </label>
+                {recurringWeekly && (
+                  <div className="ck-recurring-inline__weeks">
+                    <label htmlFor="schedule-weeks">For</label>
+                    <input
+                      id="schedule-weeks"
+                      type="number"
+                      min={2}
+                      max={52}
+                      className="paper-input"
+                      value={recurWeeks}
+                      onChange={e => setRecurWeeks(Math.min(52, Math.max(2, Number(e.target.value) || 2)))}
+                    />
+                    <span className="text-small text-muted">weeks starting {sessionDate}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
+        )}
+
+        {isEdit && appointment && (onBookAnother || onScheduleMore) && (
+          <section className="ck-schedule-more">
+            <h3 className="ck-schedule-more__title">Schedule more</h3>
+            <p className="text-small text-muted">Book follow-up sessions without leaving the editor.</p>
+            <div className="ck-schedule-more__actions">
+              {onBookAnother && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => onBookAnother(appointment)}
+                  disabled={saving || deleting}
+                >
+                  Book next week
+                </button>
+              )}
+              {onScheduleMore && (
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => onScheduleMore(appointment)}
+                  disabled={saving || deleting}
+                >
+                  Repeat series…
+                </button>
+              )}
+            </div>
+          </section>
         )}
 
         <div className="form-actions">

@@ -2109,6 +2109,76 @@ button.calendar-event {
   align-self: flex-start;
 }
 
+.ck-schedule-advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  margin: 0.35rem 0 0.65rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--col-primary, #2f5d50);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.ck-schedule-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin-bottom: 0.35rem;
+  padding-top: 0.15rem;
+  border-top: 1px solid var(--border-light, #e5e7eb);
+}
+
+.ck-schedule-more {
+  margin: 0.75rem 0 0.35rem;
+  padding: 0.7rem 0.75rem;
+  border: 1px solid var(--border-light, #e5e7eb);
+  background: color-mix(in srgb, var(--surface, #fff) 92%, var(--col-primary, #2f5d50));
+}
+
+.ck-schedule-more__title {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+}
+
+.ck-schedule-more__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.calendar-event--admin,
+.calendar-event--dimmed {
+  opacity: 0.55;
+}
+
+.calendar-event--interactive[draggable='true'] {
+  cursor: grab;
+}
+
+.calendar-event--interactive[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.calendar-view-options__check {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0.15rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.calendar-view-options__check input {
+  margin: 0;
+}
+
 .ck-schedule-selected {
   margin: 0 0 0.85rem;
 }

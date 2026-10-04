@@ -11,7 +11,7 @@ import {
   formatSessionDateTime,
   appointmentSchedule,
 } from '../../lib/appointmentUtils'
-import { modalityLabel } from '../../lib/calendarConstants'
+import { appointmentDisplayName } from '../../lib/calendarServiceStyles'
 import { todayYmd } from '../../lib/dateArchitecture'
 import PageHeader from '../../components/PageHeader'
 import RoleBlockShell from '../../components/RoleBlockShell'
@@ -62,7 +62,7 @@ function UpcomingTimeline({ appointments, clients, blurNames }) {
         <ul className="timeline timeline--horizontal">
           {appointments.map((appt, i) => {
             const isLast = i === appointments.length - 1
-            const service = modalityLabel(appt.therapy_modality) || appt.service_name || 'Session'
+            const service = appointmentDisplayName(appt)
             return (
               <li key={appt.id} className="timeline__item">
                 <div className="timeline__rail" aria-hidden>
@@ -163,7 +163,7 @@ export default function HomePage() {
                       {formatAppointmentDate(nextSession)} · {formatAppointmentTime(nextSession)}
                     </p>
                     <p className="home-stat-card__meta">
-                      {modalityLabel(nextSession.therapy_modality) || nextSession.service_name || 'Session'}
+                      {appointmentDisplayName(nextSession)}
                       {nextSession.location ? ` · ${nextSession.location}` : ''}
                     </p>
                   </Link>
@@ -188,7 +188,7 @@ export default function HomePage() {
                       {formatSessionDateTime(nextTask) || appointmentSchedule(nextTask).session_date}
                     </p>
                     <p className="home-stat-card__meta">
-                      {nextTaskNote?.title || modalityLabel(nextTask.therapy_modality) || 'Session documentation'}
+                      {nextTaskNote?.title || appointmentDisplayName(nextTask, 'Session documentation')}
                     </p>
                   </Link>
                 ) : (
