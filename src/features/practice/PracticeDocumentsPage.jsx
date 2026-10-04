@@ -21,11 +21,52 @@ function formatUpdated(iso) {
 }
 
 const COLUMNS = [
+  { key: 'mark', label: '', className: 'practice-docs__mark-col' },
   { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
-  { key: 'kind', label: 'Kind', filter: 'choice', sort: 'text' },
   { key: 'updated', label: 'Updated', sort: 'date' },
   { key: 'actions', label: '', className: 'practice-docs__actions-col' },
 ]
+
+function ItemMark({ kind }) {
+  const folder = kind === 'folder'
+  return (
+    <span className={`practice-docs__mark${folder ? ' practice-docs__mark--folder' : ''}`}>
+      {folder ? (
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden focusable="false">
+          <path
+            fill="currentColor"
+            d="M3.5 8.2V7.1c0-.7.6-1.3 1.3-1.3h3.4l1.4 1.5h9.1c.7 0 1.3.6 1.3 1.3v8.6c0 .7-.6 1.3-1.3 1.3H4.8c-.7 0-1.3-.6-1.3-1.3V8.2z"
+          />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden focusable="false">
+          <path
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            d="M7 3.8h6.2L18 8.6V20H7V3.8z"
+          />
+          <path
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            d="M13 3.8V8.6H18"
+          />
+          <path
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            d="M9.2 12.4h5.6M9.2 15.4h5.6"
+          />
+        </svg>
+      )}
+      <span className="sr-only">{folder ? 'Folder' : 'Document'}</span>
+    </span>
+  )
+}
 
 export default function PracticeDocumentsPage() {
   const toast = useToast()
@@ -154,16 +195,14 @@ export default function PracticeDocumentsPage() {
     item,
     filterValues: {
       name: item.name,
-      kind: item.kind === 'folder' ? 'Folder' : 'Document',
     },
     sortValues: {
       name: practiceNameSortKey(item),
-      kind: item.kind === 'folder' ? '0' : '1',
       updated: item.updated_at,
     },
     cells: {
+      mark: <ItemMark kind={item.kind} />,
       name: <span className="record-table__primary">{item.name}</span>,
-      kind: item.kind === 'folder' ? 'Folder' : 'Document',
       updated: formatUpdated(item.updated_at),
       actions: (
         <span className="practice-docs__actions">

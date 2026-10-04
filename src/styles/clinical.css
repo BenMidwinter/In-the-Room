@@ -1404,6 +1404,23 @@ a.badge {
   text-align: right;
 }
 
+.record-table th.practice-docs__mark-col,
+.record-table td.practice-docs__mark-col {
+  width: 2.5rem;
+  padding-right: 0.25rem;
+  padding-left: 0.9rem;
+}
+
+.practice-docs__mark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--txt-muted);
+}
+
+.practice-docs__mark--folder {
+  color: var(--col-primary-dark);
+}
+
 .client-layout__main {
   flex: 1;
   min-width: 0;
