@@ -43,6 +43,17 @@ export function appointmentServiceLabel(modalityId) {
   return key
 }
 
+/** Prefer embedded service_name, then catalogue lookup — never fall back to a junk modality slug. */
+export function appointmentDisplayName(appointment, fallback = 'Session') {
+  const embedded = String(appointment?.service_name || '').trim()
+  if (embedded) return embedded
+  const fromCatalog = appointmentServiceLabel(
+    appointment?.service_id || appointment?.therapy_modality,
+  )
+  if (fromCatalog && fromCatalog !== 'Session') return fromCatalog
+  return fallback
+}
+
 /** Client initials for compact calendar chips, e.g. "Selena Gauche" → "SG". */
 export function clientInitials(name) {
   const parts = String(name || '')

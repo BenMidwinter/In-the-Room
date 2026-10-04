@@ -766,7 +766,6 @@ export function EventDrawer({
   onReschedule,
   onDelete,
   locked: lockedProp,
-  waitlistSuggestion,
   fundingWarning,
   className,
   presentation = 'overlay',
@@ -807,20 +806,6 @@ export function EventDrawer({
         <ContextBanner variant="conflict" title="Schedule conflict">
           Overlaps with {conflicts.length} other booking{conflicts.length === 1 ? '' : 's'} at this time
           ({conflicts.map(c => c.client_name || 'Busy').join(', ')}).
-        </ContextBanner>
-      )}
-
-      {(waitlistSuggestion || conflicts.length > 0) && (
-        <ContextBanner
-          variant="waitlist"
-          title="Waitlist match"
-          actions={(
-            <button type="button" className="secondary">
-              Review waitlist
-            </button>
-          )}
-        >
-          {waitlistSuggestion || 'Taylor Brooks requested this slot — consider offering a cancellation fill.'}
         </ContextBanner>
       )}
 
