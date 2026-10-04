@@ -364,6 +364,16 @@
   color: inherit;
 }
 
+button.home-stat-card__link {
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
 .home-stat-card__link:hover {
   text-decoration: none;
 }
@@ -1021,6 +1031,7 @@
 
 .calendar-module {
   --calendar-radius: 0;
+  --calendar-slot-min: 2.75rem;
   --calendar-hour-min: 2.35rem;
   --calendar-hour-height: 3.4rem;
   --calendar-subslot-line: color-mix(in srgb, var(--border-color) 55%, transparent);
@@ -1583,7 +1594,11 @@ button.calendar-event {
   flex-shrink: 0;
 }
 
-/* Week / working-week / day time grid — row-synced layout (Splose-inspired) */
+.calendar-upcoming {
+  padding: 0.5rem 0 1.5rem;
+}
+
+/* Week / day time grid — row-synced layout */
 
 .calendar-time-grid-wrap {
   display: flex;
@@ -1607,11 +1622,12 @@ button.calendar-event {
   --calendar-hour-border: color-mix(in srgb, var(--border-color) 85%, var(--txt-muted));
   display: grid;
   grid-template-columns: 3.5rem repeat(var(--calendar-cols, 7), minmax(0, 1fr));
-  grid-template-rows: auto repeat(var(--calendar-hours, 9), minmax(var(--calendar-hour-min, 2.35rem), 1fr));
-  height: 100%;
+  --calendar-hour-size: calc(var(--calendar-slots-per-hour, 2) * var(--calendar-slot-min, 2.75rem));
+  grid-template-rows: auto repeat(var(--calendar-hours, 9), var(--calendar-hour-size));
+  height: auto;
   min-height: calc(
     (var(--calendar-header-rows, 1) * 2.75rem) +
-    (var(--calendar-hours, 9) * var(--calendar-hour-min, 2.35rem))
+    (var(--calendar-hours, 9) * var(--calendar-hour-size))
   );
   min-width: 0;
   width: 100%;
@@ -1681,7 +1697,7 @@ button.calendar-event {
   justify-content: flex-end;
   align-items: flex-start;
   height: 100%;
-  min-height: var(--calendar-hour-min, 2.35rem);
+  min-height: 0;
   padding: 0;
   background: var(--bg-page);
   border-right: 1px solid var(--calendar-hour-border);
@@ -1719,16 +1735,16 @@ button.calendar-event {
 .calendar-col__hour {
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
-  min-height: var(--calendar-hour-min, 2.35rem);
+  flex: 1 1 auto;
+  min-height: var(--calendar-hour-size, 5.5rem);
   height: auto;
   border-bottom: 1px solid var(--calendar-hour-border);
   box-sizing: border-box;
 }
 
 .calendar-col__slot {
-  flex: 1 1 0;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: var(--calendar-slot-min, 2.75rem);
   height: auto;
   padding: 0;
   margin: 0;
@@ -1743,7 +1759,7 @@ button.calendar-event {
 }
 
 .calendar-col__slot.room-time-slot {
-  min-height: 0;
+  min-height: var(--calendar-slot-min, 2.75rem);
   padding: 0;
   border-radius: 0;
 }
@@ -2145,7 +2161,7 @@ button.calendar-event {
 
 @media (max-width: 480px) {
   .calendar-module {
-    --calendar-hour-min: 2.15rem;
+    --calendar-slot-min: 2.25rem;
   }
 
   .calendar-time-grid:not(.calendar-time-grid--day-only) {

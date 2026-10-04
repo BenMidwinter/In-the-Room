@@ -1,7 +1,5 @@
-import { Link } from 'react-router-dom'
 import { useAppSession } from '../lib/AppSessionContext'
 import { useAppClients } from '../lib/queries'
-import PageHeader from './PageHeader'
 import { APPOINTMENT_TYPES } from '../lib/store'
 import { useUpcomingAppointmentsQuery } from '../lib/appointmentQueries'
 import {
@@ -11,11 +9,13 @@ import {
   attendanceLabel,
   attendanceBadgeClass,
 } from '../lib/appointmentUtils'
-function AgendaEvent({ appt, clientName }) {
+
+function AgendaEvent({ appt, clientName, onSelect }) {
   return (
-    <Link
-      to={`/clients/${appt.client_id}/appointments/${appt.id}`}
+    <button
+      type="button"
       className="agenda-event"
+      onClick={() => onSelect?.(appt)}
     >
       <time className="agenda-event__time" dateTime={appt.scheduled_at}>
         {formatAppointmentTime(appt.scheduled_at)}
@@ -32,11 +32,11 @@ function AgendaEvent({ appt, clientName }) {
       <span className={`badge agenda-event__badge ${attendanceBadgeClass(appt.attendance_status)}`}>
         {attendanceLabel(appt.attendance_status)}
       </span>
-    </Link>
+    </button>
   )
 }
 
-function LaterGroup({ items, clientName }) {
+function LaterGroup({ items, clientName, onSelect }) {
   if (!items.length) return null
 
   const byDate = items.reduce((acc, appt) => {
@@ -57,7 +57,7 @@ function LaterGroup({ items, clientName }) {
           <ul className="agenda-day__events">
             {dayItems.map(appt => (
               <li key={appt.id}>
-                <AgendaEvent appt={appt} clientName={clientName(appt.client_id)} />
+                <AgendaEvent appt={appt} clientName={clientName(appt.client_id)} onSelect={onSelect} />
               </li>
             ))}
           </ul>
@@ -67,7 +67,7 @@ function LaterGroup({ items, clientName }) {
   )
 }
 
-export default function UpcomingAppointments() {
+export default function UpcomingAppointments({ onSelect }) {
   const { session } = useAppSession()
   const { clients } = useAppClients()
   const { data: upcoming = [] } = useUpcomingAppointmentsQuery({
@@ -84,12 +84,7 @@ export default function UpcomingAppointments() {
   const laterSection = sections.find(s => s.key === 'later')
 
   return (
-    <div className="page">
-      <PageHeader
-        title="Upcoming appointments"
-        subtitle="Your schedule for today, tomorrow, and beyond."
-      />
-
+    <div className="calendar-upcoming">
       {upcoming.length === 0 ? (
         <div className="card empty-state">No upcoming appointments scheduled.</div>
       ) : (
@@ -105,7 +100,7 @@ export default function UpcomingAppointments() {
                 <ul className="agenda-day__events">
                   {section.items.map(appt => (
                     <li key={appt.id}>
-                      <AgendaEvent appt={appt} clientName={clientName(appt.client_id)} />
+                      <AgendaEvent appt={appt} clientName={clientName(appt.client_id)} onSelect={onSelect} />
                     </li>
                   ))}
                 </ul>
@@ -113,7 +108,7 @@ export default function UpcomingAppointments() {
             </section>
           ))}
 
-          <LaterGroup items={laterSection.items} clientName={clientName} />
+          <LaterGroup items={laterSection.items} clientName={clientName} onSelect={onSelect} />
         </div>
       )}
     </div>

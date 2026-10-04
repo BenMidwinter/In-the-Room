@@ -15,7 +15,6 @@ import ProgressNotesRedirect from './features/client/ProgressNotesRedirect'
 import WorkingDocumentsPanel from './features/client/WorkingDocumentsPanel'
 import LettersPanel from './features/client/LettersPanel'
 import CaseHistoryPanel from './features/client/CaseHistoryPanel'
-import UpcomingAppointments from './components/UpcomingAppointments'
 import ClientAppointmentsIndex from './features/client/ClientAppointmentsIndex'
 import AppointmentEditor from './features/client/AppointmentEditor'
 import ClientSectionPlaceholder from './features/client/ClientSectionPlaceholder'
@@ -55,7 +54,7 @@ export default function App() {
         <Route path="finance" element={<FinancePage />} />
         <Route path="journal" element={<JournalPage />} />
         <Route path="lab/progress-note" element={<ProgressNoteLabPage />} />
-        <Route path="upcoming-appointments" element={<UpcomingAppointments />} />
+        <Route path="upcoming-appointments" element={<Navigate to="/calendar?view=upcoming" replace />} />
         <Route path="active-cases" element={<ActiveCases />} />
         <Route path="clients" element={<AllClients />} />
         <Route path="clients/add" element={<AddClient />} />

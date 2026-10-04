@@ -1,17 +1,14 @@
 import { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAppSession } from '../../lib/AppSessionContext'
-import { useAppClients } from '../../lib/queries'
 import {
   appointmentQueryKeys,
   useAllAppointmentsQuery,
-  useDeleteAppointmentsMutation,
-  useSaveAppointmentMutation,
 } from '../../lib/appointmentQueries'
-import { useConfirm, useToast } from '../../components/ui'
-import { appointmentBelongsToSeries, countSeriesScope, newSeriesId } from '../../lib/appointmentSeries'
-import SeriesScopeDialog from '../../components/SeriesScopeDialog'
+import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
+import UpcomingAgenda from '../../components/UpcomingAppointments'
 import {
   externalBlocksAsAppointments,
   listCalendarConnections,
@@ -28,7 +25,6 @@ import {
   monthGridDays,
   startOfMonthYmd,
   weekDatesYmd,
-  workingWeekDatesYmd,
 } from '../../lib/dateArchitecture'
 import {
   filterAppointmentsForPersona,
@@ -41,8 +37,7 @@ import {
   syncCalendarPrefsFromAvailability,
   CALENDAR_START_HOUR_OPTIONS,
   CALENDAR_END_HOUR_OPTIONS,
-  MIN_CALENDAR_INTERVAL,
-  MAX_CALENDAR_INTERVAL,
+  CALENDAR_INTERVAL_OPTIONS,
 } from '../../lib/calendarPreferences'
 import { getClinicianWorkplaceSettings } from '../../lib/store'
 import {
@@ -65,14 +60,19 @@ import {
 } from '../../lib/calendarServiceStyles'
 import { listServices } from '../../lib/supabase/servicesRepo'
 import { db } from '../../lib/data/collections'
-import { CalendarWorkspaceFrame, CalendarTimeSlot, EventDrawer, ScheduleSessionPanel, RecurringSchedulePanel } from '../../components/LayoutComponents'
+import { CalendarWorkspaceFrame, CalendarTimeSlot } from '../../components/LayoutComponents'
 
 const VIEW_MODES = [
-  { id: 'month', label: 'Month' },
-  { id: 'week', label: 'Week' },
-  { id: 'working-week', label: 'Working week' },
   { id: 'day', label: 'Day' },
+  { id: 'week', label: 'Week' },
+  { id: 'month', label: 'Month' },
+  { id: 'upcoming', label: 'Upcoming' },
 ]
+
+function readViewMode(params) {
+  const value = params.get('view')
+  return VIEW_MODES.some((mode) => mode.id === value) ? value : 'week'
+}
 
 function pad2(n) {
   return String(n).padStart(2, '0')
@@ -239,23 +239,14 @@ function CalendarViewOptions({
   onToggle,
   onClose,
   onChange,
-  viewMode,
-  onViewModeChange,
   calendarOwner,
   ownerOptions,
   showOwnerPicker,
   onOwnerChange,
 }) {
-  const [intervalDraft, setIntervalDraft] = useState(String(prefs.intervalMinutes))
-  const [prevInterval, setPrevInterval] = useState(prefs.intervalMinutes)
   const [panelPos, setPanelPos] = useState({ top: 0, left: 0 })
   const triggerRef = useRef(null)
   const panelRef = useRef(null)
-
-  if (prefs.intervalMinutes !== prevInterval) {
-    setPrevInterval(prefs.intervalMinutes)
-    setIntervalDraft(String(prefs.intervalMinutes))
-  }
 
   const updatePanelPosition = useCallback(() => {
     const trigger = triggerRef.current
@@ -310,14 +301,6 @@ function CalendarViewOptions({
     }
   }, [open, onClose])
 
-  const commitInterval = () => {
-    if (intervalDraft.trim() === '') {
-      setIntervalDraft(String(prefs.intervalMinutes))
-      return
-    }
-    onChange({ intervalMinutes: intervalDraft })
-  }
-
   const panel = open ? (
     <div
       ref={panelRef}
@@ -326,19 +309,6 @@ function CalendarViewOptions({
       role="dialog"
       aria-label="Calendar view options"
     >
-      <div className="calendar-view-options__field">
-        <label htmlFor="calendar-view-mode">View</label>
-        <select
-          id="calendar-view-mode"
-          className="paper-input"
-          value={viewMode}
-          onChange={e => onViewModeChange(e.target.value)}
-        >
-          {VIEW_MODES.map(mode => (
-            <option key={mode.id} value={mode.id}>{mode.label}</option>
-          ))}
-        </select>
-      </div>
       {showOwnerPicker && (
         <div className="calendar-view-options__field">
           <label htmlFor="calendar-owner-select">View as</label>
@@ -381,23 +351,20 @@ function CalendarViewOptions({
         </select>
       </div>
       <div className="calendar-view-options__field">
-        <label htmlFor="calendar-interval">Slot interval (minutes)</label>
-        <input
+        <label htmlFor="calendar-interval">Slot size</label>
+        <select
           id="calendar-interval"
-          type="number"
-          inputMode="numeric"
-          min={MIN_CALENDAR_INTERVAL}
-          max={MAX_CALENDAR_INTERVAL}
-          step={5}
           className="paper-input"
-          value={intervalDraft}
-          onChange={e => setIntervalDraft(e.target.value)}
-          onBlur={commitInterval}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitInterval() } }}
-        />
+          value={prefs.intervalMinutes}
+          onChange={e => onChange({ intervalMinutes: Number(e.target.value) })}
+        >
+          {CALENDAR_INTERVAL_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
       </div>
       <p className="calendar-view-options__hint text-small text-muted">
-        Grid lines mark each interval; events still span their true length.
+        A smaller slot makes each hour taller, so every row stays easy to click. Events still use their real length.
       </p>
     </div>
   ) : null
@@ -771,22 +738,25 @@ function DayView({
 
 export default function CalendarModule({ persona }) {
   const { session } = useAppSession()
-  const { clients: remoteClients = [] } = useAppClients()
-  const [viewMode, setViewMode] = useState('week')
+  const overlay = useAppointmentOverlay()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [viewMode, setViewModeState] = useState(() => readViewMode(searchParams))
   const [activeDate, setActiveDate] = useState(DEMO_TODAY)
-  const [selectedAppointment, setSelectedAppointment] = useState(null)
-  const [scheduleDraft, setScheduleDraft] = useState(null)
-  const [scheduleSaving, setScheduleSaving] = useState(false)
+  const [selectedId, setSelectedId] = useState(null)
   const { data: appointments = [] } = useAllAppointmentsQuery()
-  const saveAppointmentMutation = useSaveAppointmentMutation()
-  const deleteAppointmentsMutation = useDeleteAppointmentsMutation()
-  const confirm = useConfirm()
-  const toast = useToast()
   const [viewPrefs, setViewPrefs] = useState(() => getCalendarViewPreferences())
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false)
-  const [deleteScopeFor, setDeleteScopeFor] = useState(null)
-  const [scheduleDeleting, setScheduleDeleting] = useState(false)
   const [rescheduleTarget, setRescheduleTarget] = useState(null)
+
+  const setViewMode = useCallback((next) => {
+    setViewModeState(next)
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      if (next === 'week') params.delete('view')
+      else params.set('view', next)
+      return params
+    }, { replace: true })
+  }, [setSearchParams])
 
   const [availabilitySettings, setAvailabilitySettings] = useState(() => (
     getClinicianWorkplaceSettings(session.user.id)
@@ -908,11 +878,6 @@ export default function CalendarModule({ persona }) {
   const dayStartMin = viewPrefs.startHour * 60
   const dayEndMin = viewPrefs.endHour * 60
 
-  const assignedClients = useMemo(
-    () => remoteClients.filter(c => c.is_active !== false),
-    [remoteClients],
-  )
-
   const filtered = useMemo(() => {
     const roleScoped = filterAppointmentsForPersona(appointments, persona)
     const owned = filterAppointmentsByCalendarOwner(roleScoped, calendarOwner, persona)
@@ -921,35 +886,55 @@ export default function CalendarModule({ persona }) {
 
   const blurNames = false
 
+  const viewModeRef = useRef(viewMode)
+  viewModeRef.current = viewMode
+
   const weekDates = weekDatesYmd(activeDate)
-  const workingDates = workingWeekDatesYmd(activeDate)
 
   const navigateDate = (deltaDays) => {
     setActiveDate(prev => addDaysYmd(prev, deltaDays))
   }
 
-  const jumpToday = () => setActiveDate(DEMO_TODAY)
+  const jumpToday = () => {
+    setActiveDate(DEMO_TODAY)
+    if (viewMode === 'upcoming') setViewMode('day')
+  }
 
   const periodLabel = useMemo(() => {
-    switch (viewMode) {
-      case 'month':
-        return formatLongDate(startOfMonthYmd(activeDate)).split(',')[1]?.trim() || formatDisplayDate(startOfMonthYmd(activeDate))
-      case 'week':
-        return `${formatDisplayDate(weekDates[0])} – ${formatDisplayDate(weekDates[6])}`
-      case 'working-week':
-        return `${formatDisplayDate(workingDates[0])} – ${formatDisplayDate(workingDates[4])}`
-      default:
-        return formatLongDate(activeDate)
+    if (viewMode === 'upcoming') return 'Upcoming'
+    if (viewMode === 'month') {
+      return formatLongDate(startOfMonthYmd(activeDate)).split(',')[1]?.trim() || formatDisplayDate(startOfMonthYmd(activeDate))
     }
-  }, [viewMode, activeDate, weekDates, workingDates])
+    if (viewMode === 'week') {
+      return `${formatDisplayDate(weekDates[0])} – ${formatDisplayDate(weekDates[6])}`
+    }
+    return formatLongDate(activeDate)
+  }, [viewMode, activeDate, weekDates])
+
+  useEffect(() => {
+    return overlay.register({
+      onMove: (appt) => {
+        setRescheduleTarget(appt)
+        setSelectedId(appt?.id || null)
+        if (appt?.session_date) setActiveDate(appt.session_date)
+        const current = viewModeRef.current
+        if (current === 'month' || current === 'upcoming') setViewMode('week')
+      },
+      onSaved: (saved, meta) => {
+        if (saved?.session_date) setActiveDate(saved.session_date)
+        if (saved?.id) setSelectedId(saved.id)
+        const current = viewModeRef.current
+        if (meta?.created && (current === 'month' || current === 'upcoming')) setViewMode('day')
+      },
+      onClose: () => setSelectedId(null),
+    })
+  }, [overlay, setViewMode])
 
   const selectAppointment = (appt) => {
     if (appt?.is_external_busy) return
-    // Leave move mode if the clinician picks another event.
     if (rescheduleTarget) setRescheduleTarget(null)
-    // View overlay (attendance / details). Edit is a separate overlay from there.
-    setScheduleDraft(null)
-    setSelectedAppointment((prev) => (prev?.id === appt.id ? null : appt))
+    setSelectedId(appt.id)
+    overlay.openView(appt)
   }
 
   const applyMoveToSlot = (appt, sessionDate, startTime) => {
@@ -968,14 +953,8 @@ export default function CalendarModule({ persona }) {
       end_time: endTime,
     }
     setRescheduleTarget(null)
-    setSelectedAppointment(null)
-    setScheduleDraft({
-      mode: 'edit',
-      appointment: moved,
-      session_date: sessionDate,
-      start_time: startTime,
-      manual: true,
-    })
+    setSelectedId(moved.id)
+    overlay.openEdit(moved)
   }
 
   const openScheduleSlot = (sessionDate, startTime, manual = false) => {
@@ -983,18 +962,13 @@ export default function CalendarModule({ persona }) {
       applyMoveToSlot(rescheduleTarget, sessionDate, startTime)
       return
     }
-    setSelectedAppointment(null)
-    setScheduleDraft({ mode: 'create', session_date: sessionDate, start_time: startTime, manual })
+    setSelectedId(null)
+    overlay.openCreate({ sessionDate, startTime, manual })
   }
 
   const openAddAppointment = () => {
     setRescheduleTarget(null)
     openScheduleSlot(activeDate, hhmm(viewPrefs.startHour, 0), true)
-  }
-
-  const closeSidePane = () => {
-    setSelectedAppointment(null)
-    setScheduleDraft(null)
   }
 
   const cancelReschedule = () => setRescheduleTarget(null)
@@ -1012,200 +986,14 @@ export default function CalendarModule({ persona }) {
     setViewPrefs(prev => saveCalendarViewPreferences({ ...prev, ...patch }))
   }
 
-  const handleAttendanceChange = async (status) => {
-    if (!selectedAppointment) return
-    const saved = await saveAppointmentMutation.mutateAsync({
-      payload: {
-        id: selectedAppointment.id,
-        client_id: selectedAppointment.client_id,
-        session_date: selectedAppointment.session_date,
-        start_time: selectedAppointment.start_time,
-        end_time: selectedAppointment.end_time,
-        appointment_type: selectedAppointment.appointment_type,
-        therapy_modality: selectedAppointment.therapy_modality,
-        service_id: selectedAppointment.service_id,
-        service_name: selectedAppointment.service_name,
-        location: selectedAppointment.location,
-        other_info: selectedAppointment.other_info,
-        block_role: selectedAppointment.block_role || 'client_session',
-        clinician_id: selectedAppointment.clinician_id,
-        attendance_status: status,
-      },
-      userId: session.user.id,
-    })
-    setSelectedAppointment(saved)
-  }
-
-  const handleScheduleSave = async (payload, scope = 'this') => {
-    setScheduleSaving(true)
-    try {
-      const dates = payload.dates?.length ? payload.dates : [payload.session_date]
-      const seriesId = payload.series_id || (dates.length > 1 ? newSeriesId() : undefined)
-
-      // Editing an existing session (possibly a series scope).
-      if (payload.id && !payload.dates?.length) {
-        const saved = await saveAppointmentMutation.mutateAsync({
-          payload: {
-            ...payload,
-            dates: undefined,
-            series_id: payload.series_id || undefined,
-            clinician_id: payload.clinician_id || session.user.id,
-          },
-          userId: session.user.id,
-          scope,
-          allAppointments: filtered,
-        })
-        setScheduleDraft(null)
-        if (saved) {
-          setActiveDate(saved.session_date)
-          setSelectedAppointment(saved) // return to view overlay
-          toast.saved(scope === 'this' ? 'Appointment updated' : 'Series updated')
-        } else {
-          setSelectedAppointment(null)
-        }
-        return
-      }
-
-      let first = null
-      let last = null
-      for (const date of dates) {
-        last = await saveAppointmentMutation.mutateAsync({
-          payload: {
-            ...payload,
-            session_date: date,
-            dates: undefined,
-            series_id: seriesId,
-            clinician_id: payload.clinician_id || session.user.id,
-          },
-          userId: session.user.id,
-        })
-        if (!first) first = last
-      }
-      setScheduleDraft(null)
-      setSelectedAppointment(null)
-      // Stay on the first occurrence — jumping to the series end is confusing.
-      if (first) {
-        setActiveDate(first.session_date)
-        if (viewMode === 'month') setViewMode('day')
-        toast.saved(dates.length > 1 ? `Booked ${dates.length} sessions` : 'Appointment booked')
-      }
-    } finally {
-      setScheduleSaving(false)
-    }
-  }
-
-  const runDelete = async (appointment, scope = 'this') => {
-    setScheduleDeleting(true)
-    try {
-      await deleteAppointmentsMutation.mutateAsync({
-        appointment,
-        scope,
-        allAppointments: filtered,
-      })
-      setScheduleDraft(null)
-      setSelectedAppointment(null)
-      setDeleteScopeFor(null)
-      toast.saved(scope === 'this' ? 'Appointment deleted' : 'Appointments deleted')
-    } finally {
-      setScheduleDeleting(false)
-    }
-  }
-
-  const handleDeleteAppointment = async (appointment, scope) => {
-    if (!appointment) return
-    if (scope) {
-      await runDelete(appointment, scope)
-      return
-    }
-    if (appointmentBelongsToSeries(appointment, filtered)) {
-      setDeleteScopeFor(appointment)
-      return
-    }
-    const ok = await confirm({
-      title: 'Delete appointment?',
-      message: `Remove the session on ${appointment.session_date} at ${appointment.start_time}?`,
-      confirmLabel: 'Delete',
-      tone: 'danger',
-    })
-    if (!ok) return
-    await runDelete(appointment, 'this')
-  }
-
-  const handleRecurringSave = async (payload) => {
-    setScheduleSaving(true)
-    try {
-      const seriesId = payload.series_id || (payload.dates?.length > 1 ? newSeriesId() : undefined)
-      let first = null
-      for (const date of payload.dates) {
-        const saved = await saveAppointmentMutation.mutateAsync({
-          payload: {
-            client_id: payload.client_id,
-            session_date: date,
-            start_time: payload.start_time,
-            end_time: payload.end_time,
-            duration_minutes: payload.duration_minutes,
-            therapy_modality: payload.therapy_modality,
-            service_id: payload.service_id,
-            service_name: payload.service_name,
-            series_id: seriesId,
-            location: payload.location,
-            other_info: payload.other_info,
-            appointment_type: payload.appointment_type,
-            clinician_id: payload.clinician_id || session.user.id,
-            block_role: payload.block_role || 'client_session',
-          },
-          userId: session.user.id,
-        })
-        if (!first) first = saved
-      }
-      setScheduleDraft(null)
-      setSelectedAppointment(null)
-      if (first) {
-        setActiveDate(first.session_date)
-        if (viewMode === 'month') setViewMode('day')
-      }
-    } finally {
-      setScheduleSaving(false)
-    }
-  }
-
   const handleEditAppointment = (appt) => {
-    // Edit always uses the centred overlay.
     setRescheduleTarget(null)
-    setSelectedAppointment(null)
-    setScheduleDraft({
-      mode: 'edit',
-      appointment: appt,
+    setSelectedId(appt.id)
+    overlay.openEdit({
+      ...appt,
       session_date: appt.session_date || appointmentSchedule(appt).session_date,
       start_time: appt.start_time || appointmentSchedule(appt).start_time,
-      manual: true,
     })
-  }
-
-  const handleBookAnother = (appt) => {
-    setRescheduleTarget(null)
-    setSelectedAppointment(null)
-    setScheduleDraft({
-      mode: 'book_another',
-      prefill: appt,
-      session_date: addDaysYmd(appt.session_date, 7),
-      start_time: appt.start_time,
-      manual: true,
-    })
-  }
-
-  const handleRecurring = (appt) => {
-    setRescheduleTarget(null)
-    setSelectedAppointment(null)
-    setScheduleDraft({ mode: 'recurring', source: appt })
-  }
-
-  const handleMove = (appt) => {
-    setSelectedAppointment(null)
-    setScheduleDraft(null)
-    setRescheduleTarget(appt)
-    if (appt?.session_date) setActiveDate(appt.session_date)
-    if (viewMode === 'month') setViewMode('week')
   }
 
   const handleDropOnSlot = (appointmentId, sessionDate, startTime) => {
@@ -1220,8 +1008,7 @@ export default function CalendarModule({ persona }) {
     onSelectAppointment: selectAppointment,
     onEditAppointment: handleEditAppointment,
     onDropOnSlot: handleDropOnSlot,
-    selectedAppointmentId: selectedAppointment?.id
-      || (scheduleDraft?.mode === 'edit' ? scheduleDraft.appointment?.id : undefined),
+    selectedAppointmentId: selectedId,
     hours,
     subSlotMinutes,
     dayStartMin,
@@ -1252,15 +1039,6 @@ export default function CalendarModule({ persona }) {
           {...gridHandlers}
         />
       )}
-      {viewMode === 'working-week' && (
-        <TimeGridView
-          dates={workingDates}
-          appointments={filtered}
-          activeDate={activeDate}
-          onSelectDate={setActiveDate}
-          {...gridHandlers}
-        />
-      )}
       {viewMode === 'day' && (
         <DayView
           activeDate={activeDate}
@@ -1268,17 +1046,11 @@ export default function CalendarModule({ persona }) {
           {...gridHandlers}
         />
       )}
+      {viewMode === 'upcoming' && (
+        <UpcomingAgenda onSelect={selectAppointment} />
+      )}
     </>
   )
-
-  // Side pane only for recurring helper — view + edit/create use centred overlays.
-  const showRecurringOverlay = scheduleDraft?.mode === 'recurring'
-  const showScheduleOverlay = Boolean(scheduleDraft && scheduleDraft.mode !== 'recurring')
-  const showViewOverlay = Boolean(selectedAppointment && !showScheduleOverlay && !showRecurringOverlay)
-
-  const closeScheduleOverlay = () => {
-    closeSidePane()
-  }
 
   return (
     <div
@@ -1308,21 +1080,35 @@ export default function CalendarModule({ persona }) {
             <button type="button" className="calendar-toolbar__btn calendar-toolbar__btn--today" onClick={jumpToday}>
               Today
             </button>
-            <div className="calendar-toolbar__nav">
-              <button type="button" className="calendar-toolbar__btn" onClick={() => navigateDate(viewMode === 'month' ? -30 : viewMode === 'day' ? -1 : -7)} aria-label="Previous period">←</button>
-              <button type="button" className="calendar-toolbar__btn" onClick={() => navigateDate(viewMode === 'month' ? 30 : viewMode === 'day' ? 1 : 7)} aria-label="Next period">→</button>
-            </div>
+            {viewMode !== 'upcoming' && (
+              <div className="calendar-toolbar__nav">
+                <button type="button" className="calendar-toolbar__btn" onClick={() => navigateDate(viewMode === 'month' ? -30 : viewMode === 'day' ? -1 : -7)} aria-label="Previous period">←</button>
+                <button type="button" className="calendar-toolbar__btn" onClick={() => navigateDate(viewMode === 'month' ? 30 : viewMode === 'day' ? 1 : 7)} aria-label="Next period">→</button>
+              </div>
+            )}
             <p className="calendar-toolbar__period">{periodLabel}</p>
           </div>
           <div className="calendar-toolbar__options">
+            <div className="calendar-toolbar__views" role="tablist" aria-label="Calendar view">
+              {VIEW_MODES.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={viewMode === mode.id}
+                  className={`calendar-toolbar__view${viewMode === mode.id ? ' calendar-toolbar__view--active' : ''}`}
+                  onClick={() => setViewMode(mode.id)}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
             <CalendarViewOptions
               prefs={viewPrefs}
               open={viewOptionsOpen}
               onToggle={() => setViewOptionsOpen(o => !o)}
               onClose={() => setViewOptionsOpen(false)}
               onChange={handleViewPrefsChange}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
               calendarOwner={calendarOwner}
               ownerOptions={ownerOptions}
               showOwnerPicker={showOwnerPicker}
@@ -1340,69 +1126,6 @@ export default function CalendarModule({ persona }) {
           </ErrorBoundary>
         )}
       />
-
-      {showViewOverlay && (
-        <ErrorBoundary label="calendar-view-overlay">
-          <EventDrawer
-            appointment={selectedAppointment}
-            allAppointments={filtered}
-            presentation="overlay"
-            onClose={closeSidePane}
-            onAttendanceChange={handleAttendanceChange}
-            onEdit={handleEditAppointment}
-            onMove={handleMove}
-            onDelete={handleDeleteAppointment}
-          />
-        </ErrorBoundary>
-      )}
-
-      {showRecurringOverlay && (
-        <ErrorBoundary label="calendar-recurring-overlay">
-          <RecurringSchedulePanel
-            key={scheduleDraft.source.id}
-            source={scheduleDraft.source}
-            onSave={handleRecurringSave}
-            onCancel={closeSidePane}
-            saving={scheduleSaving}
-            presentation="overlay"
-          />
-        </ErrorBoundary>
-      )}
-
-      {showScheduleOverlay && (
-        <ErrorBoundary label="calendar-schedule-overlay">
-          <ScheduleSessionPanel
-            key={scheduleDraft.appointment?.id || scheduleDraft.prefill?.id || `${scheduleDraft.mode}-${scheduleDraft.session_date}-${scheduleDraft.start_time}`}
-            sessionDate={scheduleDraft.session_date}
-            startTime={scheduleDraft.start_time}
-            appointment={scheduleDraft.mode === 'edit' ? scheduleDraft.appointment : null}
-            prefill={scheduleDraft.mode === 'book_another' ? scheduleDraft.prefill : null}
-            clients={assignedClients}
-            allAppointments={filtered}
-            sessionUserId={session.user.id}
-            myWorkplace={null}
-            calendarOwner={calendarOwner}
-            showDateField={Boolean(scheduleDraft.manual) || scheduleDraft.mode === 'book_another' || scheduleDraft.mode === 'edit'}
-            presentation="overlay"
-            onSave={handleScheduleSave}
-            onDelete={handleDeleteAppointment}
-            onBookAnother={handleBookAnother}
-            onScheduleMore={handleRecurring}
-            onCancel={closeScheduleOverlay}
-            saving={scheduleSaving}
-            deleting={scheduleDeleting}
-          />
-        </ErrorBoundary>
-      )}
-
-      {deleteScopeFor && (
-        <SeriesScopeDialog
-          action="delete"
-          onCancel={() => setDeleteScopeFor(null)}
-          countForScope={(scope) => countSeriesScope(deleteScopeFor, filtered, scope)}
-          onSelect={(scope) => runDelete(deleteScopeFor, scope)}
-        />
-      )}
     </div>
   )
 }

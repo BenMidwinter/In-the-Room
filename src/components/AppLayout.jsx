@@ -4,6 +4,7 @@ import { useStoreRefreshers } from '../lib/queries'
 import ThemeToggle from './ThemeToggle'
 import { RouteErrorBoundary } from './ErrorBoundary'
 import { AppSessionProvider } from '../lib/AppSessionContext'
+import { AppointmentOverlayProvider } from '../features/appointments/AppointmentOverlay'
 import { useAuth } from '../lib/auth/AuthProvider'
 import RequireAuth from './RequireAuth'
 
@@ -169,7 +170,9 @@ function AppShell() {
         </div>
         <RouteErrorBoundary>
           <AppSessionProvider value={appSession}>
-            <Outlet />
+            <AppointmentOverlayProvider>
+              <Outlet />
+            </AppointmentOverlayProvider>
           </AppSessionProvider>
         </RouteErrorBoundary>
       </main>

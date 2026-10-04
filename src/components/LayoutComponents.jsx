@@ -520,9 +520,6 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
   const noteHref = showAttendance && appointment.client_id
     ? `/clients/${appointment.client_id}/progress-notes?appointment=${appointment.id}`
     : null
-  const apptHref = showAttendance && appointment.client_id
-    ? `/clients/${appointment.client_id}/appointments/${appointment.id}`
-    : null
   const timeRange = appointment.end_time
     ? `${appointment.start_time}–${appointment.end_time}`
     : appointment.start_time
@@ -552,7 +549,6 @@ function StandardEventBody({ appointment, locked, onAttendanceChange, showAttend
             label="When"
             value={`${appointment.session_date} · ${timeRange}`}
             meta={[duration, appointment.location].filter(Boolean).join(' · ')}
-            href={apptHref || undefined}
           />
           <StackedDataRow
             icon="🎨"

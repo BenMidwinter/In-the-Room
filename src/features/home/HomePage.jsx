@@ -1,5 +1,6 @@
 import { useMemo, useRef, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useAppClients } from '../../lib/queries'
 import { useUpcomingAppointmentsQuery, useAllAppointmentsQuery } from '../../lib/appointmentQueries'
@@ -29,7 +30,7 @@ function HomeStatCard({ title, children }) {
   )
 }
 
-function UpcomingTimeline({ appointments, clients }) {
+function UpcomingTimeline({ appointments, clients, onSelect }) {
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -67,9 +68,10 @@ function UpcomingTimeline({ appointments, clients }) {
                   <div className="timeline__marker" />
                   {!isLast && <div className="timeline__line timeline__line--horizontal" />}
                 </div>
-                <Link
-                  to={`/clients/${appt.client_id}/appointments/${appt.id}`}
-                  className="timeline__body home-upcoming-timeline__card"
+                <button
+                  type="button"
+                  className="timeline__body timeline__body--link home-upcoming-timeline__card"
+                  onClick={() => onSelect(appt)}
                 >
                   <div className="timeline__meta">
                     <time className="home-upcoming-timeline__when">
@@ -86,7 +88,7 @@ function UpcomingTimeline({ appointments, clients }) {
                     {service}
                     {appt.location ? ` · ${appt.location}` : ''}
                   </p>
-                </Link>
+                </button>
               </li>
             )
           })}
@@ -98,6 +100,7 @@ function UpcomingTimeline({ appointments, clients }) {
 
 export default function HomePage() {
   const { session, activePersona } = useAppSession()
+  const overlay = useAppointmentOverlay()
   const { clients } = useAppClients()
   const name = activePersona?.name && activePersona.name !== 'Clinician'
     ? activePersona.name
@@ -136,7 +139,7 @@ export default function HomePage() {
           actions={(
             <>
               <Link to="/calendar" className="secondary">Calendar</Link>
-              <Link to="/upcoming-appointments" className="secondary">All upcoming</Link>
+              <Link to="/calendar?view=upcoming" className="secondary">All upcoming</Link>
             </>
           )}
         >
@@ -146,9 +149,10 @@ export default function HomePage() {
                 {upcomingLoading && !nextSession ? (
                   <p className="section-card__empty">Loading schedule…</p>
                 ) : nextSession ? (
-                  <Link
-                    to={`/clients/${nextSession.client_id}/appointments/${nextSession.id}`}
+                  <button
+                    type="button"
                     className="home-stat-card__link"
+                    onClick={() => overlay.openView(nextSession)}
                   >
                     <p className="home-stat-card__primary">
                       {clientLabel(clients, nextSession.client_id)}
@@ -160,7 +164,7 @@ export default function HomePage() {
                       {appointmentDisplayName(nextSession)}
                       {nextSession.location ? ` · ${nextSession.location}` : ''}
                     </p>
-                  </Link>
+                  </button>
                 ) : (
                   <p className="section-card__empty">No upcoming sessions on your diary.</p>
                 )}
@@ -193,6 +197,7 @@ export default function HomePage() {
             <UpcomingTimeline
               appointments={timelineAppointments}
               clients={clients}
+              onSelect={overlay.openView}
             />
           </div>
         </SectionCard>

@@ -4,8 +4,14 @@ export const DEFAULT_CALENDAR_START_HOUR = 8
 export const DEFAULT_CALENDAR_END_HOUR = 17
 export const DEFAULT_CALENDAR_INTERVAL = 30
 
-export const MIN_CALENDAR_INTERVAL = 5
-export const MAX_CALENDAR_INTERVAL = 120
+export const CALENDAR_INTERVAL_OPTIONS = [
+  { value: 15, label: '15 minutes' },
+  { value: 30, label: '30 minutes' },
+  { value: 60, label: '60 minutes' },
+]
+
+export const MIN_CALENDAR_INTERVAL = 15
+export const MAX_CALENDAR_INTERVAL = 60
 
 export const CALENDAR_START_HOUR_OPTIONS = [
   { value: 5, label: '5:00 am' },
@@ -45,9 +51,18 @@ function toNumber(value, fallback) {
   return Number.isFinite(n) ? n : fallback
 }
 
-function clampInterval(value) {
+function snapInterval(value) {
   const n = toNumber(value, DEFAULT_CALENDAR_INTERVAL)
-  return Math.min(MAX_CALENDAR_INTERVAL, Math.max(MIN_CALENDAR_INTERVAL, Math.round(n)))
+  let best = DEFAULT_CALENDAR_INTERVAL
+  let bestDist = Number.POSITIVE_INFINITY
+  for (const option of CALENDAR_INTERVAL_OPTIONS) {
+    const dist = Math.abs(option.value - n)
+    if (dist < bestDist) {
+      best = option.value
+      bestDist = dist
+    }
+  }
+  return best
 }
 
 function snapToAllowed(value, allowed, fallback) {
@@ -82,7 +97,7 @@ export function normalizeCalendarViewPreferences({ startHour, endHour, intervalM
   return {
     startHour: start,
     endHour: end,
-    intervalMinutes: clampInterval(intervalMinutes),
+    intervalMinutes: snapInterval(intervalMinutes),
   }
 }
 

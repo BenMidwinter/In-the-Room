@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Outlet, useNavigate, useParams } from 'react-router-dom'
+import { Outlet, useParams } from 'react-router-dom'
+import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
 import { getProfile, getProgressNoteByAppointment } from '../../lib/store'
 import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
 import { appointmentDisplayName } from '../../lib/calendarServiceStyles'
@@ -21,7 +22,7 @@ const APPT_COLUMNS = [
 
 export default function ClientAppointmentsIndex() {
   const { id: clientId } = useParams()
-  const navigate = useNavigate()
+  const overlay = useAppointmentOverlay()
   const { data: appointments = [] } = useClientAppointmentsQuery(clientId)
 
   const rows = useMemo(() => {
@@ -71,15 +72,19 @@ export default function ClientAppointmentsIndex() {
     <>
       <RecordListLayout
         title="Appointments"
-        subtitle="Scheduled sessions and attendance — open a row to view or edit."
+        subtitle="Scheduled sessions and attendance — open a row to view it."
         newLabel="appointment"
-        onNew={() => navigate(`/clients/${clientId}/appointments/new`)}
+        onNew={() => overlay.openCreate({
+          clientId,
+          lockedClient: true,
+          manual: true,
+        })}
       >
         <RecordTable
           columns={APPT_COLUMNS}
           rows={rows}
           emptyMessage="No appointments recorded yet."
-          onRowClick={(row) => navigate(`/clients/${clientId}/appointments/${row.id}`)}
+          onRowClick={(row) => overlay.openView(row.appt)}
         />
       </RecordListLayout>
       <Outlet />

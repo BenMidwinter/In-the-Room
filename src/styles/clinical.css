@@ -1322,6 +1322,15 @@ select.paper-input {
   list-style: none;
 }
 
+button.agenda-event {
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
 .agenda-event {
   display: grid;
   grid-template-columns: 4.5rem 1fr auto;
