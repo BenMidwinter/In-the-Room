@@ -575,6 +575,7 @@ a.badge {
   font-size: 11pt;
   line-height: 1.75;
   color: var(--editor-prose-color);
+  quotes: "“" "”" "‘" "’";
 }
 
 .doc-editor__prose,
@@ -586,28 +587,86 @@ a.badge {
   font-size: 11pt;
   line-height: 1.75;
   color: var(--editor-prose-color);
+  quotes: "“" "”" "‘" "’";
 }
 
-.doc-editor .ProseMirror h1 {
-  font-size: 1.65rem;
-  font-weight: 700;
-  margin: 0 0 0.75rem;
+.clinical-prose {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--col-accent);
+  quotes: "“" "”" "‘" "’";
+}
+
+.doc-editor .ProseMirror h1,
+.doc-editor .ProseMirror h2,
+.doc-editor .ProseMirror h3,
+.clinical-prose h1,
+.clinical-prose h2,
+.clinical-prose h3 {
+  font-family: var(--font-head);
+  font-variation-settings: var(--font-head-variation);
+  font-weight: 600;
+  color: var(--col-accent);
+  letter-spacing: -0.02em;
+}
+
+.doc-editor .ProseMirror h1,
+.clinical-prose h1 {
+  font-size: 1.85rem;
+  margin: 0 0 0.85rem;
+  line-height: 1.15;
+}
+
+.doc-editor .ProseMirror h2,
+.clinical-prose h2 {
+  font-size: 1.35rem;
+  margin: 1.35rem 0 0.45rem;
+  line-height: 1.25;
+}
+
+.doc-editor .ProseMirror h3,
+.clinical-prose h3 {
+  font-size: 1.12rem;
+  margin: 1.1rem 0 0.35rem;
   line-height: 1.3;
 }
 
-.doc-editor .ProseMirror h2 {
+.doc-editor .ProseMirror blockquote,
+.clinical-prose blockquote {
+  margin: 0.85rem 0 1rem;
+  padding: 0.15rem 0 0.15rem 0.95rem;
+  border-left: 2px solid var(--col-primary);
+  font-family: var(--font-head);
+  font-variation-settings: var(--font-head-variation);
+  font-style: italic;
   font-size: 1.2rem;
-  font-weight: 700;
-  margin: 1.25rem 0 0.5rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--col-accent);
 }
 
-.doc-editor .ProseMirror h3 {
-  font-size: 1.05rem;
+.doc-editor .ProseMirror blockquote::before,
+.clinical-prose blockquote::before {
+  content: 'Client words';
+  display: block;
+  margin-bottom: 0.25rem;
+  font-family: var(--font-body);
+  font-style: normal;
   font-weight: 700;
-  margin: 1rem 0 0.4rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
 }
 
-.doc-editor .ProseMirror p {
+.doc-editor .ProseMirror blockquote p,
+.clinical-prose blockquote p {
+  margin-bottom: 0.35rem;
+}
+
+.doc-editor .ProseMirror p,
+.clinical-prose p {
   margin-bottom: 0.65rem;
 }
 

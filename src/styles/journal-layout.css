@@ -216,68 +216,6 @@
   color: var(--txt-muted);
 }
 
-.journal-audio {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  padding: 0.85rem 0;
-  margin-bottom: 0.75rem;
-  border-bottom: 1px solid var(--border-light);
-  transition: background 0.2s ease;
-}
-
-.journal-audio--recording {
-  background: color-mix(in srgb, var(--col-primary) 10%, var(--bg-surface));
-  padding-left: 0.75rem;
-  padding-right: 0.75rem;
-  margin-left: -0.75rem;
-  margin-right: -0.75rem;
-}
-
-.journal-audio__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  align-self: flex-start;
-}
-
-.journal-audio__mic {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-
-.journal-audio__pulse {
-  position: absolute;
-  inset: -5px;
-  border-radius: 50%;
-  border: 2px solid var(--col-primary);
-  animation: mic-pulse 1.2s ease-out infinite;
-}
-
-.journal-audio__wave {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 2rem;
-}
-
-.journal-audio__bar {
-  flex: 1;
-  max-width: 6px;
-  min-width: 3px;
-  height: var(--bar-h, 40%);
-  border-radius: 999px;
-  background: var(--expr-gradient-b);
-  opacity: 0.85;
-  animation: journal-bar-pulse 0.9s ease-in-out infinite alternate;
-}
-
-@keyframes journal-bar-pulse {
-  from { opacity: 0.55; }
-  to { opacity: 1; }
-}
-
 .journal__editor {
   flex: 1;
   min-height: 420px;

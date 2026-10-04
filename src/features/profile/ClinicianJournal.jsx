@@ -2,7 +2,6 @@ import { useMemo, useState, useCallback } from 'react'
 import { useAppSession } from '../../lib/AppSessionContext'
 import SectionCard from '../../components/SectionCard'
 import RichTextEditor from '../../components/RichTextEditor'
-import { IconMic } from '../../components/EditorToolbarIcons'
 import { getJournalEntries, saveJournalEntry } from '../../lib/store'
 import { DEMO_TODAY } from '../../lib/dateArchitecture'
 
@@ -31,27 +30,6 @@ function stripHtml(html) {
   return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
-function AudioReflectionRecorder({ recording, onToggle }) {
-  return (
-    <div className={`journal-audio${recording ? ' journal-audio--recording' : ''}`}>
-      <button type="button" className="primary journal-audio__btn" onClick={onToggle}>
-        <span className="journal-audio__mic" aria-hidden>
-          {recording && <span className="journal-audio__pulse" />}
-          <IconMic />
-        </span>
-        {recording ? 'Recording… tap to stop' : 'Record Audio Reflection'}
-      </button>
-      {recording && (
-        <div className="journal-audio__wave" aria-hidden>
-          {Array.from({ length: 24 }, (_, i) => (
-            <span key={i} className="journal-audio__bar" style={{ '--bar-h': `${22 + ((i * 13) % 68)}%` }} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function ClinicianJournal() {
   const { session } = useAppSession()
   const userId = session?.user?.id ?? ''
@@ -65,7 +43,6 @@ export default function ClinicianJournal() {
   const [entries, setEntries] = useState(initialEntries)
   const [selectedId, setSelectedId] = useState(initialEntry?.id ?? 'new')
   const [feedOpen, setFeedOpen] = useState(false)
-  const [recording, setRecording] = useState(false)
 
   const [draftDate, setDraftDate] = useState(initialEntry?.date ?? DEMO_TODAY)
   const [draftTime, setDraftTime] = useState(initialEntry?.time ?? defaultJournalTime())
@@ -208,11 +185,6 @@ export default function ClinicianJournal() {
             Save entry
           </button>
         </header>
-
-        <AudioReflectionRecorder
-          recording={recording}
-          onToggle={() => setRecording(r => !r)}
-        />
 
         <div className="journal__editor">
           <RichTextEditor

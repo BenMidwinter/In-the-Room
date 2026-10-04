@@ -1,7 +1,7 @@
-/** Standard web-safe font stacks for the rich text editor. */
+/** Faces the editor can apply. Body defaults to Karla; headings default to Fraunces. */
 export const EDITOR_FONTS = [
   { id: 'karla', label: 'Karla', css: "'Karla', system-ui, sans-serif" },
-  { id: 'system', label: 'System UI', css: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" },
+  { id: 'fraunces', label: 'Fraunces', css: "'Fraunces', Georgia, serif" },
   { id: 'georgia', label: 'Georgia', css: "Georgia, 'Times New Roman', serif" },
   { id: 'times', label: 'Times', css: "'Times New Roman', Times, serif" },
   { id: 'arial', label: 'Arial', css: 'Arial, Helvetica, sans-serif' },
@@ -17,88 +17,105 @@ export const EDITOR_TEXT_SIZES = [
   { id: 'xlarge', label: 'Extra large', className: 'doc-size--xlarge' },
 ]
 
-/** Expressive display sizes (slash + expressive panel). */
-export const EXPRESSIVE_SIZES = [
-  { id: 'standard', label: 'Standard', className: 'expr-size--standard' },
-  { id: 'loud', label: 'Loud', className: 'expr-size--loud' },
-  { id: 'bold-bright', label: 'Bold & Bright', className: 'expr-size--bold-bright' },
-  { id: 'fluid', label: 'Fluid Narrative', className: 'expr-size--fluid' },
+/**
+ * Ways of writing inside a process note.
+ * These are voices, not poster sizes: a phrase can sound like the client,
+ * sit back as an aside, or land in the heading face.
+ */
+export const WRITING_VOICES = [
+  { id: 'voice', label: 'Their words', hint: 'Fraunces italic, as something said', className: 'expr-size--voice' },
+  { id: 'aside', label: 'Aside', hint: 'Quieter, for a reflection', className: 'expr-size--aside' },
+  { id: 'land', label: 'Landing line', hint: 'A phrase in the heading face', className: 'expr-size--land' },
 ]
 
+/** Kept so older notes still resolve a colour. The palette shows a shorter set. */
 export const EDITOR_TEXT_COLORS = [
   { id: 'default', label: 'Default', hex: null, className: '' },
   { id: 'charcoal', label: 'Charcoal', hex: '#2d3439', className: 'doc-color--charcoal' },
-  { id: 'teal', label: 'Teal', hex: '#3a9fbf', className: 'doc-color--teal' },
-  { id: 'violet', label: 'Violet', hex: '#7a6ec4', className: 'doc-color--violet' },
-  { id: 'clay', label: 'Clay', hex: '#c67b5c', className: 'doc-color--clay' },
-  { id: 'sage', label: 'Sage', hex: '#6b7a5e', className: 'doc-color--sage' },
-  { id: 'coral', label: 'Coral', hex: '#e07a5f', className: 'doc-color--coral' },
+  { id: 'teal', label: 'Teal', hex: '#3a6f62', className: 'doc-color--teal' },
+  { id: 'clay', label: 'Clay', hex: '#8d5340', className: 'doc-color--clay' },
+  { id: 'sage', label: 'Sage', hex: '#4f6248', className: 'doc-color--sage' },
   { id: 'navy', label: 'Navy', hex: '#1a3a5c', className: 'doc-color--navy' },
+  { id: 'violet', label: 'Violet', hex: '#7a6ec4', className: 'doc-color--violet' },
+  { id: 'coral', label: 'Coral', hex: '#e07a5f', className: 'doc-color--coral' },
   { id: 'magenta', label: 'Magenta', hex: '#d926b8', className: 'doc-color--magenta' },
   { id: 'lime', label: 'Lime', hex: '#5a8f00', className: 'doc-color--lime' },
 ]
 
+export const EDITOR_COLOR_CHOICES = ['default', 'charcoal', 'teal', 'clay', 'sage', 'navy']
+
 export const EDITOR_HIGHLIGHTS = [
   { id: 'none', label: 'None', className: '', isClear: true },
+  { id: 'yellow-soft', label: 'Return to this', className: 'expr-hl--yellow-soft' },
+  { id: 'sage-wash', label: 'Observation', className: 'expr-hl--sage-wash' },
+  { id: 'clay-wash', label: 'Feeling', className: 'expr-hl--clay-wash' },
   { id: 'teal-wash', label: 'Teal wash', className: 'expr-hl--teal-wash' },
   { id: 'violet-wash', label: 'Violet wash', className: 'expr-hl--violet-wash' },
-  { id: 'clay-wash', label: 'Clay wash', className: 'expr-hl--clay-wash' },
-  { id: 'sage-wash', label: 'Sage wash', className: 'expr-hl--sage-wash' },
-  { id: 'yellow-soft', label: 'Soft yellow', className: 'expr-hl--yellow-soft' },
   { id: 'pink-soft', label: 'Soft pink', className: 'expr-hl--pink-soft' },
   { id: 'neon-lime', label: 'Neon lime', className: 'expr-hl--neon-lime' },
   { id: 'neon-magenta', label: 'Neon magenta', className: 'expr-hl--neon-magenta' },
 ]
 
+export const EDITOR_HIGHLIGHT_CHOICES = ['none', 'yellow-soft', 'sage-wash', 'clay-wash']
+
 export const SLASH_COMMANDS = [
-  { id: 'dapnotes', label: 'DAP notes', group: 'Clinical sections', action: 'insertSnippet', value: 'dapnotes' },
-  { id: 'consent', label: 'Consent record', group: 'Clinical sections', action: 'insertSnippet', value: 'consent' },
-  { id: 'size-large', label: 'Large text', group: 'Size', action: 'textSize', value: 'large' },
-  { id: 'size-loud', label: 'Loud text', group: 'Expressive size', action: 'size', value: 'loud' },
-  { id: 'size-bold', label: 'Bold & Bright', group: 'Expressive size', action: 'size', value: 'bold-bright' },
-  { id: 'color-teal', label: 'Teal text', group: 'Text colour', action: 'textColor', value: 'teal' },
-  { id: 'color-violet', label: 'Violet text', group: 'Text colour', action: 'textColor', value: 'violet' },
-  { id: 'hl-teal', label: 'Teal highlight', group: 'Highlight', action: 'highlight', value: 'teal-wash' },
-  { id: 'hl-violet', label: 'Violet highlight', group: 'Highlight', action: 'highlight', value: 'violet-wash' },
-  { id: 'hl-neon', label: 'Neon lime glow', group: 'Highlight', action: 'highlight', value: 'neon-lime' },
-  { id: 'audio', label: 'Audio fragment', group: 'Media', action: 'audio' },
-  { id: 'artwork', label: 'Inline artwork', group: 'Media', action: 'artwork' },
-  { id: 'h1', label: 'Large title', group: 'Structure', action: 'heading', value: 1 },
-  { id: 'h2', label: 'Section heading', group: 'Structure', action: 'heading', value: 2 },
-  { id: 'divider', label: 'Divider line', group: 'Structure', action: 'divider' },
+  { id: 'h1', label: 'Title', hint: 'Fraunces, for the note', group: 'Structure', action: 'heading', value: 1 },
+  { id: 'h2', label: 'Heading', hint: 'A section', group: 'Structure', action: 'heading', value: 2 },
+  { id: 'h3', label: 'Subheading', hint: 'A smaller section', group: 'Structure', action: 'heading', value: 3 },
+  { id: 'bullet', label: 'Bullet list', hint: 'A short list', group: 'Structure', action: 'bullet' },
+  { id: 'numbered', label: 'Numbered list', hint: 'Steps, in order', group: 'Structure', action: 'ordered' },
+  { id: 'quote', label: 'Client words', hint: 'A longer quotation, set apart', group: 'Writing', action: 'blockquote' },
+  { id: 'voice', label: 'Their words', hint: 'Quoted, in Fraunces', group: 'Writing', action: 'voice', value: 'voice' },
+  { id: 'aside', label: 'Aside', hint: 'A quieter reflection in the sentence', group: 'Writing', action: 'voice', value: 'aside' },
+  { id: 'land', label: 'Landing line', hint: 'The phrase to come back to', group: 'Writing', action: 'voice', value: 'land' },
+  { id: 'mark', label: 'Mark to return', hint: 'A soft highlight', group: 'Writing', action: 'highlight', value: 'yellow-soft' },
+  { id: 'divider', label: 'Divider', hint: 'A line across the page', group: 'Insert', action: 'divider' },
+  { id: 'table', label: 'Table', hint: 'Three columns', group: 'Insert', action: 'table', clinical: true },
+  { id: 'image', label: 'Image', hint: 'A picture in the page', group: 'Insert', action: 'artwork' },
+  { id: 'fill', label: 'Fill-in line', hint: 'A blank to complete', group: 'Insert', action: 'fill', clinical: true },
+  { id: 'field-name', label: 'Client name', hint: 'Filled from the record', group: 'Fields', action: 'field', value: 'client_name', clinical: true },
+  { id: 'field-date', label: 'Session date', hint: 'Filled from the appointment', group: 'Fields', action: 'field', value: 'session_date', clinical: true },
+  { id: 'field-clinician', label: 'Clinician name', hint: 'Your name', group: 'Fields', action: 'field', value: 'clinician_name', clinical: true },
+  { id: 'dapnotes', label: 'DAP notes', hint: 'Data, assessment, plan', group: 'Modules', action: 'insertSnippet', value: 'dapnotes', clinical: true },
+  { id: 'consent', label: 'Consent record', hint: 'A consent section', group: 'Modules', action: 'insertSnippet', value: 'consent', clinical: true },
 ]
 
 /** HTML snippets inserted by clinical slash commands (section-level, not full templates). */
 export const SLASH_SNIPPETS = {
   dapnotes: `<h2>DAP notes</h2>
-<p><strong>Data</strong> — objective observations from the session:</p>
+<p><strong>Data</strong> — what was seen and heard:</p>
 <p></p>
-<p><strong>Assessment</strong> — clinical interpretation and formulation:</p>
+<p><strong>Assessment</strong> — what it means:</p>
 <p></p>
-<p><strong>Plan</strong> — next steps, goals, and follow-up:</p>
+<p><strong>Plan</strong> — what happens next:</p>
 <p></p>`,
   consent: `<h2>Consent</h2>
 <p><strong>Discussion held with:</strong> </p>
 <p><strong>Date:</strong> </p>
 <p><strong>Capacity considered:</strong> </p>
 <ul>
-<li>Purpose of intervention explained</li>
-<li>Benefits and possible limitations discussed</li>
-<li>Confidentiality and information-sharing boundaries explained</li>
-<li>Right to withdraw consent explained</li>
+<li>Purpose of the work explained</li>
+<li>Benefits and limits discussed</li>
+<li>Confidentiality explained</li>
+<li>Right to withdraw explained</li>
 </ul>
 <p><strong>Consent outcome:</strong> </p>
-<p><strong>Clinician notes:</strong> </p>
 <p></p>`,
 }
 
-export function filterSlashCommands(query) {
+export function slashCommandsFor(mode = 'basic') {
+  return SLASH_COMMANDS.filter((cmd) => !cmd.clinical || mode === 'clinical')
+}
+
+export function filterSlashCommands(query, mode = 'basic') {
+  const source = slashCommandsFor(mode)
   const q = query.trim().toLowerCase()
-  if (!q) return SLASH_COMMANDS
-  return SLASH_COMMANDS.filter(cmd =>
+  if (!q) return source
+  return source.filter((cmd) =>
     cmd.id.toLowerCase().includes(q)
     || cmd.label.toLowerCase().includes(q)
-    || cmd.group.toLowerCase().includes(q),
+    || cmd.group.toLowerCase().includes(q)
+    || cmd.hint.toLowerCase().includes(q),
   )
 }
 

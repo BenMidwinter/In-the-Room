@@ -37,7 +37,19 @@ const DOCUMENT_PRINT_STYLES = `
   .clinical-pdf .letterhead__name { display: block; margin: 0 0 0.3rem; padding: 0; font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 26px; line-height: 1.15; color: #1f2528; }
   .clinical-pdf .letterhead__line { display: block; margin: 0; padding: 0; font-family: 'Karla', system-ui, sans-serif; font-size: 12px; line-height: 1.35; color: #404b54; }
   .clinical-pdf .letterhead__rule { border: 0; border-top: 1px solid #1a1818; margin: 0.55rem 0 0; }
-  .clinical-pdf h1 { font-family: 'Fraunces', Georgia, serif; font-weight: 600; font-size: 22px; line-height: 1.3; margin: 1rem 0 0.35rem; color: #1a1818; }
+  .clinical-pdf h1, .clinical-pdf h2, .clinical-pdf h3 { font-family: 'Fraunces', Georgia, serif; font-weight: 600; color: #1a1818; letter-spacing: -0.02em; }
+  .clinical-pdf h1 { font-size: 22px; line-height: 1.3; margin: 1rem 0 0.35rem; }
+  .clinical-pdf h2 { font-size: 16px; line-height: 1.3; margin: 1rem 0 0.3rem; }
+  .clinical-pdf h3 { font-size: 13px; line-height: 1.35; margin: 0.85rem 0 0.25rem; }
+  .clinical-pdf blockquote { margin: 0.75rem 0; padding: 0 0 0 0.7rem; border-left: 2px solid #1a1818; font-family: 'Fraunces', Georgia, serif; font-style: italic; font-size: 13pt; line-height: 1.45; }
+  .clinical-pdf .expr-size--voice, .clinical-pdf .expr-size--loud { font-family: 'Fraunces', Georgia, serif; font-style: italic; }
+  .clinical-pdf .expr-size--voice::before, .clinical-pdf .expr-size--loud::before { content: "“"; }
+  .clinical-pdf .expr-size--voice::after, .clinical-pdf .expr-size--loud::after { content: "”"; }
+  .clinical-pdf .expr-size--aside, .clinical-pdf .expr-size--fluid { font-style: italic; color: #5c656c; }
+  .clinical-pdf .expr-size--land, .clinical-pdf .expr-size--bold-bright { font-family: 'Fraunces', Georgia, serif; font-weight: 600; }
+  .clinical-pdf .expr-hl--yellow-soft, .clinical-pdf .expr-hl--neon-lime { background: #f4e7b8; }
+  .clinical-pdf .expr-hl--sage-wash { background: #e4eadf; }
+  .clinical-pdf .expr-hl--clay-wash, .clinical-pdf .expr-hl--pink-soft, .clinical-pdf .expr-hl--neon-magenta { background: #f3e4dc; }
   .clinical-pdf .meta,
   .clinical-pdf .clinical-pdf__body { font-family: 'Karla', system-ui, sans-serif; color: #1a1818; }
   .clinical-pdf .meta { font-size: 0.9rem; margin: 0 0 1.1rem; }
