@@ -7,7 +7,7 @@ vi.mock('../supabase/client', () => ({
 import { resetStore, getProgressNote } from '../store'
 import { db } from '../data/collections'
 import { saveAppointment, setEpisodeAppointmentsLocal } from '../store/scheduling'
-import { dischargeLocalEpisode, getLocalEpisode, openLocalEpisode, reopenLocalEpisode } from '../store/episodes'
+import { deleteLocalEpisode, dischargeLocalEpisode, getLocalEpisode, openLocalEpisode, reopenLocalEpisode } from '../store/episodes'
 import { resolveEpisodeAttachment } from './episodes'
 import { isProgressNoteEditable } from '../progressNoteLifecycle'
 import { saveProgressNoteForUser } from '../supabase/progressNotesRepo'
@@ -261,6 +261,48 @@ describe('reopen a course', () => {
       end_time: '10:00',
     }, 'user-1')
     expect(next.episode_id).toBe(first.episode_id)
+  })
+
+  it('removes the course and keeps the appointments', async () => {
+    const booked = saveAppointment({
+      client_id: 'c1',
+      block_role: 'client_session',
+      session_date: '2026-05-01',
+      start_time: '09:00',
+      end_time: '10:00',
+    }, 'user-1')
+    const courseId = String(booked.episode_id)
+    db.appointments.push({
+      id: 'appt-follow',
+      client_id: 'c1',
+      parent_appointment_id: booked.id,
+      episode_id: courseId,
+      block_role: 'client_session',
+      session_date: '2026-05-01',
+      start_time: '10:00',
+      end_time: '10:15',
+    })
+    const note = await saveProgressNoteForUser({
+      client_id: 'c1',
+      appointment_id: booked.id,
+      title: 'Session',
+      content: '<p>Noted.</p>',
+      session_date: '2026-05-01',
+    }, 'user-1')
+    db.reports.push({
+      id: 'report-1',
+      client_id: 'c1',
+      episode_id: courseId,
+      title: 'Review',
+    })
+
+    const removed = deleteLocalEpisode(courseId)
+    expect(removed.id).toBe(courseId)
+    expect(getLocalEpisode(courseId)).toBeNull()
+    expect(db.appointments.find((row) => row.id === booked.id)?.episode_id).toBeNull()
+    expect(db.appointments.find((row) => row.id === 'appt-follow')?.episode_id).toBeNull()
+    expect(db.progressNotes.find((row) => row.id === note.id)).toBeUndefined()
+    expect(db.reports).toHaveLength(0)
   })
 
   it('refuses to reopen while another course is open', () => {

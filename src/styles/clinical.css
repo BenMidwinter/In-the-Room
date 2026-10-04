@@ -193,6 +193,22 @@ button, .btn {
   border-color: var(--col-primary-dark);
 }
 
+.danger, .btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #b42318;
+  color: #fff;
+  border: 1px solid #8f1d14;
+  padding: 0.5rem 1rem;
+  font-size: 0.9375rem;
+}
+
+.danger:hover, .btn-danger:hover {
+  background: #8f1d14;
+  border-color: #8f1d14;
+}
+
 .secondary, .btn-secondary {
   display: inline-flex;
   align-items: center;
@@ -722,13 +738,31 @@ select.paper-input {
 
 .episode-detail__header {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.episode-detail__title {
+  display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1.25rem;
+  min-width: 0;
 }
 
 .episode-detail__header h3 {
   margin: 0;
+}
+
+.episode-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-left: auto;
 }
 
 .episode-detail__grid {
@@ -757,8 +791,7 @@ select.paper-input {
   grid-column: 1 / -1;
 }
 
-.episode-detail__appointments,
-.episode-detail__reports {
+.episode-detail__section {
   margin-top: 1.25rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border-light);
@@ -873,18 +906,6 @@ select.paper-input {
   margin-bottom: 1rem;
 }
 
-.documents-page__later {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem 1rem;
-  margin: 0 0 1rem;
-  color: var(--txt-muted);
-  font-size: 0.9rem;
-}
-
-.documents-page__later a {
-  color: inherit;
-}
 
 @media (max-width: 800px) {
   .course-page__body {
@@ -916,7 +937,19 @@ select.paper-input {
   color: var(--col-accent);
 }
 
-.episode-detail__reports-header,
+.episode-detail__reports-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  margin: 0 0 0.65rem;
+}
+
+.episode-detail__reports-header h4 {
+  margin: 0;
+  line-height: 1.2;
+}
+
 .episode-note-list li {
   display: flex;
   flex-wrap: wrap;
@@ -925,7 +958,6 @@ select.paper-input {
   gap: 0.5rem 1rem;
 }
 
-.episode-detail__reports-header h4,
 .episode-note-list {
   margin: 0 0 0.75rem;
 }
@@ -1178,7 +1210,7 @@ select.paper-input {
 
 .client-layout {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   flex: 1;
   margin: 0;
   min-height: 0;
@@ -1186,89 +1218,46 @@ select.paper-input {
   background: var(--bg-page);
 }
 
-.client-sidebar {
-  width: 13.5rem;
-  flex-shrink: 0;
+.client-nav-bar {
   background: var(--bg-surface);
-  border-right: 1px solid var(--border-light);
-  border-bottom: none;
-  padding: 0.75rem 0 1.25rem;
+  border-bottom: 1px solid var(--border-light);
   position: sticky;
   top: var(--nav-height);
-  align-self: flex-start;
-  max-height: calc(100vh - var(--nav-height) - 2rem);
-  overflow-x: hidden;
-  overflow-y: auto;
+  z-index: 4;
+}
+
+.client-nav-bar__list {
   display: flex;
-  flex-direction: column;
   align-items: stretch;
-  gap: 0;
-}
-
-.client-sidebar__section {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  gap: 0.15rem;
   margin: 0;
-  padding: 0;
-  border: none;
-}
-
-.client-sidebar__section + .client-sidebar__section {
-  border-left: none;
-  border-top: 1px solid var(--border-light);
-  margin-top: 0.65rem;
-  padding-top: 0.65rem;
-}
-
-.client-sidebar__heading {
-  display: block;
-  margin: 0;
-  padding: 0.35rem 1rem 0.5rem;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--txt-muted);
-}
-
-.client-sidebar__list {
+  padding: 0 0.65rem;
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  margin: 0;
-  padding: 0;
+  overflow-x: auto;
 }
 
-.client-sidebar__link {
-  display: block;
-  padding: 0.55rem 1rem;
+.client-nav-bar__link {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 0.8rem;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--txt-muted);
   text-decoration: none;
-  border-left: 3px solid transparent;
-  border-bottom: none;
-  white-space: normal;
-  line-height: 1.35;
-  transition: color 0.12s, border-color 0.12s, background 0.12s;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  line-height: 1.2;
 }
 
-.client-sidebar__link:hover {
-  background: var(--bg-zone-muted);
-  text-decoration: none;
+.client-nav-bar__link:hover {
   color: var(--col-accent);
-  border-bottom-color: transparent;
+  text-decoration: none;
 }
 
-.client-sidebar__link--active {
-  background: var(--col-primary-light);
-  border-left-color: var(--col-primary);
-  border-bottom-color: transparent;
+.client-nav-bar__link--active {
   color: var(--col-primary-dark);
+  border-bottom-color: var(--col-primary);
   font-weight: 700;
-  box-shadow: none;
 }
 
 .client-layout__main {
@@ -1413,64 +1402,9 @@ select.paper-input {
     min-width: 8.5rem;
   }
 
-  .client-layout {
-    flex-direction: column;
-    margin: 0;
-  }
-
-  .client-sidebar {
-    width: 100%;
-    position: static;
-    max-height: none;
-    align-self: stretch;
-    border-right: none;
-    border-bottom: 1px solid var(--border-light);
-    padding: 0.35rem 0 0;
-    overflow-x: auto;
-    overflow-y: visible;
-    flex-direction: row;
-    flex-wrap: nowrap;
-    gap: 0;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .client-sidebar__section {
-    flex-direction: row;
-    flex-shrink: 0;
-    border-top: none;
-    margin-top: 0;
-    padding-top: 0;
-    border-left: none;
-  }
-
-  .client-sidebar__section + .client-sidebar__section {
-    border-top: none;
-    margin-top: 0;
-    padding-top: 0;
-  }
-
-  .client-sidebar__heading {
-    display: none;
-  }
-
-  .client-sidebar__list {
-    flex-direction: row;
-    flex-wrap: nowrap;
-  }
-
-  .client-sidebar__link {
-    border-left: none;
-    border-bottom: 3px solid transparent;
-    white-space: nowrap;
-    padding: 0.65rem 0.85rem;
+  .client-nav-bar__link {
+    padding: 0.5rem 0.7rem;
     font-size: 0.8125rem;
-  }
-
-  .client-sidebar__link--active {
-    background: transparent;
-    border-left-color: transparent;
-    border-bottom-color: var(--col-primary);
-    color: var(--col-primary-dark);
   }
 
   .client-layout__main {

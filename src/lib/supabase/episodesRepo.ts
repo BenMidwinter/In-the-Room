@@ -2,6 +2,7 @@ import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 import {
   activeLocalEpisode,
+  deleteLocalEpisode,
   dischargeLocalEpisode,
   listLocalEpisodes,
   openLocalEpisode,
@@ -173,6 +174,40 @@ export async function reopenEpisode(episodeId: string): Promise<AppEpisode> {
   const mapped = toAppEpisode(data as EpisodeRow)
   rememberLocalEpisode(mapped)
   return mapped
+}
+
+/** Remove a course opened by mistake. Appointments stay; notes and reports on it do not. */
+export async function deleteEpisode(episodeId: string): Promise<AppEpisode> {
+  if (!isSupabaseConfigured()) return deleteLocalEpisode(episodeId)
+  const supabase = getSupabase()
+  if (!supabase) return deleteLocalEpisode(episodeId)
+
+  const { data: current, error: readError } = await supabase
+    .from('episodes')
+    .select(EPISODE_COLUMNS)
+    .eq('id', episodeId)
+    .maybeSingle()
+  if (readError) throw readError
+  if (!current) throw new Error('Episode not found')
+
+  const { data: reportRows, error: reportReadError } = await supabase
+    .from('reports')
+    .select('id')
+    .eq('episode_id', episodeId)
+  if (reportReadError) throw reportReadError
+  const reportIds = (reportRows || []).map((row) => row.id)
+
+  const { error } = await supabase.from('episodes').delete().eq('id', episodeId)
+  if (error) throw error
+
+  if (reportIds.length > 0) {
+    const { error: reportDeleteError } = await supabase.from('reports').delete().in('id', reportIds)
+    if (reportDeleteError) throw reportDeleteError
+  }
+
+  const mapped = toAppEpisode(current as EpisodeRow)
+  rememberLocalEpisode(mapped)
+  return deleteLocalEpisode(episodeId)
 }
 
 /** Discharge closes the course. Documents already on it stay writable. */

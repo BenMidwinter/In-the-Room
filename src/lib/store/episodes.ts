@@ -104,6 +104,28 @@ export function reopenLocalEpisode(episodeId: string): AppEpisode {
   return next
 }
 
+/**
+ * Remove a course that was opened by mistake.
+ * Appointments stay on the client and come off the course.
+ * Process Notes and reports that belonged to the course are removed with it.
+ */
+export function deleteLocalEpisode(episodeId: string): AppEpisode {
+  const episode = getLocalEpisode(episodeId)
+  if (!episode) throw new Error('Episode not found')
+  for (const row of db.appointments) {
+    if (row.episode_id === episodeId) row.episode_id = null
+  }
+  for (let i = db.progressNotes.length - 1; i >= 0; i -= 1) {
+    if (db.progressNotes[i].episode_id === episodeId) db.progressNotes.splice(i, 1)
+  }
+  for (let i = db.reports.length - 1; i >= 0; i -= 1) {
+    if (db.reports[i].episode_id === episodeId) db.reports.splice(i, 1)
+  }
+  const idx = db.episodes.findIndex((row) => row.id === episodeId)
+  if (idx !== -1) db.episodes.splice(idx, 1)
+  return episode
+}
+
 /** Close the course. Notes and reports on this episode stay editable. */
 export function dischargeLocalEpisode(episodeId: string, endDate?: string | null): AppEpisode {
   const idx = db.episodes.findIndex((row) => row.id === episodeId)

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { dischargeEpisode, listEpisodesForClient, openEpisode, reopenEpisode } from './supabase/episodesRepo'
+import { deleteEpisode, dischargeEpisode, listEpisodesForClient, openEpisode, reopenEpisode } from './supabase/episodesRepo'
 import { setEpisodeAppointments } from './supabase/appointmentsRepo'
 import type { AppEpisode } from './store/episodes'
 
@@ -49,6 +49,20 @@ export function useReopenEpisodeMutation() {
     mutationFn: (input: { episodeId: string; clientId: string }) => reopenEpisode(input.episodeId),
     onSuccess: (_episode, input) => {
       queryClient.invalidateQueries({ queryKey: episodeQueryKeys.client(input.clientId) })
+    },
+  })
+}
+
+export function useDeleteEpisodeMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { episodeId: string; clientId: string }) => deleteEpisode(input.episodeId),
+    onSuccess: (_episode, input) => {
+      queryClient.invalidateQueries({ queryKey: episodeQueryKeys.client(input.clientId) })
+      queryClient.invalidateQueries({ queryKey: ['appointments', 'client', input.clientId] })
+      queryClient.invalidateQueries({ queryKey: ['appointments'] })
+      queryClient.invalidateQueries({ queryKey: ['progressNotes'] })
+      queryClient.invalidateQueries({ queryKey: ['reports'] })
     },
   })
 }

@@ -12,6 +12,7 @@ import {
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import { useToast, useConfirm } from '../../components/ui'
+import { useClientChrome } from './ClientChrome'
 
 function formatDocDate(iso) {
   if (!iso) return '—'
@@ -39,6 +40,13 @@ export default function WorkingDocumentsPanel() {
   const [editorVersion, setEditorVersion] = useState(0)
   const toast = useToast()
   const confirm = useConfirm()
+  const setEditorOpen = useClientChrome()?.setEditorOpen
+
+  useEffect(() => {
+    if (!setEditorOpen) return undefined
+    setEditorOpen(selectedId != null)
+    return () => setEditorOpen(false)
+  }, [selectedId, setEditorOpen])
 
   const clinicianProfile = session?.user?.id ? getProfile(session.user.id) : null
   const documentTemplates = useMemo(
@@ -181,7 +189,7 @@ export default function WorkingDocumentsPanel() {
       onNew={editing ? undefined : handleNew}
       headerActions={editing ? (
         <>
-          <button type="button" className="secondary" onClick={handleCancel}>Cancel</button>
+          <button type="button" className="secondary" onClick={handleCancel}>Back</button>
           <button type="button" className="primary" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save document'}
           </button>

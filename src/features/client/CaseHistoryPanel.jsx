@@ -5,6 +5,7 @@ import { useClientSession } from '../../lib/useClientSession'
 import {
   useClientEpisodesQuery,
   useDischargeEpisodeMutation,
+  useDeleteEpisodeMutation,
   useOpenEpisodeMutation,
   useReopenEpisodeMutation,
   useSetEpisodeAppointmentsMutation,
@@ -76,7 +77,7 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
   }
 
   return (
-    <div className="episode-detail__appointments">
+    <div className="episode-detail__section">
       <div className="episode-detail__reports-header">
         <h4>Appointments</h4>
         {editing ? (
@@ -139,6 +140,25 @@ function EpisodeAppointments({ episode, clientId, episodes }) {
   )
 }
 
+function EpisodeSection({ title, empty, newLabel }) {
+  const toast = useToast()
+  return (
+    <div className="episode-detail__section">
+      <div className="episode-detail__reports-header">
+        <h4>{title}</h4>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => toast.info(`${newLabel} creation will connect to the backend.`)}
+        >
+          Add
+        </button>
+      </div>
+      <p className="text-small text-muted">{empty}</p>
+    </div>
+  )
+}
+
 function EpisodeReports({ episode, clientId, userId, organizationId }) {
   const toast = useToast()
   const { data: reports = [], isPending } = useEpisodeReportsQuery(episode.id)
@@ -192,7 +212,7 @@ function EpisodeReports({ episode, clientId, userId, organizationId }) {
   }
 
   return (
-    <div className="episode-detail__reports">
+    <div className="episode-detail__section">
       <div className="episode-detail__reports-header">
         <h4>Reports</h4>
         <button
@@ -266,6 +286,7 @@ export default function CaseHistoryPanel() {
   const openEpisode = useOpenEpisodeMutation()
   const dischargeEpisode = useDischargeEpisodeMutation()
   const reopenEpisode = useReopenEpisodeMutation()
+  const deleteEpisode = useDeleteEpisodeMutation()
   const episodes = episodesQuery.data || []
   const [selectedId, setSelectedId] = useState(null)
   const active = episodes.find((episode) => episode.status === 'active') || null
@@ -330,16 +351,25 @@ export default function CaseHistoryPanel() {
     }
   }
 
-  const headerActions = episodesQuery.isPending || episodesQuery.isError ? null : active ? (
-    <button
-      type="button"
-      className="secondary"
-      onClick={discharge}
-      disabled={dischargeEpisode.isPending}
-    >
-      Discharge
-    </button>
-  ) : (
+  const remove = async (episode) => {
+    if (!episode || !clientId) return
+    const ok = await confirm({
+      title: `Delete episode ${episode.episode_number}?`,
+      message: 'This removes the course. Appointments stay on the client and come off this course. Process Notes and reports on this course are deleted.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      const removed = await deleteEpisode.mutateAsync({ episodeId: episode.id, clientId })
+      setSelectedId(null)
+      toast.saved(`Episode ${removed.episode_number} deleted`)
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete this episode')
+    }
+  }
+
+  const headerActions = episodesQuery.isPending || episodesQuery.isError || active ? null : (
     <button
       type="button"
       className="primary"
@@ -349,6 +379,8 @@ export default function CaseHistoryPanel() {
       Open new episode
     </button>
   )
+
+  const episodeBusy = dischargeEpisode.isPending || reopenEpisode.isPending || deleteEpisode.isPending
 
   return (
     <div className="course-page">
@@ -390,20 +422,27 @@ export default function CaseHistoryPanel() {
           {selected && (
             <div className="episode-detail">
               <div className="episode-detail__header">
-                <h3>Episode {selected.episode_number}</h3>
-                <span className={`badge ${selected.status === 'active' ? 'badge-green' : 'badge-grey'}`}>
-                  {STATUS_LABELS[selected.status] || selected.status}
-                </span>
-                {selected.status === 'discharged' && (
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => reopen(selected)}
-                    disabled={reopenEpisode.isPending || dischargeEpisode.isPending}
-                  >
-                    Reopen
+                <div className="episode-detail__title">
+                  <h3>Episode {selected.episode_number}</h3>
+                  <span className={`badge ${selected.status === 'active' ? 'badge-green' : 'badge-grey'}`}>
+                    {STATUS_LABELS[selected.status] || selected.status}
+                  </span>
+                </div>
+                <div className="episode-detail__actions">
+                  {selected.status === 'active' && (
+                    <button type="button" className="secondary" onClick={discharge} disabled={episodeBusy}>
+                      Discharge
+                    </button>
+                  )}
+                  {selected.status === 'discharged' && (
+                    <button type="button" className="secondary" onClick={() => reopen(selected)} disabled={episodeBusy}>
+                      Reopen
+                    </button>
+                  )}
+                  <button type="button" className="danger" onClick={() => remove(selected)} disabled={episodeBusy}>
+                    Delete
                   </button>
-                )}
+                </div>
               </div>
               {selected.status === 'discharged' && (
                 <p className="episode-detail__banner">
@@ -425,6 +464,16 @@ export default function CaseHistoryPanel() {
                 episode={selected}
                 clientId={clientId}
                 episodes={episodes}
+              />
+              <EpisodeSection
+                title="Forms"
+                newLabel="Form"
+                empty="No forms on this course yet."
+              />
+              <EpisodeSection
+                title="Outcome measures"
+                newLabel="Outcome measure"
+                empty="No outcome measures on this course yet."
               />
               {userId && (
                 <EpisodeReports

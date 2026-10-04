@@ -105,32 +105,8 @@ export default function App() {
               ]}
             />
           } />
-          <Route path="forms" element={
-            <ClientSectionPlaceholder
-              title="Forms"
-              description="Referrals, consent forms, and other structured records for this client."
-              newLabel="form"
-              columns={[
-                { key: 'name', label: 'Form' },
-                { key: 'status', label: 'Status' },
-                { key: 'date', label: 'Completed' },
-                { key: 'author', label: 'Recorded by' },
-              ]}
-            />
-          } />
-          <Route path="outcomes" element={
-            <ClientSectionPlaceholder
-              title="Outcome measures"
-              description="Standardised outcome tracking and measurement tools will be recorded here."
-              newLabel="outcome measure"
-              columns={[
-                { key: 'name', label: 'Measure' },
-                { key: 'score', label: 'Score' },
-                { key: 'date', label: 'Date' },
-                { key: 'author', label: 'Recorded by' },
-              ]}
-            />
-          } />
+          <Route path="forms" element={<Navigate to="../case-history" replace />} />
+          <Route path="outcomes" element={<Navigate to="../case-history" replace />} />
         </Route>
 
         <Route path="settings" element={<SettingsLayout />}>

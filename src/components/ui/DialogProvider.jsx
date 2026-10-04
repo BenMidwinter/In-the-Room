@@ -131,7 +131,7 @@ function DialogSurface({ dialog, onCancel, onConfirm }) {
           <button
             ref={confirmRef}
             type="submit"
-            className={tone === 'danger' ? 'primary bg-secondary hover:bg-secondary-dark' : 'primary'}
+            className={tone === 'danger' ? 'danger' : 'primary'}
           >
             {confirmLabel}
           </button>
