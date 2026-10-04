@@ -231,10 +231,16 @@
   gap: 0.65rem;
 }
 
+.settings-service-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
 .settings-service-list__swatch {
   width: 0.85rem;
   height: 0.85rem;
-  margin-top: 0.25rem;
+  margin-top: 0;
   border-radius: 999px;
   flex-shrink: 0;
   border: 1px solid color-mix(in srgb, currentColor 12%, transparent);

@@ -88,15 +88,16 @@ function UpcomingTimeline({ appointments, clients, onSelect }) {
           {appointments.map((appt, i) => {
             const isLast = i === appointments.length - 1
             const service = appointmentDisplayName(appt)
+            const later = appointmentSchedule(appt).session_date > todayYmd()
             return (
-              <li key={appt.id} className="timeline__item">
+              <li key={appt.id} className={`timeline__item${later ? ' timeline__item--future' : ''}`}>
                 <div className="timeline__rail" aria-hidden>
                   <div className="timeline__marker" />
                   {!isLast && <div className="timeline__line timeline__line--horizontal" />}
                 </div>
                 <button
                   type="button"
-                  className="timeline__body timeline__body--link home-upcoming-timeline__card"
+                  className={`timeline__body timeline__body--link home-upcoming-timeline__card${later ? ' home-upcoming-timeline__card--later' : ''}`}
                   onClick={() => onSelect(appt)}
                 >
                   <div className="timeline__meta">

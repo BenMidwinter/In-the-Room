@@ -12,7 +12,6 @@ export { default as PatientProfile } from '../features/client/PatientProfile'
 export { default as Profile } from '../features/profile/ProfilePage'
 export { default as Resources } from './Resources'
 export { default as About } from './About'
-export { default as BodyMap } from '../features/client/BodyMap'
 export { default as DiagnosisPicker } from './DiagnosisPicker'
 export { default as RichTextEditor } from './RichTextEditor'
 export {

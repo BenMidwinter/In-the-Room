@@ -57,7 +57,7 @@
 }
 
 .record-module__body {
-  padding-top: 0;
+  padding-top: 1.25rem;
 }
 
 .record-module__editor {
@@ -73,7 +73,7 @@
   overflow: auto;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--elevation-paper-1);
 }
 
@@ -257,6 +257,10 @@
   text-decoration: underline;
 }
 
+.record-table__inline--danger {
+  color: #8f1d14;
+}
+
 .note-status-tag {
   font-size: 0.68rem;
   font-weight: 700;
@@ -289,7 +293,7 @@
   padding: 0.7rem;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: var(--elevation-paper-3);
 }
 

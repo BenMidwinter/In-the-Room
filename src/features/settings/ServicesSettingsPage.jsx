@@ -5,7 +5,25 @@ import { isSupabaseConfigured } from '../../lib/supabase/client'
 import { writeAuditEvent } from '../../lib/supabase/audit'
 import { useConfirm, useToast } from '../../components/ui'
 import FormOverlay from '../../components/FormOverlay'
+import RecordTable from '../../components/RecordTable'
 import { SERVICE_COLOR_PRESETS, normalizeServiceColor } from '../../lib/serviceColors'
+
+const TYPE_LABELS = {
+  appointment: 'Appointment',
+  support: 'Support',
+  admin: 'Admin',
+  busy: 'Busy',
+}
+
+const SERVICE_COLUMNS = [
+  { key: 'name', label: 'Service', filter: 'text' },
+  { key: 'type', label: 'Type', filter: 'choice' },
+  { key: 'duration', label: 'Duration', sort: 'number' },
+  { key: 'follow', label: 'Follow-on', filter: 'text' },
+  { key: 'meet', label: 'Meet', filter: 'choice' },
+  { key: 'status', label: 'Status', filter: 'choice' },
+  { key: 'actions', label: '', sort: false },
+]
 
 const EMPTY_FORM = {
   id: '',
@@ -166,6 +184,82 @@ export default function ServicesSettingsPage() {
     }
   }
 
+  const serviceRows = services.map((service) => {
+    const typeLabel = TYPE_LABELS[service.service_type] || service.service_type || 'Service'
+    const followOn = services.find((item) => item.id === service.follow_on_service_id)
+    const followLabel = followOn
+      ? `${followOn.name}${service.follow_on_duration_minutes ? ` · ${service.follow_on_duration_minutes}m` : ''}`
+      : ''
+    const active = service.is_active !== false
+    const meetLabel = service.service_type === 'appointment'
+      ? (service.create_meet_link ? 'On' : 'Off')
+      : ''
+    return {
+      id: service.id,
+      service,
+      muted: !active,
+      filterValues: {
+        name: service.name,
+        type: typeLabel,
+        follow: followLabel,
+        meet: meetLabel,
+        status: active ? 'Active' : 'Inactive',
+      },
+      sortValues: {
+        name: service.name,
+        type: typeLabel,
+        duration: Number(service.default_duration_minutes) || 0,
+        follow: followLabel,
+        status: active ? 'Active' : 'Inactive',
+      },
+      cells: {
+        name: (
+          <span className="settings-service-name">
+            <span
+              className="settings-service-list__swatch"
+              style={{ background: service.color || '#557a61' }}
+              aria-hidden
+            />
+            <span className="record-table__primary">{service.name}</span>
+          </span>
+        ),
+        type: typeLabel,
+        duration: `${service.default_duration_minutes}m`,
+        follow: followLabel || <span className="record-table__cell-muted">—</span>,
+        meet: service.service_type === 'appointment' ? (
+          <button
+            type="button"
+            className="record-table__inline"
+            onClick={(event) => {
+              event.stopPropagation()
+              toggleMeet(service)
+            }}
+          >
+            {service.create_meet_link ? 'On' : 'Off'}
+          </button>
+        ) : (
+          <span className="record-table__cell-muted">—</span>
+        ),
+        status: active
+          ? <span className="badge badge-green">Active</span>
+          : <span className="badge badge-grey">Inactive</span>,
+        actions: (
+          <button
+            type="button"
+            className="record-table__inline record-table__inline--danger"
+            disabled={busy}
+            onClick={(event) => {
+              event.stopPropagation()
+              removeService(service)
+            }}
+          >
+            Delete
+          </button>
+        ),
+      },
+    }
+  })
+
   return (
     <div className="section-card-stack">
       <SettingsSectionCard blockId="settings_services" title="Services">
@@ -191,47 +285,13 @@ export default function ServicesSettingsPage() {
           <p className="auth-page__alert" role="alert">{error}</p>
         )}
 
-        <ul className="settings-service-list">
-          {services.map((service) => (
-            <li key={service.id} className="settings-service-list__item">
-              <div className="settings-service-list__label">
-                <span
-                  className="settings-service-list__swatch"
-                  style={{ background: service.color || '#557a61' }}
-                  aria-hidden
-                />
-                <div>
-                  <strong>{service.name}</strong>
-                  <span className="text-small text-muted">
-                    {' '}· {service.service_type} · {service.default_duration_minutes}m
-                    {service.follow_on_service_id ? ` + follow-on ${service.follow_on_duration_minutes || '?'}m` : ''}
-                  </span>
-                </div>
-              </div>
-              <div className="settings-service-list__actions">
-                {service.service_type === 'appointment' && (
-                  <label className="settings-service-list__meet">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(service.create_meet_link)}
-                      onChange={() => toggleMeet(service)}
-                    />
-                    Google Meet when booked
-                  </label>
-                )}
-                <button type="button" className="btn btn-secondary" onClick={() => startEdit(service)} disabled={busy}>
-                  Edit
-                </button>
-                <button type="button" className="btn btn-secondary" onClick={() => removeService(service)} disabled={busy}>
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-          {services.length === 0 && (
-            <li className="text-muted">No services yet — use + New Service to add one.</li>
-          )}
-        </ul>
+        <RecordTable
+          columns={SERVICE_COLUMNS}
+          rows={serviceRows}
+          countNoun="services"
+          emptyMessage="No services yet. Use New Service to add one."
+          onRowClick={(row) => startEdit(row.service)}
+        />
       </SettingsSectionCard>
 
       {overlayOpen && form && (

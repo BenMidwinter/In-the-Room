@@ -37,7 +37,7 @@ export default function RecordListLayout({
         </div>
       )}
 
-      <div className="pt-0">{children}</div>
+      <div className="pt-5">{children}</div>
 
       {editor && (
         <div className="mt-5 border-t border-line-light pt-5">{editor}</div>

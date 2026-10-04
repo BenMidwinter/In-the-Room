@@ -1,6 +1,5 @@
 import {
   CLIENTS as SEED_CLIENTS,
-  BODY_MAPS as SEED_BODY_MAPS,
   CLINICIAN_PROFILES as SEED_PROFILES,
   CLINICIAN_WORKPLACES as SEED_MEMBERSHIPS,
   WORKPLACES as SEED_WORKPLACES,
@@ -30,7 +29,6 @@ import type { ArrayCollectionName, Db, StoreRecord } from '../types/collections'
 function seed(): Db {
   return {
     clients: structuredClone(SEED_CLIENTS) as StoreRecord[],
-    bodyMaps: structuredClone(SEED_BODY_MAPS) as unknown as Record<string, StoreRecord>,
     profiles: structuredClone(SEED_PROFILES) as StoreRecord[],
     memberships: structuredClone(SEED_MEMBERSHIPS) as unknown as StoreRecord[],
     workplaces: structuredClone(SEED_WORKPLACES) as StoreRecord[],
@@ -64,8 +62,7 @@ export function uid(prefix = 'id') {
 
 /* ── Generic array primitives ─────────────────────────────────────────────
    Small, intention-revealing accessors so domain modules don't hand-roll the
-   same find/index/splice dance. Object-keyed collections (e.g. bodyMaps) are
-   accessed directly via `db`. */
+   same find/index/splice dance. */
 
 export function list(name: ArrayCollectionName): StoreRecord[] {
   return [...db[name]]

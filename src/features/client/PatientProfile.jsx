@@ -2,13 +2,10 @@ import { useState, useEffect } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useAppClients } from '../../lib/queries'
-import BodyMap from './BodyMap'
 import ClientDetailsBar from './ClientDetailsBar'
 import ClientNav from './ClientNav'
 import { ClientChromeProvider, useClientChrome } from './ClientChrome'
 import ClientClinicalAlerts from './ClientClinicalAlerts'
-import ErrorBoundary from '../../components/ErrorBoundary'
-import { usePermissions } from '../../lib/usePermissions'
 
 function PatientProfileFrame({ client: initialClient }) {
   const { editorOpen } = useClientChrome()
@@ -16,8 +13,6 @@ function PatientProfileFrame({ client: initialClient }) {
   const { session } = useAppSession()
   const { clients } = useAppClients()
   const [client, setClient] = useState(initialClient)
-  const [showBodyMap, setShowBodyMap] = useState(false)
-  const perms = usePermissions(client)
 
   useEffect(() => {
     setClient(initialClient)
@@ -55,9 +50,6 @@ function PatientProfileFrame({ client: initialClient }) {
         />
 
         <div className="client-shell__actions">
-          {perms.canUseBodyMap && (
-            <button type="button" className="secondary" onClick={() => setShowBodyMap(true)}>Body map</button>
-          )}
           <button type="button" className="secondary" onClick={() => navigate('/home')}>Home</button>
         </div>
       </header>
@@ -72,11 +64,6 @@ function PatientProfileFrame({ client: initialClient }) {
         </div>
       </div>
 
-      {showBodyMap && (
-        <ErrorBoundary label="body-map">
-          <BodyMap client={client} onClose={() => setShowBodyMap(false)} />
-        </ErrorBoundary>
-      )}
     </div>
   )
 }

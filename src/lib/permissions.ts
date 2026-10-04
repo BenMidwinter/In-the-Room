@@ -52,7 +52,6 @@ export function buildPermissions(
     canAddWorkplaceClient: false,
     canAddPrivateClient: true,
     canEditClientDetails: owns,
-    canUseBodyMap: owns,
     canAccessClient: owns,
     canAssignAppointmentClinician: false,
     canViewFullCaseload: false,
