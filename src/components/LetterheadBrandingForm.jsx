@@ -1,5 +1,10 @@
 import { formatWorkplaceAddress } from '../lib/workplaceBranding'
 
+function previewAddress(addressLines, previewBranding) {
+  if (addressLines) return addressLines.filter(Boolean).join('\n')
+  return formatWorkplaceAddress(previewBranding)
+}
+
 export default function LetterheadBrandingForm({
   displayName,
   logoUrl,
@@ -15,6 +20,9 @@ export default function LetterheadBrandingForm({
   onPostcodeChange,
   onCountryChange,
   previewBranding,
+  addressLines,
+  clinicianName = '',
+  professionalTitle = '',
   error,
   savedMessage,
   saving,
@@ -22,24 +30,34 @@ export default function LetterheadBrandingForm({
   onSubmit,
   practiceNameField,
 }) {
+  const address = previewAddress(addressLines, previewBranding)
+  const practiceName = displayName || previewBranding?.name || ''
+
   return (
     <div className="letterhead-branding">
       <div className="letterhead-branding__preview" aria-label="Letterhead preview">
-        {previewBranding.logo_url ? (
-          <img
-            className="letterhead-branding__logo"
-            src={previewBranding.logo_url}
-            alt={`${displayName} logo`}
-          />
-        ) : (
-          <div className="letterhead-branding__logo letterhead-branding__logo--empty" aria-hidden>
-            No logo
+        <div className="letterhead-branding__brand">
+          {logoUrl || previewBranding?.logo_url ? (
+            <img
+              className="letterhead-branding__logo"
+              src={logoUrl || previewBranding.logo_url}
+              alt={practiceName ? `${practiceName} logo` : 'Practice logo'}
+            />
+          ) : (
+            <div className="letterhead-branding__logo letterhead-branding__logo--empty" aria-hidden>
+              No logo
+            </div>
+          )}
+          <div className="letterhead-branding__practice">
+            {practiceName ? <strong>{practiceName}</strong> : null}
+            <span className="letterhead-branding__address">
+              {address || 'Add your practice address below'}
+            </span>
           </div>
-        )}
-        <div className="letterhead-branding__preview-text">
-          <strong>{previewBranding.name}</strong>
-          <span>{formatWorkplaceAddress(previewBranding) || 'Add your practice address below'}</span>
         </div>
+        {clinicianName ? <p className="letterhead-branding__clinician">{clinicianName}</p> : null}
+        {professionalTitle ? <p className="letterhead-branding__role">{professionalTitle}</p> : null}
+        <hr className="letterhead-branding__rule" />
       </div>
 
       <form className="letterhead-branding__form" onSubmit={onSubmit}>

@@ -3,10 +3,11 @@ import RichTextEditor from '../../components/RichTextEditor'
 import { useClientSession } from '../../lib/useClientSession'
 import { getLetters, saveLetter, getProfile } from '../../lib/store'
 import { downloadLetterPdf } from '../../lib/clinicalExport'
-import { getClinicalExportBranding } from '../../lib/workplaceBranding'
+import { loadClinicianPrintIdentity, resolveDownloadLetterhead } from '../../lib/letterheadPrint'
+import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
-import { useToast } from '../../components/ui'
+import { useChoose, useToast } from '../../components/ui'
 import { useClientChrome } from './ClientChrome'
 
 function formatDocDate(iso) {
@@ -36,6 +37,7 @@ export default function LettersPanel() {
   const [letterDate, setLetterDate] = useState(todayISO())
   const [saving, setSaving] = useState(false)
   const toast = useToast()
+  const chooseLetterhead = useChoose()
   const setEditorOpen = useClientChrome()?.setEditorOpen
 
   useEffect(() => {
@@ -97,27 +99,31 @@ export default function LettersPanel() {
     }
   }
 
-  const handleDownload = () => {
-    const branding = getClinicalExportBranding(client?.workplace_id, session?.user?.id)
-    const author = session?.user?.id ? getProfile(session.user.id) : null
-    const opened = downloadLetterPdf(
-      {
-        title: title.trim() || 'Untitled letter',
-        content,
-        recipient,
-        letter_date: letterDate,
-      },
-      {
-        clientName: client?.real_name,
-        authorName: author?.full_name,
-        branding,
-      },
-    )
-    if (!opened) {
-      toast.error('Could not open the print dialog. Please try again.')
-      return
+  const handleDownload = async () => {
+    try {
+      const identity = await loadClinicianPrintIdentity(session?.user?.id)
+      const letterhead = await resolveDownloadLetterhead(await listLetterheads(), chooseLetterhead, identity)
+      if (!letterhead) return
+      const opened = downloadLetterPdf(
+        {
+          title: title.trim() || 'Untitled letter',
+          content,
+          recipient,
+          letter_date: letterDate,
+        },
+        {
+          clientName: client?.real_name,
+          letterhead,
+        },
+      )
+      if (!opened) {
+        toast.error('Could not open the print dialog. Please try again.')
+        return
+      }
+      toast.info('Choose “Save as PDF” in the print dialog.')
+    } catch (err) {
+      toast.error(err?.message || 'Could not prepare the letterhead.')
     }
-    toast.info('Choose “Save as PDF” in the print dialog.')
   }
 
   const rows = letters.map(letter => ({

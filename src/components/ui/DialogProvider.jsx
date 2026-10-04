@@ -18,6 +18,11 @@ export function usePrompt() {
   return useDialog().prompt
 }
 
+/** `await choose({ options, defaultValue })` → selected value, or null when cancelled. */
+export function useChoose() {
+  return useDialog().choose
+}
+
 function normalize(opts) {
   return typeof opts === 'string' ? { message: opts } : { ...opts }
 }
@@ -51,7 +56,23 @@ export function DialogProvider({ children }) {
     [],
   )
 
-  const api = useMemo(() => ({ confirm, prompt }), [confirm, prompt])
+  const choose = useCallback(
+    (opts) =>
+      new Promise((resolve) => {
+        resolver.current = resolve
+        setDialog({
+          type: 'choose',
+          confirmLabel: 'Continue',
+          cancelLabel: 'Cancel',
+          options: [],
+          defaultValue: '',
+          ...normalize(opts),
+        })
+      }),
+    [],
+  )
+
+  const api = useMemo(() => ({ confirm, prompt, choose }), [confirm, prompt, choose])
 
   return (
     <DialogContext.Provider value={api}>
@@ -59,8 +80,8 @@ export function DialogProvider({ children }) {
       {dialog && (
         <DialogSurface
           dialog={dialog}
-          onCancel={() => settle(dialog.type === 'prompt' ? null : false)}
-          onConfirm={(value) => settle(dialog.type === 'prompt' ? value : true)}
+          onCancel={() => settle(dialog.type === 'confirm' ? false : null)}
+          onConfirm={(value) => settle(dialog.type === 'confirm' ? true : value)}
         />
       )}
     </DialogContext.Provider>
@@ -68,13 +89,13 @@ export function DialogProvider({ children }) {
 }
 
 function DialogSurface({ dialog, onCancel, onConfirm }) {
-  const { type, title, message, label, placeholder, defaultValue, confirmLabel, cancelLabel, tone } = dialog
+  const { type, title, message, label, placeholder, defaultValue, confirmLabel, cancelLabel, tone, options = [] } = dialog
   const [value, setValue] = useState(defaultValue ?? '')
   const inputRef = useRef(null)
   const confirmRef = useRef(null)
 
   useEffect(() => {
-    const el = type === 'prompt' ? inputRef.current : confirmRef.current
+    const el = type === 'confirm' ? confirmRef.current : inputRef.current
     el?.focus()
     if (type === 'prompt') inputRef.current?.select()
   }, [type])
@@ -109,6 +130,22 @@ function DialogSurface({ dialog, onCancel, onConfirm }) {
       >
         {title && <h2 className="m-0 mb-2 text-[1.05rem] font-bold text-accent">{title}</h2>}
         {message && <p className="m-0 text-[0.925rem] text-ink">{message}</p>}
+
+        {type === 'choose' && (
+          <label className="mt-3 block">
+            <span className="mb-1 block text-[0.8rem] font-semibold text-subtle">{label || 'Letterhead'}</span>
+            <select
+              ref={inputRef}
+              className="paper-input w-full"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+            >
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {type === 'prompt' && (
           <label className="mt-3 block">
