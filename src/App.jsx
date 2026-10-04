@@ -81,7 +81,6 @@ export default function App() {
           <Route path="files" element={
             <ClientSectionPlaceholder
               title="Files"
-              description="Uploaded files and attachments for this client."
               newLabel="file"
               columns={[
                 { key: 'name', label: 'File name' },
@@ -95,7 +94,6 @@ export default function App() {
           <Route path="contacts" element={
             <ClientSectionPlaceholder
               title="Contacts"
-              description="Parents, carers, referrers, and other key contacts linked to this client."
               newLabel="contact"
               columns={[
                 { key: 'name', label: 'Name' },

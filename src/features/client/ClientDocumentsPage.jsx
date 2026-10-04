@@ -15,7 +15,6 @@ export default function ClientDocumentsPage() {
           <header className="course-page__header">
             <div>
               <h2>Documents</h2>
-              <p>Letters and working documents for this client. Reports, forms, and outcome measures stay on the course.</p>
             </div>
           </header>
           <div className="documents-page__tabs" role="tablist" aria-label="Document types">

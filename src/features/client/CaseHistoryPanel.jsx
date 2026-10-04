@@ -226,7 +226,7 @@ function EpisodeReports({ episode, clientId, userId, organizationId }) {
           })}
           disabled={Boolean(draft)}
         >
-          Add report
+          Add
         </button>
       </div>
       {isPending && <p className="text-small text-muted">Loading reports…</p>}
@@ -387,7 +387,6 @@ export default function CaseHistoryPanel() {
       <header className="course-page__header">
         <div>
           <h2>Course</h2>
-          <p>New appointments join the open course. A Process Note stays with its appointment.</p>
         </div>
         <div className="course-page__actions">{headerActions}</div>
       </header>
@@ -444,11 +443,6 @@ export default function CaseHistoryPanel() {
                   </button>
                 </div>
               </div>
-              {selected.status === 'discharged' && (
-                <p className="episode-detail__banner">
-                  This course is closed. Reopen it if the client returns to the same course. A missed Process Note is added from the appointment.
-                </p>
-              )}
               <dl className="episode-detail__grid">
                 <div>
                   <dt>Started</dt>

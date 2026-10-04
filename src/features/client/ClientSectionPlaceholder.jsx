@@ -23,7 +23,7 @@ export default function ClientSectionPlaceholder({
   return (
     <RecordListLayout
       title={title}
-      subtitle={description}
+      subtitle={description || undefined}
       newLabel={newLabel}
       onNew={() => toast.info(`${newLabel || title} creation will connect to the backend.`)}
     >

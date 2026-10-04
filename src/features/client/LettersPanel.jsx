@@ -181,9 +181,6 @@ export default function LettersPanel() {
   return (
     <RecordListLayout
       title={editing ? editorTitle : 'Letters'}
-      subtitle={editing
-        ? 'Compose and save correspondence for this client.'
-        : 'Correspondence and formal letters for this client.'}
       newLabel={editing ? undefined : 'letter'}
       onNew={editing ? undefined : handleNew}
       headerActions={editing ? (

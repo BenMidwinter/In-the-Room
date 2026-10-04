@@ -72,7 +72,6 @@ export default function ClientAppointmentsIndex() {
     <>
       <RecordListLayout
         title="Appointments"
-        subtitle="Scheduled sessions and attendance — open a row to view it."
         newLabel="booking"
         onNew={() => overlay.openCreate({
           clientId,

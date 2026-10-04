@@ -182,9 +182,6 @@ export default function WorkingDocumentsPanel() {
   return (
     <RecordListLayout
       title={editing ? editorTitle : 'Working documents'}
-      subtitle={editing
-        ? 'Draft and save internal working papers for this client.'
-        : 'Draft formulations, care plans, and internal working papers.'}
       newLabel={editing ? undefined : 'working document'}
       onNew={editing ? undefined : handleNew}
       headerActions={editing ? (

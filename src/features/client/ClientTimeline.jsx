@@ -81,11 +81,6 @@ export default function ClientTimeline({ events = [], orientation = 'vertical' }
     <div className={`card timeline-card${isHorizontal ? ' timeline-card--horizontal' : ''}`}>
       <div className="timeline-card__header">
         <h3 className="card__title">Timeline</h3>
-        {isHorizontal && (
-          <p className="timeline-card__hint text-small text-muted">
-            Scroll horizontally — past on the left, latest on the right
-          </p>
-        )}
       </div>
       <div
         ref={scrollRef}

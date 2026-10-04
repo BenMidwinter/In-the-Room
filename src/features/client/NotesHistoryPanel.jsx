@@ -71,8 +71,7 @@ export default function NotesHistoryPanel() {
 
   return (
     <RecordListLayout
-      title="Notes history"
-      subtitle="Process Notes filed against appointments."
+      title="Process Notes"
     >
       <RecordTable
         columns={NOTE_COLUMNS}
