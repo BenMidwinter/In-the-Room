@@ -27,6 +27,8 @@ import ServicesSettingsPage from './features/settings/ServicesSettingsPage'
 import IntegrationsSettingsPage from './features/settings/IntegrationsSettingsPage'
 import { TwoFactorSettingsPage } from './features/settings/SettingsPlaceholders'
 import FormsSettingsPage from './features/settings/FormsSettingsPage'
+import FormDesignerPage from './features/settings/FormDesignerPage'
+import MeasureDesignerPage from './features/settings/MeasureDesignerPage'
 import TemplatesSettingsPage from './features/settings/TemplatesSettingsPage'
 import LoginSettingsPage from './features/settings/LoginSettingsPage'
 import JournalPage from './features/journal/JournalPage'
@@ -137,6 +139,8 @@ export default function App() {
             <TemplatesSettingsPage kind="working_document" title="Working document templates" />
           } />
           <Route path="forms" element={<FormsSettingsPage />} />
+          <Route path="forms/edit/:formId" element={<FormDesignerPage />} />
+          <Route path="forms/questionnaires/:measureId" element={<MeasureDesignerPage />} />
           <Route path="login" element={<LoginSettingsPage />} />
           <Route path="password" element={<Navigate to="/settings/login" replace />} />
           <Route path="2fa" element={<TwoFactorSettingsPage />} />

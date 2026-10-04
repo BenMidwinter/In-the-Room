@@ -40,7 +40,10 @@ function PatientProfileFrame({ client: initialClient }) {
             {client.real_name}
           </h1>
           <p className="client-shell__subtitle">
-            DOB {client.dob}{assignmentHint}
+            DOB {client.dob || '—'}
+            {' · '}
+            {client.gender?.trim() || 'Gender not recorded'}
+            {assignmentHint}
           </p>
         </div>
 

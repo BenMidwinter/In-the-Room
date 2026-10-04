@@ -53,7 +53,7 @@ export function upsertClient(payload, userId) {
 }
 
 export function updateClientClinicalDetails(clientId, details) {
-  const { diagnosis, medication, school } = parseOrThrow(
+  const { diagnosis, medication, school, gender } = parseOrThrow(
     clientClinicalDetailsSchema,
     details,
     'Clinical details',
@@ -65,6 +65,7 @@ export function updateClientClinicalDetails(clientId, details) {
     ...(school !== undefined ? { school } : {}),
     ...(medication !== undefined ? { medication } : {}),
     ...(diagnosis !== undefined ? { diagnosis } : {}),
+    ...(gender !== undefined ? { gender } : {}),
   }
   return { ...db.clients[idx] }
 }

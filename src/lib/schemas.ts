@@ -224,6 +224,7 @@ export const clientClinicalDetailsSchema = z.object({
   diagnosis: optionalText,
   medication: optionalText,
   school: optionalText,
+  gender: optionalText,
 })
 
 export const clinicalProfileInputSchema = z.object({

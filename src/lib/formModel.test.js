@@ -5,6 +5,8 @@ import {
   measureEditIsBlocked,
   measureScoresCsv,
   measureStructureKey,
+  submissionStatusLabel,
+  validateDraftName,
   validateMeasure,
   outcomesInForm,
   prefillClientAnswers,
@@ -88,5 +90,13 @@ describe('outcome scores', () => {
     expect(csv).toContain('2026-04-02,Ada North,2014-03-01,Female,3,3')
     expect(csv.toLowerCase()).not.toContain('cutoff')
     expect(csv.toLowerCase()).not.toContain('clinical')
+  })
+
+  it('names a finished form as completed, and a saved draft only needs a name', () => {
+    expect(submissionStatusLabel('submitted', true)).toBe('Completed')
+    expect(submissionStatusLabel('in_progress', true)).toBe('In progress')
+    expect(submissionStatusLabel('in_progress', false)).toBe('Not started')
+    expect(validateDraftName('', 'form')).toMatch(/name/i)
+    expect(validateDraftName('Consent', 'form')).toBeNull()
   })
 })

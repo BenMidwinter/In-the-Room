@@ -3,6 +3,7 @@ import {
   createPrivateSubmission,
   deleteForm,
   deleteMeasure,
+  deleteSubmission,
   listEpisodeForms,
   listEpisodeOutcomes,
   listForms,
@@ -61,7 +62,12 @@ export function useSaveMeasureMutation(userId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: saveMeasure,
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      queryClient.setQueryData(formQueryKeys.measures(userId), (current) => {
+        const list = Array.isArray(current) ? current : []
+        return [...list.filter((row) => row.id !== saved.id), saved]
+          .sort((a, b) => a.name.localeCompare(b.name))
+      })
       queryClient.invalidateQueries({ queryKey: formQueryKeys.measures(userId) })
     },
   })
@@ -81,7 +87,12 @@ export function useSaveFormMutation(userId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: saveForm,
-    onSuccess: () => {
+    onSuccess: (saved) => {
+      queryClient.setQueryData(formQueryKeys.forms(userId), (current) => {
+        const list = Array.isArray(current) ? current : []
+        return [...list.filter((row) => row.id !== saved.id), saved]
+          .sort((a, b) => a.name.localeCompare(b.name))
+      })
       queryClient.invalidateQueries({ queryKey: formQueryKeys.forms(userId) })
     },
   })
@@ -97,12 +108,25 @@ export function useDeleteFormMutation(userId: string) {
   })
 }
 
+export function useDeleteSubmissionMutation(episodeId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: deleteSubmission,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: formQueryKeys.episodeForms(episodeId) })
+    },
+  })
+}
+
 export function useSendFormMutation(episodeId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createPrivateSubmission,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: formQueryKeys.episodeForms(episodeId) })
+      queryClient.invalidateQueries({ queryKey: ['episode-forms'] })
+      if (episodeId) {
+        queryClient.invalidateQueries({ queryKey: formQueryKeys.episodeForms(episodeId) })
+      }
     },
   })
 }

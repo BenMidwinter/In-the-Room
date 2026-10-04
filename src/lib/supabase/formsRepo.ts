@@ -5,6 +5,7 @@ import {
   prefillClientAnswers,
   scoreMeasure,
   slugify,
+  validateDraftName,
   validateForm,
   validateMeasure,
   type ClientBind,
@@ -22,6 +23,7 @@ export type MeasureRecord = {
   schema: MeasureSchema
   is_active: boolean
   has_scores: boolean
+  status: 'draft' | 'published'
 }
 
 export type FormRecord = {
@@ -40,6 +42,7 @@ export type EpisodeFormRow = {
   token: string
   name: string
   status: string
+  started: boolean
   updated_at: string
   submitted_at: string | null
 }
@@ -136,6 +139,21 @@ function scorePayload(raw: Json | null | undefined): { total: number; items: Rec
   return { total: Number(row.total) || 0, items }
 }
 
+function measureStatus(value: string | null | undefined): 'draft' | 'published' {
+  return value === 'draft' ? 'draft' : 'published'
+}
+
+function answersStarted(raw: Json | null | undefined): boolean {
+  const answers = asObject(asObject(raw).answers)
+  return Object.values(answers).some((value) => {
+    if (value == null) return false
+    if (typeof value === 'string') return value.trim() !== ''
+    if (typeof value === 'number') return true
+    if (typeof value === 'object') return Object.keys(value as object).length > 0
+    return false
+  })
+}
+
 function one<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] || null
   return value || null
@@ -169,7 +187,7 @@ export async function listMeasures(): Promise<MeasureRecord[]> {
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('outcome_measure_defs')
-    .select('id, name, slug, schema, is_active')
+    .select('id, name, slug, schema, is_active, status')
     .order('name')
   throwIf(error)
   const { data: scores, error: scoreError } = await supabase
@@ -182,8 +200,9 @@ export async function listMeasures(): Promise<MeasureRecord[]> {
     name: row.name,
     slug: row.slug,
     schema: parseMeasureSchema(row.schema),
-    is_active: row.is_active,
+    is_active: row.is_active && measureStatus(row.status) === 'published',
     has_scores: used.has(row.id),
+    status: measureStatus(row.status),
   }))
 }
 
@@ -191,11 +210,12 @@ export async function saveMeasure(input: {
   id?: string | null
   name: string
   schema: MeasureSchema
+  publish: boolean
 }): Promise<MeasureRecord> {
   const name = input.name.trim()
   const schema = parseMeasureSchema(input.schema)
-  const problem = validateMeasure(name, schema)
-  if (problem) throw new Error(problem)
+  const nameProblem = validateDraftName(name, 'questionnaire')
+  if (nameProblem) throw new Error(nameProblem)
   const { supabase, user } = await signedIn()
 
   if (input.id) {
@@ -206,7 +226,7 @@ export async function saveMeasure(input: {
     throwIf(countError)
     const { data: existing, error: existingError } = await supabase
       .from('outcome_measure_defs')
-      .select('schema, slug, is_active')
+      .select('schema, slug, status')
       .eq('id', input.id)
       .single()
     rowOrThrow(existing, existingError, 'Could not load that questionnaire.')
@@ -214,9 +234,19 @@ export async function saveMeasure(input: {
     if (measureEditIsBlocked(parseMeasureSchema(existing.schema), schema, hasScores)) {
       throw new Error('Scores are already saved. You can change the wording. A new scale needs a new questionnaire.')
     }
+    const status: 'draft' | 'published' = (input.publish || existing.status === 'published') ? 'published' : 'draft'
+    if (status === 'published') {
+      const problem = validateMeasure(name, schema)
+      if (problem) throw new Error(problem)
+    }
     const { error } = await supabase
       .from('outcome_measure_defs')
-      .update({ name, schema: schema as unknown as Json })
+      .update({
+        name,
+        schema: schema as unknown as Json,
+        status,
+        is_active: status === 'published',
+      })
       .eq('id', input.id)
     throwIf(error)
     return {
@@ -224,11 +254,17 @@ export async function saveMeasure(input: {
       name,
       slug: existing.slug,
       schema,
-      is_active: existing.is_active,
+      is_active: status === 'published',
       has_scores: hasScores,
+      status,
     }
   }
 
+  const status: 'draft' | 'published' = input.publish ? 'published' : 'draft'
+  if (status === 'published') {
+    const problem = validateMeasure(name, schema)
+    if (problem) throw new Error(problem)
+  }
   const slug = await uniqueSlug('outcome_measure_defs', name)
   const { data, error } = await supabase
     .from('outcome_measure_defs')
@@ -237,12 +273,13 @@ export async function saveMeasure(input: {
       name,
       slug,
       schema: schema as unknown as Json,
-      is_active: true,
+      is_active: status === 'published',
+      status,
     })
     .select('id')
     .single()
   rowOrThrow(data, error, 'Could not save the questionnaire.')
-  return { id: data.id, name, slug, schema, is_active: true, has_scores: false }
+  return { id: data.id, name, slug, schema, is_active: status === 'published', has_scores: false, status }
 }
 
 export async function deleteMeasure(id: string): Promise<void> {
@@ -262,6 +299,7 @@ export async function listForms(): Promise<FormRecord[]> {
   const { data, error } = await supabase
     .from('form_definitions')
     .select('id, name, slug, audience, status, is_onboarding, version, schema')
+    .neq('status', 'archived')
     .order('name')
   throwIf(error)
   return (data || []).map((row) => ({
@@ -276,26 +314,52 @@ export async function listForms(): Promise<FormRecord[]> {
   }))
 }
 
+async function assertPublishedMeasures(
+  supabase: ReturnType<typeof supabaseOrThrow>,
+  schema: FormSchema,
+) {
+  const ids = [...new Set(schema.blocks.flatMap((block) => (
+    block.type === 'measure' && block.measureId ? [block.measureId] : []
+  )))]
+  if (!ids.length) return
+  const { data, error } = await supabase
+    .from('outcome_measure_defs')
+    .select('id, status')
+    .in('id', ids)
+  throwIf(error)
+  const ready = new Set((data || []).filter((row) => row.status === 'published').map((row) => row.id))
+  if (ids.some((id) => !ready.has(id))) {
+    throw new Error('Publish the questionnaire on this form before you publish the form.')
+  }
+}
+
 export async function saveForm(input: {
   id?: string | null
   name: string
   audience: 'public' | 'private'
   schema: FormSchema
+  publish: boolean
 }): Promise<FormRecord> {
   const name = input.name.trim()
   const schema = parseFormSchema(input.schema)
-  const problem = validateForm(name, schema)
-  if (problem) throw new Error(problem)
+  const nameProblem = validateDraftName(name, 'form')
+  if (nameProblem) throw new Error(nameProblem)
   const { supabase, user } = await signedIn()
 
   if (input.id) {
     const { data: existing, error: existingError } = await supabase
       .from('form_definitions')
-      .select('audience, version, slug')
+      .select('audience, version, slug, status')
       .eq('id', input.id)
       .single()
     rowOrThrow(existing, existingError, 'Could not load that form.')
     const audience = existing.audience === 'public' ? 'public' : 'private'
+    const status = (input.publish || existing.status === 'published') ? 'published' : 'draft'
+    if (status === 'published') {
+      const problem = validateForm(name, schema)
+      if (problem) throw new Error(problem)
+      await assertPublishedMeasures(supabase, schema)
+    }
     const version = (existing.version || 1) + 1
     const { error } = await supabase
       .from('form_definitions')
@@ -304,7 +368,7 @@ export async function saveForm(input: {
         schema: schema as unknown as Json,
         audience,
         is_onboarding: audience === 'public',
-        status: 'published',
+        status,
         version,
       })
       .eq('id', input.id)
@@ -314,7 +378,7 @@ export async function saveForm(input: {
       name,
       slug: existing.slug,
       audience,
-      status: 'published',
+      status,
       is_onboarding: audience === 'public',
       version,
       schema,
@@ -322,6 +386,12 @@ export async function saveForm(input: {
   }
 
   const audience = input.audience === 'public' ? 'public' : 'private'
+  const status = input.publish ? 'published' : 'draft'
+  if (status === 'published') {
+    const problem = validateForm(name, schema)
+    if (problem) throw new Error(problem)
+    await assertPublishedMeasures(supabase, schema)
+  }
   const slug = await uniqueSlug('form_definitions', name)
   const { data, error } = await supabase
     .from('form_definitions')
@@ -330,7 +400,7 @@ export async function saveForm(input: {
       name,
       slug,
       audience,
-      status: 'published',
+      status,
       is_onboarding: audience === 'public',
       version: 1,
       schema: schema as unknown as Json,
@@ -343,22 +413,33 @@ export async function saveForm(input: {
     name,
     slug: data.slug,
     audience,
-    status: 'published',
+    status,
     is_onboarding: audience === 'public',
     version: data.version,
     schema,
   }
 }
 
-export async function deleteForm(id: string): Promise<void> {
+export async function deleteForm(id: string): Promise<'deleted' | 'archived'> {
   const supabase = supabaseOrThrow()
   const { count, error: countError } = await supabase
     .from('form_submissions')
     .select('id', { count: 'exact', head: true })
     .eq('form_definition_id', id)
   throwIf(countError)
-  if (count) throw new Error('This form has already been used, so it stays in your list.')
+  if (count) {
+    const { error } = await supabase.from('form_definitions').update({ status: 'archived' }).eq('id', id)
+    throwIf(error)
+    return 'archived'
+  }
   const { error } = await supabase.from('form_definitions').delete().eq('id', id)
+  throwIf(error)
+  return 'deleted'
+}
+
+export async function deleteSubmission(id: string): Promise<void> {
+  const supabase = supabaseOrThrow()
+  const { error } = await supabase.from('form_submissions').delete().eq('id', id)
   throwIf(error)
 }
 
@@ -367,7 +448,7 @@ export async function listEpisodeForms(episodeId: string): Promise<EpisodeFormRo
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('form_submissions')
-    .select('id, access_token, status, submitted_at, updated_at, form_definitions(name)')
+    .select('id, access_token, status, submitted_at, updated_at, encrypted_payload, form_definitions(name)')
     .eq('episode_id', episodeId)
     .order('updated_at', { ascending: false })
   throwIf(error)
@@ -378,6 +459,7 @@ export async function listEpisodeForms(episodeId: string): Promise<EpisodeFormRo
       token: row.access_token,
       name: def?.name || 'Form',
       status: row.status,
+      started: row.status !== 'in_progress' || answersStarted(row.encrypted_payload),
       updated_at: row.updated_at,
       submitted_at: row.submitted_at,
     }
@@ -468,8 +550,18 @@ export async function createPrivateSubmission(input: {
     .single()
   rowOrThrow(form, error, 'Could not load that form.')
   if (form.audience !== 'private' || form.status !== 'published') {
-    throw new Error('Send a form made for a client you already see.')
+    throw new Error('Publish a form for a client you already see before sending it.')
   }
+  const { data: openRows, error: openError } = await supabase
+    .from('form_submissions')
+    .select('id, access_token')
+    .eq('form_definition_id', form.id)
+    .eq('episode_id', input.episodeId)
+    .eq('client_id', input.clientId)
+    .eq('status', 'in_progress')
+    .limit(1)
+  throwIf(openError)
+  if (openRows?.[0]) return { id: openRows[0].id, token: openRows[0].access_token }
   const schema = parseFormSchema(form.schema)
   const measureIds = [...new Set(schema.blocks.flatMap((block) => (
     block.type === 'measure' ? [block.measureId] : []

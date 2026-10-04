@@ -233,3 +233,61 @@ export async function upsertClientRemote(
   hydrateLocal([mapped])
   return mapped
 }
+
+export async function patchClientIdentity(
+  clientId: string,
+  patch: { gender?: string; school?: string; diagnosis?: string; medication?: string },
+): Promise<AppClientRecord> {
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Sign in required')
+
+  const { data: clientRow, error: clientError } = await supabase
+    .from('clients')
+    .select('id, owner_id, organization_id, status, created_at, updated_at')
+    .eq('id', clientId)
+    .single()
+  if (clientError) throw clientError
+
+  const { data: identityRow, error: identityError } = await supabase
+    .from('client_identities')
+    .select('encrypted_payload, organization_id')
+    .eq('client_id', clientId)
+    .maybeSingle()
+  if (identityError) throw identityError
+
+  const current = parseIdentity(identityRow?.encrypted_payload)
+  const identity: IdentityPayload = {
+    ...current,
+    v: 0,
+    gender: patch.gender !== undefined ? patch.gender.trim() : (current.gender || ''),
+    school: patch.school !== undefined ? patch.school.trim() : (current.school || ''),
+    diagnosis: patch.diagnosis !== undefined ? patch.diagnosis : (current.diagnosis || ''),
+    medication: patch.medication !== undefined ? patch.medication.trim() : (current.medication || ''),
+  }
+
+  const { error: writeError } = await supabase
+    .from('client_identities')
+    .upsert({
+      client_id: clientId,
+      owner_id: clientRow.owner_id || user.id,
+      organization_id: identityRow?.organization_id ?? clientRow.organization_id,
+      encrypted_payload: identity as unknown as Json,
+    })
+  if (writeError) throw writeError
+
+  await writeAuditEvent({
+    action: 'client.updated',
+    entityType: 'client',
+    entityId: clientId,
+    clientId,
+  })
+
+  const mapped = toAppClient({
+    ...clientRow,
+    client_identities: { encrypted_payload: identity as unknown as Json },
+  })
+  hydrateLocal([mapped])
+  return mapped
+}

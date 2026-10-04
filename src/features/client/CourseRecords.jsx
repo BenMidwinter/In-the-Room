@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import RecordTable from '../../components/RecordTable'
-import { useChoose, useToast } from '../../components/ui'
-import { measureScoresCsv } from '../../lib/formModel'
+import { useChoose, useConfirm, useToast } from '../../components/ui'
+import { measureScoresCsv, submissionStatusLabel } from '../../lib/formModel'
 import {
+  useDeleteSubmissionMutation,
   useEpisodeFormsQuery,
   useEpisodeOutcomesQuery,
   useFormsQuery,
@@ -12,6 +13,7 @@ import {
 } from '../../lib/formQueries'
 import { listMeasureScores } from '../../lib/supabase/formsRepo'
 import { downloadCsv, formFillUrl } from '../forms/downloadCsv'
+import RowMenu from '../forms/RowMenu'
 import ScoreFields from '../forms/ScoreFields'
 
 function formatDate(iso) {
@@ -44,8 +46,8 @@ function CourseAccordion({ title, open, onToggle, actions, children }) {
   )
 }
 
-function statusLabel(status) {
-  return status === 'in_progress' ? 'In progress' : 'Sent'
+function statusLabel(form) {
+  return submissionStatusLabel(form.status, form.started)
 }
 
 async function copyText(text) {
@@ -55,9 +57,11 @@ async function copyText(text) {
 export function EpisodeForms({ episode, clientId, userId, organizationId, open, onToggle }) {
   const toast = useToast()
   const choose = useChoose()
+  const confirm = useConfirm()
   const formsQuery = useFormsQuery(userId || '')
   const sentQuery = useEpisodeFormsQuery(episode.id, open)
   const send = useSendFormMutation(episode.id)
+  const removeSubmission = useDeleteSubmissionMutation(episode.id)
 
   const copyLink = async (token) => {
     try {
@@ -71,7 +75,7 @@ export function EpisodeForms({ episode, clientId, userId, organizationId, open, 
   const sendForm = async () => {
     const forms = (formsQuery.data || []).filter((form) => form.audience === 'private' && form.status === 'published')
     if (!forms.length) {
-      toast.error('Add a form for a client you already see, in Settings, under Forms.')
+      toast.error('Publish a form for a client you already see, in Settings, under Forms.')
       return
     }
     let formId = forms[0].id
@@ -98,29 +102,55 @@ export function EpisodeForms({ episode, clientId, userId, organizationId, open, 
     }
   }
 
-  const rows = (sentQuery.data || []).map((form) => ({
-    id: form.id,
-    form,
-    filterValues: { name: form.name, status: statusLabel(form.status) },
-    sortValues: { name: form.name, date: form.submitted_at || form.updated_at },
-    cells: {
-      name: <span className="record-table__primary">{form.name}</span>,
-      status: statusLabel(form.status),
-      date: formatDate(form.submitted_at || form.updated_at),
-      link: form.status === 'in_progress' ? (
-        <button
-          type="button"
-          className="secondary"
-          onClick={(event) => {
-            event.stopPropagation()
-            copyLink(form.token)
-          }}
-        >
-          Copy link
-        </button>
-      ) : '—',
-    },
-  }))
+  const removeForm = async (form) => {
+    const completed = statusLabel(form) === 'Completed'
+    const ok = await confirm({
+      title: 'Delete this form?',
+      message: completed
+        ? 'This removes it from the course. A score already saved stays under Outcome measures.'
+        : 'This link will stop working.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      await removeSubmission.mutateAsync(form.id)
+      toast.saved('Form removed from this course')
+    } catch (err) {
+      toast.error(err.message || 'Could not delete the form')
+    }
+  }
+
+  const rows = (sentQuery.data || []).map((form) => {
+    const label = statusLabel(form)
+    return {
+      id: form.id,
+      form,
+      filterValues: { name: form.name, status: label },
+      sortValues: { name: form.name, date: form.submitted_at || form.updated_at },
+      cells: {
+        name: <span className="record-table__primary">{form.name}</span>,
+        status: (
+          <span className={`badge ${label === 'Completed' ? 'badge-green' : 'badge-grey'}`}>{label}</span>
+        ),
+        date: formatDate(form.submitted_at || form.updated_at),
+        menu: (
+          <RowMenu
+            label={`Actions for ${form.name}`}
+            items={[
+              {
+                label: 'View',
+                onSelect: () => window.open(formFillUrl(form.token), '_blank', 'noopener'),
+              },
+              { label: 'Copy link', onSelect: () => copyLink(form.token) },
+              { label: 'Send', onSelect: () => copyLink(form.token) },
+              { label: 'Delete', danger: true, onSelect: () => removeForm(form) },
+            ]}
+          />
+        ),
+      },
+    }
+  })
 
   return (
     <CourseAccordion
@@ -138,7 +168,7 @@ export function EpisodeForms({ episode, clientId, userId, organizationId, open, 
           { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
           { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
           { key: 'date', label: 'Date', sort: 'date' },
-          { key: 'link', label: '', sort: false },
+          { key: 'menu', label: '', sort: false, className: 'record-table__menu' },
         ]}
         rows={rows}
         countNoun="forms"

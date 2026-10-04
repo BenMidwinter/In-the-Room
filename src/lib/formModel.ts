@@ -218,6 +218,19 @@ export function scaleUsesButtons(schema: MeasureSchema): boolean {
     && (schema.max - schema.min) <= 12
 }
 
+export function submissionStatusLabel(status: string, started = false): string {
+  if (status === 'in_progress') return started ? 'In progress' : 'Not started'
+  if (status === 'rejected') return 'Not used'
+  return 'Completed'
+}
+
+export function validateDraftName(name: string, kind: 'form' | 'questionnaire'): string | null {
+  if (!name.trim()) {
+    return kind === 'form' ? 'Name the form.' : 'Name the questionnaire.'
+  }
+  return null
+}
+
 export function validateMeasure(name: string, schema: MeasureSchema): string | null {
   if (!name.trim()) return 'Name the questionnaire.'
   if (!Number.isInteger(schema.min) || !Number.isInteger(schema.max) || schema.max < schema.min) {

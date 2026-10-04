@@ -7,6 +7,7 @@ import RecordTable from './RecordTable'
 const CLIENT_COLUMNS = [
   { key: 'name', label: 'Name', filter: 'text' },
   { key: 'dob', label: 'Date of birth', sort: 'date' },
+  { key: 'gender', label: 'Gender', filter: 'text' },
   { key: 'status', label: 'Status', filter: 'choice' },
 ]
 
@@ -22,16 +23,19 @@ export default function AllClients() {
       muted: !client.is_active,
       filterValues: {
         name: client.real_name,
+        gender: client.gender || '',
         status: client.is_active ? 'Active' : 'Discharged',
       },
       sortValues: {
         name: client.real_name,
         dob: client.dob || '',
+        gender: client.gender || '',
         status: client.is_active ? 'Active' : 'Discharged',
       },
       cells: {
         name: <span className="record-table__primary">{client.real_name}</span>,
         dob: formatDisplayDate(client.dob) || client.dob || '—',
+        gender: client.gender?.trim() || '—',
         status: client.is_active
           ? <span className="badge badge-green">Active</span>
           : <span className="badge badge-grey">Discharged</span>,

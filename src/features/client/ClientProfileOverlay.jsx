@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import DiagnosisPicker from '../../components/DiagnosisPicker'
 import { updateClientClinicalDetails, updateClientClinicalProfile } from '../../lib/store'
+import { isSupabaseConfigured } from '../../lib/supabase/client'
+import { patchClientIdentity } from '../../lib/supabase/clientsRepo'
 import { useToast } from '../../components/ui'
 import { joinDiagnosisList, parseDiagnosisList } from '../../lib/diagnosisList'
 
@@ -14,6 +16,7 @@ const TEXT_PROFILE_FIELDS = [
 ]
 
 export default function ClientProfileOverlay({ client, onClose, onSaved }) {
+  const [gender, setGender] = useState(client.gender || '')
   const [school, setSchool] = useState(client.school || '')
   const [medication, setMedication] = useState(client.medication || '')
   const [selectedDiagnoses, setSelectedDiagnoses] = useState([])
@@ -23,6 +26,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
   const toast = useToast()
 
   useEffect(() => {
+    setGender(client.gender || '')
     setSchool(client.school || '')
     setMedication(client.medication || '')
     setSelectedDiagnoses(parseDiagnosisList(client.diagnosis))
@@ -33,16 +37,19 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
     setProfile(prev => ({ ...prev, [key]: value }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setSaving(true)
     setErrors({})
+    const details = {
+      gender: gender.trim(),
+      school: school.trim(),
+      medication: medication.trim(),
+      diagnosis: joinDiagnosisList(selectedDiagnoses),
+    }
     try {
-      updateClientClinicalDetails(client.id, {
-        school: school.trim(),
-        medication: medication.trim(),
-        diagnosis: joinDiagnosisList(selectedDiagnoses),
-      })
+      if (isSupabaseConfigured()) await patchClientIdentity(client.id, details)
+      updateClientClinicalDetails(client.id, details)
       const updated = updateClientClinicalProfile(client.id, profile)
       onSaved?.(updated)
       toast.success('Clinical profile saved.')
@@ -67,7 +74,9 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
             <p className="client-profile-overlay__eyebrow">Client clinical profile</p>
             <h2 id="client-profile-overlay-title" className="client-profile-overlay__title">{client.real_name}</h2>
             <p className="client-profile-overlay__meta">
-              DOB {client.dob}
+              DOB {client.dob || '—'}
+              {' · '}
+              {gender.trim() || 'Gender not recorded'}
             </p>
           </div>
           <button type="button" className="client-profile-overlay__close secondary" onClick={onClose} aria-label="Close">
@@ -82,6 +91,16 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
           <section className="client-profile-overlay__section">
             <h3 className="client-profile-overlay__section-title">Core details</h3>
             <div className="client-profile-overlay__grid client-profile-overlay__grid--core">
+              <div className="form-group client-profile-overlay__field client-profile-overlay__field--wide">
+                <label htmlFor="client-profile-gender">Gender</label>
+                <input
+                  id="client-profile-gender"
+                  className="paper-input client-profile-overlay__input"
+                  value={gender}
+                  onChange={e => setGender(e.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
               <div className="form-group client-profile-overlay__field client-profile-overlay__field--wide">
                 <label htmlFor="client-profile-school">School / setting</label>
                 <input

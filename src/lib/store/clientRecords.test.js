@@ -116,5 +116,8 @@ describe('updateClientClinicalDetails', () => {
     })
     expect(updated.diagnosis).toBe('Updated diagnosis')
     expect(updated.medication).toBe('None')
+    const withGender = updateClientClinicalDetails(client.id, { gender: 'Female' })
+    expect(withGender.gender).toBe('Female')
+    expect(withGender.diagnosis).toBe('Updated diagnosis')
   })
 })

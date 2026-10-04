@@ -28,7 +28,8 @@ function hasProfileContent(client) {
   if (!client) return false
   const profile = client.clinical_profile || {}
   return Boolean(
-    client.diagnosis?.trim()
+    client.gender?.trim()
+    || client.diagnosis?.trim()
     || client.school?.trim()
     || client.medication?.trim()
     || profile.working_formulation?.trim(),
@@ -47,6 +48,7 @@ export default function ClientClinicalProfileSummary({ client }) {
         </p>
       ) : (
         <div className="client-profile-summary">
+          <TextField label="Gender" value={client.gender} />
           <TextField label="School / setting" value={client.school} />
           {client.diagnosis && (
             <TagGroup label="Diagnosis" tags={parseDiagnosisList(client.diagnosis)} />
