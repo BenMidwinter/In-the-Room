@@ -322,7 +322,9 @@ export default function CaseHistoryPanel() {
       <RecordTable
         columns={EPISODE_COLUMNS}
         rows={rows}
-        emptyMessage="No episodes yet. Open a new episode, or book a client session and the first course opens with it."
+        emptyMessage={episodesQuery.isPending
+          ? 'Loading episodes…'
+          : 'No episodes yet. Open a new episode, or book a client session and the first course opens with it.'}
         onRowClick={(row) => setSelectedId(row.id)}
         selectedId={selected?.id}
       />
