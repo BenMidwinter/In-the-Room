@@ -2029,30 +2029,12 @@ button.calendar-event {
   margin-top: 0.55rem;
 }
 
-.calendar-event--admin,
-.calendar-event--dimmed {
-  opacity: 0.55;
-}
-
 .calendar-event--interactive[draggable='true'] {
   cursor: grab;
 }
 
 .calendar-event--interactive[draggable='true']:active {
   cursor: grabbing;
-}
-
-.calendar-view-options__check {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0.35rem 0 0.15rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.calendar-view-options__check input {
-  margin: 0;
 }
 
 .room-schedule-selected {

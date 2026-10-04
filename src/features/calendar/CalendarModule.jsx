@@ -172,7 +172,6 @@ function EventChip({
   onEdit,
   onDragStart,
   selected = false,
-  dimmed = false,
   style,
 }) {
   const cancelled = isCancelled(appointment)
@@ -182,7 +181,6 @@ function EventChip({
     : appointment.start_time
   const otherInfo = appointmentOtherInfo(appointment)
   const chipLabel = appointmentChipLabel(appointment, { blurNames })
-  const isAdmin = appointment.block_role === 'admin'
 
   const className = [
     'calendar-event',
@@ -190,8 +188,6 @@ function EventChip({
     'calendar-event--block',
     'calendar-event--service',
     externalBusy && 'calendar-event--external-busy',
-    isAdmin && 'calendar-event--admin',
-    dimmed && 'calendar-event--dimmed',
     compact && 'calendar-event--compact',
     otherInfo && !externalBusy && 'calendar-event--has-info',
     selected && 'calendar-event--selected',
@@ -237,16 +233,6 @@ function EventChip({
   )
 }
 
-const ADMIN_BLOCKS_KEY = 'in-the-room-calendar-show-admin'
-
-function readShowAdminBlocks() {
-  try {
-    return localStorage.getItem(ADMIN_BLOCKS_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
 function CalendarViewOptions({
   prefs,
   open,
@@ -259,8 +245,6 @@ function CalendarViewOptions({
   ownerOptions,
   showOwnerPicker,
   onOwnerChange,
-  showAdminBlocks = false,
-  onShowAdminBlocksChange,
 }) {
   const [intervalDraft, setIntervalDraft] = useState(String(prefs.intervalMinutes))
   const [prevInterval, setPrevInterval] = useState(prefs.intervalMinutes)
@@ -412,14 +396,6 @@ function CalendarViewOptions({
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitInterval() } }}
         />
       </div>
-      <label className="calendar-view-options__check">
-        <input
-          type="checkbox"
-          checked={showAdminBlocks}
-          onChange={(e) => onShowAdminBlocksChange?.(e.target.checked)}
-        />
-        <span>Show admin blocks (Notes)</span>
-      </label>
       <p className="calendar-view-options__hint text-small text-muted">
         Grid lines mark each interval; events still span their true length.
       </p>
@@ -487,7 +463,7 @@ function MonthView({ activeDate, appointments, onSelectDate, blurNames = false, 
                       <button
                         key={appt.id}
                         type="button"
-                        className={`calendar-month__event calendar-event--interactive${isCancelled(appt) ? ' calendar-month__event--cancelled' : ''}${appt.block_role === 'admin' ? ' calendar-month__event--admin' : ''}`}
+                        className={`calendar-month__event calendar-event--interactive${isCancelled(appt) ? ' calendar-month__event--cancelled' : ''}`}
                         onClick={(e) => {
                           e.stopPropagation()
                           onSelectAppointment?.(appt)
@@ -608,7 +584,6 @@ function DayColumn({
             onSelect={onSelectAppointment}
             onEdit={onEditAppointment}
             onDragStart={onDragAppointment}
-            dimmed={item.appt.block_role === 'admin'}
             selected={selectedAppointmentId === item.appt.id}
             style={{
               top: `${item.top}%`,
@@ -812,7 +787,6 @@ export default function CalendarModule({ persona }) {
   const [deleteScopeFor, setDeleteScopeFor] = useState(null)
   const [scheduleDeleting, setScheduleDeleting] = useState(false)
   const [rescheduleTarget, setRescheduleTarget] = useState(null)
-  const [showAdminBlocks, setShowAdminBlocks] = useState(() => readShowAdminBlocks())
 
   const [availabilitySettings, setAvailabilitySettings] = useState(() => (
     getClinicianWorkplaceSettings(session.user.id)
@@ -942,20 +916,8 @@ export default function CalendarModule({ persona }) {
   const filtered = useMemo(() => {
     const roleScoped = filterAppointmentsForPersona(appointments, persona)
     const owned = filterAppointmentsByCalendarOwner(roleScoped, calendarOwner, persona)
-    const visible = showAdminBlocks
-      ? owned
-      : owned.filter((a) => a.block_role !== 'admin')
-    return [...visible, ...googleBusy]
-  }, [appointments, calendarOwner, persona, googleBusy, showAdminBlocks])
-
-  const handleShowAdminBlocksChange = (next) => {
-    setShowAdminBlocks(next)
-    try {
-      localStorage.setItem(ADMIN_BLOCKS_KEY, next ? '1' : '0')
-    } catch {
-      /* ignore */
-    }
-  }
+    return [...owned, ...googleBusy]
+  }, [appointments, calendarOwner, persona, googleBusy])
 
   const blurNames = false
 
@@ -1365,8 +1327,6 @@ export default function CalendarModule({ persona }) {
               ownerOptions={ownerOptions}
               showOwnerPicker={showOwnerPicker}
               onOwnerChange={setCalendarOwner}
-              showAdminBlocks={showAdminBlocks}
-              onShowAdminBlocksChange={handleShowAdminBlocksChange}
             />
           </div>
         </div>
