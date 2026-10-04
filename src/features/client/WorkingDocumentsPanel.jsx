@@ -24,10 +24,9 @@ function todayISO() {
 }
 
 const DOC_COLUMNS = [
-  { key: 'title', label: 'Title', filter: { type: 'text', placeholder: 'Filter title…' } },
-  { key: 'author', label: 'Created by', filter: { type: 'select', allLabel: 'All authors' } },
-  { key: 'created', label: 'Created', filter: { type: 'text', placeholder: 'Filter date…' } },
-  { key: 'updated', label: 'Last updated' },
+  { key: 'title', label: 'Title', filter: 'text' },
+  { key: 'created', label: 'Created', sort: 'date' },
+  { key: 'updated', label: 'Last updated', sort: 'date' },
 ]
 
 export default function WorkingDocumentsPanel() {
@@ -134,12 +133,14 @@ export default function WorkingDocumentsPanel() {
     doc,
     filterValues: {
       title: doc.title,
-      author: getProfile(doc.author_id)?.full_name || '—',
-      created: formatDocDate(doc.created_at),
+    },
+    sortValues: {
+      title: doc.title,
+      created: doc.created_at || '',
+      updated: doc.updated_at || '',
     },
     cells: {
       title: <span className="record-table__primary">{doc.title}</span>,
-      author: getProfile(doc.author_id)?.full_name || '—',
       created: formatDocDate(doc.created_at),
       updated: formatDocDate(doc.updated_at),
     },
@@ -198,6 +199,8 @@ export default function WorkingDocumentsPanel() {
         <RecordTable
           columns={DOC_COLUMNS}
           rows={rows}
+          defaultSort={{ key: 'updated', direction: 'desc' }}
+          countNoun="documents"
           emptyMessage="No working documents yet."
           onRowClick={(row) => selectDocument(row.doc)}
         />

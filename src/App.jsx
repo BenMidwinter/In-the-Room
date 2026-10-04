@@ -5,7 +5,6 @@ import AppLayout from './components/AppLayout'
 import AuthPage from './features/auth/AuthPage'
 import Home from './features/home/HomePage'
 import Calendar from './features/calendar/CalendarPage'
-import ActiveCases from './components/ActiveCases'
 import AllClients from './components/AllClients'
 import AddClient from './components/AddClient'
 import PatientProfile from './features/client/PatientProfile'
@@ -56,7 +55,7 @@ export default function App() {
         <Route path="journal" element={<JournalPage />} />
         <Route path="lab/progress-note" element={<ProgressNoteLabPage />} />
         <Route path="upcoming-appointments" element={<Navigate to="/calendar?view=upcoming" replace />} />
-        <Route path="active-cases" element={<ActiveCases />} />
+        <Route path="active-cases" element={<Navigate to="/home" replace />} />
         <Route path="clients" element={<AllClients />} />
         <Route path="clients/add" element={<AddClient />} />
         <Route path="clients/:clientId/edit" element={<AddClient />} />
@@ -88,7 +87,6 @@ export default function App() {
                 { key: 'name', label: 'File name' },
                 { key: 'type', label: 'Type' },
                 { key: 'date', label: 'Uploaded' },
-                { key: 'author', label: 'Uploaded by' },
               ]}
             />
           } />

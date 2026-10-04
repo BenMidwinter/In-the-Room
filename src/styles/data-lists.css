@@ -70,72 +70,191 @@
 
 .record-table-wrap {
   width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--elevation-paper-1);
+}
+
+.record-table-wrap--scroll {
+  max-height: 24rem;
 }
 
 .record-table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-  line-height: 1.45;
-}
-
-.record-table thead tr {
-  border-bottom: 1px solid var(--border-strong);
+  border-collapse: separate;
+  border-spacing: 0;
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  line-height: 1.4;
 }
 
 .record-table th {
-  padding: 0.7rem 1rem;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0;
+  background: var(--bg-muted);
+  border-bottom: 1px solid var(--border-strong);
   text-align: left;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--txt-muted);
   white-space: nowrap;
 }
 
+.record-table__head {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  min-height: 2.65rem;
+  padding: 0.3rem 0.55rem 0.3rem 0.95rem;
+}
+
+.record-table__sort,
+.record-table__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.1rem;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.record-table__sort {
+  cursor: pointer;
+}
+
+.record-table__sort:hover {
+  color: var(--text-primary);
+}
+
+.record-table__sort:focus-visible,
+.record-table__filter-btn:focus-visible,
+.record-table__choice:focus-visible,
+.record-table__inline:focus-visible {
+  outline: 2px solid var(--col-primary);
+  outline-offset: 2px;
+}
+
+.record-table__sort-mark {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  width: 0.55rem;
+}
+
+.record-table__sort-mark span {
+  display: block;
+  width: 0;
+  height: 0;
+  margin-left: 1px;
+  border-left: 3.5px solid transparent;
+  border-right: 3.5px solid transparent;
+  opacity: 0.28;
+}
+
+.record-table__sort-mark .up {
+  border-bottom: 4px solid currentColor;
+}
+
+.record-table__sort-mark .down {
+  border-top: 4px solid currentColor;
+}
+
+.record-table__sort-mark .is-active {
+  opacity: 1;
+  color: var(--col-primary);
+}
+
+.record-table__filter-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.record-table__filter-btn:hover,
+.record-table__filter-btn--open {
+  background: var(--bg-subtle);
+  color: var(--text-primary);
+}
+
+.record-table__filter-btn--on {
+  background: var(--accent-tint);
+  color: var(--col-primary-dark);
+}
+
 .record-table td {
-  padding: 0.75rem 1rem;
+  padding: 0.8rem 1rem;
   vertical-align: middle;
-  color: var(--txt-body);
-  border-bottom: 1px solid var(--border-light);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
 }
 
 .record-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.record-table tbody tr:nth-child(even) {
-  background: var(--bg-zone-muted);
-}
-
 .record-table tbody tr.record-table__row--clickable {
   cursor: pointer;
 }
 
-.record-table tbody tr.record-table__row--clickable:hover {
-  background: var(--col-primary-light);
+.record-table tbody tr.record-table__row--clickable:hover td {
+  background: color-mix(in srgb, var(--accent-tint) 72%, var(--bg-surface));
 }
 
-.record-table tbody tr.record-table__row--selected {
-  background: var(--col-primary-light);
+.record-table tbody tr.record-table__row--clickable:hover td:first-child {
   box-shadow: inset 3px 0 0 var(--col-primary);
 }
 
-.record-table tbody tr.record-table__row--muted {
-  opacity: 0.65;
+.record-table tbody tr.record-table__row--selected td {
+  background: var(--accent-tint);
+}
+
+.record-table tbody tr.record-table__row--selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--col-primary);
+}
+
+.record-table tbody tr.record-table__row--muted td {
+  color: var(--text-secondary);
 }
 
 .record-table__primary {
-  font-weight: 600;
-  color: var(--col-accent);
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .record-table__cell-muted {
-  color: var(--txt-muted);
-  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+}
+
+.record-table__inline {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--col-primary-dark);
+  cursor: pointer;
+  text-align: left;
+}
+
+.record-table__inline:hover {
+  text-decoration: underline;
 }
 
 .note-status-tag {
@@ -147,47 +266,91 @@
 }
 
 .record-table__empty {
-  padding: 2rem 1rem;
+  padding: 2.25rem 1rem;
   text-align: center;
-  color: var(--txt-muted);
-  font-size: 0.9375rem;
+  color: var(--text-secondary);
   border-bottom: none;
 }
 
-.record-table__filter-row th {
-  padding: 0.35rem 0.5rem 0.55rem;
-  border-bottom: 1px solid var(--border-light);
-  vertical-align: bottom;
-}
-
-.record-table__filter {
-  display: block;
-  min-width: 0;
-}
-
-.record-table__filter-input {
-  width: 100%;
-  min-width: 4.5rem;
-  padding: 0.3rem 0.45rem;
+.record-table__count {
+  margin: 0;
+  padding: 0.4rem 1rem 0.5rem;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-canvas);
   font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--txt-body);
-  background: var(--bg-page);
+  color: var(--text-tertiary);
+  position: sticky;
+  left: 0;
+}
+
+.record-table__popover {
+  position: fixed;
+  z-index: 80;
+  padding: 0.7rem;
+  background: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 3px;
+  border-radius: 8px;
+  box-shadow: var(--elevation-paper-3);
 }
 
-.record-table__filter-input:focus {
-  outline: none;
-  border-color: var(--col-primary);
-  box-shadow: 0 0 0 2px var(--col-primary-light);
+.record-table__popover-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
-.record-table__actions-cell {
-  text-align: right;
-  white-space: nowrap;
+.record-table__popover-input {
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+.record-table__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  max-height: 14rem;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.record-table__choice {
+  display: block;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.record-table__choice:hover,
+.record-table__choice--on {
+  background: var(--accent-tint);
+}
+
+.record-table__popover-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+.record-table__col--mobile-hide {
+  /* shown by default; hidden in the mobile query below */
+}
+
+@media (max-width: 768px) {
+  .record-table__col--mobile-hide {
+    display: none;
+  }
 }
 
 /* Page-level caseload lists reuse record table inside page content */
@@ -202,9 +365,12 @@
 }
 
 @media (max-width: 768px) {
-  .record-table th,
   .record-table td {
-    padding: 0.65rem 0.75rem;
+    padding: 0.7rem 0.75rem;
+  }
+
+  .record-table__head {
+    padding-left: 0.75rem;
   }
 
   .record-module__header {

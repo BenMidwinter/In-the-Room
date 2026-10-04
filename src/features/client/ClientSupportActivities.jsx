@@ -1,7 +1,6 @@
 import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
-import { getProfile } from '../../lib/store'
 import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
 import { appointmentDisplayName } from '../../lib/calendarServiceStyles'
 import { formatSessionDateTime, isSupportActivity } from '../../lib/appointmentUtils'
@@ -9,9 +8,8 @@ import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 
 const SUPPORT_COLUMNS = [
-  { key: 'service', label: 'Activity', filter: { type: 'text', placeholder: 'Filter activity…' } },
-  { key: 'date', label: 'Date', filter: { type: 'text', placeholder: 'Filter date…' } },
-  { key: 'clinician', label: 'Clinician', filter: { type: 'select', allLabel: 'All clinicians' } },
+  { key: 'service', label: 'Activity', filter: 'text' },
+  { key: 'date', label: 'Date', filter: 'text', sort: 'date' },
 ]
 
 export default function ClientSupportActivities() {
@@ -19,34 +17,28 @@ export default function ClientSupportActivities() {
   const overlay = useAppointmentOverlay()
   const { data: appointments = [] } = useClientAppointmentsQuery(clientId)
 
-  const rows = useMemo(() => {
-    const sorted = appointments
-      .filter((appt) => appt.client_id === clientId && isSupportActivity(appt))
-      .sort((a, b) => {
-        const dateCmp = String(b.session_date || '').localeCompare(String(a.session_date || ''))
-        if (dateCmp !== 0) return dateCmp
-        return String(b.start_time || '').localeCompare(String(a.start_time || ''))
-      })
-
-    return sorted.map((appt) => {
+  const rows = useMemo(() => appointments
+    .filter((appt) => appt.client_id === clientId && isSupportActivity(appt))
+    .map((appt) => {
       const serviceLabel = appointmentDisplayName(appt)
-      const clinician = getProfile(appt.clinician_id)?.full_name || appt.assigned_therapist || '—'
+      const when = formatSessionDateTime(appt)
       return {
         id: appt.id,
         appt,
         filterValues: {
           service: serviceLabel,
-          date: formatSessionDateTime(appt),
-          clinician,
+          date: when,
+        },
+        sortValues: {
+          service: serviceLabel,
+          date: `${appt.session_date || ''}T${appt.start_time || ''}`,
         },
         cells: {
           service: <span className="record-table__primary">{serviceLabel}</span>,
-          date: formatSessionDateTime(appt),
-          clinician,
+          date: when,
         },
       }
-    })
-  }, [appointments, clientId])
+    }), [appointments, clientId])
 
   return (
     <RecordListLayout
@@ -62,6 +54,8 @@ export default function ClientSupportActivities() {
       <RecordTable
         columns={SUPPORT_COLUMNS}
         rows={rows}
+        countNoun="activities"
+        defaultSort={{ key: 'date', direction: 'desc' }}
         emptyMessage="No support activities yet."
         onRowClick={(row) => overlay.openView(row.appt)}
       />

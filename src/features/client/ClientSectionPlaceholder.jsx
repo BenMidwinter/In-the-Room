@@ -17,7 +17,6 @@ export default function ClientSectionPlaceholder({
     : [
       { key: 'name', label: 'Name' },
       { key: 'date', label: 'Date' },
-      { key: 'author', label: 'Created by' },
     ]
 
   return (

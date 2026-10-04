@@ -58,7 +58,7 @@ function PatientProfileFrame({ client: initialClient }) {
           {perms.canUseBodyMap && (
             <button type="button" className="secondary" onClick={() => setShowBodyMap(true)}>Body map</button>
           )}
-          <button type="button" className="secondary" onClick={() => navigate('/clients')}>Back</button>
+          <button type="button" className="secondary" onClick={() => navigate('/home')}>Home</button>
         </div>
       </header>
 
