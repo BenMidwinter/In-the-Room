@@ -33,6 +33,8 @@ export type FormRecord = {
   audience: 'public' | 'private'
   status: string
   is_onboarding: boolean
+  place_on_screener: boolean
+  letterhead_id: string | null
   version: number
   schema: FormSchema
 }
@@ -70,6 +72,13 @@ export type OpenFormLink = {
   schema: FormSchema
   measures: Record<string, MeasureSchema>
   answers: Record<string, unknown>
+  letterhead: {
+    practiceName: string
+    logoUrl: string
+    addressLines: string[]
+    clinicianName: string
+    professionalTitle: string
+  } | null
 }
 
 type DbError = { message: string; code?: string }
@@ -298,7 +307,7 @@ export async function listForms(): Promise<FormRecord[]> {
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('form_definitions')
-    .select('id, name, slug, audience, status, is_onboarding, version, schema')
+    .select('id, name, slug, audience, status, is_onboarding, place_on_screener, letterhead_id, version, schema')
     .neq('status', 'archived')
     .order('name')
   throwIf(error)
@@ -309,6 +318,8 @@ export async function listForms(): Promise<FormRecord[]> {
     audience: row.audience === 'public' ? 'public' : 'private',
     status: row.status,
     is_onboarding: row.is_onboarding,
+    place_on_screener: Boolean(row.place_on_screener),
+    letterhead_id: row.letterhead_id,
     version: row.version,
     schema: parseFormSchema(row.schema),
   }))
@@ -339,6 +350,8 @@ export async function saveForm(input: {
   audience: 'public' | 'private'
   schema: FormSchema
   publish: boolean
+  placeOnScreener?: boolean
+  letterheadId?: string | null
 }): Promise<FormRecord> {
   const name = input.name.trim()
   const schema = parseFormSchema(input.schema)
@@ -354,6 +367,8 @@ export async function saveForm(input: {
       .single()
     rowOrThrow(existing, existingError, 'Could not load that form.')
     const audience = existing.audience === 'public' ? 'public' : 'private'
+    const placeOnScreener = audience === 'public' && Boolean(input.placeOnScreener)
+    const letterheadId = input.letterheadId || null
     const status = (input.publish || existing.status === 'published') ? 'published' : 'draft'
     if (status === 'published') {
       const problem = validateForm(name, schema)
@@ -368,6 +383,8 @@ export async function saveForm(input: {
         schema: schema as unknown as Json,
         audience,
         is_onboarding: audience === 'public',
+        place_on_screener: placeOnScreener,
+        letterhead_id: letterheadId,
         status,
         version,
       })
@@ -380,12 +397,16 @@ export async function saveForm(input: {
       audience,
       status,
       is_onboarding: audience === 'public',
+      place_on_screener: placeOnScreener,
+      letterhead_id: letterheadId,
       version,
       schema,
     }
   }
 
   const audience = input.audience === 'public' ? 'public' : 'private'
+  const placeOnScreener = audience === 'public' && Boolean(input.placeOnScreener)
+  const letterheadId = input.letterheadId || null
   const status = input.publish ? 'published' : 'draft'
   if (status === 'published') {
     const problem = validateForm(name, schema)
@@ -402,6 +423,8 @@ export async function saveForm(input: {
       audience,
       status,
       is_onboarding: audience === 'public',
+      place_on_screener: placeOnScreener,
+      letterhead_id: letterheadId,
       version: 1,
       schema: schema as unknown as Json,
     })
@@ -415,9 +438,25 @@ export async function saveForm(input: {
     audience,
     status,
     is_onboarding: audience === 'public',
+    place_on_screener: placeOnScreener,
+    letterhead_id: letterheadId,
     version: data.version,
     schema,
   }
+}
+
+export async function duplicateForm(id: string): Promise<FormRecord> {
+  const forms = await listForms()
+  const source = forms.find((form) => form.id === id)
+  if (!source) throw new Error('Could not find that form.')
+  return saveForm({
+    name: `${source.name} copy`,
+    audience: source.audience,
+    schema: source.schema,
+    publish: false,
+    placeOnScreener: source.place_on_screener,
+    letterheadId: source.letterhead_id,
+  })
 }
 
 export async function deleteForm(id: string): Promise<'deleted' | 'archived'> {
@@ -666,6 +705,63 @@ export async function openFormLink(token: string): Promise<OpenFormLink> {
     schema: parseFormSchema(row.schema),
     measures,
     answers: asObject(row.answers),
+    letterhead: parseOpenLetterhead(row.letterhead),
+  }
+}
+
+function parseOpenLetterhead(raw: unknown): OpenFormLink['letterhead'] {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const row = raw as Record<string, unknown>
+  const practiceName = String(row.practiceName || '')
+  const logoUrl = String(row.logoUrl || '')
+  const addressLines = Array.isArray(row.addressLines) ? row.addressLines.map((line) => String(line || '')).filter(Boolean) : []
+  if (!practiceName && !logoUrl && !addressLines.length && !row.clinicianName) return null
+  return {
+    practiceName,
+    logoUrl,
+    addressLines,
+    clinicianName: String(row.clinicianName || ''),
+    professionalTitle: String(row.professionalTitle || ''),
+  }
+}
+
+export type FormDocumentRecord = {
+  id: string
+  clientId: string | null
+  title: string
+  status: string
+  submittedAt: string | null
+  schema: FormSchema
+  measures: Record<string, MeasureSchema>
+  answers: Record<string, unknown>
+  letterheadId: string | null
+}
+
+export async function getFormDocument(submissionId: string): Promise<FormDocumentRecord> {
+  const supabase = supabaseOrThrow()
+  const { data, error } = await supabase
+    .from('form_submissions')
+    .select('id, client_id, status, submitted_at, encrypted_payload, form_definitions(name, letterhead_id)')
+    .eq('id', submissionId)
+    .single()
+  rowOrThrow(data, error, 'Could not open this form.')
+  const payload = asObject(data.encrypted_payload)
+  const measuresRaw = asObject(payload.measures)
+  const measures: Record<string, MeasureSchema> = {}
+  for (const [id, schema] of Object.entries(measuresRaw)) {
+    measures[id] = parseMeasureSchema(schema)
+  }
+  const definition = one(data.form_definitions as { name?: string; letterhead_id?: string | null } | { name?: string; letterhead_id?: string | null }[] | null)
+  return {
+    id: data.id,
+    clientId: data.client_id,
+    title: definition?.name || 'Form',
+    status: data.status,
+    submittedAt: data.submitted_at,
+    schema: parseFormSchema(payload.schema),
+    measures,
+    answers: asObject(payload.answers),
+    letterheadId: definition?.letterhead_id || null,
   }
 }
 

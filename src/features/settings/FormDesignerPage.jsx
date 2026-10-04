@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useConfirm, useToast } from '../../components/ui'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { CLIENT_BINDS, bindLabel, blankForm, moveListItem, newFormId } from '../../lib/formModel'
@@ -9,6 +10,7 @@ import {
   useMeasuresQuery,
   useSaveFormMutation,
 } from '../../lib/formQueries'
+import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 import { formEmbedCode, formStartUrl } from '../forms/downloadCsv'
 
 const FORM_MODULES = [
@@ -62,6 +64,8 @@ function blankDraft() {
     id: null,
     name: '',
     audience: 'private',
+    placeOnScreener: false,
+    letterheadId: undefined,
     status: 'draft',
     schema: blankForm(),
   }
@@ -72,6 +76,8 @@ function fromRecord(form) {
     id: form.id,
     name: form.name,
     audience: form.audience === 'public' ? 'public' : 'private',
+    placeOnScreener: Boolean(form.place_on_screener),
+    letterheadId: form.letterhead_id || null,
     status: form.status === 'published' ? 'published' : 'draft',
     schema: form.schema,
   }
@@ -138,6 +144,15 @@ function FormDesigner({ draft, onChange, measures, userId }) {
   const confirm = useConfirm()
   const save = useSaveFormMutation(userId)
   const remove = useDeleteFormMutation(userId)
+  const letterheadsQuery = useQuery({
+    queryKey: ['letterheads', userId],
+    queryFn: listLetterheads,
+    enabled: Boolean(userId),
+  })
+  const letterheads = letterheadsQuery.data || []
+  const letterheadId = draft.letterheadId === undefined
+    ? (letterheads.find((row) => row.is_default)?.id || letterheads[0]?.id || '')
+    : (draft.letterheadId || '')
   const schema = draft.schema
   const published = draft.status === 'published'
   const publishedMeasures = measures.filter((measure) => measure.status === 'published')
@@ -179,6 +194,8 @@ function FormDesigner({ draft, onChange, measures, userId }) {
         audience: draft.audience,
         schema,
         publish,
+        placeOnScreener: draft.audience === 'public' && draft.placeOnScreener,
+        letterheadId: letterheadId || null,
       })
       onChange(fromRecord(saved))
       if (!draft.id) navigate(`/settings/forms/edit/${saved.id}`, { replace: true })
@@ -290,13 +307,37 @@ function FormDesigner({ draft, onChange, measures, userId }) {
                 })}
               >
                 <option value="private">Send to a client I already see</option>
-                <option value="public">Intake. Someone new joins the waitlist</option>
+                <option value="public">Share a link</option>
               </select>
             </div>
+            <div className="form-group" style={{ marginTop: '0.8rem' }}>
+              <label htmlFor="form-letterhead">Letterhead</label>
+              <select
+                id="form-letterhead"
+                className="paper-input"
+                value={letterheadId}
+                onChange={(event) => onChange({ ...draft, letterheadId: event.target.value || null })}
+              >
+                <option value="">No letterhead</option>
+                {letterheads.map((row) => (
+                  <option key={row.id} value={row.id}>{row.name || row.practice_name || 'Letterhead'}</option>
+                ))}
+              </select>
+            </div>
+            {draft.audience === 'public' && (
+              <label className="form-builder__required" style={{ marginTop: '0.8rem' }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(draft.placeOnScreener)}
+                  onChange={(event) => onChange({ ...draft, placeOnScreener: event.target.checked })}
+                />
+                Place the person on the screener
+              </label>
+            )}
             <p className="form-export-note">
               {draft.audience === 'public'
-                ? 'Publish this, then copy the link or the embed from the forms list. When someone sends it, they are added to the waitlist, a course is opened, and the form is the first thing on their timeline.'
-                : 'Add a published form from the client’s course. A draft cannot be added there. Intake forms are not sent from a course.'}
+                ? 'Publish this, then copy the link or the embed. With the screener box ticked, sending the form creates the client, opens a course, and puts them on the screener. The letterhead sits at the top of the form and the PDF.'
+                : 'Add a published form from the client’s course. A draft cannot be added there. A shared form is not sent from a course.'}
             </p>
           </div>
           {schema.blocks.map((block, index) => (
@@ -366,8 +407,10 @@ function FormDesigner({ draft, onChange, measures, userId }) {
                 </p>
               )}
               <div className="form-designer__card-actions">
-                <button type="button" className="secondary" disabled={index === 0} onClick={() => setBlocks(moveListItem(schema.blocks, index, index - 1))}>Up</button>
-                <button type="button" className="secondary" disabled={index === schema.blocks.length - 1} onClick={() => setBlocks(moveListItem(schema.blocks, index, index + 1))}>Down</button>
+                <div className="form-designer__nudge">
+                  <button type="button" className="secondary" aria-label="Move up" disabled={index === 0} onClick={() => setBlocks(moveListItem(schema.blocks, index, index - 1))}>↑</button>
+                  <button type="button" className="secondary" aria-label="Move down" disabled={index === schema.blocks.length - 1} onClick={() => setBlocks(moveListItem(schema.blocks, index, index + 1))}>↓</button>
+                </div>
                 <button type="button" className="secondary" onClick={() => setBlocks(schema.blocks.filter((_, blockIndex) => blockIndex !== index))}>Remove</button>
               </div>
             </div>

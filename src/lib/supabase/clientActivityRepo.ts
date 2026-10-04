@@ -110,7 +110,7 @@ export async function listClientActivity(clientId: string): Promise<ClientActivi
       client_id: clientId,
       type: 'form',
       title: formName || payloadTitle(row.encrypted_payload, 'Form submitted'),
-      summary: formDef?.audience === 'public' ? 'Added to the waitlist' : 'Form submitted',
+      summary: formDef?.audience === 'public' ? 'Added to the screener' : 'Form submitted',
       created_at: row.submitted_at || row.created_at,
       author_id: null,
       ref_id: row.id,

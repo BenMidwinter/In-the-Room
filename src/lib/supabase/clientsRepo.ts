@@ -31,7 +31,9 @@ export type AppClientRecord = {
   medication: string
   gender: string
   is_active: boolean
+  on_screener: boolean
   on_waitlist: boolean
+  status: string
   created_at: string
   updated_at?: string
 }
@@ -93,7 +95,9 @@ function toAppClient(row: {
     medication: identity.medication || '',
     gender: identity.gender || '',
     is_active: row.status === 'active',
+    on_screener: row.status === 'screener',
     on_waitlist: row.status === 'waitlist',
+    status: row.status,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
@@ -292,6 +296,31 @@ export async function patchClientIdentity(
   })
   hydrateLocal([mapped])
   return mapped
+}
+
+export async function promoteWaitlistClient(clientId: string): Promise<void> {
+  if (!clientId) return
+  const supabase = getSupabase()
+  if (!supabase) return
+  const { error } = await supabase
+    .from('clients')
+    .update({ status: 'active' })
+    .eq('id', clientId)
+    .eq('status', 'waitlist')
+  if (error) throw error
+  const idx = db.clients.findIndex((row) => row.id === clientId)
+  if (idx !== -1) {
+    const current = db.clients[idx] as { on_waitlist?: boolean }
+    if (current.on_waitlist) {
+      db.clients[idx] = {
+        ...db.clients[idx],
+        is_active: true,
+        on_waitlist: false,
+        on_screener: false,
+        status: 'active',
+      } as StoreRecord
+    }
+  }
 }
 
 export async function acceptWaitlistClient(clientId: string): Promise<void> {

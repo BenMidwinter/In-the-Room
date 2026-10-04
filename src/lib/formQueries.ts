@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createPrivateSubmission,
   deleteForm,
+  duplicateForm,
   deleteMeasure,
   deleteSubmission,
   listEpisodeForms,
@@ -93,6 +94,16 @@ export function useSaveFormMutation(userId: string) {
         return [...list.filter((row) => row.id !== saved.id), saved]
           .sort((a, b) => a.name.localeCompare(b.name))
       })
+      queryClient.invalidateQueries({ queryKey: formQueryKeys.forms(userId) })
+    },
+  })
+}
+
+export function useDuplicateFormMutation(userId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: duplicateForm,
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: formQueryKeys.forms(userId) })
     },
   })

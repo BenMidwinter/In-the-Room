@@ -6,6 +6,7 @@ import { useAppClients } from '../../lib/queries'
 import {
   useDeleteFormMutation,
   useDeleteMeasureMutation,
+  useDuplicateFormMutation,
   useFormsQuery,
   useMeasuresQuery,
   useSendFormMutation,
@@ -36,6 +37,7 @@ export default function FormsSettingsPage() {
   const formsQuery = useFormsQuery(userId)
   const removeMeasure = useDeleteMeasureMutation(userId)
   const removeForm = useDeleteFormMutation(userId)
+  const duplicate = useDuplicateFormMutation(userId)
   const send = useSendFormMutation('library')
   const measures = measuresQuery.data || []
   const forms = formsQuery.data || []
@@ -152,9 +154,20 @@ export default function FormsSettingsPage() {
     },
   }))
 
+  const copyForm = async (form) => {
+    try {
+      await duplicate.mutateAsync(form.id)
+      toast.saved('Copy saved as a draft')
+    } catch (err) {
+      toast.error(err.message || 'Could not copy the form')
+    }
+  }
+
   const formRows = forms.map((form) => {
-    const intake = form.audience === 'public'
-    const kind = intake ? 'Intake' : 'Send to a client'
+    const shared = form.audience === 'public'
+    const kind = shared
+      ? (form.place_on_screener ? 'Screener' : 'Shared link')
+      : 'Send to a client'
     const view = { label: 'View', onSelect: () => navigate(`/settings/forms/edit/${form.id}`) }
     const remove = { label: 'Delete', danger: true, onSelect: () => deleteForm(form) }
     const share = (label, text, message) => ({
@@ -167,16 +180,19 @@ export default function FormsSettingsPage() {
         copy(text, message)
       },
     })
-    const items = intake
+    const duplicateItem = { label: 'Duplicate', onSelect: () => copyForm(form) }
+    const items = shared
       ? [
         view,
-        share('Copy link', formStartUrl(form.id), 'Link copied. Share it whenever someone new should join the waitlist.'),
+        share('Copy link', formStartUrl(form.id), 'Link copied.'),
         share('Copy embed', formEmbedCode(form.id, form.name), 'Embed code copied'),
+        duplicateItem,
         remove,
       ]
       : [
         view,
         { label: 'Send', onSelect: () => sendForm(form) },
+        duplicateItem,
         remove,
       ]
     return {
@@ -230,7 +246,7 @@ export default function FormsSettingsPage() {
       <SettingsSectionCard
         blockId="settings_forms"
         title="Forms"
-        description="A form you send is added on a course. An intake form is shared with a link or an embed, and the person who sends it joins the waitlist."
+        description="A form you send is added on a course. A shared form can be copied as a link or an embed. Tick “Place the person on the screener” when sending it should create a client."
         actions={(
           <button
             type="button"

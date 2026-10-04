@@ -2193,6 +2193,131 @@ button.agenda-event {
   max-width: 42rem;
 }
 
+.screener-switch {
+  display: inline-flex;
+  gap: 0.35rem;
+}
+
+.screener-switch__btn {
+  border: 1px solid var(--border-light);
+  background: var(--bg-surface);
+  color: var(--txt-body);
+  font: inherit;
+  font-weight: 600;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.screener-switch__btn--on {
+  border-color: var(--col-accent);
+  color: var(--col-accent);
+  background: color-mix(in srgb, var(--col-accent) 8%, var(--bg-surface));
+}
+
+.screener-note {
+  display: block;
+  width: 100%;
+  min-height: 2.6rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--txt-body);
+  text-align: left;
+  text-decoration: none;
+  white-space: pre-wrap;
+}
+
+.screener-note--quiet {
+  color: var(--txt-muted);
+}
+
+.screener-tag {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.3rem 0;
+}
+
+.record-table__row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.settings-inline-add {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.settings-inline-add .paper-input {
+  width: 12rem;
+}
+
+.form-document__bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 44rem;
+  margin: 0 auto 1rem;
+}
+
+.form-document__sheet {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2.75rem 3rem 3.25rem;
+  background: #fffdf8;
+  color: #241f1a;
+  border: 1px solid rgba(60, 46, 28, 0.08);
+  box-shadow: 0 16px 48px rgba(48, 36, 18, 0.1);
+}
+
+.form-document__sheet h1 {
+  margin: 0 0 1.5rem;
+  font-family: var(--font-head);
+  font-variation-settings: var(--font-head-variation);
+  font-size: 2rem;
+  color: #241f1a;
+}
+
+.form-document__sheet .form-question__label,
+.form-document__sheet .form-question__answer,
+.form-document__sheet .form-fill__prose {
+  color: #241f1a;
+}
+
+.form-document__sheet .form-question__answer {
+  white-space: pre-wrap;
+}
+
+.form-fill__sheet .letterhead-preview,
+.form-document__sheet .letterhead-preview {
+  padding: 0 0 0.75rem;
+  color: #241f1a;
+}
+
+.form-fill__sheet .letterhead-preview__name,
+.form-fill__sheet .letterhead-preview__clinician,
+.form-document__sheet .letterhead-preview__name,
+.form-document__sheet .letterhead-preview__clinician {
+  color: #241f1a;
+}
+
+.form-fill__sheet .letterhead-preview__role,
+.form-fill__sheet .letterhead-preview__line,
+.form-document__sheet .letterhead-preview__role,
+.form-document__sheet .letterhead-preview__line {
+  color: #5c564e;
+}
+
+.form-fill__sheet .letterhead-preview__rule,
+.form-document__sheet .letterhead-preview__rule {
+  border-top-color: #241f1a;
+}
+
 .form-question {
   margin: 0 0 1.25rem;
 }
@@ -2387,6 +2512,9 @@ button.agenda-event {
   gap: 0.45rem;
   position: sticky;
   top: 0.75rem;
+  max-height: calc(100vh - 5.5rem);
+  overflow-y: auto;
+  padding-right: 0.2rem;
 }
 
 .form-designer__palette-title {
@@ -2439,6 +2567,24 @@ button.agenda-event {
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+}
+
+.form-designer__card-actions {
+  justify-content: flex-start;
+}
+
+.form-designer__nudge {
+  display: inline-flex;
+}
+
+.form-designer__nudge .secondary {
+  min-width: 2.15rem;
+  padding-left: 0.45rem;
+  padding-right: 0.45rem;
+}
+
+.form-designer__nudge .secondary + .secondary {
+  margin-left: 0.15rem;
 }
 
 @media (max-width: 800px) {
