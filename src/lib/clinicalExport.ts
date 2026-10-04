@@ -1,5 +1,6 @@
+import type { PrintLetterhead } from './letterheadPrint'
 import type { WorkplaceBranding } from './workplaceBranding'
-import { formatWorkplaceAddress, getClinicalExportBranding, getWorkplaceBranding } from './workplaceBranding'
+import { formatWorkplaceAddress, getClinicalExportBranding } from './workplaceBranding'
 
 function stripHtml(html) {
   return (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
@@ -24,43 +25,80 @@ function escapeHtml(text) {
 
 const DOCUMENT_PRINT_STYLES = `
   body { font-family: Georgia, 'Times New Roman', serif; color: #1a1818; margin: 1.75cm 2cm; line-height: 1.65; }
-  .letterhead { display: flex; align-items: flex-start; gap: 1rem; padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 2px solid #58c2d5; }
-  .letterhead__logo { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; }
-  .letterhead__org { font-size: 0.82rem; line-height: 1.45; color: #404b54; }
-  .letterhead__org strong { display: block; font-size: 0.95rem; color: #1f2528; margin-bottom: 0.2rem; }
-  .letterhead__org address { font-style: normal; white-space: pre-line; }
-  h1 { font-size: 1.35rem; margin: 0 0 0.35rem; }
-  .meta { font-size: 0.9rem; color: #555; margin: 0 0 1.25rem; }
+  .letterhead { margin: 0 0 1.25rem; }
+  .letterhead__brand { display: flex; align-items: flex-start; gap: 1.25rem; }
+  .letterhead__logo { width: 72px; height: 72px; object-fit: contain; flex-shrink: 0; }
+  .letterhead__practice { margin-left: auto; text-align: right; }
+  .letterhead__practice strong { display: block; font-size: 1.35rem; line-height: 1.2; color: #1f2528; }
+  .letterhead__practice address { font-style: normal; font-size: 0.85rem; line-height: 1.4; color: #404b54; margin-top: 0.3rem; }
+  .letterhead__clinician, .letterhead__role { margin: 0.15rem 0 0; font-size: 11pt; }
+  .letterhead__rule { border: 0; border-top: 1px solid #1a1818; margin: 0.75rem 0 0; }
+  h1 { font-size: 1.35rem; margin: 1rem 0 0.35rem; }
+  .meta { font-size: 0.9rem; color: #333; margin: 0 0 1.25rem; }
   .content { font-size: 11pt; }
   .content p { margin: 0 0 0.75rem; }
   .content ul, .content ol { margin: 0 0 0.75rem 1.25rem; }
   @media print { body { margin: 1.25cm 1.5cm; } }
 `
 
-function buildLetterheadHtml(branding: WorkplaceBranding) {
-  const address = formatWorkplaceAddress(branding)
-  const logo = branding.logo_url
-    ? `<img class="letterhead__logo" src="${branding.logo_url}" alt="${escapeHtml(branding.name)} logo" />`
+function formatPrintDate(value: string | undefined) {
+  if (!value) return ''
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  const parsed = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+function formatPrintDateTime(value: string | undefined) {
+  if (!value) return ''
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function buildLetterheadHtml(letterhead?: PrintLetterhead) {
+  const practiceName = letterhead?.practiceName?.trim() || ''
+  const logoUrl = letterhead?.logoUrl?.trim() || ''
+  const lines = (letterhead?.addressLines || []).map((line) => line.trim()).filter(Boolean)
+  const clinicianName = letterhead?.clinicianName?.trim() || ''
+  const professionalTitle = letterhead?.professionalTitle?.trim() || ''
+  const logo = logoUrl
+    ? `<img class="letterhead__logo" src="${escapeHtml(logoUrl)}" alt="${escapeHtml(practiceName || 'Practice logo')}" />`
     : ''
-  return `<header class="letterhead">
-    ${logo}
-    <div class="letterhead__org">
-      <strong>${escapeHtml(branding.name)}</strong>
-      <address>${escapeHtml(address)}</address>
-    </div>
-  </header>`
+  const address = lines.length
+    ? `<address>${lines.map((line) => escapeHtml(line)).join('<br />')}</address>`
+    : ''
+  const practice = practiceName || address
+    ? `<div class="letterhead__practice">${practiceName ? `<strong>${escapeHtml(practiceName)}</strong>` : ''}${address}</div>`
+    : ''
+  const brand = logo || practice ? `<div class="letterhead__brand">${logo}${practice}</div>` : ''
+  const clinician = clinicianName
+    ? `<p class="letterhead__clinician">${escapeHtml(clinicianName)}</p>`
+    : ''
+  const role = professionalTitle
+    ? `<p class="letterhead__role">${escapeHtml(professionalTitle)}</p>`
+    : ''
+  return `<header class="letterhead">${brand}${clinician}${role}<hr class="letterhead__rule" /></header>`
 }
 
 function buildClinicalDocumentPrintHtml({
   title,
   metaHtml,
   bodyHtml,
-  branding,
+  letterhead,
 }: {
   title: string
   metaHtml: string
   bodyHtml: string
-  branding: WorkplaceBranding
+  letterhead?: PrintLetterhead
 }) {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -70,7 +108,7 @@ function buildClinicalDocumentPrintHtml({
   <style>${DOCUMENT_PRINT_STYLES}</style>
 </head>
 <body>
-  ${buildLetterheadHtml(branding)}
+  ${buildLetterheadHtml(letterhead)}
   <h1>${escapeHtml(title)}</h1>
   ${metaHtml}
   <div class="content">${bodyHtml || ''}</div>
@@ -100,14 +138,39 @@ function openPrintDocument(html: string) {
   }
 
   iframe.onload = () => {
-    try {
-      iframe.contentWindow?.focus()
-      iframe.contentWindow?.print()
-    } catch {
-      cleanup()
+    const print = () => {
+      try {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+      } catch {
+        cleanup()
+        return
+      }
+      window.setTimeout(cleanup, 1000)
+    }
+
+    const images = [...(iframe.contentDocument?.images || [])].filter((img) => !img.complete)
+    if (!images.length) {
+      print()
       return
     }
-    window.setTimeout(cleanup, 1000)
+
+    let pending = images.length
+    let printed = false
+    const finish = () => {
+      if (printed) return
+      printed = true
+      print()
+    }
+    const done = () => {
+      pending -= 1
+      if (pending <= 0) finish()
+    }
+    window.setTimeout(finish, 4000)
+    for (const img of images) {
+      img.addEventListener('load', done, { once: true })
+      img.addEventListener('error', done, { once: true })
+    }
   }
 
   iframe.src = url
@@ -116,50 +179,41 @@ function openPrintDocument(html: string) {
 
 function noteToPlainBlock(note, profileName, branding?: WorkplaceBranding) {
   const date = note.session_date || note.created_at?.split('T')[0] || ''
-  const modality = note.modality_used ? `\nModality: ${note.modality_used}` : ''
-  const theme = note.therapeutic_theme ? `\nTheme: ${note.therapeutic_theme}` : ''
-  const attachments = note.artwork_attachments?.length
-    ? `\nArtwork attachments: ${note.artwork_attachments.map((a: { name?: string }) => a.name).join(', ')}`
-    : ''
   const header = branding
     ? `${branding.name}\n${formatWorkplaceAddress(branding)}\n\n`
     : ''
-  return `${header}${note.title}\nDate: ${date}\nAuthor: ${profileName || 'Clinician'}${modality}${theme}${attachments}\n\n${stripHtml(note.content)}`
+  const author = profileName ? `\nAuthor: ${profileName}` : ''
+  return `${header}${note.title}\nDate: ${date}${author}\n\n${stripHtml(note.content)}`
 }
 
-function buildProgressNotePrintHtml(
+function noteMetaHtml(note, clientName?: string) {
+  const sessionDate = note.session_date || note.created_at?.split('T')[0] || ''
+  const dateLabel = formatPrintDate(sessionDate)
+  const signed = note.status === 'signed_off' && note.signed_off_at
+    ? `<br /><strong>Signed off:</strong> ${escapeHtml(formatPrintDateTime(note.signed_off_at))}`
+    : ''
+  return `<p class="meta">
+    ${clientName ? `<strong>Client:</strong> ${escapeHtml(clientName)}<br />` : ''}
+    ${dateLabel ? `<strong>Date:</strong> ${escapeHtml(dateLabel)}` : ''}
+    ${signed}
+  </p>`
+}
+
+export function renderProgressNoteDocument(
   note,
   {
     clientName,
-    authorName,
-    branding,
+    letterhead,
   }: {
     clientName?: string
-    authorName?: string
-    branding?: WorkplaceBranding
+    letterhead?: PrintLetterhead
   } = {},
 ) {
-  const resolvedBranding = branding || getWorkplaceBranding(null)
-  const sessionDate = note.session_date || note.created_at?.split('T')[0] || ''
-  const modality = note.modality_used ? `<p><strong>Modality:</strong> ${escapeHtml(note.modality_used)}</p>` : ''
-  const theme = note.therapeutic_theme
-    ? `<p><strong>Therapeutic theme:</strong> ${escapeHtml(note.therapeutic_theme)}</p>`
-    : ''
-  const signed = note.status === 'signed_off' && note.signed_off_at
-    ? `<p class="meta"><strong>Signed off:</strong> ${escapeHtml(new Date(note.signed_off_at).toLocaleString())}</p>`
-    : ''
-
-  const metaHtml = `<p class="meta">
-    <strong>Client:</strong> ${escapeHtml(clientName || 'Client')}<br />
-    <strong>Session date:</strong> ${escapeHtml(sessionDate)}<br />
-    <strong>Author:</strong> ${escapeHtml(authorName || 'Clinician')}
-  </p>${modality}${theme}${signed}`
-
   return buildClinicalDocumentPrintHtml({
     title: note.title,
-    metaHtml,
+    metaHtml: noteMetaHtml(note, clientName),
     bodyHtml: note.content || '',
-    branding: resolvedBranding,
+    letterhead,
   })
 }
 
@@ -167,28 +221,25 @@ function buildLetterPrintHtml(
   letter,
   {
     clientName,
-    authorName,
-    branding,
+    letterhead,
   }: {
     clientName?: string
-    authorName?: string
-    branding?: WorkplaceBranding
+    letterhead?: PrintLetterhead
   } = {},
 ) {
-  const resolvedBranding = branding || getWorkplaceBranding(null)
   const letterDate = letter.letter_date || letter.created_at?.split('T')[0] || ''
+  const dateLabel = formatPrintDate(letterDate)
   const metaHtml = `<p class="meta">
+    ${dateLabel ? `<strong>Date:</strong> ${escapeHtml(dateLabel)}<br />` : ''}
     ${letter.recipient ? `<strong>To:</strong> ${escapeHtml(letter.recipient)}<br />` : ''}
-    <strong>Date:</strong> ${escapeHtml(letterDate)}<br />
-    <strong>Re:</strong> ${escapeHtml(clientName || 'Client')}<br />
-    <strong>Author:</strong> ${escapeHtml(authorName || 'Clinician')}
+    ${clientName ? `<strong>Re:</strong> ${escapeHtml(clientName)}` : ''}
   </p>`
 
   return buildClinicalDocumentPrintHtml({
     title: letter.title,
     metaHtml,
     bodyHtml: letter.content || '',
-    branding: resolvedBranding,
+    letterhead,
   })
 }
 
@@ -197,33 +248,23 @@ export function downloadProgressNotePdf(
   note,
   meta: {
     clientName?: string
-    authorName?: string
-    workplaceId?: string | null
-    clinicianUserId?: string | null
-    branding?: WorkplaceBranding
+    letterhead?: PrintLetterhead
   } = {},
 ) {
   if (!note) return false
-  const branding = meta.branding || getClinicalExportBranding(meta.workplaceId, meta.clinicianUserId)
-  const html = buildProgressNotePrintHtml(note, { ...meta, branding })
-  return openPrintDocument(html)
+  return openPrintDocument(renderProgressNoteDocument(note, meta))
 }
 
-/** Open a print-ready letter with workplace letterhead. */
+/** Open a print-ready letter with the chosen practice letterhead. */
 export function downloadLetterPdf(
   letter,
   meta: {
     clientName?: string
-    authorName?: string
-    workplaceId?: string | null
-    clinicianUserId?: string | null
-    branding?: WorkplaceBranding
+    letterhead?: PrintLetterhead
   } = {},
 ) {
   if (!letter) return false
-  const branding = meta.branding || getClinicalExportBranding(meta.workplaceId, meta.clinicianUserId)
-  const html = buildLetterPrintHtml(letter, { ...meta, branding })
-  return openPrintDocument(html)
+  return openPrintDocument(buildLetterPrintHtml(letter, meta))
 }
 
 /** Mock batch export — resolves after delay with a browser download. */

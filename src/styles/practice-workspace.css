@@ -337,6 +337,53 @@
   color: var(--col-accent);
 }
 
+.letterhead-branding__preview {
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.letterhead-branding__brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  width: 100%;
+}
+
+.letterhead-branding__practice {
+  margin-left: auto;
+  text-align: right;
+}
+
+.letterhead-branding__practice strong {
+  display: block;
+  font-size: 1.35rem;
+  line-height: 1.2;
+  color: var(--txt);
+}
+
+.letterhead-branding__address {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--txt-muted);
+  white-space: pre-line;
+}
+
+.letterhead-branding__clinician,
+.letterhead-branding__role {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.letterhead-branding__rule {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--txt);
+  margin: 0.65rem 0 0;
+}
+
 .workplace-branding__form,
 .letterhead-branding__form {
   display: flex;

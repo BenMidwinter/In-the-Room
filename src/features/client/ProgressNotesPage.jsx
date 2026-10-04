@@ -30,13 +30,14 @@ import {
   PROGRESS_NOTE_LOCK_HOURS,
 } from '../../lib/progressNoteLifecycle'
 import { downloadProgressNotePdf } from '../../lib/clinicalExport'
-import { getClinicalExportBranding } from '../../lib/workplaceBranding'
+import { loadClinicianPrintIdentity, resolveDownloadLetterhead } from '../../lib/letterheadPrint'
+import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 import {
   formatAppointmentDateTime,
   formatAppointmentDate,
   sessionDateFromAppointment,
 } from '../../lib/appointmentUtils'
-import { useToast, useConfirm } from '../../components/ui'
+import { useToast, useConfirm, useChoose } from '../../components/ui'
 import ErrorBoundary from '../../components/ErrorBoundary'
 
 function sortNotesLatestFirst(notes) {
@@ -172,6 +173,7 @@ function ProgressNotesPageContent() {
   const { client, session, refreshClients } = useClientSession()
   const toast = useToast()
   const confirm = useConfirm()
+  const chooseLetterhead = useChoose()
 
   const [title, setTitle] = useState('')
   const [sessionDate, setSessionDate] = useState(DEMO_TODAY)
@@ -655,23 +657,28 @@ function ProgressNotesPageContent() {
     )
   }
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     const note = {
       ...buildNotePayload(),
       status: noteMeta.status,
       signed_off_at: noteMeta.signed_off_at,
     }
-    const branding = getClinicalExportBranding(client.workplace_id, session?.user?.id)
-    const opened = downloadProgressNotePdf(note, {
-      clientName: client.real_name,
-      authorName: clinicianProfile?.full_name,
-      branding,
-    })
-    if (!opened) {
-      toast.error('Could not open the print dialog. Please try again.')
-      return
+    try {
+      const identity = await loadClinicianPrintIdentity(session?.user?.id)
+      const letterhead = await resolveDownloadLetterhead(await listLetterheads(), chooseLetterhead, identity)
+      if (!letterhead) return
+      const opened = downloadProgressNotePdf(note, {
+        clientName: client.real_name,
+        letterhead,
+      })
+      if (!opened) {
+        toast.error('Could not open the print dialog. Please try again.')
+        return
+      }
+      toast.info('Choose “Save as PDF” in the print dialog.')
+    } catch (err) {
+      toast.error(err?.message || 'Could not prepare the letterhead.')
     }
-    toast.info('Choose “Save as PDF” in the print dialog.')
   }
 
   const autoSaveLabel = autoSaveStatus === 'saving'

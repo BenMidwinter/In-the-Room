@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import SectionCard from '../../components/SectionCard'
 import LetterheadBrandingForm from '../../components/LetterheadBrandingForm'
-import { resolvePracticeBranding } from '../../lib/workplaceBranding'
+import { useAppSession } from '../../lib/AppSessionContext'
+import { loadClinicianPrintIdentity } from '../../lib/letterheadPrint'
 import {
   deleteLetterhead,
   listLetterheads,
@@ -13,7 +14,6 @@ import { useConfirm, useToast } from '../../components/ui'
 const EMPTY = {
   id: '',
   name: '',
-  practice_name: '',
   logo_url: '',
   address_line1: '',
   address_line2: '',
@@ -26,8 +26,7 @@ const EMPTY = {
 function toForm(row) {
   return {
     id: row.id || '',
-    name: row.name || '',
-    practice_name: row.practice_name || '',
+    name: row.practice_name || row.name || '',
     logo_url: row.logo_url || '',
     address_line1: row.address_line1 || '',
     address_line2: row.address_line2 || '',
@@ -38,11 +37,24 @@ function toForm(row) {
   }
 }
 
+function addressLinesFromForm(form) {
+  if (!form) return []
+  return [
+    form.address_line1,
+    form.address_line2,
+    form.address_line3,
+    form.postcode,
+    form.country,
+  ].map((line) => String(line || '').trim()).filter(Boolean)
+}
+
 export default function LetterheadsPanel() {
   const toast = useToast()
   const confirm = useConfirm()
+  const { session } = useAppSession()
   const [rows, setRows] = useState([])
   const [form, setForm] = useState(null)
+  const [identity, setIdentity] = useState({ clinicianName: '', professionalTitle: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -57,22 +69,21 @@ export default function LetterheadsPanel() {
     reload().catch((err) => setError(err.message))
   }, [])
 
-  const previewBranding = useMemo(() => {
-    if (!form) return resolvePracticeBranding({})
-    return resolvePracticeBranding({
-      practice_name: form.practice_name || form.name,
-      practice_logo_url: form.logo_url || null,
-      practice_address_line1: form.address_line1,
-      practice_address_line2: form.address_line2,
-      practice_address_line3: form.address_line3,
-      practice_postcode: form.postcode,
-      practice_country: form.country,
-    })
-  }, [form])
+  useEffect(() => {
+    let cancelled = false
+    loadClinicianPrintIdentity(session?.user?.id)
+      .then((next) => {
+        if (!cancelled) setIdentity(next)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [session?.user?.id])
 
   const openNew = () => {
     setError('')
-    setForm({ ...EMPTY, name: 'New letterhead' })
+    setForm({ ...EMPTY })
   }
 
   const openExisting = (row) => {
@@ -91,10 +102,11 @@ export default function LetterheadsPanel() {
     setBusy(true)
     setError('')
     try {
+      const practiceName = form.name.trim() || 'Letterhead'
       const saved = await upsertLetterhead({
         ...(form.id ? { id: form.id } : {}),
-        name: form.name.trim() || form.practice_name.trim() || 'Letterhead',
-        practice_name: form.practice_name,
+        name: practiceName,
+        practice_name: practiceName,
         logo_url: form.logo_url,
         address_line1: form.address_line1,
         address_line2: form.address_line2,
@@ -157,7 +169,7 @@ export default function LetterheadsPanel() {
             className={`section-card__toolbar-item${form?.id === row.id ? ' section-card__toolbar-item--active' : ''}`}
             onClick={() => openExisting(row)}
           >
-            {row.name || row.practice_name || 'Letterhead'}
+            {row.practice_name || row.name || 'Letterhead'}
           </button>
         ))}
       </div>
@@ -186,7 +198,7 @@ export default function LetterheadsPanel() {
 
         {form && (
           <LetterheadBrandingForm
-            displayName={previewBranding.name}
+            displayName={form.name.trim()}
             logoUrl={form.logo_url}
             addressLine1={form.address_line1}
             addressLine2={form.address_line2}
@@ -199,7 +211,9 @@ export default function LetterheadsPanel() {
             onAddressLine3Change={(value) => setForm((f) => ({ ...f, address_line3: value }))}
             onPostcodeChange={(value) => setForm((f) => ({ ...f, postcode: value }))}
             onCountryChange={(value) => setForm((f) => ({ ...f, country: value }))}
-            previewBranding={previewBranding}
+            addressLines={addressLinesFromForm(form)}
+            clinicianName={identity.clinicianName}
+            professionalTitle={identity.professionalTitle}
             error={error}
             savedMessage=""
             saving={busy}
@@ -208,24 +222,14 @@ export default function LetterheadsPanel() {
             practiceNameField={(
               <>
                 <label className="letterhead-branding__field">
-                  <span className="letterhead-branding__label">Letterhead name</span>
+                  <span className="letterhead-branding__label">Practice name</span>
                   <input
                     type="text"
                     className="paper-input"
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="e.g. Private practice"
+                    placeholder="Printed on the letterhead"
                     required
-                  />
-                </label>
-                <label className="letterhead-branding__field">
-                  <span className="letterhead-branding__label">Practice name on letterhead</span>
-                  <input
-                    type="text"
-                    className="paper-input"
-                    value={form.practice_name}
-                    onChange={(e) => setForm((f) => ({ ...f, practice_name: e.target.value }))}
-                    placeholder="Printed organisation name"
                   />
                 </label>
                 <label className="settings-service-list__meet" style={{ marginTop: '0.75rem' }}>
