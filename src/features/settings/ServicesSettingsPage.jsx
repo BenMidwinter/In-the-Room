@@ -368,7 +368,7 @@ export default function ServicesSettingsPage() {
                   fee_includes_vat: e.target.value.trim() ? f.fee_includes_vat : false,
                 }))}
               />
-              <p className="settings-form__hint">Leave blank if this service is not billed.</p>
+              <p className="settings-form__hint">Leave blank if this is not billed. A price on a support activity or admin block is invoiced with sessions.</p>
             </div>
             <label className="settings-service-list__meet">
               <input

@@ -77,6 +77,7 @@ export type Database = {
           attendance_status: string | null
           block_role: string
           charged_pence: number | null
+          fee_override_pence: number | null
           do_not_invoice: boolean
           client_id: string | null
           clinician_id: string
@@ -98,6 +99,7 @@ export type Database = {
           attendance_status?: string | null
           block_role?: string
           charged_pence?: number | null
+          fee_override_pence?: number | null
           client_id?: string | null
           clinician_id: string
           do_not_invoice?: boolean
@@ -119,6 +121,7 @@ export type Database = {
           attendance_status?: string | null
           block_role?: string
           charged_pence?: number | null
+          fee_override_pence?: number | null
           client_id?: string | null
           clinician_id?: string
           do_not_invoice?: boolean
@@ -472,6 +475,10 @@ export type Database = {
       }
       clients: {
         Row: {
+          concession_kind: string
+          concession_label: string | null
+          concession_pence: number | null
+          concession_percent: number | null
           created_at: string
           encrypted_pseudonym: Json | null
           id: string
@@ -481,6 +488,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          concession_kind?: string
+          concession_label?: string | null
+          concession_pence?: number | null
+          concession_percent?: number | null
           created_at?: string
           encrypted_pseudonym?: Json | null
           id?: string
@@ -490,6 +501,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          concession_kind?: string
+          concession_label?: string | null
+          concession_pence?: number | null
+          concession_percent?: number | null
           created_at?: string
           encrypted_pseudonym?: Json | null
           id?: string

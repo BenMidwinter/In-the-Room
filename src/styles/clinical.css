@@ -1901,7 +1901,64 @@ button.agenda-event {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem 0.75rem;
-  margin-top: 0.85rem;
+  margin-top: 0.35rem;
+}
+
+.appointment-card__custom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.6rem;
+  align-items: end;
+  width: 100%;
+}
+
+.appointment-card__custom label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.appointment-card__custom input {
+  font: inherit;
+  font-weight: 500;
+  min-width: 7rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  background: var(--bg-page);
+  color: var(--txt-primary);
+}
+
+.client-concession {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.75rem;
+  align-items: end;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.client-concession label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 8rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.client-concession input,
+.client-concession select {
+  font: inherit;
+  font-weight: 500;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  background: var(--bg-page);
+  color: var(--txt-primary);
 }
 
 .appointment-card__do-not-invoice--on {

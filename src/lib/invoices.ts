@@ -68,7 +68,7 @@ export type InvoiceRecord = {
 export type InvoiceDisplay = 'draft' | 'awaiting' | 'partial' | 'paid' | 'overdue' | 'void'
 
 export type BatchLine = {
-  clientId: string
+  clientId: string | null
   clientName: string
   billToName: string
   billToEmail: string
@@ -108,6 +108,11 @@ export function paymentInstructions(details: PaymentDetails): string {
   return lines.join('\n')
 }
 
+function withPriceNote(description: string, note?: string): string {
+  const phrase = String(note || '').trim()
+  return phrase ? `${description} · ${phrase}` : description
+}
+
 export function lineFromAppointment(
   appointment: ReportAppointment,
   policy: CancellationPolicy,
@@ -120,7 +125,26 @@ export function lineForInvoice(
   policy: CancellationPolicy,
   include: 'held' | 'booked' | 'both',
 ): InvoiceLineInput | null {
-  if (roleOf(appointment) !== 'appointment') return null
+  const role = roleOf(appointment)
+  if (role === 'support' || role === 'admin') {
+    if (appointment.externalBusy || appointment.doNotInvoice) return null
+    if (!appointment.feePence || appointment.feePence <= 0) return null
+    const kind = role === 'support' ? 'Support' : 'Admin'
+    const title = appointment.serviceName || appointment.clientName || kind
+    const when = appointment.sessionDate ? formatDisplayDate(appointment.sessionDate) : ''
+    const hours = formatHoursFromMinutes(slotMinutes(appointment.startTime, appointment.endTime))
+    const detail = `${kind}: ${title} (${hours})`
+    const description = withPriceNote(when ? `${when} — ${detail}` : detail, appointment.priceNote)
+    return {
+      appointmentId: appointment.id,
+      description,
+      sessionDate: appointment.sessionDate || null,
+      unitPence: appointment.feePence,
+      quantity: 1,
+      includesVat: Boolean(appointment.feeIncludesVat),
+    }
+  }
+  if (role !== 'appointment') return null
   if (!appointment.clientId || appointment.doNotInvoice) return null
   const marked = Boolean(appointment.attendance)
   if (include === 'held' && !marked) return null
@@ -133,7 +157,7 @@ export function lineForInvoice(
     const attendance = appointment.attendance && appointment.attendance !== 'attended'
       ? ` (${attendanceLabel(appointment.attendance)})`
       : ''
-    const description = when ? `${when} — ${service}${attendance}` : `${service}${attendance}`
+    const description = withPriceNote(when ? `${when} — ${service}${attendance}` : `${service}${attendance}`, appointment.overridePence != null ? appointment.priceNote : '')
     return {
       appointmentId: appointment.id,
       description,
@@ -148,7 +172,7 @@ export function lineForInvoice(
   const when = appointment.sessionDate ? formatDisplayDate(appointment.sessionDate) : ''
   return {
     appointmentId: appointment.id,
-    description: when ? `${when} — ${service}` : service,
+    description: withPriceNote(when ? `${when} — ${service}` : service, appointment.priceNote),
     sessionDate: appointment.sessionDate || null,
     unitPence: appointment.feePence,
     quantity: 1,
@@ -165,13 +189,14 @@ export function activityLineForInvoice(appointment: ReportAppointment): InvoiceL
   const when = appointment.sessionDate ? formatDisplayDate(appointment.sessionDate) : ''
   const hours = formatHoursFromMinutes(slotMinutes(appointment.startTime, appointment.endTime))
   const detail = `${kind}: ${title} (${hours})`
+  const pence = Math.max(0, Math.trunc(Number(appointment.feePence) || 0))
   return {
     appointmentId: appointment.id,
-    description: when ? `${when} — ${detail}` : detail,
+    description: withPriceNote(when ? `${when} — ${detail}` : detail, appointment.priceNote),
     sessionDate: appointment.sessionDate || null,
-    unitPence: 0,
+    unitPence: pence,
     quantity: 1,
-    includesVat: false,
+    includesVat: Boolean(appointment.feeIncludesVat),
   }
 }
 
@@ -261,8 +286,8 @@ export function invoiceStatusLabel(
 export function batchInvoiceGroups(rows: BatchLine[], mode: 'client' | 'payer'): InvoiceBatch[] {
   const groups = new Map<string, InvoiceBatch & { names: string[] }>()
   for (const row of rows) {
-    const payerKey = row.billToEmail.trim().toLowerCase() || row.billToName.trim().toLowerCase() || row.clientId
-    const key = mode === 'payer' ? `payer:${payerKey}` : `client:${row.clientId}`
+    const payerKey = row.billToEmail.trim().toLowerCase() || row.billToName.trim().toLowerCase() || row.clientId || 'practice'
+    const key = mode === 'payer' ? `payer:${payerKey}` : `client:${row.clientId || 'practice'}`
     const current = groups.get(key) || {
       key,
       clientId: row.clientId,

@@ -14,7 +14,8 @@ import { listServices } from '../../lib/supabase/servicesRepo'
 import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 import { loadClinicianPrintIdentity, preferredLetterhead, printLetterheadFromRow } from '../../lib/letterheadPrint'
 import { DEFAULT_CANCELLATION_POLICY } from '../../lib/cancellationPolicy'
-import { calendarMonthRange, inDateRange, matchesClientTag } from '../../lib/reporting'
+import { calendarMonthRange, inDateRange, matchesClientTag, roleOf } from '../../lib/reporting'
+import { concessionFromClient, sessionBasePence } from '../../lib/sessionPrice'
 import { getSupabase } from '../../lib/supabase/client'
 import { listTags } from '../../lib/supabase/screenerRepo'
 import {
@@ -140,21 +141,47 @@ export default function InvoicingPage() {
     const sessions = []
     const activities = []
     for (const appointment of appointmentsQuery.data || []) {
-      const report = toReportAppointment(appointment, serviceById)
+      const client = clients.find((item) => item.id === appointment.client_id)
+      const report = toReportAppointment(appointment, serviceById, client)
       if (report.externalBusy || billed.has(report.id)) continue
-      const activity = activityLineForInvoice(report)
-      if (activity) {
-        activities.push({
-          appointmentId: report.id,
-          clientId: report.clientId,
-          sessionDate: report.sessionDate,
-          line: activity,
-        })
+      const role = roleOf(report)
+      if (role === 'support' || role === 'admin') {
+        const priced = lineForInvoice(report, policy, 'both')
+        if (priced) {
+          const recipient = report.clientId
+            ? invoiceRecipient({
+              clientName: client?.real_name || report.clientName || 'Client',
+              clientEmail: client?.email || '',
+              contacts: contactsByClient.get(report.clientId) || [],
+            })
+            : { billToName: 'Practice', billToEmail: '' }
+          sessions.push({
+            appointmentId: report.id,
+            clientId: report.clientId,
+            clientName: report.clientId ? (client?.real_name || report.clientName || 'Client') : 'Practice',
+            serviceId: report.serviceId,
+            sessionDate: report.sessionDate,
+            marked: false,
+            pricedActivity: true,
+            billToName: recipient.billToName,
+            billToEmail: recipient.billToEmail,
+            line: priced,
+          })
+        } else if (report.overridePence == null && report.feePence == null) {
+          const activity = activityLineForInvoice(report)
+          if (activity) {
+            activities.push({
+              appointmentId: report.id,
+              clientId: report.clientId,
+              sessionDate: report.sessionDate,
+              line: activity,
+            })
+          }
+        }
         continue
       }
       const line = lineForInvoice(report, policy, 'both')
       if (!line || !report.clientId) continue
-      const client = clients.find((item) => item.id === report.clientId)
       const recipient = invoiceRecipient({
         clientName: client?.real_name || report.clientName || 'Client',
         clientEmail: client?.email || '',
@@ -167,6 +194,7 @@ export default function InvoicingPage() {
         serviceId: report.serviceId,
         sessionDate: report.sessionDate,
         marked: Boolean(report.attendance),
+        pricedActivity: false,
         billToName: recipient.billToName,
         billToEmail: recipient.billToEmail,
         line,
@@ -178,8 +206,10 @@ export default function InvoicingPage() {
   const batchRows = work.sessions.filter((item) => {
     if (!inDateRange(item.sessionDate, range)) return false
     if (serviceId && item.serviceId !== serviceId) return false
-    if (include === 'held' && !item.marked) return false
-    if (include === 'booked' && item.marked) return false
+    if (!item.pricedActivity) {
+      if (include === 'held' && !item.marked) return false
+      if (include === 'booked' && item.marked) return false
+    }
     return matchesClientTag(item.clientId, tagId, tagsByClient)
   })
   const groups = batchInvoiceGroups(batchRows.map((item) => ({
@@ -286,10 +316,11 @@ export default function InvoicingPage() {
     try {
       let last = null
       for (const group of ready) {
-        const lines = group.clientId ? group.lines : group.lines.map((line) => {
+        const manyClients = group.forName.split(', ').filter(Boolean).length > 1
+        const lines = manyClients ? group.lines.map((line) => {
           const source = ticked.find((item) => item.appointmentId === line.appointmentId)
           return source ? { ...line, description: `${source.clientName} — ${line.description}` } : line
-        })
+        }) : group.lines
         last = await createInvoice({
           clientId: group.clientId,
           billToName: group.billToName,
@@ -578,7 +609,7 @@ export default function InvoicingPage() {
                 </select>
               </label>
             </div>
-            <p className="text-muted">Tick the rows, then create invoices. Held sessions use the fee already stored. Booked sessions use the service price. One invoice per payer puts clients who share a billing contact on the same invoice.</p>
+            <p className="text-muted">Tick the rows, then create invoices. Held sessions use the fee already stored. Booked sessions use the service price, after any client concession or a custom price on that session. Support and admin with a price are included. One invoice per payer puts clients who share a billing contact on the same invoice.</p>
             {groups.length === 0 ? (
               <p className="text-muted">Nothing matches these filters. New invoice still starts a draft, and you can add a line there.</p>
             ) : groups.map((group) => (
@@ -642,8 +673,13 @@ function Stat({ label, value, detail }) {
   )
 }
 
-function toReportAppointment(appointment, serviceById) {
+function toReportAppointment(appointment, serviceById, client) {
   const service = serviceById.get(appointment.service_id) || null
+  const price = sessionBasePence({
+    feePence: service?.fee_pence ?? null,
+    overridePence: appointment.fee_override_pence ?? null,
+    concession: concessionFromClient(client),
+  })
   return {
     id: appointment.id,
     clientId: appointment.client_id || null,
@@ -658,7 +694,9 @@ function toReportAppointment(appointment, serviceById) {
     externalBusy: Boolean(appointment.is_external_busy),
     doNotInvoice: Boolean(appointment.do_not_invoice),
     chargedPence: appointment.charged_pence ?? null,
-    feePence: service?.fee_pence ?? null,
+    feePence: price.pence,
+    overridePence: appointment.fee_override_pence ?? null,
+    priceNote: price.phrase,
     feeIncludesVat: Boolean(service?.fee_includes_vat),
   }
 }

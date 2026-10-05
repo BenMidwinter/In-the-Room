@@ -68,6 +68,16 @@ describe('reporting', () => {
     expect(buckets.appointment).toBe(50 * 3)
   })
 
+  it('counts a priced support activity in money earned', () => {
+    const summary = summariseAppointments(
+      [session({ id: 's', attendance: null, blockRole: 'support', minutes: 60, fee: 4000 })],
+      { from: '2026-10-01', to: '2026-10-07' },
+      new Map(),
+    )
+    expect(summary.earnedPence).toBe(4000)
+    expect(summary.attended).toBe(0)
+  })
+
   it('reads a signed-off note as complete', () => {
     expect(noteStateFor([{ status: 'draft' }, { status: 'signed_off' }])).toBe('complete')
     expect(noteStateFor([])).toBe('missing')

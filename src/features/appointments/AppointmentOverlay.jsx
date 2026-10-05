@@ -20,6 +20,7 @@ import { listServices } from '../../lib/supabase/servicesRepo'
 import { loadCancellationPolicy } from '../../lib/supabase/cancellationPolicyRepo'
 import { chargeForAttendance, DEFAULT_CANCELLATION_POLICY } from '../../lib/cancellationPolicy'
 import { formatGbpFromPence } from '../../lib/money'
+import { concessionFromClient, sessionBasePence } from '../../lib/sessionPrice'
 import { activityLineForInvoice, invoiceRecipient, lineForInvoice } from '../../lib/invoices'
 import { roleOf } from '../../lib/reporting'
 import { listContacts } from '../../lib/supabase/contactsRepo'
@@ -166,6 +167,7 @@ function AppointmentOverlayHost({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [addingInvoice, setAddingInvoice] = useState(false)
+  const [customFor, setCustomFor] = useState(null)
   const [deleteScopeFor, setDeleteScopeFor] = useState(null)
 
   const clients = useMemo(
@@ -337,10 +339,17 @@ function AppointmentOverlayHost({
     await runDelete(appointment, 'this')
   }
 
-  const feeFor = (appointment) => {
+  const priceFor = (appointment, overridePence = appointment?.fee_override_pence ?? null) => {
     const service = (servicesQuery.data || []).find((row) => row.id === appointment?.service_id)
-    return service?.fee_pence ?? null
+    const client = remoteClients.find((item) => item.id === appointment?.client_id)
+    return sessionBasePence({
+      feePence: service?.fee_pence ?? null,
+      overridePence,
+      concession: concessionFromClient(client),
+    })
   }
+
+  const feeFor = (appointment) => priceFor(appointment).pence
 
   const saveAttendance = async (appointment, { status, doNotInvoice }) => {
     if (!appointment || !session?.user?.id) return
@@ -386,24 +395,57 @@ function AppointmentOverlayHost({
     })
   }
 
-  const invoiceSummary = (() => {
-    if (!viewed?.attendance_status) return ''
-    if (viewed.do_not_invoice) return 'Do not invoice.'
-    if (viewed.charged_pence != null) {
-      return viewed.charged_pence === 0
-        ? 'No fee for this session.'
-        : `This session is ${formatGbpFromPence(viewed.charged_pence)}.`
-    }
-    const charge = chargeForAttendance({
-      attendance: viewed.attendance_status,
-      sessionDate: viewed.session_date,
-      startTime: viewed.start_time,
-      feePence: feeFor(viewed),
-      policy: policyQuery.data || DEFAULT_CANCELLATION_POLICY,
-    })
-    if (!charge.chargedPence) return charge.summary
-    return `${charge.summary} ${formatGbpFromPence(charge.chargedPence)}.`
+  const feeLabel = (() => {
+    if (!viewed) return ''
+    if (viewed.do_not_invoice) return 'Do not invoice'
+    const price = priceFor(viewed)
+    const stored = Boolean(viewed.attendance_status) && viewed.charged_pence != null
+    const amount = stored ? viewed.charged_pence : price.pence
+    if (amount == null) return 'No price'
+    const money = formatGbpFromPence(amount)
+    const phrase = stored
+      ? (viewed.fee_override_pence != null ? 'this session' : (amount === price.pence ? price.phrase : ''))
+      : price.phrase
+    return phrase ? `${money} · ${phrase}` : money
   })()
+
+  const saveFeeOverride = async (overridePence) => {
+    if (!viewed || !session?.user?.id) return
+    const price = priceFor(viewed, overridePence)
+    const charge = viewed.attendance_status
+      ? chargeForAttendance({
+        attendance: viewed.attendance_status,
+        sessionDate: viewed.session_date,
+        startTime: viewed.start_time,
+        feePence: price.pence,
+        policy: policyQuery.data || DEFAULT_CANCELLATION_POLICY,
+        doNotInvoice: viewed.do_not_invoice,
+      })
+      : null
+    const saved = await saveAppointmentMutation.mutateAsync({
+      payload: {
+        id: viewed.id,
+        client_id: viewed.client_id,
+        session_date: viewed.session_date,
+        start_time: viewed.start_time,
+        end_time: viewed.end_time,
+        appointment_type: viewed.appointment_type,
+        therapy_modality: viewed.therapy_modality,
+        service_id: viewed.service_id,
+        service_name: viewed.service_name,
+        location: viewed.location,
+        other_info: viewed.other_info,
+        block_role: viewed.block_role || 'client_session',
+        clinician_id: viewed.clinician_id,
+        attendance_status: viewed.attendance_status,
+        fee_override_pence: overridePence,
+        ...(charge ? { do_not_invoice: charge.doNotInvoice, charged_pence: charge.chargedPence } : {}),
+      },
+      userId: session.user.id,
+    })
+    if (saved) setState({ mode: 'view', appointment: saved })
+    setCustomFor(null)
+  }
 
   const handleAddInvoice = async () => {
     if (!viewed || addingInvoice) return
@@ -413,6 +455,11 @@ function AppointmentOverlayHost({
       return
     }
     const service = (servicesQuery.data || []).find((row) => row.id === viewed.service_id)
+    const price = priceFor(viewed)
+    if (viewed.fee_override_pence != null && (!price.pence || price.pence <= 0)) {
+      toast.error('This session is set to no charge.')
+      return
+    }
     const report = {
       id: viewed.id,
       clientId: viewed.client_id || null,
@@ -427,7 +474,9 @@ function AppointmentOverlayHost({
       externalBusy: false,
       doNotInvoice: Boolean(viewed.do_not_invoice),
       chargedPence: viewed.charged_pence ?? null,
-      feePence: service?.fee_pence ?? null,
+      feePence: price.pence,
+      overridePence: viewed.fee_override_pence ?? null,
+      priceNote: price.phrase,
       feeIncludesVat: Boolean(service?.fee_includes_vat),
     }
     const marked = Boolean(viewed.attendance_status)
@@ -562,10 +611,15 @@ function AppointmentOverlayHost({
           onClose={close}
           onAttendanceChange={handleAttendanceChange}
           onToggleDoNotInvoice={handleToggleDoNotInvoice}
-          invoiceSummary={invoiceSummary}
+          feeLabel={feeLabel}
           onAddInvoice={canInvoice ? handleAddInvoice : undefined}
           addInvoiceLabel={existingInvoice ? 'Open invoice' : 'Add invoice'}
           addInvoicePending={addingInvoice}
+          onCustomPrice={() => setCustomFor(customFor === viewed.id ? null : viewed.id)}
+          customPriceOpen={customFor === viewed.id}
+          customPriceInitial={viewed.fee_override_pence}
+          onSaveCustomPrice={saveFeeOverride}
+          onClearCustomPrice={() => saveFeeOverride(null)}
           onEdit={openEdit}
           onMove={handleMove}
           onDelete={handleDelete}

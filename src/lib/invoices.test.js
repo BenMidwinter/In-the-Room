@@ -99,6 +99,26 @@ describe('invoices', () => {
     expect(shared[0].billToEmail).toBe('finance@council.test')
   })
 
+  it('invoices a priced support activity and a concession', () => {
+    const support = lineForInvoice({
+      ...session({ attendance: null, fee: 4000 }),
+      blockRole: 'support',
+      serviceName: 'School meeting',
+      startTime: '10:00',
+      endTime: '11:00',
+      priceNote: 'Student 20%',
+    }, DEFAULT_CANCELLATION_POLICY, 'held')
+    expect(support?.unitPence).toBe(4000)
+    expect(support?.description).toContain('Support: School meeting')
+    expect(support?.description).toContain('Student 20%')
+    const booked = lineForInvoice({
+      ...session({ attendance: null, fee: 6400 }),
+      priceNote: 'Student 20%',
+    }, DEFAULT_CANCELLATION_POLICY, 'booked')
+    expect(booked?.description).toContain('Student 20%')
+    expect(booked?.unitPence).toBe(6400)
+  })
+
   it('builds a support line the clinician can price', () => {
     const line = activityLineForInvoice({
       ...session({ attendance: null, fee: null }),

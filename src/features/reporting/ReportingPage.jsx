@@ -34,6 +34,7 @@ import {
   timeBuckets,
 } from '../../lib/reporting'
 import { activeBilledAppointmentIds, invoiceBalancePence } from '../../lib/invoices'
+import { concessionFromClient, sessionBasePence } from '../../lib/sessionPrice'
 import { listInvoices } from '../../lib/supabase/invoicesRepo'
 
 const SECTIONS = [
@@ -149,15 +150,20 @@ export default function ReportingPage() {
     return states
   }, [noteIndex.data])
 
+  const clientsById = useMemo(() => {
+    const map = new Map()
+    for (const client of clientsQuery.data || []) map.set(client.id, client)
+    return map
+  }, [clientsQuery.data])
   const mapped = useMemo(() => {
-    const own = (appointmentsQuery.data || []).map((appointment) => toReportAppointment(appointment, serviceById))
+    const own = (appointmentsQuery.data || []).map((appointment) => toReportAppointment(appointment, serviceById, clientsById.get(appointment.client_id)))
     const external = externalBlocksAsAppointments(busyQuery.data || [], userId || '').map((appointment) => ({
-      ...toReportAppointment(appointment, serviceById),
+      ...toReportAppointment(appointment, serviceById, null),
       externalBusy: true,
       blockRole: 'busy',
     }))
     return [...own, ...external]
-  }, [appointmentsQuery.data, busyQuery.data, serviceById, userId])
+  }, [appointmentsQuery.data, busyQuery.data, serviceById, clientsById, userId])
 
   const tagKind = section === 'waitlist' ? 'waitlist' : 'client'
   const tagOptions = tagKind === 'waitlist' ? (waitlistTagsQuery.data || []) : (clientTagsQuery.data || [])
@@ -637,8 +643,13 @@ function Stat({ label, value, detail }) {
   )
 }
 
-function toReportAppointment(appointment, serviceById) {
+function toReportAppointment(appointment, serviceById, client) {
   const service = serviceById.get(appointment.service_id) || null
+  const price = sessionBasePence({
+    feePence: service?.fee_pence ?? null,
+    overridePence: appointment.fee_override_pence ?? null,
+    concession: concessionFromClient(client),
+  })
   return {
     id: appointment.id,
     clientId: appointment.client_id || null,
@@ -653,7 +664,9 @@ function toReportAppointment(appointment, serviceById) {
     externalBusy: Boolean(appointment.is_external_busy),
     doNotInvoice: Boolean(appointment.do_not_invoice),
     chargedPence: appointment.charged_pence ?? null,
-    feePence: service?.fee_pence ?? null,
+    feePence: price.pence,
+    overridePence: appointment.fee_override_pence ?? null,
+    priceNote: price.phrase,
     feeIncludesVat: Boolean(service?.fee_includes_vat),
   }
 }

@@ -60,6 +60,7 @@ export type AppAppointment = {
   attendance_status: string | null
   do_not_invoice?: boolean
   charged_pence?: number | null
+  fee_override_pence?: number | null
   location: string
   notes: string
   other_info: string
@@ -104,6 +105,7 @@ function toAppAppointment(row: {
   attendance_status: string | null
   do_not_invoice?: boolean | null
   charged_pence?: number | null
+  fee_override_pence?: number | null
   starts_at: string
   ends_at: string
   block_role?: string
@@ -137,6 +139,7 @@ function toAppAppointment(row: {
     attendance_status: row.attendance_status,
     do_not_invoice: Boolean(row.do_not_invoice),
     charged_pence: row.charged_pence ?? null,
+    fee_override_pence: row.fee_override_pence ?? null,
     location: extras.location || '',
     notes: extras.notes || '',
     other_info: extras.other_info || '',
@@ -187,7 +190,7 @@ export async function listAppointmentsFromSupabase(): Promise<AppAppointment[]> 
 
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, fee_override_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
     .order('starts_at', { ascending: false })
 
   if (error) throw error
@@ -219,7 +222,7 @@ export async function fetchAppointment(appointmentId: string): Promise<AppAppoin
   if (!supabase) return null
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, fee_override_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
     .eq('id', appointmentId)
     .maybeSingle()
   if (error) throw error
@@ -259,7 +262,7 @@ export async function fetchUpcomingAppointments(
   ).reverse() as AppAppointment[]
 }
 
-const APPOINTMENT_COLUMNS = 'id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at'
+const APPOINTMENT_COLUMNS = 'id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, fee_override_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at'
 
 async function attachMeetUrls(rows: AppAppointment[]): Promise<AppAppointment[]> {
   const supabase = getSupabase()
@@ -471,6 +474,7 @@ export async function upsertAppointmentRemote(
     attendance_status: attendanceStatus,
     ...(payload.do_not_invoice !== undefined ? { do_not_invoice: Boolean(payload.do_not_invoice) } : {}),
     ...(payload.charged_pence !== undefined ? { charged_pence: payload.charged_pence as number | null } : {}),
+    ...(payload.fee_override_pence !== undefined ? { fee_override_pence: payload.fee_override_pence as number | null } : {}),
     encrypted_payload: extras as unknown as Json,
     block_role: blockRole,
     ...(seriesId ? { series_id: seriesId } : {}),

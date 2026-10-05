@@ -4,6 +4,7 @@ import type { Json } from './database.types'
 import { db } from '../data/collections'
 import type { StoreRecord } from '../types/collections'
 import { filterClientsForUser, type Client } from '../permissions'
+import type { ClientConcession } from '../sessionPrice'
 
 /** Transitional identity blob until client-side encryption is wired. */
 type IdentityPayload = {
@@ -32,6 +33,10 @@ export type AppClientRecord = {
   medication: string
   gender: string
   email: string
+  concession_kind: string
+  concession_percent: number | null
+  concession_pence: number | null
+  concession_label: string
   is_active: boolean
   on_screener: boolean
   on_waitlist: boolean
@@ -78,6 +83,10 @@ function toAppClient(row: {
   status: string
   created_at: string
   updated_at?: string
+  concession_kind?: string | null
+  concession_percent?: number | null
+  concession_pence?: number | null
+  concession_label?: string | null
   client_identities?: { encrypted_payload: Json } | { encrypted_payload: Json }[] | null
 }): AppClientRecord {
   const identityRow = Array.isArray(row.client_identities)
@@ -99,6 +108,10 @@ function toAppClient(row: {
     medication: identity.medication || '',
     gender: identity.gender || '',
     email: identity.email || '',
+    concession_kind: row.concession_kind || 'none',
+    concession_percent: row.concession_percent ?? null,
+    concession_pence: row.concession_pence ?? null,
+    concession_label: row.concession_label || '',
     is_active: row.status === 'active',
     on_screener: row.status === 'screener',
     on_waitlist: row.status === 'waitlist',
@@ -122,7 +135,7 @@ export async function listClientsFromSupabase(): Promise<AppClientRecord[]> {
 
   const { data, error } = await supabase
     .from('clients')
-    .select('id, owner_id, organization_id, status, created_at, updated_at, client_identities(encrypted_payload)')
+    .select('id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, created_at, updated_at, client_identities(encrypted_payload)')
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -177,7 +190,7 @@ export async function upsertClientRemote(
         encrypted_pseudonym: pseudonym as unknown as Json,
       })
       .eq('id', input.id)
-      .select('id, owner_id, organization_id, status, created_at, updated_at')
+      .select('id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, created_at, updated_at')
       .single()
     if (clientError) throw clientError
 
@@ -214,7 +227,7 @@ export async function upsertClientRemote(
       status: 'active',
       encrypted_pseudonym: pseudonym as unknown as Json,
     })
-    .select('id, owner_id, organization_id, status, created_at, updated_at')
+    .select('id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, created_at, updated_at')
     .single()
   if (clientError) throw clientError
 
@@ -257,7 +270,7 @@ export async function patchClientIdentity(
 
   const { data: clientRow, error: clientError } = await supabase
     .from('clients')
-    .select('id, owner_id, organization_id, status, created_at, updated_at')
+    .select('id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, created_at, updated_at')
     .eq('id', clientId)
     .single()
   if (clientError) throw clientError
@@ -302,6 +315,47 @@ export async function patchClientIdentity(
   })
   hydrateLocal([mapped])
   return mapped
+}
+
+export async function saveClientConcession(clientId: string, concession: ClientConcession): Promise<ClientConcession> {
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const kind = concession.kind
+  const percent = kind === 'percent' ? Math.trunc(Number(concession.percent)) : null
+  const amount = kind === 'amount' ? Math.trunc(Number(concession.amountPence)) : null
+  if (kind === 'percent' && (!percent || percent < 1 || percent > 100)) {
+    throw new Error('Enter a percentage from 1 to 100.')
+  }
+  if (kind === 'amount' && (!amount || amount < 1)) {
+    throw new Error('Enter an amount off.')
+  }
+  const saved: ClientConcession = {
+    kind,
+    percent: kind === 'percent' ? percent : null,
+    amountPence: kind === 'amount' ? amount : null,
+    label: kind === 'none' ? '' : concession.label.trim(),
+  }
+  const { error } = await supabase
+    .from('clients')
+    .update({
+      concession_kind: saved.kind,
+      concession_percent: saved.percent,
+      concession_pence: saved.amountPence,
+      concession_label: saved.label || null,
+    })
+    .eq('id', clientId)
+  if (error) throw error
+  const idx = db.clients.findIndex((row) => row.id === clientId)
+  if (idx !== -1) {
+    db.clients[idx] = {
+      ...db.clients[idx],
+      concession_kind: saved.kind,
+      concession_percent: saved.percent,
+      concession_pence: saved.amountPence,
+      concession_label: saved.label,
+    } as StoreRecord
+  }
+  return saved
 }
 
 export async function promoteWaitlistClient(clientId: string): Promise<void> {

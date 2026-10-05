@@ -277,10 +277,12 @@ function SessionPicker({ invoice, today, candidates, services, tags, tagsByClien
   const [serviceId, setServiceId] = useState('')
   const [tagId, setTagId] = useState('')
   const rows = candidates.filter((item) => {
-    if (invoice.clientId && item.clientId !== invoice.clientId) return false
+    if (invoice.clientId && item.clientId && item.clientId !== invoice.clientId) return false
     if (!inDateRange(item.sessionDate, range)) return false
-    if (include === 'held' && !item.marked) return false
-    if (include === 'booked' && item.marked) return false
+    if (!item.pricedActivity) {
+      if (include === 'held' && !item.marked) return false
+      if (include === 'booked' && item.marked) return false
+    }
     if (serviceId && item.serviceId !== serviceId) return false
     return matchesClientTag(item.clientId, tagId, tagsByClient)
   })
