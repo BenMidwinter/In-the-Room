@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
 import FormOverlay from '../../components/FormOverlay'
+import RecordTable from '../../components/RecordTable'
 import { useConfirm, useToast } from '../../components/ui'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useClientsQuery } from '../../lib/queries'
@@ -42,8 +43,26 @@ import {
   updateInvoiceRecipient,
 } from '../../lib/supabase/invoicesRepo'
 import InvoiceSheet from './InvoiceSheet'
+import BatchInvoiceWizard from './BatchInvoiceWizard'
+import BulkDispatchModal from './BulkDispatchModal'
 
 const EMPTY_LIST = []
+const INVOICE_COLUMNS = [
+  { key: 'number', label: 'Invoice', filter: 'text', sort: 'text' },
+  { key: 'client', label: 'Client', filter: 'text', sort: 'text' },
+  { key: 'issued', label: 'Issue date', sort: 'date', sortFirst: 'desc' },
+  { key: 'due', label: 'Due date', sort: 'date' },
+  { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
+  { key: 'total', label: 'Total', sort: 'number' },
+  { key: 'action', label: '', sort: false },
+]
+const UNBILLED_COLUMNS = [
+  { key: 'date', label: 'Date', sort: 'date', sortFirst: 'desc' },
+  { key: 'client', label: 'Client', filter: 'text', sort: 'text' },
+  { key: 'service', label: 'Service', filter: 'choice', sort: 'text' },
+  { key: 'rate', label: 'Rate', sort: 'number' },
+  { key: 'action', label: '', sort: false },
+]
 const STATUS_LABEL = {
   draft: 'Draft',
   awaiting: 'Sent',
@@ -65,10 +84,10 @@ export default function InvoicingPage() {
   const tab = params.get('tab') === 'unbilled' ? 'unbilled' : 'invoices'
   const today = todayYmd()
   const [creatingId, setCreatingId] = useState('')
-  const [invoiceQuery, setInvoiceQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [sessionQuery, setSessionQuery] = useState('')
   const [selected, setSelected] = useState({})
+  const [pickedInvoices, setPickedInvoices] = useState({})
+  const [batchOpen, setBatchOpen] = useState(false)
+  const [dispatchState, setDispatchState] = useState(null)
   const [chooserOpen, setChooserOpen] = useState(false)
   const [clientQuery, setClientQuery] = useState('')
   const [feeItem, setFeeItem] = useState(null)
@@ -157,6 +176,7 @@ export default function InvoicingPage() {
         billToName: recipient.billToName,
         billToEmail: recipient.billToEmail,
         billedToContact: Boolean(recipient.billedToContact),
+        priceNote: report.priceNote || '',
         line: hasFee ? line : null,
       })
     }
@@ -183,21 +203,70 @@ export default function InvoicingPage() {
     .filter((invoice) => invoice.status !== 'void')
     .reduce((sum, invoice) => sum + paidPence(invoice.payments), 0)
 
-  const invoiceNeedle = invoiceQuery.trim().toLowerCase()
-  const visibleInvoices = invoices.filter((invoice) => {
-    const display = invoiceDisplayStatus(invoice, today)
-    if (statusFilter === 'sent' && display !== 'awaiting') return false
-    if (statusFilter && statusFilter !== 'sent' && display !== statusFilter) return false
-    if (!invoiceNeedle) return true
-    return `${invoice.number} ${invoice.billToName} ${invoice.forName}`.toLowerCase().includes(invoiceNeedle)
-  })
-
-  const sessionNeedle = sessionQuery.trim().toLowerCase()
-  const unbilled = items.filter((item) => item.held && (
-    !sessionNeedle || `${item.clientName} ${item.serviceName}`.toLowerCase().includes(sessionNeedle)
-  ))
+  const unbilled = items.filter((item) => item.held)
   const pricedUnbilled = unbilled.filter((item) => item.hasFee)
   const selectedItems = pricedUnbilled.filter((item) => selected[item.appointmentId])
+  const pickedInvoiceList = invoices.filter((invoice) => pickedInvoices[invoice.id])
+  const invoiceRows = invoices.map((invoice) => {
+    const display = invoiceDisplayStatus(invoice, today)
+    const clientLabel = invoice.forName && invoice.forName !== invoice.billToName
+      ? `${invoice.billToName} · ${invoice.forName}`
+      : invoice.billToName
+    return {
+      id: invoice.id,
+      muted: display === 'void',
+      cells: {
+        number: invoice.number,
+        client: clientLabel,
+        issued: invoice.issuedOn ? formatDisplayDate(invoice.issuedOn) : '—',
+        due: invoice.dueOn ? formatDisplayDate(invoice.dueOn) : '—',
+        status: <span className={statusClass(display)}>{STATUS_LABEL[display]}</span>,
+        total: formatGbpFromPence(invoice.totalPence),
+        action: (
+          <button type="button" className="secondary" onClick={(event) => { event.stopPropagation(); showInvoice(invoice.id) }}>
+            Open
+          </button>
+        ),
+      },
+      filterValues: { number: invoice.number, client: clientLabel, status: STATUS_LABEL[display] },
+      sortValues: {
+        number: invoice.number,
+        client: clientLabel,
+        issued: invoice.issuedOn || '',
+        due: invoice.dueOn || '',
+        status: STATUS_LABEL[display],
+        total: invoice.totalPence,
+      },
+    }
+  })
+  const unbilledRows = unbilled.map((item) => ({
+    id: item.appointmentId,
+    hasFee: item.hasFee,
+    cells: {
+      date: item.sessionDate ? formatDisplayDate(item.sessionDate) : '—',
+      client: item.clientName,
+      service: item.serviceName,
+      rate: item.hasFee
+        ? formatGbpFromPence(item.line.unitPence)
+        : (
+          <button type="button" className="invoice-fee-pill" onClick={() => { setFeeItem(item); setFeeAmount('') }}>
+            No fee set · Set fee
+          </button>
+        ),
+      action: item.hasFee ? (
+        <button type="button" className="secondary" disabled={Boolean(creatingId)} onClick={() => onCreateFor([item])}>
+          Create invoice
+        </button>
+      ) : null,
+    },
+    filterValues: { client: item.clientName, service: item.serviceName },
+    sortValues: {
+      date: item.sessionDate || '',
+      client: item.clientName,
+      service: item.serviceName,
+      rate: item.hasFee ? item.line.unitPence : null,
+    },
+  }))
   const clientChoices = [...clients]
     .filter((client) => !clientQuery.trim() || String(client.real_name || '').toLowerCase().includes(clientQuery.trim().toLowerCase()))
     .sort((a, b) => String(a.real_name || '').localeCompare(String(b.real_name || '')))
@@ -503,13 +572,16 @@ export default function InvoicingPage() {
   }
 
   return (
-    <div className="page page--invoicing">
+    <div className={pickedInvoiceList.length > 0 && tab === 'invoices' ? 'page page--invoicing page--invoice-selecting' : 'page page--invoicing'}>
       <PageHeader
         title="Invoicing"
         actions={(
-          <button type="button" className="primary" onClick={() => { setChooserOpen(true); setClientQuery('') }}>
-            + New Invoice
-          </button>
+          <>
+            <button type="button" className="secondary" onClick={() => setBatchOpen(true)}>Batch Invoice</button>
+            <button type="button" className="primary" onClick={() => { setChooserOpen(true); setClientQuery('') }}>
+              + New Invoice
+            </button>
+          </>
         )}
       />
 
@@ -530,122 +602,93 @@ export default function InvoicingPage() {
 
       {tab === 'invoices' ? (
         <section className="invoicing-panel">
-          <div className="invoice-toolbar">
-            <input value={invoiceQuery} onChange={(event) => setInvoiceQuery(event.target.value)} placeholder="Search invoices" aria-label="Search invoices" />
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} aria-label="Status">
-              <option value="">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="sent">Sent</option>
-              <option value="partial">Partially paid</option>
-              <option value="paid">Paid</option>
-              <option value="overdue">Overdue</option>
-              <option value="void">Void</option>
-            </select>
-          </div>
-          <table className="invoice-table">
-            <thead>
-              <tr>
-                <th>Invoice</th>
-                <th>Client</th>
-                <th>Issue date</th>
-                <th>Due date</th>
-                <th>Status</th>
-                <th>Total</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {visibleInvoices.length === 0 ? (
-                <tr><td colSpan={7} className="invoice-table__empty">No invoices yet.</td></tr>
-              ) : visibleInvoices.map((invoice) => {
-                const display = invoiceDisplayStatus(invoice, today)
-                return (
-                  <tr key={invoice.id}>
-                    <td>{invoice.number}</td>
-                    <td>{invoice.forName && invoice.forName !== invoice.billToName ? `${invoice.billToName} · ${invoice.forName}` : invoice.billToName}</td>
-                    <td>{invoice.issuedOn ? formatDisplayDate(invoice.issuedOn) : '—'}</td>
-                    <td>{invoice.dueOn ? formatDisplayDate(invoice.dueOn) : '—'}</td>
-                    <td><span className={statusClass(display)}>{STATUS_LABEL[display]}</span></td>
-                    <td>{formatGbpFromPence(invoice.totalPence)}</td>
-                    <td><button type="button" className="secondary" onClick={() => showInvoice(invoice.id)}>Open</button></td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <RecordTable
+            columns={INVOICE_COLUMNS}
+            rows={invoiceRows}
+            countNoun="invoices"
+            emptyMessage="No invoices yet."
+            defaultSort={{ key: 'number', direction: 'desc' }}
+            onRowClick={(row) => showInvoice(row.id)}
+            selection={{
+              isSelected: (row) => Boolean(pickedInvoices[row.id]),
+              label: (row) => `Select ${row.sortValues.number}`,
+              onToggle: (row) => setPickedInvoices((current) => toggleId(current, row.id)),
+              onToggleVisible: (visible, next) => setPickedInvoices((current) => toggleVisible(current, visible, next)),
+            }}
+          />
         </section>
       ) : (
         <section className="invoicing-panel">
-          <div className="invoice-toolbar">
-            <input value={sessionQuery} onChange={(event) => setSessionQuery(event.target.value)} placeholder="Search" aria-label="Search unbilled sessions" />
-            <button
-              type="button"
-              className="primary"
-              disabled={Boolean(creatingId) || selectedItems.length === 0}
-              onClick={() => onCreateFor(selectedItems)}
-            >
-              Invoice selected
-            </button>
-          </div>
-          <table className="invoice-table">
-            <thead>
-              <tr>
-                <th className="invoice-table__check">
-                  <input
-                    type="checkbox"
-                    aria-label="Select priced sessions"
-                    checked={pricedUnbilled.length > 0 && selectedItems.length === pricedUnbilled.length}
-                    onChange={() => {
-                      const on = selectedItems.length !== pricedUnbilled.length
-                      setSelected(on ? Object.fromEntries(pricedUnbilled.map((item) => [item.appointmentId, true])) : {})
-                    }}
-                  />
-                </th>
-                <th>Date</th>
-                <th>Client</th>
-                <th>Service</th>
-                <th>Rate</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {unbilled.length === 0 ? (
-                <tr><td colSpan={6} className="invoice-table__empty">Nothing held is waiting to invoice.</td></tr>
-              ) : unbilled.map((item) => (
-                <tr key={item.appointmentId}>
-                  <td className="invoice-table__check">
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${item.clientName}`}
-                      disabled={!item.hasFee}
-                      checked={Boolean(selected[item.appointmentId])}
-                      onChange={() => setSelected((current) => ({ ...current, [item.appointmentId]: !current[item.appointmentId] }))}
-                    />
-                  </td>
-                  <td>{item.sessionDate ? formatDisplayDate(item.sessionDate) : '—'}</td>
-                  <td>{item.clientName}</td>
-                  <td>{item.serviceName}</td>
-                  <td>
-                    {item.hasFee
-                      ? formatGbpFromPence(item.line.unitPence)
-                      : (
-                        <button type="button" className="invoice-fee-pill" onClick={() => { setFeeItem(item); setFeeAmount('') }}>
-                          No fee set · Set fee
-                        </button>
-                      )}
-                  </td>
-                  <td>
-                    {item.hasFee && (
-                      <button type="button" className="secondary" disabled={Boolean(creatingId)} onClick={() => onCreateFor([item])}>
-                        Create invoice
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {selectedItems.length > 0 && (
+            <div className="invoice-toolbar">
+              <button
+                type="button"
+                className="primary"
+                disabled={Boolean(creatingId)}
+                onClick={() => onCreateFor(selectedItems)}
+              >
+                Invoice selected
+              </button>
+            </div>
+          )}
+          <RecordTable
+            columns={UNBILLED_COLUMNS}
+            rows={unbilledRows}
+            countNoun="sessions"
+            emptyMessage="Nothing held is waiting to invoice."
+            defaultSort={{ key: 'date', direction: 'desc' }}
+            selection={{
+              isSelected: (row) => Boolean(selected[row.id]),
+              canSelect: (row) => row.hasFee,
+              label: (row) => `Select ${row.sortValues.client}`,
+              onToggle: (row) => setSelected((current) => toggleId(current, row.id)),
+              onToggleVisible: (visible, next) => setSelected((current) => toggleVisible(current, visible, next)),
+            }}
+          />
         </section>
+      )}
+
+      {pickedInvoiceList.length > 0 && tab === 'invoices' && (
+        <div className="invoice-selection-bar invoicing-no-print">
+          <span>{pickedInvoiceList.length} {pickedInvoiceList.length === 1 ? 'invoice' : 'invoices'} selected</span>
+          <button type="button" className="primary" onClick={() => setDispatchState({ invoices: pickedInvoiceList, preferManual: false })}>
+            Send / Dispatch Invoices
+          </button>
+          <button type="button" className="secondary" onClick={() => setDispatchState({ invoices: pickedInvoiceList, preferManual: true })}>
+            Mark as Sent (Manual)
+          </button>
+          <button type="button" className="secondary" onClick={() => setPickedInvoices({})}>Deselect All</button>
+        </div>
+      )}
+
+      {batchOpen && (
+        <BatchInvoiceWizard
+          items={items}
+          today={today}
+          onGenerate={createDrafts}
+          onClose={() => setBatchOpen(false)}
+          onReview={() => { setBatchOpen(false); setTab('invoices') }}
+          onDispatch={(created) => {
+            setBatchOpen(false)
+            setDispatchState({ invoices: created, preferManual: false })
+          }}
+        />
+      )}
+
+      {dispatchState && (
+        <BulkDispatchModal
+          invoices={dispatchState.invoices}
+          preferManual={dispatchState.preferManual}
+          onClose={() => setDispatchState(null)}
+          onFinished={(result) => {
+            queryClient.invalidateQueries({ queryKey: ['invoices', userId] })
+            setPickedInvoices((current) => {
+              const next = { ...current }
+              for (const id of result.successfulIds) delete next[id]
+              return next
+            })
+          }}
+        />
       )}
 
       {chooserOpen && (
@@ -686,6 +729,22 @@ export default function InvoicingPage() {
       )}
     </div>
   )
+}
+
+function toggleId(current, id) {
+  const next = { ...current }
+  if (next[id]) delete next[id]
+  else next[id] = true
+  return next
+}
+
+function toggleVisible(current, visible, nextChecked) {
+  const next = { ...current }
+  for (const row of visible) {
+    if (nextChecked) next[row.id] = true
+    else delete next[row.id]
+  }
+  return next
 }
 
 function statusClass(display) {

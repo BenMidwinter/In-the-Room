@@ -5,11 +5,13 @@ import {
   activityLineForInvoice,
   batchInvoiceGroups,
   dueDateFrom,
+  filterBatchCandidates,
   formatInvoiceNumber,
   invoiceDisplayStatus,
   invoiceTotalPence,
   invoiceRecipient,
   lineForInvoice,
+  monthPresetRange,
   readyInvoiceGroups,
   lineFromAppointment,
   paymentInstructions,
@@ -160,7 +162,37 @@ describe('invoices', () => {
     expect(line?.unitPence).toBe(0)
     expect(line?.quantity).toBe(1)
   })
+
+  it('offers last, this, and next month as ranges', () => {
+    expect(monthPresetRange('2026-10-05', 'this')).toEqual({ from: '2026-10-01', to: '2026-10-31' })
+    expect(monthPresetRange('2026-10-05', 'last')).toEqual({ from: '2026-09-01', to: '2026-09-30' })
+    expect(monthPresetRange('2026-10-05', 'next')).toEqual({ from: '2026-11-01', to: '2026-11-30' })
+    expect(monthPresetRange('2026-01-15', 'last')).toEqual({ from: '2025-12-01', to: '2025-12-31' })
+  })
+
+  it('keeps sessions with no price out of a batch', () => {
+    const held = candidate({ held: true, sessionDate: '2026-10-02' })
+    const booked = candidate({ held: false, sessionDate: '2026-10-20' })
+    const bare = candidate({ held: true, hasFee: false, line: null, sessionDate: '2026-10-03' })
+    const support = candidate({ held: true, pricedActivity: true, sessionDate: '2026-10-04' })
+    const heldOnly = { from: '2026-10-01', to: '2026-10-31', sessionStatus: 'held', includeActivities: false }
+    expect(filterBatchCandidates([held, booked, bare, support], heldOnly)).toEqual({ ready: [held], unpriced: [bare] })
+    expect(filterBatchCandidates([held, booked], { ...heldOnly, sessionStatus: 'booked' }).ready).toEqual([booked])
+    expect(filterBatchCandidates([support], { ...heldOnly, includeActivities: true }).ready).toEqual([support])
+    expect(filterBatchCandidates([held], { ...heldOnly, from: '2026-11-01', to: '2026-11-30' }).ready).toEqual([])
+  })
 })
+
+function candidate(extras = {}) {
+  return {
+    held: true,
+    pricedActivity: false,
+    hasFee: true,
+    sessionDate: '2026-10-02',
+    line: { appointmentId: 'a', description: 'Session', sessionDate: '2026-10-02', unitPence: 8000, quantity: 1, includesVat: false },
+    ...extras,
+  }
+}
 
 function readyRow(clientId, clientName, extras = {}) {
   return {

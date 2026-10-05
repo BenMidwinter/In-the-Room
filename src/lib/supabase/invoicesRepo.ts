@@ -10,7 +10,7 @@ import {
   sequenceFromInvoiceNumber,
   EMPTY_PAYMENT,
 } from '../invoices'
-import type { InvoiceLine, InvoiceLineInput, InvoicePayment, InvoiceRecord, InvoiceStatus, PaymentDetails } from '../invoices'
+import type { DeliveryMethod, InvoiceLine, InvoiceLineInput, InvoicePayment, InvoiceRecord, InvoiceStatus, PaymentDetails } from '../invoices'
 import { todayYmd } from '../dateArchitecture'
 
 type InvoiceRow = {
@@ -24,6 +24,11 @@ type InvoiceRow = {
   for_name: string
   payment_details: string
   bill_to_email: string
+  recipient_email: string
+  sent_at: string | null
+  delivery_method: string
+  resend_batch_id: string | null
+  last_delivery_error: string | null
   total_pence: number
 }
 
@@ -48,7 +53,7 @@ type PaymentRow = {
   note: string
 }
 
-const INVOICE_COLUMNS = 'id, client_id, number, status, issued_on, due_on, bill_to_name, for_name, bill_to_email, payment_details, total_pence'
+const INVOICE_COLUMNS = 'id, client_id, number, status, issued_on, due_on, bill_to_name, for_name, bill_to_email, recipient_email, sent_at, delivery_method, resend_batch_id, last_delivery_error, payment_details, total_pence'
 const LINE_COLUMNS = 'id, invoice_id, appointment_id, position, description, session_date, unit_pence, quantity, includes_vat, released_at'
 const PAYMENT_COLUMNS = 'id, invoice_id, amount_pence, paid_on, note'
 
@@ -87,6 +92,11 @@ function mapInvoice(row: InvoiceRow, lines: LineRow[], payments: PaymentRow[]): 
     totalPence: row.total_pence,
     paymentDetails: row.payment_details || '',
     billToEmail: row.bill_to_email || '',
+    recipientEmail: row.recipient_email || row.bill_to_email || '',
+    sentAt: row.sent_at || null,
+    deliveryMethod: row.delivery_method === 'resend' ? 'resend' : 'manual',
+    resendBatchId: row.resend_batch_id || null,
+    lastDeliveryError: row.last_delivery_error || null,
     lines: lines
       .filter((line) => line.invoice_id === row.id)
       .sort((a, b) => a.position - b.position)
@@ -251,6 +261,7 @@ export async function createInvoice(input: {
         status: 'draft',
         bill_to_name: input.billToName.trim() || 'Invoice',
         bill_to_email: String(input.billToEmail || '').trim(),
+        recipient_email: String(input.billToEmail || '').trim(),
         for_name: String(input.forName || '').trim(),
         payment_details: '',
         total_pence: invoiceTotalPence(lines),
@@ -288,9 +299,11 @@ export async function updateInvoiceRecipient(
   const { supabase, user } = await requireUser()
   const current = await reloadInvoice(supabase, user.id, invoiceId)
   if (current.status !== 'draft') throw new Error('Sent invoices keep the recipient they were sent to.')
+  const email = input.billToEmail.trim()
   const { error } = await supabase.from('invoices').update({
     bill_to_name: name,
-    bill_to_email: input.billToEmail.trim(),
+    bill_to_email: email,
+    recipient_email: email,
   }).eq('id', invoiceId)
   if (error) throw error
   return reloadInvoice(supabase, user.id, invoiceId)
@@ -345,6 +358,10 @@ export async function setInvoiceStatus(invoiceId: string, status: InvoiceStatus)
       issued_on: issuedOn,
       due_on: dueDateFrom(issuedOn, details.dueDays),
       payment_details: paymentInstructions(details),
+      recipient_email: current.billToEmail || '',
+      sent_at: new Date().toISOString(),
+      delivery_method: 'manual',
+      last_delivery_error: null,
     }).eq('id', invoiceId)
     if (error) throw error
   } else if (status === 'void' && current.status !== 'void') {
@@ -387,6 +404,32 @@ export async function recordInvoicePayment(
     if (paidError) throw paidError
   }
   return reloadInvoice(supabase, user.id, invoiceId)
+}
+
+export async function stampInvoiceDelivery(
+  invoiceId: string,
+  patch: {
+    deliveryMethod?: DeliveryMethod
+    resendBatchId?: string | null
+    lastDeliveryError?: string | null
+    recipientEmail?: string
+  },
+): Promise<void> {
+  const { supabase } = await requireUser()
+  const update: {
+    delivery_method?: DeliveryMethod
+    resend_batch_id?: string | null
+    last_delivery_error?: string | null
+    recipient_email?: string
+    sent_at?: string
+  } = {}
+  if (patch.deliveryMethod) update.delivery_method = patch.deliveryMethod
+  if (patch.resendBatchId !== undefined) update.resend_batch_id = patch.resendBatchId
+  if (patch.lastDeliveryError !== undefined) update.last_delivery_error = patch.lastDeliveryError
+  if (patch.recipientEmail !== undefined) update.recipient_email = patch.recipientEmail
+  if (patch.deliveryMethod === 'resend') update.sent_at = new Date().toISOString()
+  const { error } = await supabase.from('invoices').update(update).eq('id', invoiceId)
+  if (error) throw error
 }
 
 export async function deleteInvoice(invoiceId: string): Promise<void> {

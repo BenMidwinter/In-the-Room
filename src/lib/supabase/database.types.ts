@@ -892,6 +892,11 @@ export type Database = {
           number: string
           owner_id: string
           payment_details: string
+          recipient_email: string
+          resend_batch_id: string | null
+          sent_at: string | null
+          delivery_method: string
+          last_delivery_error: string | null
           status: string
           total_pence: number
           updated_at: string
@@ -909,6 +914,11 @@ export type Database = {
           number: string
           owner_id: string
           payment_details?: string
+          recipient_email?: string
+          resend_batch_id?: string | null
+          sent_at?: string | null
+          delivery_method?: string
+          last_delivery_error?: string | null
           status?: string
           total_pence?: number
           updated_at?: string
@@ -926,6 +936,11 @@ export type Database = {
           number?: string
           owner_id?: string
           payment_details?: string
+          recipient_email?: string
+          resend_batch_id?: string | null
+          sent_at?: string | null
+          delivery_method?: string
+          last_delivery_error?: string | null
           status?: string
           total_pence?: number
           updated_at?: string

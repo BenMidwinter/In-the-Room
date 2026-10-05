@@ -1,5 +1,5 @@
 import { attendanceLabel } from './appointmentUtils'
-import { addDaysYmd, formatDisplayDate } from './dateArchitecture'
+import { addDaysYmd, endOfMonthYmd, formatDisplayDate, startOfMonthYmd } from './dateArchitecture'
 import {
   billablePence,
   formatHoursFromMinutes,
@@ -49,6 +49,8 @@ export type InvoicePayment = {
   note: string
 }
 
+export type DeliveryMethod = 'manual' | 'resend'
+
 export type InvoiceRecord = {
   id: string
   number: string
@@ -61,6 +63,11 @@ export type InvoiceRecord = {
   totalPence: number
   paymentDetails: string
   billToEmail: string
+  recipientEmail: string
+  sentAt: string | null
+  deliveryMethod: DeliveryMethod
+  resendBatchId: string | null
+  lastDeliveryError: string | null
   lines: InvoiceLine[]
   payments: InvoicePayment[]
 }
@@ -100,7 +107,7 @@ export function dueDateFrom(issuedOn: string, dueDays: number): string {
 }
 
 export function paymentInstructions(details: PaymentDetails): string {
-  const lines = []
+  const lines: string[] = []
   if (details.accountName.trim()) lines.push(details.accountName.trim())
   if (details.sortCode.trim()) lines.push(`Sort code ${details.sortCode.trim()}`)
   if (details.accountNumber.trim()) lines.push(`Account number ${details.accountNumber.trim()}`)
@@ -354,6 +361,51 @@ export function batchInvoiceGroups(rows: BatchLine[], mode: 'client' | 'payer'):
     forName: group.names.join(', '),
     lines: group.lines,
   }))
+}
+
+export type MonthPreset = 'last' | 'this' | 'next'
+
+/** Calendar month containing `today`, or the month before or after it. */
+export function monthPresetRange(today: string, preset: MonthPreset): { from: string; to: string } {
+  const [year, month] = today.split('-').map(Number)
+  const delta = preset === 'next' ? 1 : preset === 'last' ? -1 : 0
+  const shifted = new Date(Date.UTC(year, (month || 1) - 1 + delta, 1))
+  const anchor = `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}-01`
+  return { from: startOfMonthYmd(anchor), to: endOfMonthYmd(anchor) }
+}
+
+export type BatchSessionFilter = 'held' | 'booked' | 'all'
+
+export type BatchCandidate = {
+  sessionDate: string | null
+  held: boolean
+  pricedActivity?: boolean
+  hasFee: boolean
+  line: InvoiceLineInput | null
+}
+
+/** Sessions in the chosen dates, split into priced rows and rows that still have no fee. */
+export function filterBatchCandidates<T extends BatchCandidate>(
+  rows: T[],
+  options: {
+    from: string
+    to: string
+    sessionStatus: BatchSessionFilter
+    includeActivities: boolean
+  },
+): { ready: T[]; unpriced: T[] } {
+  const ready: T[] = []
+  const unpriced: T[] = []
+  for (const row of rows) {
+    if (!row.sessionDate || row.sessionDate < options.from || row.sessionDate > options.to) continue
+    if (row.pricedActivity) {
+      if (!options.includeActivities) continue
+    } else if (options.sessionStatus === 'held' && !row.held) continue
+    else if (options.sessionStatus === 'booked' && row.held) continue
+    if (row.hasFee && row.line && Math.trunc(Number(row.line.unitPence)) > 0) ready.push(row)
+    else unpriced.push(row)
+  }
+  return { ready, unpriced }
 }
 
 export function activeBilledAppointmentIds(
