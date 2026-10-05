@@ -22,6 +22,7 @@ import ClientAppointmentsIndex from './features/client/ClientAppointmentsIndex'
 import ClientSupportActivities from './features/client/ClientSupportActivities'
 import AppointmentEditor from './features/client/AppointmentEditor'
 import ClientSectionPlaceholder from './features/client/ClientSectionPlaceholder'
+import ContactsPanel from './features/client/ContactsPanel'
 import SettingsLayout from './features/settings/SettingsLayout'
 import AccountSettingsPage from './features/settings/AccountSettingsPage'
 import AvailabilitySettingsPage from './features/settings/AvailabilitySettingsPage'
@@ -41,7 +42,7 @@ import Resources from './components/Resources'
 import About from './components/About'
 import NotesHistoryPanel from './features/client/NotesHistoryPanel'
 import ReportingPage from './features/reporting/ReportingPage'
-import FinancePage from './features/finance/FinancePage'
+import InvoicingPage from './features/invoicing/InvoicingPage'
 
 export default function App() {
   return (
@@ -59,7 +60,8 @@ export default function App() {
         <Route path="home" element={<Home />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="reporting" element={<ReportingPage />} />
-        <Route path="finance" element={<FinancePage />} />
+        <Route path="invoicing" element={<InvoicingPage />} />
+        <Route path="finance" element={<Navigate to="/invoicing" replace />} />
         <Route path="journal" element={<Navigate to="/practice/journal" replace />} />
         <Route path="practice" element={<PracticeLayout />}>
           <Route index element={<Navigate to="journal" replace />} />
@@ -109,18 +111,7 @@ export default function App() {
             />
           } />
           <Route path="documents" element={<ClientDocumentsPage />} />
-          <Route path="contacts" element={
-            <ClientSectionPlaceholder
-              title="Contacts"
-              newLabel="contact"
-              columns={[
-                { key: 'name', label: 'Name' },
-                { key: 'role', label: 'Relationship' },
-                { key: 'phone', label: 'Phone' },
-                { key: 'email', label: 'Email' },
-              ]}
-            />
-          } />
+          <Route path="contacts" element={<ContactsPanel />} />
           <Route path="forms" element={<Navigate to="../case-history" replace />} />
           <Route path="outcomes" element={<Navigate to="../case-history" replace />} />
         </Route>

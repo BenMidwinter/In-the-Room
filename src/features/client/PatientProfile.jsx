@@ -6,6 +6,7 @@ import ClientDetailsBar from './ClientDetailsBar'
 import ClientNav from './ClientNav'
 import { ClientChromeProvider, useClientChrome } from './ClientChrome'
 import ClientClinicalAlerts from './ClientClinicalAlerts'
+import ClientConcessionForm from './ClientConcessionForm'
 
 function PatientProfileFrame({ client: initialClient }) {
   const { editorOpen } = useClientChrome()
@@ -57,6 +58,14 @@ function PatientProfileFrame({ client: initialClient }) {
           <button type="button" className="secondary" onClick={() => navigate('/home')}>Home</button>
         </div>
       </header>
+      )}
+
+      {!editorOpen && (
+        <ClientConcessionForm
+          key={`${client.id}:${client.concession_kind}:${client.concession_percent}:${client.concession_pence}:${client.concession_label}`}
+          client={client}
+          onSaved={(fields) => handleClientUpdated({ ...client, ...fields })}
+        />
       )}
 
       {!editorOpen && <ClientNav clientId={client.id} client={client} />}

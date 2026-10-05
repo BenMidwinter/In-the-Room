@@ -20,6 +20,7 @@ export default function AddClient() {
   const [surname, setSurname] = useState('')
   const [dob, setDob] = useState('')
   const [school, setSchool] = useState('')
+  const [email, setEmail] = useState('')
   const [gender, setGender] = useState('')
   const [selectedDiagnoses, setSelectedDiagnoses] = useState([])
   const [loading, setLoading] = useState(false)
@@ -40,6 +41,7 @@ export default function AddClient() {
     setSurname(existing.surname || '')
     setDob(existing.dob || '')
     setSchool(existing.school || '')
+    setEmail(existing.email || '')
     setGender(existing.gender || '')
     if (existing.diagnosis) {
       setSelectedDiagnoses(parseDiagnosisList(existing.diagnosis))
@@ -52,6 +54,9 @@ export default function AddClient() {
     if (!firstName.trim()) nextErrors.firstName = 'First name is required.'
     if (!surname.trim()) nextErrors.surname = 'Surname is required.'
     if (!dob) nextErrors.dob = 'Date of birth is required.'
+    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      nextErrors.email = 'Enter an email address.'
+    }
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors)
       return
@@ -65,6 +70,7 @@ export default function AddClient() {
         surname,
         dob,
         school,
+        email,
         gender,
         diagnosis: joinDiagnosisList(selectedDiagnoses),
         workplace_id: null,
@@ -130,6 +136,18 @@ export default function AddClient() {
             aria-invalid={!!errors.dob}
           />
           {errors.dob && <p className="mt-1 text-[0.8rem] text-secondary">{errors.dob}</p>}
+        </div>
+        <div className="form-group">
+          <label>Email</label>
+          <input
+            className="paper-input"
+            type="email"
+            value={email}
+            onChange={e => { setEmail(e.target.value); clearError('email') }}
+            placeholder="Where invoices go, unless a contact is flagged"
+            aria-invalid={!!errors.email}
+          />
+          {errors.email && <p className="mt-1 text-[0.8rem] text-secondary">{errors.email}</p>}
         </div>
         <div className="form-group">
           <label>Gender</label>

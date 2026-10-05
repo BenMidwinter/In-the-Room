@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { to: '/clients', label: 'All Clients' },
   { to: '/screener', label: 'Screener' },
   { to: '/practice', label: 'My Practice' },
-  { to: '/finance', label: '[Finance]' },
+  { to: '/invoicing', label: 'Invoicing' },
   { to: '/reporting', label: 'Reporting' },
 ]
 

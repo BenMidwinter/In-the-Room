@@ -218,6 +218,9 @@ export function saveAppointment(payload, userId) {
       charged_pence: payload.charged_pence !== undefined
         ? payload.charged_pence
         : prev.charged_pence,
+      fee_override_pence: payload.fee_override_pence !== undefined
+        ? payload.fee_override_pence
+        : prev.fee_override_pence,
       location: payload.location ?? prev.location ?? '',
       notes: payload.notes !== undefined ? payload.notes : prev.notes,
       other_info: payload.other_info !== undefined ? payload.other_info : prev.other_info ?? '',
@@ -275,6 +278,9 @@ export function saveAppointment(payload, userId) {
     therapy_modality: payload.therapy_modality || 'music_therapy',
     appointment_type: payload.appointment_type || 'one_to_one',
     attendance_status: payload.attendance_status ?? null,
+    do_not_invoice: Boolean(payload.do_not_invoice),
+    charged_pence: payload.charged_pence ?? null,
+    fee_override_pence: payload.fee_override_pence ?? null,
     location: payload.location ?? '',
     notes: payload.notes || '',
     other_info: payload.other_info?.trim() || '',

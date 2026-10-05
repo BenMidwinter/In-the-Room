@@ -33,6 +33,9 @@ import {
   summariseAppointments,
   timeBuckets,
 } from '../../lib/reporting'
+import { activeBilledAppointmentIds, invoiceBalancePence } from '../../lib/invoices'
+import { concessionFromClient, sessionBasePence } from '../../lib/sessionPrice'
+import { listInvoices } from '../../lib/supabase/invoicesRepo'
 
 const SECTIONS = [
   { id: 'overview', label: 'Overview' },
@@ -109,6 +112,11 @@ export default function ReportingPage() {
     queryFn: () => listScreenerBoard().catch(() => []),
     enabled: Boolean(userId),
   })
+  const invoicesQuery = useQuery({
+    queryKey: ['invoices', userId],
+    queryFn: () => listInvoices().catch(() => []),
+    enabled: Boolean(userId),
+  })
   const busyQuery = useQuery({
     queryKey: ['external-busy', 'reporting', range.from, range.to],
     queryFn: () => listExternalCalendarBlocks({
@@ -142,15 +150,20 @@ export default function ReportingPage() {
     return states
   }, [noteIndex.data])
 
+  const clientsById = useMemo(() => {
+    const map = new Map()
+    for (const client of clientsQuery.data || []) map.set(client.id, client)
+    return map
+  }, [clientsQuery.data])
   const mapped = useMemo(() => {
-    const own = (appointmentsQuery.data || []).map((appointment) => toReportAppointment(appointment, serviceById))
+    const own = (appointmentsQuery.data || []).map((appointment) => toReportAppointment(appointment, serviceById, clientsById.get(appointment.client_id)))
     const external = externalBlocksAsAppointments(busyQuery.data || [], userId || '').map((appointment) => ({
-      ...toReportAppointment(appointment, serviceById),
+      ...toReportAppointment(appointment, serviceById, null),
       externalBusy: true,
       blockRole: 'busy',
     }))
     return [...own, ...external]
-  }, [appointmentsQuery.data, busyQuery.data, serviceById, userId])
+  }, [appointmentsQuery.data, busyQuery.data, serviceById, clientsById, userId])
 
   const tagKind = section === 'waitlist' ? 'waitlist' : 'client'
   const tagOptions = tagKind === 'waitlist' ? (waitlistTagsQuery.data || []) : (clientTagsQuery.data || [])
@@ -297,7 +310,11 @@ export default function ReportingPage() {
         />
       )}
       {section === 'finance' && (
-        <FinanceSection summary={summary} />
+        <FinanceSection
+          summary={summary}
+          invoices={invoicesQuery.data || EMPTY_LIST}
+          range={range}
+        />
       )}
     </div>
   )
@@ -570,8 +587,13 @@ function PracticeSection({ cpd, supervision, appointments, range, serviceId }) {
   )
 }
 
-function FinanceSection({ summary }) {
-  const uninvoiced = summary.rows.filter((row) => row.earnedPence > 0)
+function FinanceSection({ summary, invoices, range }) {
+  const billed = activeBilledAppointmentIds(invoices)
+  const outstanding = invoices.filter((invoice) => (
+    invoice.status === 'issued' && invoice.issuedOn && inDateRange(invoice.issuedOn, range)
+  ))
+  const outstandingPence = outstanding.reduce((sum, invoice) => sum + invoiceBalancePence(invoice), 0)
+  const uninvoiced = summary.rows.filter((row) => row.earnedPence > 0 && !billed.has(row.id))
   const rows = uninvoiced.map((row) => ({
     id: row.id,
     filterValues: { client: row.clientName, service: row.serviceName, attendance: attendanceLabel(row.attendance) },
@@ -588,7 +610,11 @@ function FinanceSection({ summary }) {
     <div className="reporting-section">
       <div className="section-card__stat-row">
         <Stat label="Money earned" value={formatGbpFromPence(summary.earnedPence)} />
-        <Stat label="Outstanding invoices" value={formatGbpFromPence(0)} detail="Invoices are not available yet" />
+        <Stat
+          label="Outstanding invoices"
+          value={formatGbpFromPence(outstandingPence)}
+          detail={outstanding.length ? `${outstanding.length} awaiting payment in these dates` : 'Awaiting payment in these dates'}
+        />
         <Stat label="Sessions not yet invoiced" value={uninvoiced.length} />
       </div>
       <RecordTable
@@ -617,8 +643,13 @@ function Stat({ label, value, detail }) {
   )
 }
 
-function toReportAppointment(appointment, serviceById) {
+function toReportAppointment(appointment, serviceById, client) {
   const service = serviceById.get(appointment.service_id) || null
+  const price = sessionBasePence({
+    feePence: service?.fee_pence ?? null,
+    overridePence: appointment.fee_override_pence ?? null,
+    concession: concessionFromClient(client),
+  })
   return {
     id: appointment.id,
     clientId: appointment.client_id || null,
@@ -633,7 +664,9 @@ function toReportAppointment(appointment, serviceById) {
     externalBusy: Boolean(appointment.is_external_busy),
     doNotInvoice: Boolean(appointment.do_not_invoice),
     chargedPence: appointment.charged_pence ?? null,
-    feePence: service?.fee_pence ?? null,
+    feePence: price.pence,
+    overridePence: appointment.fee_override_pence ?? null,
+    priceNote: price.phrase,
     feeIncludesVat: Boolean(service?.fee_includes_vat),
   }
 }

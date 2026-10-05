@@ -67,11 +67,50 @@
   line-height: 1.45;
 }
 
+.contact-invoice-flag {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--txt-primary);
+}
+
 .settings-form__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 0.75rem;
+}
+
+.payment-lock__mask {
+  display: grid;
+  gap: 0.65rem;
+  max-width: 28rem;
+  margin-bottom: 1rem;
+  filter: blur(6px);
+  user-select: none;
+  pointer-events: none;
+}
+
+.payment-lock__row {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--col-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.payment-lock__bar {
+  display: block;
+  height: 2.25rem;
+  border-radius: 0.4rem;
+  background: var(--bg-zone-muted, var(--border-light));
+  border: 1px solid var(--border-color);
 }
 
 .template-studio {

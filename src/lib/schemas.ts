@@ -33,6 +33,10 @@ export const clientInputSchema = z.object({
   diagnosis: optionalText,
   medication: optionalText,
   gender: optionalText,
+  email: z.string().trim().max(200).optional().refine(
+    (value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+    'Enter an email address.',
+  ),
   workplace_id: z.string().nullish(),
 })
 
@@ -108,6 +112,7 @@ export const appointmentInputSchema = z
     attendance_status: z.enum(attendanceStatusKeys).nullish(),
     do_not_invoice: z.boolean().optional(),
     charged_pence: z.number().int().nonnegative().nullish(),
+    fee_override_pence: z.number().int().nonnegative().nullish(),
     location: optionalText,
     notes: z.string().optional(),
     other_info: z.string().optional(),

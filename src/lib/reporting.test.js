@@ -4,6 +4,7 @@ import {
   availabilityMinutes,
   averageWaitDays,
   efficiencyFromMinutes,
+  calendarMonthRange,
   monthToDateRange,
   noteStateFor,
   rollingWeekRange,
@@ -17,6 +18,7 @@ describe('reporting', () => {
     const range = rollingWeekRange('2026-10-07')
     expect(range).toEqual({ from: '2026-10-01', to: '2026-10-07' })
     expect(monthToDateRange('2026-10-07').from).toBe('2026-10-01')
+    expect(calendarMonthRange('2026-10-07')).toEqual({ from: '2026-10-01', to: '2026-10-31' })
   })
 
   it('counts weekday availability and leaves the weekend out', () => {
@@ -64,6 +66,16 @@ describe('reporting', () => {
     expect(buckets.busy).toBe(60)
     expect(buckets.support).toBe(10)
     expect(buckets.appointment).toBe(50 * 3)
+  })
+
+  it('counts a priced support activity in money earned', () => {
+    const summary = summariseAppointments(
+      [session({ id: 's', attendance: null, blockRole: 'support', minutes: 60, fee: 4000 })],
+      { from: '2026-10-01', to: '2026-10-07' },
+      new Map(),
+    )
+    expect(summary.earnedPence).toBe(4000)
+    expect(summary.attended).toBe(0)
   })
 
   it('reads a signed-off note as complete', () => {

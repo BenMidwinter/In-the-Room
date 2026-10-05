@@ -1,4 +1,4 @@
-import { addDaysYmd, daysBetweenYmd, startOfMonthYmd } from './dateArchitecture'
+import { addDaysYmd, daysBetweenYmd, endOfMonthYmd, startOfMonthYmd } from './dateArchitecture'
 import { dayKeyFromYmd, timeToMinutes, type WorkplaceClinicianSetting } from './clinicianAvailability'
 import {
   chargeForAttendance,
@@ -14,6 +14,10 @@ export function rollingWeekRange(today: string): ReportRange {
 
 export function monthToDateRange(today: string): ReportRange {
   return { from: startOfMonthYmd(today), to: today }
+}
+
+export function calendarMonthRange(today: string): ReportRange {
+  return { from: startOfMonthYmd(today), to: endOfMonthYmd(today) }
 }
 
 export function quarterToDateRange(today: string): ReportRange {
@@ -100,6 +104,8 @@ export type ReportAppointment = {
   chargedPence: number | null
   feePence: number | null
   feeIncludesVat: boolean
+  overridePence?: number | null
+  priceNote?: string
 }
 
 export type NoteState = 'complete' | 'draft' | 'missing'
@@ -193,8 +199,40 @@ export function summariseAppointments(
   let notesToFinish = 0
 
   for (const appointment of appointments) {
-    if (roleOf(appointment) !== 'appointment') continue
+    const role = roleOf(appointment)
+    if (role === 'busy' || appointment.externalBusy) continue
     if (!inDateRange(appointment.sessionDate, range)) continue
+    if (role === 'support' || role === 'admin') {
+      if (appointment.doNotInvoice) continue
+      const earned = appointment.chargedPence != null
+        ? appointment.chargedPence
+        : Math.max(0, Math.trunc(Number(appointment.feePence) || 0))
+      if (earned <= 0) continue
+      earnedPence += earned
+      const key = appointment.serviceId || 'none'
+      const current = byService.get(key) || {
+        serviceId: key,
+        name: appointment.serviceName || (role === 'support' ? 'Support' : 'Admin'),
+        minutes: 0,
+        sessions: 0,
+        earnedPence: 0,
+      }
+      current.minutes += slotMinutes(appointment.startTime, appointment.endTime)
+      current.earnedPence += earned
+      byService.set(key, current)
+      rows.push({
+        id: appointment.id,
+        sessionDate: appointment.sessionDate,
+        clientName: appointment.clientName,
+        serviceName: appointment.serviceName || (role === 'support' ? 'Support' : 'Admin'),
+        attendance: null,
+        note: 'missing',
+        earnedPence: earned,
+        clientId: appointment.clientId,
+      })
+      continue
+    }
+    if (role !== 'appointment') continue
     const earned = billablePence(appointment, policy)
     const note = notesByAppointment.get(appointment.id) || 'missing'
     if (appointment.attendance === 'attended') {

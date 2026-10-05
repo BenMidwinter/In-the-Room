@@ -7,6 +7,7 @@ import {
 import { useAppSession } from '../../lib/AppSessionContext'
 import { SettingsSectionCard } from './SettingsPlaceholders'
 import LoginSettingsPage from './LoginSettingsPage'
+import InvoicePaymentSettings from './InvoicePaymentSettings'
 import { useToast } from '../../components/ui'
 import {
   loadCancellationPolicy,
@@ -32,6 +33,7 @@ export default function AccountSettingsPage() {
       <ProfileLetterheadBlock />
       <LoginSettingsPage />
       <CancellationPolicyCard userId={session.user.id} />
+      <InvoicePaymentSettings userId={session.user.id} />
       <SettingsSectionCard
         blockId="settings_subscription"
         title="Subscription"

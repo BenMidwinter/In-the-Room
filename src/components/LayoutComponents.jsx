@@ -22,6 +22,8 @@ import { canAssignAppointmentClinician } from '../lib/permissions'
 import { listServices } from '../lib/supabase/servicesRepo'
 import { isSupabaseConfigured } from '../lib/supabase/client'
 import FormOverlay from './FormOverlay'
+import { useToast } from './ui'
+import { feePenceToInput, formatServiceFee, parseFeePounds } from '../lib/money'
 import SeriesScopeDialog from './SeriesScopeDialog'
 import {
   appointmentBelongsToSeries,
@@ -457,10 +459,28 @@ function EventDrawerActions({
   onDelete,
   locked = false,
   kind = 'standard',
+  onAddInvoice,
+  addInvoiceLabel = 'Add invoice',
+  addInvoicePending = false,
+  showDoNotInvoice = false,
+  doNotInvoiceOn = false,
+  onToggleDoNotInvoice,
+  onCustomPrice,
+  customPriceOpen = false,
+  customPriceInitial,
+  onSaveCustomPrice,
+  onClearCustomPrice,
 }) {
   const editLabel = kind === 'busy' || kind === 'support' ? 'Edit block' : 'Edit'
   return (
     <section className="room-event-drawer__actions">
+      {customPriceOpen && onSaveCustomPrice && (
+        <CustomPriceFields
+          initialPence={customPriceInitial}
+          onSave={onSaveCustomPrice}
+          onClear={onClearCustomPrice}
+        />
+      )}
       <div className="room-event-drawer__action-row">
         <button type="button" className="secondary" onClick={onEdit} disabled={locked}>
           {editLabel}
@@ -475,8 +495,61 @@ function EventDrawerActions({
             Delete
           </button>
         )}
+        {onAddInvoice && (
+          <button type="button" className="secondary" disabled={addInvoicePending || locked} onClick={onAddInvoice}>
+            {addInvoiceLabel}
+          </button>
+        )}
+        {onCustomPrice && (
+          <button
+            type="button"
+            className={`secondary${customPriceOpen ? ' appointment-card__do-not-invoice--on' : ''}`}
+            aria-pressed={customPriceOpen}
+            disabled={locked}
+            onClick={onCustomPrice}
+          >
+            Custom price
+          </button>
+        )}
+        {showDoNotInvoice && (
+          <button
+            type="button"
+            className={`secondary appointment-card__do-not-invoice${doNotInvoiceOn ? ' appointment-card__do-not-invoice--on' : ''}`}
+            disabled={locked}
+            aria-pressed={doNotInvoiceOn}
+            onClick={() => onToggleDoNotInvoice?.()}
+          >
+            Do not invoice
+          </button>
+        )}
       </div>
     </section>
+  )
+}
+
+function CustomPriceFields({ initialPence, onSave, onClear }) {
+  const toast = useToast()
+  const [amount, setAmount] = useState(initialPence == null ? '' : feePenceToInput(initialPence))
+
+  function onSubmit(event) {
+    event.preventDefault()
+    const parsed = parseFeePounds(amount)
+    if (parsed.error || parsed.pence == null) {
+      toast.error(parsed.error || 'Enter a price for this session.')
+      return
+    }
+    onSave(parsed.pence)
+  }
+
+  return (
+    <form className="appointment-card__custom" onSubmit={onSubmit}>
+      <label>
+        This session (£)
+        <input value={amount} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" placeholder="50.00" />
+      </label>
+      <button type="submit" className="secondary">Save price</button>
+      <button type="button" className="secondary" onClick={onClear}>Use usual price</button>
+    </form>
   )
 }
 
@@ -610,8 +683,7 @@ function StandardEventBody({
   appointment,
   locked,
   onAttendanceChange,
-  onToggleDoNotInvoice,
-  invoiceSummary = '',
+  feeLabel = '',
   showAttendance = true,
   showProcessNote = false,
   linkedNote = null,
@@ -649,6 +721,7 @@ function StandardEventBody({
               <span className="room-stacked-row__value">{serviceLabel}</span>
               <span className="room-stacked-row__meta">
                 {showAttendance ? appointmentTypeLabel(appointment.appointment_type) : 'Follow-on block'}
+                {feeLabel ? ` · ${feeLabel}` : ''}
               </span>
             </div>
             {showProcessNote && (
@@ -694,18 +767,6 @@ function StandardEventBody({
             locked={locked}
             compact
           />
-          {(appointment.attendance_status === 'cancelled' || appointment.attendance_status === 'did_not_attend') && (
-            <button
-              type="button"
-              className={`secondary appointment-card__do-not-invoice${appointment.do_not_invoice ? ' appointment-card__do-not-invoice--on' : ''}`}
-              disabled={locked}
-              aria-pressed={Boolean(appointment.do_not_invoice)}
-              onClick={() => onToggleDoNotInvoice?.()}
-            >
-              Do not invoice
-            </button>
-          )}
-          {invoiceSummary ? <p className="text-small text-muted">{invoiceSummary}</p> : null}
         </div>
       )}
     </SafetyLock>
@@ -845,7 +906,15 @@ export function EventDrawer({
   onClose,
   onAttendanceChange,
   onToggleDoNotInvoice,
-  invoiceSummary,
+  feeLabel = '',
+  onAddInvoice,
+  addInvoiceLabel,
+  addInvoicePending,
+  onCustomPrice,
+  customPriceOpen,
+  customPriceInitial,
+  onSaveCustomPrice,
+  onClearCustomPrice,
   onEdit,
   onMove,
   onDelete,
@@ -914,8 +983,7 @@ export function EventDrawer({
           appointment={appointment}
           locked={locked}
           onAttendanceChange={onAttendanceChange}
-          onToggleDoNotInvoice={onToggleDoNotInvoice}
-          invoiceSummary={invoiceSummary}
+          feeLabel={feeLabel}
           showAttendance={kind === 'standard'}
           showProcessNote={kind === 'standard'}
           linkedNote={linkedNote}
@@ -930,6 +998,17 @@ export function EventDrawer({
         onEdit={() => onEdit?.(appointment)}
         onMove={onMove ? () => onMove?.(appointment) : undefined}
         onDelete={onDelete ? () => onDelete?.(appointment) : undefined}
+        onAddInvoice={kind === 'standard' || kind === 'support' ? onAddInvoice : undefined}
+        addInvoiceLabel={addInvoiceLabel}
+        addInvoicePending={addInvoicePending}
+        showDoNotInvoice={kind === 'standard' && (appointment.attendance_status === 'cancelled' || appointment.attendance_status === 'did_not_attend')}
+        doNotInvoiceOn={Boolean(appointment.do_not_invoice)}
+        onToggleDoNotInvoice={onToggleDoNotInvoice}
+        onCustomPrice={kind === 'standard' || kind === 'support' ? onCustomPrice : undefined}
+        customPriceOpen={customPriceOpen}
+        customPriceInitial={customPriceInitial}
+        onSaveCustomPrice={onSaveCustomPrice}
+        onClearCustomPrice={onClearCustomPrice}
       />
     </>
   )
@@ -1295,6 +1374,7 @@ export function ScheduleSessionPanel({
               <option key={svc.id} value={svc.id}>
                 {svc.name}
                 {svc.service_type && svc.service_type !== 'appointment' ? ` · ${svc.service_type}` : ''}
+                {svc.fee_pence != null ? ` · ${formatServiceFee(svc.fee_pence, svc.fee_includes_vat)}` : ''}
                 {' '}({svc.default_duration_minutes || 50} min)
               </option>
             ))}

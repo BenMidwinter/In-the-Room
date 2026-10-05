@@ -227,6 +227,19 @@
   background: var(--bg-surface);
 }
 
+.record-table th.record-table__check,
+.record-table td.record-table__check {
+  width: 2.75rem;
+  padding: 0.8rem 0.35rem 0.8rem 0.85rem;
+  vertical-align: middle;
+}
+
+.record-table__check input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--col-primary);
+}
+
 .record-table tbody tr:last-child td {
   border-bottom: none;
 }

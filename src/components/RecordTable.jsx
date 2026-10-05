@@ -17,6 +17,24 @@ function SortMark({ direction }) {
   )
 }
 
+function SelectionBox({ checked, indeterminate = false, disabled = false, label, onChange }) {
+  const ref = useRef(null)
+  useLayoutEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate && !checked
+  }, [indeterminate, checked])
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      aria-label={label}
+      checked={checked}
+      disabled={disabled}
+      onClick={(event) => event.stopPropagation()}
+      onChange={onChange}
+    />
+  )
+}
+
 function FilterIcon() {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden focusable="false">
@@ -154,6 +172,7 @@ export default function RecordTable({
   countNoun = 'rows',
   scroll = false,
   headerAction = null,
+  selection = null,
 }) {
   const [filters, setFilters] = useState({})
   const [sort, setSort] = useState(() => (
@@ -193,12 +212,29 @@ export default function RecordTable({
   const countLabel = activeFilterCount
     ? `${displayRows.length} of ${rows.length} ${countNoun}`
     : `${rows.length} ${countNoun}`
+  const columnSpan = columns.length + (selection ? 1 : 0)
+  const selectableVisible = selection
+    ? displayRows.filter((row) => (selection.canSelect ? selection.canSelect(row) : true))
+    : []
+  const selectedVisibleCount = selectableVisible.filter((row) => selection.isSelected(row)).length
+  const allVisibleSelected = selectableVisible.length > 0 && selectedVisibleCount === selectableVisible.length
 
   return (
     <div className={['record-table-wrap', scroll ? 'record-table-wrap--scroll' : '', className].filter(Boolean).join(' ')}>
       <table className="record-table">
         <thead>
           <tr>
+            {selection ? (
+              <th className="record-table__check">
+                <SelectionBox
+                  label="Select all visible rows"
+                  checked={allVisibleSelected}
+                  indeterminate={selectedVisibleCount > 0 && !allVisibleSelected}
+                  disabled={selectableVisible.length === 0}
+                  onChange={() => selection.onToggleVisible(selectableVisible, !allVisibleSelected)}
+                />
+              </th>
+            ) : null}
             {columns.map((col, index) => {
               const sortable = Boolean(columnSortKind(col))
               const filterKind = columnFilterKind(col)
@@ -250,11 +286,11 @@ export default function RecordTable({
         <tbody>
           {!rows.length ? (
             <tr>
-              <td className="record-table__empty" colSpan={columns.length}>{emptyMessage}</td>
+              <td className="record-table__empty" colSpan={columnSpan}>{emptyMessage}</td>
             </tr>
           ) : !displayRows.length ? (
             <tr>
-              <td className="record-table__empty" colSpan={columns.length}>
+              <td className="record-table__empty" colSpan={columnSpan}>
                 {filteredEmptyMessage}
                 {' '}
                 <button type="button" className="record-table__inline" onClick={clearFilters}>
@@ -283,6 +319,16 @@ export default function RecordTable({
                   }
                 } : undefined}
               >
+                {selection ? (
+                  <td className="record-table__check" onClick={(event) => event.stopPropagation()}>
+                    <SelectionBox
+                      label={selection.label ? selection.label(row) : 'Select row'}
+                      checked={Boolean(selection.isSelected(row))}
+                      disabled={selection.canSelect ? !selection.canSelect(row) : false}
+                      onChange={() => selection.onToggle(row)}
+                    />
+                  </td>
+                ) : null}
                 {columns.map((col) => (
                   <td
                     key={col.key}

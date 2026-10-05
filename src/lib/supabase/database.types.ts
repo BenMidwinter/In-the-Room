@@ -77,6 +77,7 @@ export type Database = {
           attendance_status: string | null
           block_role: string
           charged_pence: number | null
+          fee_override_pence: number | null
           do_not_invoice: boolean
           client_id: string | null
           clinician_id: string
@@ -98,6 +99,7 @@ export type Database = {
           attendance_status?: string | null
           block_role?: string
           charged_pence?: number | null
+          fee_override_pence?: number | null
           client_id?: string | null
           clinician_id: string
           do_not_invoice?: boolean
@@ -119,6 +121,7 @@ export type Database = {
           attendance_status?: string | null
           block_role?: string
           charged_pence?: number | null
+          fee_override_pence?: number | null
           client_id?: string | null
           clinician_id?: string
           do_not_invoice?: boolean
@@ -472,6 +475,10 @@ export type Database = {
       }
       clients: {
         Row: {
+          concession_kind: string
+          concession_label: string | null
+          concession_pence: number | null
+          concession_percent: number | null
           created_at: string
           encrypted_pseudonym: Json | null
           id: string
@@ -481,6 +488,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          concession_kind?: string
+          concession_label?: string | null
+          concession_pence?: number | null
+          concession_percent?: number | null
           created_at?: string
           encrypted_pseudonym?: Json | null
           id?: string
@@ -490,6 +501,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          concession_kind?: string
+          concession_label?: string | null
+          concession_pence?: number | null
+          concession_percent?: number | null
           created_at?: string
           encrypted_pseudonym?: Json | null
           id?: string
@@ -819,6 +834,150 @@ export type Database = {
           },
         ]
       }
+      invoice_lines: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          description: string
+          id: string
+          includes_vat: boolean
+          invoice_id: string
+          owner_id: string
+          position: number
+          quantity: number
+          released_at: string | null
+          session_date: string | null
+          unit_pence: number
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          includes_vat?: boolean
+          invoice_id: string
+          owner_id: string
+          position?: number
+          quantity?: number
+          released_at?: string | null
+          session_date?: string | null
+          unit_pence: number
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          includes_vat?: boolean
+          invoice_id?: string
+          owner_id?: string
+          position?: number
+          quantity?: number
+          released_at?: string | null
+          session_date?: string | null
+          unit_pence?: number
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          bill_to_name: string
+          bill_to_email: string
+          client_id: string | null
+          created_at: string
+          due_on: string | null
+          for_name: string
+          id: string
+          issued_on: string | null
+          number: string
+          owner_id: string
+          payment_details: string
+          recipient_email: string
+          resend_batch_id: string | null
+          sent_at: string | null
+          delivery_method: string
+          last_delivery_error: string | null
+          status: string
+          total_pence: number
+          updated_at: string
+          xero_invoice_id: string | null
+        }
+        Insert: {
+          bill_to_name: string
+          bill_to_email?: string
+          client_id?: string | null
+          created_at?: string
+          due_on?: string | null
+          for_name?: string
+          id?: string
+          issued_on?: string | null
+          number: string
+          owner_id: string
+          payment_details?: string
+          recipient_email?: string
+          resend_batch_id?: string | null
+          sent_at?: string | null
+          delivery_method?: string
+          last_delivery_error?: string | null
+          status?: string
+          total_pence?: number
+          updated_at?: string
+          xero_invoice_id?: string | null
+        }
+        Update: {
+          bill_to_name?: string
+          bill_to_email?: string
+          client_id?: string | null
+          created_at?: string
+          due_on?: string | null
+          for_name?: string
+          id?: string
+          issued_on?: string | null
+          number?: string
+          owner_id?: string
+          payment_details?: string
+          recipient_email?: string
+          resend_batch_id?: string | null
+          sent_at?: string | null
+          delivery_method?: string
+          last_delivery_error?: string | null
+          status?: string
+          total_pence?: number
+          updated_at?: string
+          xero_invoice_id?: string | null
+        }
+        Relationships: []
+      }
+      invoice_payments: {
+        Row: {
+          amount_pence: number
+          created_at: string
+          id: string
+          invoice_id: string
+          note: string
+          owner_id: string
+          paid_on: string
+        }
+        Insert: {
+          amount_pence: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          note?: string
+          owner_id: string
+          paid_on: string
+        }
+        Update: {
+          amount_pence?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          note?: string
+          owner_id?: string
+          paid_on?: string
+        }
+        Relationships: []
+      }
       journal_entries: {
         Row: {
           author_id: string
@@ -1080,6 +1239,12 @@ export type Database = {
           cancel_late_fee: string
           cancel_notice_hours: number
           dna_fee: string
+          invoice_account_name: string | null
+          invoice_account_number: string | null
+          invoice_due_days: number
+          invoice_next_number: number
+          invoice_payment_note: string | null
+          invoice_sort_code: string | null
           created_at: string
           display_name: string | null
           email: string | null
@@ -1109,6 +1274,12 @@ export type Database = {
           cancel_late_fee?: string
           cancel_notice_hours?: number
           dna_fee?: string
+          invoice_account_name?: string | null
+          invoice_account_number?: string | null
+          invoice_due_days?: number
+          invoice_next_number?: number
+          invoice_payment_note?: string | null
+          invoice_sort_code?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
@@ -1138,6 +1309,12 @@ export type Database = {
           cancel_late_fee?: string
           cancel_notice_hours?: number
           dna_fee?: string
+          invoice_account_name?: string | null
+          invoice_account_number?: string | null
+          invoice_due_days?: number
+          invoice_next_number?: number
+          invoice_payment_note?: string | null
+          invoice_sort_code?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
