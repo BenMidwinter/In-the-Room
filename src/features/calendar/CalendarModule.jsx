@@ -566,7 +566,7 @@ function DayColumn({
   )
 }
 
-const FIT_HOUR_MIN_PX = 52
+const FIT_HOUR_MIN_PX = 68
 
 function TimeGridView({
   dates,
