@@ -98,7 +98,7 @@
   /* Typography */
   --text-primary: #232220;
   --text-secondary: #66625d;
-  --text-tertiary: #96918a;
+  --text-tertiary: #5c5854;
 
   /* Interactive / Brand */
   --accent-primary: #263e34;
@@ -335,4 +335,106 @@
   --border-strong: #66625d;
   --txt-body: #232220;
   --txt-muted: #66625d;
+}
+
+[data-theme='reading-contrast'] {
+  --bg-canvas: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-muted: #ffffff;
+  --bg-subtle: #ffffff;
+  --bg-page: #ffffff;
+  --bg-zone: #ffffff;
+  --bg-zone-muted: #ffffff;
+  --bg-zone-accent: #ffffff;
+  --bg-nav: #ffffff;
+  --bg-nav-edge: #ffffff;
+  --border-subtle: #000000;
+  --border-strong: #000000;
+  --border-color: #000000;
+  --border-light: #000000;
+  --text-primary: #000000;
+  --text-secondary: #000000;
+  --text-tertiary: #000000;
+  --txt-body: #000000;
+  --txt-muted: #000000;
+  --txt-inverse: #ffffff;
+  --accent-primary: #000000;
+  --accent-primary-hover: #000000;
+  --accent-tint: #ffffff;
+  --col-primary: #000000;
+  --col-primary-dark: #000000;
+  --col-primary-light: #ffffff;
+  --col-accent: #000000;
+  --col-accent-dark: #000000;
+  --editor-chrome-bg: #ffffff;
+  --editor-canvas-bg: #ffffff;
+  --editor-sheet-bg: #ffffff;
+  --editor-prose-color: #000000;
+}
+
+[data-theme='reading-contrast'] a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+[data-theme='reading-contrast'] :focus-visible {
+  outline: 3px solid #000000;
+  outline-offset: 2px;
+}
+
+[data-theme='reading-contrast'] .secondary,
+[data-theme='reading-contrast'] .badge-green,
+[data-theme='reading-contrast'] .badge-grey,
+[data-theme='reading-contrast'] .badge-blue {
+  background: #ffffff;
+  color: #000000;
+  border: 2px solid #000000;
+}
+
+[data-stronger-text='on']:not([data-theme='reading-contrast']) {
+  --text-secondary: var(--text-primary);
+  --text-tertiary: var(--text-primary);
+  --txt-muted: var(--txt-body);
+  --border-strong: var(--txt-body);
+  --border-color: color-mix(in srgb, var(--txt-body) 55%, var(--bg-page));
+  --border-subtle: color-mix(in srgb, var(--txt-body) 55%, var(--bg-page));
+  --border-light: color-mix(in srgb, var(--txt-body) 45%, var(--bg-page));
+}
+
+[data-plain-type='on'] {
+  --font-head: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-body: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --font-head-variation: normal;
+  --font-head-variation-brand: normal;
+  --paper-prose-leading: 1.9;
+}
+
+[data-plain-type='on'] body {
+  line-height: 1.7;
+  letter-spacing: 0.012em;
+}
+
+[data-plain-type='on'] h1,
+[data-plain-type='on'] h2,
+[data-plain-type='on'] h3,
+[data-plain-type='on'] h4,
+[data-plain-type='on'] .doc-editor .ProseMirror h1,
+[data-plain-type='on'] .doc-editor .ProseMirror h2,
+[data-plain-type='on'] .doc-editor .ProseMirror h3 {
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
+[data-plain-type='on'] .doc-editor .ProseMirror,
+[data-plain-type='on'] .doc-editor__prose,
+[data-plain-type='on'] .clinical-prose,
+[data-plain-type='on'] .rich-editor .ProseMirror {
+  line-height: 1.9;
+  letter-spacing: 0.012em;
+}
+
+[data-plain-type='on'] .doc-editor .ProseMirror blockquote,
+[data-plain-type='on'] .clinical-prose blockquote {
+  font-style: normal;
 }

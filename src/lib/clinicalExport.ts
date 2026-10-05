@@ -391,6 +391,27 @@ export async function downloadProgressNotePdf(
   return downloadDocumentPdf(renderProgressNoteDocument(note, meta), pdfFilename(note.title))
 }
 
+/** Download a completed form as a PDF, with the letterhead at the top. */
+export async function downloadFormPdf({
+  title,
+  clientName,
+  letterhead,
+  bodyHtml,
+}: {
+  title: string
+  clientName?: string
+  letterhead?: PrintLetterhead
+  bodyHtml: string
+}) {
+  const metaHtml = clientName
+    ? `<p class="meta"><strong>Client:</strong> ${escapeHtml(clientName)}</p>`
+    : ''
+  return downloadDocumentPdf(
+    buildClinicalDocumentPrintHtml({ title, metaHtml, bodyHtml, letterhead }),
+    pdfFilename(title),
+  )
+}
+
 /** Download a letter as a PDF file. */
 export async function downloadLetterPdf(
   letter,

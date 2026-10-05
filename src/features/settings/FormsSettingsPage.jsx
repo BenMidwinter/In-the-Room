@@ -6,9 +6,11 @@ import { useAppClients } from '../../lib/queries'
 import {
   useDeleteFormMutation,
   useDeleteMeasureMutation,
+  useDuplicateFormMutation,
   useFormsQuery,
   useMeasuresQuery,
   useSendFormMutation,
+  useSetFormScreenerMutation,
 } from '../../lib/formQueries'
 import { findActiveEpisode } from '../../lib/supabase/episodesRepo'
 import { formEmbedCode, formFillUrl, formStartUrl } from '../forms/downloadCsv'
@@ -36,6 +38,8 @@ export default function FormsSettingsPage() {
   const formsQuery = useFormsQuery(userId)
   const removeMeasure = useDeleteMeasureMutation(userId)
   const removeForm = useDeleteFormMutation(userId)
+  const duplicate = useDuplicateFormMutation(userId)
+  const placeOnScreener = useSetFormScreenerMutation(userId)
   const send = useSendFormMutation('library')
   const measures = measuresQuery.data || []
   const forms = formsQuery.data || []
@@ -152,9 +156,32 @@ export default function FormsSettingsPage() {
     },
   }))
 
+  const copyForm = async (form) => {
+    try {
+      await duplicate.mutateAsync(form.id)
+      toast.saved('Copy saved as a draft')
+    } catch (err) {
+      toast.error(err.message || 'Could not copy the form')
+    }
+  }
+
+  const toggleScreener = async (form) => {
+    const next = !form.place_on_screener
+    try {
+      await placeOnScreener.mutateAsync({ id: form.id, placeOnScreener: next })
+      toast.saved(next
+        ? 'This form now places the person on the screener.'
+        : 'This form no longer places the person on the screener.')
+    } catch (err) {
+      toast.error(err.message || 'Could not update the screener setting')
+    }
+  }
+
   const formRows = forms.map((form) => {
-    const intake = form.audience === 'public'
-    const kind = intake ? 'Intake' : 'Send to a client'
+    const shared = form.audience === 'public'
+    const kind = shared
+      ? (form.place_on_screener ? 'Screener' : 'Shared link')
+      : 'Send to a client'
     const view = { label: 'View', onSelect: () => navigate(`/settings/forms/edit/${form.id}`) }
     const remove = { label: 'Delete', danger: true, onSelect: () => deleteForm(form) }
     const share = (label, text, message) => ({
@@ -167,16 +194,24 @@ export default function FormsSettingsPage() {
         copy(text, message)
       },
     })
-    const items = intake
+    const duplicateItem = { label: 'Duplicate', onSelect: () => copyForm(form) }
+    const screenerItem = {
+      label: form.place_on_screener ? 'Take off the screener' : 'Place the person on the screener',
+      onSelect: () => toggleScreener(form),
+    }
+    const items = shared
       ? [
         view,
-        share('Copy link', formStartUrl(form.id), 'Link copied. Share it whenever someone new should join the waitlist.'),
+        screenerItem,
+        share('Copy link', formStartUrl(form.id), 'Link copied.'),
         share('Copy embed', formEmbedCode(form.id, form.name), 'Embed code copied'),
+        duplicateItem,
         remove,
       ]
       : [
         view,
         { label: 'Send', onSelect: () => sendForm(form) },
+        duplicateItem,
         remove,
       ]
     return {
@@ -203,17 +238,17 @@ export default function FormsSettingsPage() {
         blockId="settings_measures"
         title="Questionnaires you track"
         description="Name the questionnaire, such as YP-CORE or CGAS. Save a draft while you design it, and publish it when it is ready to use."
-        actions={(
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => navigate('/settings/forms/questionnaires/new')}
-          >
-            Add a questionnaire
-          </button>
-        )}
       >
         <RecordTable
+          headerAction={(
+            <button
+              type="button"
+              className="secondary record-table__add"
+              onClick={() => navigate('/settings/forms/questionnaires/new')}
+            >
+              Add a questionnaire
+            </button>
+          )}
           columns={[
             { key: 'name', label: 'Questionnaire', filter: 'text', sort: 'text' },
             { key: 'kind', label: 'Scoring', filter: 'choice', sort: 'text' },
@@ -230,18 +265,18 @@ export default function FormsSettingsPage() {
       <SettingsSectionCard
         blockId="settings_forms"
         title="Forms"
-        description="A form you send is added on a course. An intake form is shared with a link or an embed, and the person who sends it joins the waitlist."
-        actions={(
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => navigate('/settings/forms/edit/new')}
-          >
-            Add a form
-          </button>
-        )}
+        description="A form you send is added on a course. A shared form can be copied as a link or an embed. Open the form and use the settings wheel for the screener, auto fill, and email."
       >
         <RecordTable
+          headerAction={(
+            <button
+              type="button"
+              className="secondary record-table__add"
+              onClick={() => navigate('/settings/forms/edit/new')}
+            >
+              Add a form
+            </button>
+          )}
           columns={[
             { key: 'name', label: 'Form', filter: 'text', sort: 'text' },
             { key: 'kind', label: 'Kind', filter: 'choice', sort: 'text' },

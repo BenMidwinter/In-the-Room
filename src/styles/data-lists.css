@@ -109,6 +109,27 @@
   padding: 0.3rem 0.55rem 0.3rem 0.95rem;
 }
 
+.record-table__head--action {
+  justify-content: flex-end;
+  padding-right: 0.85rem;
+}
+
+.record-table th.record-table__head-action {
+  width: auto;
+  text-align: right;
+}
+
+.record-table:has(.record-table__head-action) .record-table__menu,
+.record-table:has(.record-table__head-action) .record-table__col--actions {
+  width: auto;
+}
+
+.record-table__add {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
 .record-table__sort,
 .record-table__label {
   display: inline-flex;
@@ -117,7 +138,7 @@
   padding: 0.15rem 0.1rem;
   border: 0;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-family: inherit;
   font-size: 0.7rem;
   font-weight: 700;

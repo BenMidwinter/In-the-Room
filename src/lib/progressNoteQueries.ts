@@ -5,6 +5,7 @@ import {
   fetchProgressNote,
   fetchProgressNoteByAppointment,
   fetchProgressNotesForClient,
+  listProgressNotesIndex,
   saveProgressNoteForUser,
   signOffProgressNoteForUser,
 } from './supabase/progressNotesRepo'
@@ -42,6 +43,16 @@ export function useProgressNoteQuery(noteId, { enabled = true } = {}) {
     queryFn: () => fetchProgressNote(noteId),
     enabled: enabled && Boolean(noteId),
     placeholderData: keepPreviousData,
+  })
+}
+
+export function useProgressNoteIndexQuery(enabled = true) {
+  return useQuery({
+    queryKey: [...progressNoteQueryKeys.progressNotes, 'index'],
+    queryFn: listProgressNotesIndex,
+    enabled,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   })
 }
 

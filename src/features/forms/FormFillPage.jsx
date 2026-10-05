@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import LetterheadPreview from '../client/LetterheadPreview'
 import { bindLabel, missingAnswers } from '../../lib/formModel'
 import { openFormLink, saveFormLink, submitFormLink } from '../../lib/supabase/formsRepo'
 import { formFillUrl } from './downloadCsv'
@@ -8,10 +9,11 @@ import ScoreFields from './ScoreFields'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export function FormShell({ title, children }) {
+export function FormShell({ title, letterhead, children }) {
   return (
     <main className="form-fill">
       <div className="form-fill__sheet">
+        {letterhead ? <LetterheadPreview letterhead={letterhead} /> : null}
         <h1>{title}</h1>
         {children}
       </div>
@@ -186,7 +188,7 @@ export default function FormFillPage() {
   const sent = pack.status !== 'in_progress'
 
   return (
-    <FormShell title={pack.title}>
+    <FormShell title={pack.title} letterhead={pack.letterhead}>
       {sent && <p className="form-fill__note">Thank you. This has been sent.</p>}
       {pack.schema.blocks.map((block) => {
         if (block.type === 'prose') {

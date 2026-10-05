@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import RecordTable from '../../components/RecordTable'
 import RichTextEditor from '../../components/RichTextEditor'
 import { SettingsSectionCard } from './SettingsPlaceholders'
 import { useToast, useConfirm } from '../../components/ui'
@@ -9,6 +10,7 @@ import {
 } from '../../lib/templateQueries'
 import { isSupabaseConfigured } from '../../lib/supabase/client'
 import { useAuth } from '../../lib/auth/AuthProvider'
+import { formatDisplayDate } from '../../lib/dateArchitecture'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import { getProfile } from '../../lib/store'
 import DocumentWorkspace from '../client/DocumentWorkspace'
@@ -64,8 +66,9 @@ export default function TemplatesSettingsPage({ kind, title }) {
     }
   }
 
-  const remove = async () => {
-    if (!selectedId || selectedId === 'new') {
+  const remove = async (id) => {
+    const templateId = id || selectedId
+    if (!templateId || templateId === 'new') {
       setSelectedId(null)
       return
     }
@@ -73,11 +76,12 @@ export default function TemplatesSettingsPage({ kind, title }) {
       title: 'Delete this template?',
       message: 'Notes and letters already written from it stay as they are.',
       confirmLabel: 'Delete',
+      tone: 'danger',
     })
     if (!ok) return
     try {
-      await removeTemplate.mutateAsync(selectedId)
-      setSelectedId(null)
+      await removeTemplate.mutateAsync(templateId)
+      if (selectedId === templateId) setSelectedId(null)
       toast.saved('Template deleted')
     } catch (err) {
       toast.error(err?.message || 'Could not delete the template')
@@ -93,7 +97,7 @@ export default function TemplatesSettingsPage({ kind, title }) {
         onBack={() => setSelectedId(null)}
         actions={(
           <>
-            <button type="button" className="secondary" onClick={remove} disabled={removeTemplate.isPending}>
+            <button type="button" className="secondary" onClick={() => remove(selectedId)} disabled={removeTemplate.isPending}>
               Delete
             </button>
             <button type="button" className="primary" onClick={save} disabled={saveTemplate.isPending}>
@@ -128,35 +132,49 @@ export default function TemplatesSettingsPage({ kind, title }) {
     )
   }
 
+  const rows = templates.map((template) => ({
+    id: template.id,
+    template,
+    filterValues: { name: template.name },
+    sortValues: { name: template.name, updated: template.updated_at || '' },
+    cells: {
+      name: <span className="record-table__primary">{template.name}</span>,
+      updated: formatDisplayDate(String(template.updated_at || '').slice(0, 10)) || '—',
+      actions: (
+        <div className="record-table__row-actions">
+          <button type="button" className="secondary" onClick={(event) => { event.stopPropagation(); openExisting(template) }}>Edit</button>
+          <button type="button" className="secondary" onClick={(event) => { event.stopPropagation(); remove(template.id) }} disabled={removeTemplate.isPending}>
+            Delete
+          </button>
+        </div>
+      ),
+    },
+  }))
+
   return (
     <div className="section-card-stack">
-      <SettingsSectionCard blockId={`settings_templates_${kind}`} title={title}>
+      <SettingsSectionCard
+        blockId={`settings_templates_${kind}`}
+        title={title}
+        actions={(
+          <button type="button" className="secondary" onClick={openNew}>Add a template</button>
+        )}
+      >
         {!isSupabaseConfigured() && (
           <p className="auth-page__alert">Supabase env vars required to keep templates.</p>
         )}
         {error && <p className="auth-page__alert">{error.message}</p>}
-
-        <div className="template-studio__list" role="list">
-          {templates.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              role="listitem"
-              className={`section-card__toolbar-item${selectedId === template.id ? ' section-card__toolbar-item--active' : ''}`}
-              onClick={() => openExisting(template)}
-            >
-              {template.name}
-            </button>
-          ))}
-          <button type="button" className="btn btn-primary" onClick={openNew}>
-            + New template
-          </button>
-        </div>
-
-        {isPending && <p className="text-small text-muted">Loading templates…</p>}
-        {!isPending && templates.length === 0 && (
-          <p className="text-muted" style={{ margin: 0 }}>No templates yet.</p>
-        )}
+        <RecordTable
+          columns={[
+            { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
+            { key: 'updated', label: 'Updated', sort: 'date' },
+            { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
+          ]}
+          rows={rows}
+          countNoun="templates"
+          emptyMessage={isPending ? 'Loading templates…' : 'No templates yet.'}
+          onRowClick={(row) => openExisting(row.template)}
+        />
       </SettingsSectionCard>
     </div>
   )

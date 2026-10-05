@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import FormOverlay from '../../components/FormOverlay'
 import { useConfirm, useToast } from '../../components/ui'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { CLIENT_BINDS, bindLabel, blankForm, moveListItem, newFormId } from '../../lib/formModel'
@@ -9,6 +11,7 @@ import {
   useMeasuresQuery,
   useSaveFormMutation,
 } from '../../lib/formQueries'
+import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 import { formEmbedCode, formStartUrl } from '../forms/downloadCsv'
 
 const FORM_MODULES = [
@@ -62,6 +65,9 @@ function blankDraft() {
     id: null,
     name: '',
     audience: 'private',
+    placeOnScreener: false,
+    autofillClient: true,
+    letterheadId: undefined,
     status: 'draft',
     schema: blankForm(),
   }
@@ -72,6 +78,9 @@ function fromRecord(form) {
     id: form.id,
     name: form.name,
     audience: form.audience === 'public' ? 'public' : 'private',
+    placeOnScreener: Boolean(form.place_on_screener),
+    autofillClient: form.autofill_client !== false,
+    letterheadId: form.letterhead_id || null,
     status: form.status === 'published' ? 'published' : 'draft',
     schema: form.schema,
   }
@@ -132,12 +141,106 @@ function PaletteButton({ spec, onAdd }) {
   )
 }
 
+function SettingsWheel() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden focusable="false">
+      <path
+        fill="currentColor"
+        d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.2 7.2 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
+      />
+    </svg>
+  )
+}
+
+function FormSettings({ draft, onChange, onClose }) {
+  const screenerLocked = Boolean(draft.id) && draft.audience !== 'public'
+  const autofillLocked = draft.audience === 'public'
+  return (
+    <FormOverlay
+      title="Form settings"
+      eyebrow={draft.name.trim() || 'New form'}
+      meta="These apply when you save the form."
+      size="sm"
+      onClose={onClose}
+      footer={(
+        <div className="form-actions">
+          <button type="button" className="primary" onClick={onClose}>Done</button>
+        </div>
+      )}
+    >
+      <div className="form-group">
+        <label htmlFor="form-screener">Place the person on the screener</label>
+        <select
+          id="form-screener"
+          className="paper-input"
+          value={draft.placeOnScreener ? 'yes' : 'no'}
+          disabled={screenerLocked}
+          onChange={(event) => {
+            const yes = event.target.value === 'yes'
+            onChange({
+              ...draft,
+              placeOnScreener: yes,
+              audience: yes && !draft.id ? 'public' : draft.audience,
+            })
+          }}
+        >
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+        <p className="form-designer__hint">
+          {draft.audience === 'public'
+            ? 'Yes creates the client, opens a course, and puts them on the screener when they send the form.'
+            : screenerLocked
+              ? 'A shared form places someone new on the screener. This form is sent to a client you already see.'
+              : 'Yes shares this form as a link. Someone new who sends it is added to the screener.'}
+        </p>
+      </div>
+      <div className="form-group">
+        <label htmlFor="form-autofill">Auto fill client details</label>
+        <select
+          id="form-autofill"
+          className="paper-input"
+          value={autofillLocked || draft.autofillClient === false ? 'no' : 'yes'}
+          disabled={autofillLocked}
+          onChange={(event) => onChange({ ...draft, autofillClient: event.target.value === 'yes' })}
+        >
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+        <p className="form-designer__hint">
+          {autofillLocked
+            ? 'Name, date of birth, and the other profile fields already on the form are filled in when you send a form to a client you already see.'
+            : 'Name, date of birth, and the other profile fields already on the form are filled in when you send it.'}
+        </p>
+      </div>
+      <fieldset className="form-group" disabled>
+        <legend>Email notification</legend>
+        <label className="form-builder__required">
+          <input type="checkbox" disabled />
+          Email me when someone sends this form
+        </label>
+        <p className="form-designer__hint">This is not available yet.</p>
+      </fieldset>
+    </FormOverlay>
+  )
+}
+
 function FormDesigner({ draft, onChange, measures, userId }) {
   const navigate = useNavigate()
   const toast = useToast()
   const confirm = useConfirm()
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const save = useSaveFormMutation(userId)
   const remove = useDeleteFormMutation(userId)
+  const letterheadsQuery = useQuery({
+    queryKey: ['letterheads', userId],
+    queryFn: listLetterheads,
+    enabled: Boolean(userId),
+  })
+  const letterheads = letterheadsQuery.data || []
+  const letterheadId = draft.letterheadId === undefined
+    ? (letterheads.find((row) => row.is_default)?.id || letterheads[0]?.id || '')
+    : (draft.letterheadId || '')
   const schema = draft.schema
   const published = draft.status === 'published'
   const publishedMeasures = measures.filter((measure) => measure.status === 'published')
@@ -179,6 +282,9 @@ function FormDesigner({ draft, onChange, measures, userId }) {
         audience: draft.audience,
         schema,
         publish,
+        placeOnScreener: draft.audience === 'public' && draft.placeOnScreener,
+        autofillClient: draft.autofillClient !== false,
+        letterheadId: letterheadId || null,
       })
       onChange(fromRecord(saved))
       if (!draft.id) navigate(`/settings/forms/edit/${saved.id}`, { replace: true })
@@ -231,6 +337,10 @@ function FormDesigner({ draft, onChange, measures, userId }) {
         <span className={`badge ${published ? 'badge-green' : 'badge-grey'}`}>
           {published ? 'Published' : 'Draft'}
         </span>
+        <button type="button" className="secondary form-designer__settings" onClick={() => setSettingsOpen(true)}>
+          <SettingsWheel />
+          Settings
+        </button>
         {!published && (
           <button type="button" className="secondary" onClick={() => persist(false)} disabled={save.isPending}>
             Save draft
@@ -284,21 +394,44 @@ function FormDesigner({ draft, onChange, measures, userId }) {
                 className="paper-input"
                 value={draft.audience}
                 disabled={Boolean(draft.id)}
-                onChange={(event) => onChange({
-                  ...draft,
-                  audience: event.target.value === 'public' ? 'public' : 'private',
-                })}
+                onChange={(event) => {
+                  const audience = event.target.value === 'public' ? 'public' : 'private'
+                  onChange({
+                    ...draft,
+                    audience,
+                    placeOnScreener: audience === 'public' ? draft.placeOnScreener : false,
+                  })
+                }}
               >
                 <option value="private">Send to a client I already see</option>
-                <option value="public">Intake. Someone new joins the waitlist</option>
+                <option value="public">Share a link</option>
+              </select>
+            </div>
+            <div className="form-group" style={{ marginTop: '0.8rem' }}>
+              <label htmlFor="form-letterhead">Letterhead</label>
+              <select
+                id="form-letterhead"
+                className="paper-input"
+                value={letterheadId}
+                onChange={(event) => onChange({ ...draft, letterheadId: event.target.value || null })}
+              >
+                <option value="">No letterhead</option>
+                {letterheads.map((row) => (
+                  <option key={row.id} value={row.id}>{row.name || row.practice_name || 'Letterhead'}</option>
+                ))}
               </select>
             </div>
             <p className="form-export-note">
               {draft.audience === 'public'
-                ? 'Publish this, then copy the link or the embed from the forms list. When someone sends it, they are added to the waitlist, a course is opened, and the form is the first thing on their timeline.'
-                : 'Add a published form from the client’s course. A draft cannot be added there. Intake forms are not sent from a course.'}
+                ? 'Publish this, then copy the link or the embed from the forms list. The letterhead sits at the top of the form and the PDF.'
+                : 'Add a published form from the client’s course. A draft cannot be added there.'}
+              {' '}
+              The settings wheel holds the screener, auto fill, and email notification.
             </p>
           </div>
+          {settingsOpen ? (
+            <FormSettings draft={draft} onChange={onChange} onClose={() => setSettingsOpen(false)} />
+          ) : null}
           {schema.blocks.map((block, index) => (
             <div
               key={block.id}
@@ -366,8 +499,10 @@ function FormDesigner({ draft, onChange, measures, userId }) {
                 </p>
               )}
               <div className="form-designer__card-actions">
-                <button type="button" className="secondary" disabled={index === 0} onClick={() => setBlocks(moveListItem(schema.blocks, index, index - 1))}>Up</button>
-                <button type="button" className="secondary" disabled={index === schema.blocks.length - 1} onClick={() => setBlocks(moveListItem(schema.blocks, index, index + 1))}>Down</button>
+                <div className="form-designer__nudge">
+                  <button type="button" className="secondary" aria-label="Move up" disabled={index === 0} onClick={() => setBlocks(moveListItem(schema.blocks, index, index - 1))}>↑</button>
+                  <button type="button" className="secondary" aria-label="Move down" disabled={index === schema.blocks.length - 1} onClick={() => setBlocks(moveListItem(schema.blocks, index, index + 1))}>↓</button>
+                </div>
                 <button type="button" className="secondary" onClick={() => setBlocks(schema.blocks.filter((_, blockIndex) => blockIndex !== index))}>Remove</button>
               </div>
             </div>

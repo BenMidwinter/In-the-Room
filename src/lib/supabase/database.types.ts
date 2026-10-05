@@ -693,9 +693,12 @@ export type Database = {
           description: string | null
           id: string
           is_onboarding: boolean
+          letterhead_id: string | null
           name: string
           organization_id: string | null
+          autofill_client: boolean
           owner_id: string
+          place_on_screener: boolean
           schema: Json
           slug: string
           status: string
@@ -708,9 +711,12 @@ export type Database = {
           description?: string | null
           id?: string
           is_onboarding?: boolean
+          letterhead_id?: string | null
           name: string
+          autofill_client?: boolean
           organization_id?: string | null
           owner_id: string
+          place_on_screener?: boolean
           schema?: Json
           slug: string
           status?: string
@@ -723,9 +729,12 @@ export type Database = {
           description?: string | null
           id?: string
           is_onboarding?: boolean
+          letterhead_id?: string | null
           name?: string
+          autofill_client?: boolean
           organization_id?: string | null
           owner_id?: string
+          place_on_screener?: boolean
           schema?: Json
           slug?: string
           status?: string
@@ -1680,6 +1689,98 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          kind: string
+          name: string
+          organization_id: string | null
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          kind: string
+          name: string
+          organization_id?: string | null
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          name?: string
+          organization_id?: string | null
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      client_tag_links: {
+        Row: {
+          client_id: string
+          created_at: string
+          tag_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          tag_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_tag_links_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      waitlist_placements: {
+        Row: {
+          client_id: string
+          created_at: string
+          information: string
+          organization_id: string | null
+          owner_id: string
+          preferred_times: string
+          service_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          information?: string
+          organization_id?: string | null
+          owner_id: string
+          preferred_times?: string
+          service_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          information?: string
+          organization_id?: string | null
+          owner_id?: string
+          preferred_times?: string
+          service_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {

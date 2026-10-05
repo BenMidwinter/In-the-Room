@@ -210,6 +210,22 @@ export function prefillClientAnswers(
   return answers
 }
 
+export function mergeEmptyClientAnswers(
+  answers: Record<string, unknown>,
+  prefill: Record<string, string>,
+): { answers: Record<string, unknown>; changed: boolean } {
+  const next = { ...answers }
+  let changed = false
+  for (const [key, value] of Object.entries(prefill)) {
+    const current = next[key]
+    if (current == null || String(current).trim() === '') {
+      next[key] = value
+      changed = true
+    }
+  }
+  return { answers: changed ? next : answers, changed }
+}
+
 export function slugify(value: string): string {
   const base = value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48)
   return base || 'form'

@@ -12,7 +12,18 @@ export default function ClientDetailsBar({ client, onClientUpdated, embedded = f
     { label: 'School / setting', value: client.school || '—' },
     { label: 'Diagnosis', value: client.diagnosis || '—' },
     { label: 'Medication', value: client.medication || '—' },
-    { label: 'Status', value: client.on_waitlist ? 'Waitlist' : client.is_active ? 'Active' : 'Discharged' },
+    {
+      label: 'Status',
+      value: client.on_screener
+        ? 'Screener'
+        : client.on_waitlist
+          ? 'Waitlist'
+          : client.status === 'rejected'
+            ? 'Rejected'
+            : client.is_active
+              ? 'Active'
+              : 'Discharged',
+    },
   ]
 
   const handleSaved = (updated) => {

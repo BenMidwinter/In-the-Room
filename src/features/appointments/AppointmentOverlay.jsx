@@ -147,7 +147,7 @@ function AppointmentOverlayHost({
   const [deleteScopeFor, setDeleteScopeFor] = useState(null)
 
   const clients = useMemo(
-    () => remoteClients.filter((client) => client.is_active !== false),
+    () => remoteClients.filter((client) => client.is_active || client.on_waitlist),
     [remoteClients],
   )
 

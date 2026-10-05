@@ -1,3 +1,4 @@
+import { promoteWaitlistClient } from './clientsRepo'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 import { db } from '../data/collections'
@@ -489,6 +490,7 @@ export async function upsertAppointmentRemote(
       })
     }
     mapped = await finishMeetLink(mapped, Boolean(payload.create_meet_link))
+    if (blockRole === 'client_session' && clientId) await promoteWaitlistClient(clientId)
     return mapped
   }
 
@@ -512,6 +514,7 @@ export async function upsertAppointmentRemote(
     })
   }
   mapped = await finishMeetLink(mapped, Boolean(payload.create_meet_link))
+  if (blockRole === 'client_session' && clientId) await promoteWaitlistClient(clientId)
   return mapped
 }
 

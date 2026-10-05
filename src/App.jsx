@@ -4,11 +4,12 @@ import { useAppClients } from './lib/queries'
 import AppLayout from './components/AppLayout'
 import AuthPage from './features/auth/AuthPage'
 import FormFillPage from './features/forms/FormFillPage'
+import FormDocumentPage from './features/forms/FormDocumentPage'
 import FormStartPage from './features/forms/FormStartPage'
 import Home from './features/home/HomePage'
 import Calendar from './features/calendar/CalendarPage'
 import AllClients from './components/AllClients'
-import WaitlistPage from './components/WaitlistPage'
+import ScreenerPage from './components/ScreenerPage'
 import AddClient from './components/AddClient'
 import PatientProfile from './features/client/PatientProfile'
 import ClientPanelEmpty from './features/client/ClientPanelEmpty'
@@ -28,6 +29,7 @@ import ServicesSettingsPage from './features/settings/ServicesSettingsPage'
 import IntegrationsSettingsPage from './features/settings/IntegrationsSettingsPage'
 import { TwoFactorSettingsPage } from './features/settings/SettingsPlaceholders'
 import FormsSettingsPage from './features/settings/FormsSettingsPage'
+import TagsSettingsPage from './features/settings/TagsSettingsPage'
 import FormDesignerPage from './features/settings/FormDesignerPage'
 import MeasureDesignerPage from './features/settings/MeasureDesignerPage'
 import TemplatesSettingsPage from './features/settings/TemplatesSettingsPage'
@@ -71,7 +73,9 @@ export default function App() {
         <Route path="upcoming-appointments" element={<Navigate to="/calendar?view=upcoming" replace />} />
         <Route path="active-cases" element={<Navigate to="/home" replace />} />
         <Route path="clients" element={<AllClients />} />
-        <Route path="waitlist" element={<WaitlistPage />} />
+        <Route path="screener" element={<ScreenerPage />} />
+        <Route path="waitlist" element={<Navigate to="/screener" replace />} />
+        <Route path="clients/:clientId/forms/:submissionId" element={<FormDocumentPage />} />
         <Route path="clients/add" element={<AddClient />} />
         <Route path="clients/:clientId/edit" element={<AddClient />} />
 
@@ -141,6 +145,7 @@ export default function App() {
             <TemplatesSettingsPage kind="working_document" title="Working document templates" />
           } />
           <Route path="forms" element={<FormsSettingsPage />} />
+          <Route path="tags" element={<TagsSettingsPage />} />
           <Route path="forms/edit/:formId" element={<FormDesignerPage />} />
           <Route path="forms/questionnaires/:measureId" element={<MeasureDesignerPage />} />
           <Route path="login" element={<LoginSettingsPage />} />
