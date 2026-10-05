@@ -27,6 +27,10 @@ Delete the current rows before trialling this. They are fake test data. The tria
 
 This follows the encryption and login patch, because the export has to decrypt notes. Hours, fees, and attendance can be exported before that, because they are not the clinical note.
 
+## Later, not the next piece of work
+
+- [ ] **Groups.** Record who attended a group session, with a note and a fee for each person, and invoice those people from that session. On the list, and not a priority.
+
 ---
 
 ## Later detail: Authentication Hardening, DPA Governance, & Data Portability
