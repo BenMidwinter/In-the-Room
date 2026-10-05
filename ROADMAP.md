@@ -7,7 +7,7 @@ Living plan. The clinical workspace (caseload, calendar, notes, services, forms,
 ## 1. Missing features
 
 - [x] **Reporting.** Overview, Appointments & Notes, Clients, Waitlist, My Practice, and Finance. It opens on a rolling week, and every section can take other dates. Efficiency is appointment, support, and admin time as a percentage of availability minus busy time.
-- [x] **Invoicing.** Ready to invoice lists everyone with a fee still to bill. Dates are optional. Sessions not yet held stay off until you include them. Create and send writes the invoices, marks them sent, and prints them together. People who share a Send invoices to contact go on one invoice. A single draft can still start empty, or from one session. Xero sync and expenses are still to do.
+- [x] **Invoicing.** The hub has All Invoices and Unbilled Sessions. A new invoice starts by choosing a client. The invoice itself is one document: recipient, lines, and payment terms. Send, preview, and void live on that document. People who share a Send invoices to contact still go on one invoice. Xero sync and expenses are still to do.
 
 Service prices, including whether the price already includes VAT, live on each service.
 

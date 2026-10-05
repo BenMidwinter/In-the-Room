@@ -389,6 +389,14 @@ export async function recordInvoicePayment(
   return reloadInvoice(supabase, user.id, invoiceId)
 }
 
+export async function deleteInvoice(invoiceId: string): Promise<void> {
+  const { supabase, user } = await requireUser()
+  const current = await reloadInvoice(supabase, user.id, invoiceId)
+  if (current.status !== 'draft') throw new Error('A sent invoice can be voided.')
+  const { error } = await supabase.from('invoices').delete().eq('id', invoiceId)
+  if (error) throw error
+}
+
 export async function removeInvoicePayment(invoiceId: string, paymentId: string): Promise<InvoiceRecord> {
   const { supabase, user } = await requireUser()
   const current = await reloadInvoice(supabase, user.id, invoiceId)
