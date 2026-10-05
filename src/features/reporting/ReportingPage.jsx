@@ -1,7 +1,6 @@
 import { useId, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
-import HelpTip from '../../components/HelpTip'
 import RecordTable from '../../components/RecordTable'
 import TagLabel from '../../components/TagLabel'
 import { useAppSession } from '../../lib/AppSessionContext'
@@ -46,15 +45,6 @@ const SECTIONS = [
   { id: 'practice', label: 'My Practice' },
   { id: 'finance', label: 'Finance' },
 ]
-
-const FILTER_NOTE = {
-  overview: 'Service narrows hours, fees, and notes. Efficiency uses the whole diary.',
-  appointments: 'Filter by service, and by a client tag.',
-  clients: 'Filter by a client tag. Service stays on the appointment sections.',
-  waitlist: 'Filter by a waitlist tag, and by the appointment type they are waiting for.',
-  practice: 'Service narrows the clinical rows. Filter the table by type, activity, or service. CPD and supervision stay in the list.',
-  finance: 'Filter by service, and by a client tag.',
-}
 
 const NOTE_LABEL = { complete: 'Signed off', draft: 'Draft', missing: 'Missing' }
 const EMPTY_LIST = []
@@ -113,6 +103,11 @@ export default function ReportingPage() {
     queryFn: () => listScreenerBoard().catch(() => []),
     enabled: Boolean(userId),
   })
+  const placementsQuery = useQuery({
+    queryKey: ['waitlist-placements', 'reporting'],
+    queryFn: listWaitlistPlacements,
+    enabled: Boolean(userId),
+  })
   const invoicesQuery = useQuery({
     queryKey: ['invoices', userId],
     queryFn: () => listInvoices().catch(() => []),
@@ -168,10 +163,9 @@ export default function ReportingPage() {
 
   const tagKind = section === 'waitlist' ? 'waitlist' : 'client'
   const tagOptions = tagKind === 'waitlist' ? (waitlistTagsQuery.data || []) : (clientTagsQuery.data || [])
-  const showService = section !== 'clients'
   const showTag = section === 'appointments' || section === 'clients' || section === 'waitlist' || section === 'finance'
   const activeTag = showTag ? tagId : ''
-  const activeService = showService && section !== 'practice' ? serviceId : ''
+  const activeService = section !== 'clients' && section !== 'practice' ? serviceId : ''
 
   const scoped = useMemo(
     () => mapped.filter((appointment) => (
@@ -234,17 +228,15 @@ export default function ReportingPage() {
             onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))}
           />
         </label>
-        {showService && (
-          <label className="reporting-filters__field">
-            Service
-            <select className="paper-input" value={serviceId} onChange={(event) => setServiceId(event.target.value)}>
-              <option value="">All services</option>
-              {services.filter((service) => service.is_active !== false).map((service) => (
-                <option key={service.id} value={service.id}>{service.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
+        <label className="reporting-filters__field">
+          Service
+          <select className="paper-input" value={serviceId} onChange={(event) => setServiceId(event.target.value)}>
+            <option value="">All services</option>
+            {services.filter((service) => service.is_active !== false).map((service) => (
+              <option key={service.id} value={service.id}>{service.name}</option>
+            ))}
+          </select>
+        </label>
         {showTag && (
           <label className="reporting-filters__field">
             {tagKind === 'waitlist' ? 'Waitlist tag' : 'Client tag'}
@@ -256,9 +248,6 @@ export default function ReportingPage() {
             </select>
           </label>
         )}
-        <div className="reporting-filters__help">
-          <HelpTip text={FILTER_NOTE[section]} label="About this report" />
-        </div>
       </div>
 
       <div className="finance-tabs" role="tablist" aria-label="Reporting sections">
@@ -289,6 +278,7 @@ export default function ReportingPage() {
           episodes={episodesQuery.data || []}
           range={range}
           tagId={tagId}
+          serviceId={serviceId}
           tagsByClient={tagsByClient}
         />
       )}
@@ -301,6 +291,10 @@ export default function ReportingPage() {
           tagId={tagId}
           serviceId={serviceId}
           today={today}
+          placements={placementsQuery.data || EMPTY_LIST}
+          clients={clientsQuery.data || EMPTY_LIST}
+          appointments={appointmentsQuery.data || EMPTY_LIST}
+          tagsByClient={tagsByClient}
         />
       )}
       {section === 'practice' && (
@@ -435,12 +429,19 @@ function AppointmentsSection({ summary }) {
   )
 }
 
-function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByClient }) {
+function ClientsSection({ clients, appointments, episodes, range, tagId, serviceId, tagsByClient }) {
+  const clientsForService = new Set()
+  for (const appointment of appointments) {
+    if (!isClientSession(appointment) || !appointment.clientId) continue
+    if (serviceId && appointment.serviceId !== serviceId) continue
+    clientsForService.add(appointment.clientId)
+  }
+  const onService = (clientId) => !serviceId || clientsForService.has(clientId)
   const seen = new Map()
   for (const appointment of appointments) {
-    if (appointment.externalBusy || appointment.blockRole === 'busy' || appointment.blockRole === 'support' || appointment.blockRole === 'admin') continue
-    if (appointment.attendance === 'cancelled') continue
+    if (!isClientSession(appointment)) continue
     if (!inDateRange(appointment.sessionDate, range)) continue
+    if (serviceId && appointment.serviceId !== serviceId) continue
     if (!matchesClientTag(appointment.clientId, tagId, tagsByClient)) continue
     if (!appointment.clientId) continue
     const current = seen.get(appointment.clientId) || { sessions: 0, last: appointment.sessionDate }
@@ -448,7 +449,7 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByC
     if (appointment.sessionDate > current.last) current.last = appointment.sessionDate
     seen.set(appointment.clientId, current)
   }
-  const tagged = (client) => matchesClientTag(client.id, tagId, tagsByClient)
+  const tagged = (client) => matchesClientTag(client.id, tagId, tagsByClient) && onService(client.id)
   const active = clients.filter((client) => client.status === 'active' && tagged(client))
   const newcomers = clients.filter((client) => (
     tagged(client)
@@ -461,6 +462,7 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByC
     episode.status === 'discharged'
     && inDateRange(episode.end_date || '', range)
     && matchesClientTag(episode.client_id, tagId, tagsByClient)
+    && onService(episode.client_id)
   ))
   const byId = new Map(clients.map((client) => [client.id, client]))
   const rows = [...seen.entries()].map(([id, info]) => {
@@ -499,7 +501,7 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByC
   )
 }
 
-function WaitlistSection({ people, tags, services, range, tagId, serviceId, today }) {
+function WaitlistSection({ people, tags, services, range, tagId, serviceId, today, placements, clients, appointments, tagsByClient }) {
   const tagById = new Map(tags.map((tag) => [tag.id, tag]))
   const serviceById = new Map(services.map((service) => [service.id, service]))
   const matching = people.filter((person) => (
@@ -507,6 +509,7 @@ function WaitlistSection({ people, tags, services, range, tagId, serviceId, toda
     && (!serviceId || person.serviceId === serviceId)
   ))
   const joined = matching.filter((person) => inDateRange(String(person.createdAt || '').slice(0, 10), range))
+  const left = leftWaitlistInRange({ placements, clients, appointments, range, tagId, serviceId, tagsByClient })
   const average = averageWaitDays(matching.map((person) => person.createdAt), today)
   const rows = matching.map((person) => {
     const labels = (person.tagIds || []).map((id) => tagById.get(id)).filter(Boolean)
@@ -531,6 +534,11 @@ function WaitlistSection({ people, tags, services, range, tagId, serviceId, toda
       <div className="reporting-metrics">
         <Stat label="On the waitlist now" value={matching.length} />
         <Stat label="Joined in these dates" value={joined.length} />
+        <Stat
+          label="Left in these dates"
+          value={left}
+          help="Booked into the diary in these dates, and no longer on the waitlist."
+        />
         <Stat label="Average days waiting" value={average == null ? '—' : average} help="People on the waitlist now, counted to today." />
       </div>
       <RecordTable
@@ -707,6 +715,46 @@ function toReportAppointment(appointment, serviceById, client) {
     priceNote: price.phrase,
     feeIncludesVat: Boolean(service?.fee_includes_vat),
   }
+}
+
+function isClientSession(appointment) {
+  if (appointment.externalBusy || appointment.blockRole === 'busy' || appointment.blockRole === 'support' || appointment.blockRole === 'admin') return false
+  if (appointment.attendance === 'cancelled') return false
+  return true
+}
+
+function leftWaitlistInRange({ placements, clients, appointments, range, tagId, serviceId, tagsByClient }) {
+  const clientById = new Map(clients.map((client) => [client.id, client]))
+  const bookedOn = new Map()
+  for (const appointment of appointments) {
+    if (!appointment.client_id || appointment.is_external_busy) continue
+    const role = appointment.block_role || 'client_session'
+    if (role !== 'client_session') continue
+    const booked = String(appointment.created_at || '').slice(0, 10)
+    if (!booked) continue
+    const dates = bookedOn.get(appointment.client_id) || []
+    dates.push(booked)
+    bookedOn.set(appointment.client_id, dates)
+  }
+  return placements.filter((placement) => {
+    const client = clientById.get(placement.client_id)
+    if (!client || client.status === 'waitlist' || client.status === 'screener' || client.status === 'rejected') return false
+    if (serviceId && placement.service_id !== serviceId) return false
+    if (!matchesClientTag(placement.client_id, tagId, tagsByClient)) return false
+    const placedOn = String(placement.created_at || '').slice(0, 10)
+    const leftOn = (bookedOn.get(placement.client_id) || [])
+      .filter((date) => !placedOn || date >= placedOn)
+      .sort()[0]
+    return Boolean(leftOn && inDateRange(leftOn, range))
+  }).length
+}
+
+async function listWaitlistPlacements() {
+  const supabase = getSupabase()
+  if (!supabase) return []
+  const { data, error } = await supabase.from('waitlist_placements').select('client_id, service_id, created_at')
+  if (error) throw error
+  return data || []
 }
 
 async function listClientTagLinks() {

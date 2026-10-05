@@ -22,11 +22,6 @@
   gap: 0.35rem;
 }
 
-.reporting-filters__help {
-  align-self: center;
-  margin-left: auto;
-}
-
 .reporting-section {
   display: flex;
   flex-direction: column;
