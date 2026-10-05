@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import FormOverlay from '../../components/FormOverlay'
 import RecordTable from '../../components/RecordTable'
+import TagLabel from '../../components/TagLabel'
 import { useConfirm, useToast } from '../../components/ui'
-import { createTag, deleteTag, listTags, TAG_COLOURS, tagColourLabel } from '../../lib/supabase/screenerRepo'
+import { createTag, deleteTag, listTags, TAG_COLOURS } from '../../lib/supabase/screenerRepo'
 import { SettingsSectionCard } from './SettingsPlaceholders'
 
 function TagList({ kind, title, description }) {
@@ -64,14 +65,7 @@ function TagList({ kind, title, description }) {
     filterValues: { name: tag.name },
     sortValues: { name: tag.name },
     cells: {
-      colour: (
-        <span
-          className="tag-swatch"
-          style={{ background: tag.color }}
-          title={tagColourLabel(tag.color)}
-        />
-      ),
-      name: <span className="record-table__primary">{tag.name}</span>,
+      name: <TagLabel name={tag.name} color={tag.color} />,
       remove: (
         <button type="button" className="secondary" onClick={() => remove(tag)}>Delete</button>
       ),
@@ -91,7 +85,6 @@ function TagList({ kind, title, description }) {
           </button>
         )}
         columns={[
-          { key: 'colour', label: 'Colour', sort: false, className: 'record-table__col--swatch' },
           { key: 'name', label: 'Tag', filter: 'text', sort: 'text' },
           { key: 'remove', label: '', sort: false, className: 'record-table__col--actions' },
         ]}

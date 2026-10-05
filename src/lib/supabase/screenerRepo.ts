@@ -38,7 +38,7 @@ export type ScreenerPerson = {
   name: string
   dob: string
   gender: string
-  status: 'screener' | 'waitlist'
+  status: 'screener' | 'waitlist' | 'rejected'
   createdAt: string
   submissionId: string | null
   formName: string
@@ -110,7 +110,7 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
   const { data: clients, error } = await supabase
     .from('clients')
     .select('id, status, created_at, client_identities(encrypted_payload)')
-    .in('status', ['screener', 'waitlist'])
+    .in('status', ['screener', 'waitlist', 'rejected'])
     .order('created_at', { ascending: true })
   if (error) throw error
   const rows = clients || []
@@ -164,7 +164,7 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
       name,
       dob: String(identity.dob || ''),
       gender: String(identity.gender || ''),
-      status: row.status === 'waitlist' ? 'waitlist' : 'screener',
+      status: row.status === 'waitlist' ? 'waitlist' : row.status === 'rejected' ? 'rejected' : 'screener',
       createdAt: row.created_at,
       submissionId: form?.id || null,
       formName: form?.name || '',

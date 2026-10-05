@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import FormOverlay from './FormOverlay'
+import TagLabel from './TagLabel'
 import PageHeader from './PageHeader'
 import RecordTable from './RecordTable'
 import RowMenu from '../features/forms/RowMenu'
@@ -112,8 +113,7 @@ function PlacementEditor({ person, mode, services, tags, onClose, onSaved }) {
               checked={tagIds.includes(tag.id)}
               onChange={() => toggleTag(tag.id)}
             />
-            <span className="tag-swatch" style={{ background: tag.color }} aria-hidden />
-            <span>{tag.name}</span>
+            <TagLabel name={tag.name} color={tag.color} />
           </label>
         )) : (
           <p className="text-muted">Add waitlist tags in Settings, under Tags.</p>
@@ -129,10 +129,7 @@ function TagChips({ ids, tagById }) {
   return (
     <span className="tag-chips">
       {chips.map((tag) => (
-        <span key={tag.id} className="tag-chip">
-          <span className="tag-swatch" style={{ background: tag.color }} aria-hidden />
-          {tag.name}
-        </span>
+        <TagLabel key={tag.id} name={tag.name} color={tag.color} />
       ))}
     </span>
   )
@@ -176,7 +173,7 @@ export default function ScreenerPage() {
   const reject = async (person) => {
     const ok = await confirm({
       title: 'Reject this referral?',
-      message: `${person.name} leaves the screener. Their form stays on the profile.`,
+      message: `${person.name} leaves the screener and stays on Rejected. Their form stays on the profile.`,
       confirmLabel: 'Reject',
       tone: 'danger',
     })
@@ -194,7 +191,7 @@ export default function ScreenerPage() {
     const href = formPath(person)
     const menu = [
       href ? { label: 'View form', onSelect: () => navigate(href) } : null,
-      { label: 'Edit details', onSelect: () => setEditor({ person, mode: 'edit' }) },
+      view === 'rejected' ? null : { label: 'Edit details', onSelect: () => setEditor({ person, mode: 'edit' }) },
     ].filter(Boolean)
     return {
       id: person.id,
@@ -240,6 +237,12 @@ export default function ScreenerPage() {
     { key: 'reject', label: '', sort: false, className: 'record-table__col--actions' },
     { key: 'menu', label: '', sort: false, className: 'record-table__menu' },
   ]
+  const rejectedColumns = [
+    { key: 'name', label: 'Name', filter: 'text' },
+    { key: 'form', label: 'Form', filter: 'text' },
+    { key: 'added', label: 'Added', sort: 'date' },
+    { key: 'menu', label: '', sort: false, className: 'record-table__menu' },
+  ]
   const waitlistColumns = [
     { key: 'name', label: 'Name', filter: 'text' },
     { key: 'note', label: 'Form', filter: 'text' },
@@ -253,9 +256,11 @@ export default function ScreenerPage() {
     <div className="page">
       <PageHeader
         title="Screener"
-        subtitle={view === 'screener'
-          ? 'People who sent a form that places them here, waiting to be screened.'
-          : 'People you have accepted, waiting for a session.'}
+        subtitle={view === 'waitlist'
+          ? 'People you have accepted, waiting for a session.'
+          : view === 'rejected'
+            ? 'People who were referred and not taken onto the waitlist.'
+            : 'People who sent a form that places them here, waiting to be screened.'}
         toolbar={(
           <div className="screener-switch" role="tablist" aria-label="Screener lists">
             <button
@@ -276,19 +281,31 @@ export default function ScreenerPage() {
             >
               Waitlist
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'rejected'}
+              className={`screener-switch__btn${view === 'rejected' ? ' screener-switch__btn--on' : ''}`}
+              onClick={() => setView('rejected')}
+            >
+              Rejected
+            </button>
           </div>
         )}
       />
       <RecordTable
-        columns={view === 'screener' ? screenerColumns : waitlistColumns}
+        key={view}
+        columns={view === 'waitlist' ? waitlistColumns : view === 'rejected' ? rejectedColumns : screenerColumns}
         rows={rows}
         countNoun="people"
-        defaultSort={view === 'screener' ? { key: 'added', direction: 'asc' } : { key: 'name', direction: 'asc' }}
+        defaultSort={view === 'waitlist' ? { key: 'name', direction: 'asc' } : { key: 'added', direction: 'asc' }}
         emptyMessage={board.isPending
           ? 'Loading…'
-          : view === 'screener'
-            ? 'Nobody is waiting to be screened. Publish a form and choose “Place the person on the screener”.'
-            : 'Nobody is on the waitlist yet. Accept someone from the screener.'}
+          : view === 'waitlist'
+            ? 'Nobody is on the waitlist yet. Accept someone from the screener.'
+            : view === 'rejected'
+              ? 'Nobody has been rejected.'
+              : 'Nobody is waiting to be screened. Publish a form and choose “Place the person on the screener”.'}
       />
       {board.error && <p className="form-error" role="alert">{board.error.message}</p>}
       {editor && (
