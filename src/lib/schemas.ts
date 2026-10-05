@@ -33,6 +33,10 @@ export const clientInputSchema = z.object({
   diagnosis: optionalText,
   medication: optionalText,
   gender: optionalText,
+  email: z.string().trim().max(200).optional().refine(
+    (value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+    'Enter an email address.',
+  ),
   workplace_id: z.string().nullish(),
 })
 

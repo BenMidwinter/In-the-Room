@@ -14,14 +14,17 @@ import { listServices } from '../../lib/supabase/servicesRepo'
 import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 import { loadClinicianPrintIdentity, preferredLetterhead, printLetterheadFromRow } from '../../lib/letterheadPrint'
 import { DEFAULT_CANCELLATION_POLICY } from '../../lib/cancellationPolicy'
+import { inDateRange, monthToDateRange } from '../../lib/reporting'
 import {
   activeBilledAppointmentIds,
   EMPTY_PAYMENT,
+  invoiceRecipient,
   invoiceStatusLabel,
   invoiceTotalPence,
-  lineFromAppointment,
+  lineForInvoice,
   paymentInstructions,
 } from '../../lib/invoices'
+import { listContacts } from '../../lib/supabase/contactsRepo'
 import {
   addInvoiceLine,
   createInvoice,
@@ -41,6 +44,9 @@ export default function InvoicingPage() {
   const queryClient = useQueryClient()
   const [openId, setOpenId] = useState(null)
   const [creatingId, setCreatingId] = useState('')
+  const [range, setRange] = useState(() => monthToDateRange(todayYmd()))
+  const [include, setInclude] = useState('held')
+  const [unticked, setUnticked] = useState({})
 
   const invoicesQuery = useQuery({
     queryKey: ['invoices', userId],
@@ -57,6 +63,11 @@ export default function InvoicingPage() {
   const policyQuery = useQuery({
     queryKey: ['cancellation-policy', userId],
     queryFn: loadCancellationPolicy,
+    enabled: Boolean(userId),
+  })
+  const contactsQuery = useQuery({
+    queryKey: ['contacts', 'invoicing', userId],
+    queryFn: () => listContacts(),
     enabled: Boolean(userId),
   })
   const letterheadsQuery = useQuery({
@@ -81,23 +92,42 @@ export default function InvoicingPage() {
     return names
   }, [clients])
 
+  const contactsByClient = useMemo(() => {
+    const map = new Map()
+    for (const contact of contactsQuery.data || []) {
+      const list = map.get(contact.clientId) || []
+      list.push(contact)
+      map.set(contact.clientId, list)
+    }
+    return map
+  }, [contactsQuery.data])
+
   const groups = useMemo(() => {
     const billed = activeBilledAppointmentIds(invoices)
     const byClient = new Map()
     for (const appointment of appointmentsQuery.data || []) {
       const report = toReportAppointment(appointment, serviceById)
-      const line = lineFromAppointment(report, policy)
+      if (!inDateRange(report.sessionDate, range)) continue
+      const line = lineForInvoice(report, policy, include)
       if (!line || !report.clientId || billed.has(report.id)) continue
+      const client = clients.find((item) => item.id === report.clientId)
+      const recipient = invoiceRecipient({
+        clientName: client?.real_name || report.clientName || 'Client',
+        clientEmail: client?.email || '',
+        contacts: contactsByClient.get(report.clientId) || [],
+      })
       const current = byClient.get(report.clientId) || {
         clientId: report.clientId,
-        name: clientName.get(report.clientId) || report.clientName || 'Client',
+        name: client?.real_name || report.clientName || 'Client',
+        billToName: recipient.billToName,
+        billToEmail: recipient.billToEmail,
         lines: [],
       }
       current.lines.push(line)
       byClient.set(report.clientId, current)
     }
     return [...byClient.values()].sort((a, b) => a.name.localeCompare(b.name))
-  }, [appointmentsQuery.data, serviceById, invoices, policy, clientName])
+  }, [appointmentsQuery.data, serviceById, invoices, policy, clients, range, include, contactsByClient])
 
   const open = invoices.find((invoice) => invoice.id === openId) || null
   const paymentQuery = useQuery({
@@ -124,18 +154,57 @@ export default function InvoicingPage() {
     queryClient.invalidateQueries({ queryKey: ['invoices', userId] })
   }
 
+  function tickedLines(group) {
+    return group.lines.filter((line) => line.appointmentId && !unticked[line.appointmentId])
+  }
+
   async function onCreate(group) {
+    const lines = tickedLines(group)
+    if (!lines.length) {
+      toast.error('Tick at least one session.')
+      return
+    }
     setCreatingId(group.clientId)
     try {
       const invoice = await createInvoice({
         clientId: group.clientId,
-        billToName: group.name,
-        lines: group.lines,
+        billToName: group.billToName,
+        billToEmail: group.billToEmail,
+        lines,
       })
       remember(invoice)
       setOpenId(invoice.id)
     } catch (err) {
       toast.error(err?.message || 'Could not create the invoice')
+    } finally {
+      setCreatingId('')
+    }
+  }
+
+  async function onCreateEach() {
+    const ready = groups
+      .map((group) => ({ ...group, lines: tickedLines(group) }))
+      .filter((group) => group.lines.length)
+    if (!ready.length) {
+      toast.error('Tick at least one session.')
+      return
+    }
+    setCreatingId('all')
+    try {
+      let last = null
+      for (const group of ready) {
+        last = await createInvoice({
+          clientId: group.clientId,
+          billToName: group.billToName,
+          billToEmail: group.billToEmail,
+          lines: group.lines,
+        })
+        remember(last)
+      }
+      if (ready.length === 1 && last) setOpenId(last.id)
+      else toast.success(`Created ${ready.length} invoices`)
+    } catch (err) {
+      toast.error(err?.message || 'Could not create the invoices')
     } finally {
       setCreatingId('')
     }
@@ -217,6 +286,7 @@ export default function InvoicingPage() {
           invoice={open}
           letterhead={letterhead}
           paymentText={open.status === 'draft' ? paymentInstructions(paymentQuery.data || EMPTY_PAYMENT) : open.paymentDetails}
+          forName={clientName.get(open.clientId) || ''}
           onBack={() => setOpenId(null)}
           onStatus={onStatus}
           onAddLine={onAddLine}
@@ -225,26 +295,78 @@ export default function InvoicingPage() {
       ) : (
         <>
           <div className="section-card__stat-row">
-            <Stat label="To invoice" value={formatGbpFromPence(toInvoicePence)} detail="Marked sessions with a fee" />
+            <Stat label="To invoice" value={formatGbpFromPence(toInvoicePence)} detail="Sessions in these dates" />
             <Stat label="Drafts" value={draftCount} />
             <Stat label="Outstanding" value={formatGbpFromPence(outstandingPence)} detail="Issued, not marked paid" />
           </div>
 
           <section className="invoicing-block">
-            <h2 className="invoicing-block__title">Sessions to invoice</h2>
+            <div className="invoicing-ready__head">
+              <h2 className="invoicing-block__title">Sessions to invoice</h2>
+              <button
+                type="button"
+                className="primary"
+                disabled={creatingId === 'all' || groups.every((group) => tickedLines(group).length === 0)}
+                onClick={onCreateEach}
+              >
+                Create an invoice for each client
+              </button>
+            </div>
+            <div className="invoicing-filters">
+              <label className="invoicing-filters__field">
+                From
+                <input
+                  type="date"
+                  value={range.from}
+                  onChange={(event) => {
+                    setRange((current) => ({ ...current, from: event.target.value }))
+                    setUnticked({})
+                  }}
+                />
+              </label>
+              <label className="invoicing-filters__field">
+                To
+                <input
+                  type="date"
+                  value={range.to}
+                  onChange={(event) => {
+                    setRange((current) => ({ ...current, to: event.target.value }))
+                    setUnticked({})
+                  }}
+                />
+              </label>
+              <label className="invoicing-filters__field">
+                Include
+                <select
+                  value={include}
+                  onChange={(event) => {
+                    setInclude(event.target.value)
+                    setUnticked({})
+                  }}
+                >
+                  <option value="held">Held sessions</option>
+                  <option value="booked">Booked sessions</option>
+                  <option value="both">Held and booked</option>
+                </select>
+              </label>
+            </div>
+            <p className="text-muted">Held sessions use the fee already stored. Booked sessions use the service price, so you can invoice before they happen. Tick the lines you want.</p>
             {groups.length === 0 ? (
-              <p className="text-muted">No marked sessions are waiting for an invoice.</p>
+              <p className="text-muted">Nothing to invoice in these dates.</p>
             ) : groups.map((group) => (
               <article key={group.clientId} className="invoicing-ready">
                 <div className="invoicing-ready__head">
                   <div>
                     <h3>{group.name}</h3>
-                    <p>{group.lines.length} {group.lines.length === 1 ? 'line' : 'lines'} · {formatGbpFromPence(invoiceTotalPence(group.lines))}</p>
+                    <p>
+                      {tickedLines(group).length} of {group.lines.length} ticked · {formatGbpFromPence(invoiceTotalPence(tickedLines(group)))}
+                    </p>
+                    <p>{group.billToEmail ? `Invoices go to ${group.billToName} · ${group.billToEmail}` : `Invoices go to ${group.billToName}. No email yet.`}</p>
                   </div>
                   <button
                     type="button"
                     className="primary"
-                    disabled={creatingId === group.clientId}
+                    disabled={creatingId === group.clientId || tickedLines(group).length === 0}
                     onClick={() => onCreate(group)}
                   >
                     Create invoice
@@ -253,7 +375,17 @@ export default function InvoicingPage() {
                 <ul className="invoicing-ready__lines">
                   {group.lines.map((line) => (
                     <li key={line.appointmentId || line.description}>
-                      <span>{line.description}{line.includesVat ? ' · incl. VAT' : ''}</span>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={!unticked[line.appointmentId]}
+                          onChange={() => setUnticked((current) => ({
+                            ...current,
+                            [line.appointmentId]: !current[line.appointmentId],
+                          }))}
+                        />
+                        <span>{line.description}{line.includesVat ? ' · incl. VAT' : ''}</span>
+                      </label>
                       <span>{formatGbpFromPence(line.unitPence)}</span>
                     </li>
                   ))}
@@ -284,7 +416,7 @@ export default function InvoicingPage() {
   )
 }
 
-function InvoiceSheet({ invoice, letterhead, paymentText, onBack, onStatus, onAddLine, onRemoveLine }) {
+function InvoiceSheet({ invoice, letterhead, paymentText, forName, onBack, onStatus, onAddLine, onRemoveLine }) {
   const toast = useToast()
   const [description, setDescription] = useState('')
   const [sessionDate, setSessionDate] = useState(todayYmd())
@@ -356,7 +488,12 @@ function InvoiceSheet({ invoice, letterhead, paymentText, onBack, onStatus, onAd
             </div>
           </dl>
         </div>
-        <p className="invoice-sheet__to"><span>To</span> {invoice.billToName}</p>
+        <p className="invoice-sheet__to">
+          <span>To</span>
+          {invoice.billToName}
+          {invoice.billToEmail ? <span className="invoice-sheet__email">{invoice.billToEmail}</span> : null}
+        </p>
+        {forName && forName !== invoice.billToName ? <p className="invoice-sheet__to"><span>For</span> {forName}</p> : null}
         <table className="invoice-sheet__table">
           <thead>
             <tr>

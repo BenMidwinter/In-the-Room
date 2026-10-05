@@ -12,6 +12,7 @@ type InvoiceRow = {
   due_on: string | null
   bill_to_name: string
   payment_details: string
+  bill_to_email: string
   total_pence: number
 }
 
@@ -50,6 +51,7 @@ function mapInvoice(row: InvoiceRow, lines: LineRow[]): InvoiceRecord {
     dueOn: row.due_on,
     totalPence: row.total_pence,
     paymentDetails: row.payment_details || '',
+    billToEmail: row.bill_to_email || '',
     lines: lines
       .filter((line) => line.invoice_id === row.id)
       .sort((a, b) => a.position - b.position)
@@ -72,7 +74,7 @@ export async function listInvoices(): Promise<InvoiceRecord[]> {
   if (!user) return []
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, client_id, number, status, issued_on, due_on, bill_to_name, payment_details, total_pence')
+    .select('id, client_id, number, status, issued_on, due_on, bill_to_name, bill_to_email, payment_details, total_pence')
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -138,7 +140,7 @@ async function nextSequence(supabase: NonNullable<ReturnType<typeof getSupabase>
 async function reloadInvoice(supabase: NonNullable<ReturnType<typeof getSupabase>>, userId: string, invoiceId: string): Promise<InvoiceRecord> {
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, client_id, number, status, issued_on, due_on, bill_to_name, payment_details, total_pence')
+    .select('id, client_id, number, status, issued_on, due_on, bill_to_name, bill_to_email, payment_details, total_pence')
     .eq('id', invoiceId)
     .eq('owner_id', userId)
     .single()
@@ -154,6 +156,7 @@ async function reloadInvoice(supabase: NonNullable<ReturnType<typeof getSupabase
 export async function createInvoice(input: {
   clientId: string
   billToName: string
+  billToEmail?: string
   lines: InvoiceLineInput[]
 }): Promise<InvoiceRecord> {
   const lines = input.lines.filter((line) => line.description.trim() && line.unitPence > 0)
@@ -171,6 +174,7 @@ export async function createInvoice(input: {
         number,
         status: 'draft',
         bill_to_name: input.billToName.trim() || 'Client',
+        bill_to_email: String(input.billToEmail || '').trim(),
         payment_details: '',
         total_pence: invoiceTotalPence(lines),
       })

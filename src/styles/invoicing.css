@@ -6,6 +6,45 @@
   line-height: 1.35;
 }
 
+.invoicing-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.invoicing-filters__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 9rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.invoicing-filters input,
+.invoicing-filters select {
+  font: inherit;
+  font-weight: 500;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  background: var(--bg-page);
+  color: var(--txt-primary);
+}
+
+.invoicing-ready__lines label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.invoice-sheet__email {
+  display: block;
+  font-size: 0.9375rem;
+}
+
 .invoicing-block {
   margin-top: 1.5rem;
 }

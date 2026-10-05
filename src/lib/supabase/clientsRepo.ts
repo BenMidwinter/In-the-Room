@@ -15,6 +15,7 @@ type IdentityPayload = {
   diagnosis?: string
   medication?: string
   gender?: string
+  email?: string
 }
 
 export type AppClientRecord = {
@@ -30,6 +31,7 @@ export type AppClientRecord = {
   diagnosis: string
   medication: string
   gender: string
+  email: string
   is_active: boolean
   on_screener: boolean
   on_waitlist: boolean
@@ -47,6 +49,7 @@ export type ClientWriteInput = {
   diagnosis?: string
   medication?: string
   gender?: string
+  email?: string
   workplace_id?: string | null
 }
 
@@ -64,6 +67,7 @@ function parseIdentity(raw: Json | null | undefined): IdentityPayload {
     diagnosis: String(row.diagnosis || ''),
     medication: String(row.medication || ''),
     gender: String(row.gender || ''),
+    email: String(row.email || ''),
   }
 }
 
@@ -94,6 +98,7 @@ function toAppClient(row: {
     diagnosis: identity.diagnosis || '',
     medication: identity.medication || '',
     gender: identity.gender || '',
+    email: identity.email || '',
     is_active: row.status === 'active',
     on_screener: row.status === 'screener',
     on_waitlist: row.status === 'waitlist',
@@ -155,6 +160,7 @@ export async function upsertClientRemote(
     diagnosis: input.diagnosis || '',
     medication: input.medication?.trim() || '',
     gender: input.gender?.trim() || '',
+    email: input.email?.trim() || '',
   }
   const organizationId = input.workplace_id || null
   const pseudonym = {

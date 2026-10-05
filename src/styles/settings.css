@@ -67,6 +67,17 @@
   line-height: 1.45;
 }
 
+.contact-invoice-flag {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--txt-primary);
+}
+
 .settings-form__actions {
   display: flex;
   flex-wrap: wrap;

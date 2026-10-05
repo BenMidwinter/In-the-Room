@@ -48,6 +48,7 @@ export type InvoiceRecord = {
   dueOn: string | null
   totalPence: number
   paymentDetails: string
+  billToEmail: string
   lines: InvoiceLine[]
 }
 
@@ -79,22 +80,67 @@ export function lineFromAppointment(
   appointment: ReportAppointment,
   policy: CancellationPolicy,
 ): InvoiceLineInput | null {
+  return lineForInvoice(appointment, policy, 'held')
+}
+
+export function lineForInvoice(
+  appointment: ReportAppointment,
+  policy: CancellationPolicy,
+  include: 'held' | 'booked' | 'both',
+): InvoiceLineInput | null {
   if (roleOf(appointment) !== 'appointment') return null
-  if (!appointment.clientId) return null
-  const pence = billablePence(appointment, policy)
-  if (pence <= 0) return null
+  if (!appointment.clientId || appointment.doNotInvoice) return null
+  const marked = Boolean(appointment.attendance)
+  if (include === 'held' && !marked) return null
+  if (include === 'booked' && marked) return null
+  if (marked) {
+    const pence = billablePence(appointment, policy)
+    if (pence <= 0) return null
+    const service = appointment.serviceName || 'Session'
+    const when = appointment.sessionDate ? formatDisplayDate(appointment.sessionDate) : ''
+    const attendance = appointment.attendance && appointment.attendance !== 'attended'
+      ? ` (${attendanceLabel(appointment.attendance)})`
+      : ''
+    const description = when ? `${when} — ${service}${attendance}` : `${service}${attendance}`
+    return {
+      appointmentId: appointment.id,
+      description,
+      sessionDate: appointment.sessionDate || null,
+      unitPence: pence,
+      includesVat: Boolean(appointment.feeIncludesVat),
+    }
+  }
+  if (!appointment.feePence || appointment.feePence <= 0) return null
   const service = appointment.serviceName || 'Session'
   const when = appointment.sessionDate ? formatDisplayDate(appointment.sessionDate) : ''
-  const attendance = appointment.attendance && appointment.attendance !== 'attended'
-    ? ` (${attendanceLabel(appointment.attendance)})`
-    : ''
-  const description = when ? `${when} — ${service}${attendance}` : `${service}${attendance}`
   return {
     appointmentId: appointment.id,
-    description,
+    description: when ? `${when} — ${service}` : service,
     sessionDate: appointment.sessionDate || null,
-    unitPence: pence,
+    unitPence: appointment.feePence,
     includesVat: Boolean(appointment.feeIncludesVat),
+  }
+}
+
+export function invoiceRecipient({
+  clientName,
+  clientEmail = '',
+  contacts = [],
+}: {
+  clientName: string
+  clientEmail?: string
+  contacts?: Array<{ name?: string; email?: string; sendInvoices?: boolean }>
+}) {
+  const billing = contacts.filter((contact) => contact.sendInvoices && String(contact.email || '').trim())
+  if (billing.length) {
+    return {
+      billToName: billing.map((contact) => String(contact.name || '').trim() || String(contact.email).trim()).join(', '),
+      billToEmail: billing.map((contact) => String(contact.email).trim()).join(', '),
+    }
+  }
+  return {
+    billToName: clientName || 'Client',
+    billToEmail: String(clientEmail || '').trim(),
   }
 }
 

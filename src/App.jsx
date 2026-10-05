@@ -22,6 +22,7 @@ import ClientAppointmentsIndex from './features/client/ClientAppointmentsIndex'
 import ClientSupportActivities from './features/client/ClientSupportActivities'
 import AppointmentEditor from './features/client/AppointmentEditor'
 import ClientSectionPlaceholder from './features/client/ClientSectionPlaceholder'
+import ContactsPanel from './features/client/ContactsPanel'
 import SettingsLayout from './features/settings/SettingsLayout'
 import AccountSettingsPage from './features/settings/AccountSettingsPage'
 import AvailabilitySettingsPage from './features/settings/AvailabilitySettingsPage'
@@ -110,18 +111,7 @@ export default function App() {
             />
           } />
           <Route path="documents" element={<ClientDocumentsPage />} />
-          <Route path="contacts" element={
-            <ClientSectionPlaceholder
-              title="Contacts"
-              newLabel="contact"
-              columns={[
-                { key: 'name', label: 'Name' },
-                { key: 'role', label: 'Relationship' },
-                { key: 'phone', label: 'Phone' },
-                { key: 'email', label: 'Email' },
-              ]}
-            />
-          } />
+          <Route path="contacts" element={<ContactsPanel />} />
           <Route path="forms" element={<Navigate to="../case-history" replace />} />
           <Route path="outcomes" element={<Navigate to="../case-history" replace />} />
         </Route>

@@ -30,6 +30,7 @@ export function upsertClient(payload, userId) {
     diagnosis: payload.diagnosis || '',
     medication: payload.medication?.trim() || '',
     gender: payload.gender?.trim() || '',
+    email: payload.email?.trim() || '',
     on_screener: false,
     on_waitlist: false,
     status: 'active',

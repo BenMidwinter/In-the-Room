@@ -5,6 +5,8 @@ import {
   dueDateFrom,
   formatInvoiceNumber,
   invoiceTotalPence,
+  invoiceRecipient,
+  lineForInvoice,
   lineFromAppointment,
   paymentInstructions,
   sequenceFromInvoiceNumber,
@@ -43,6 +45,22 @@ describe('invoices', () => {
     const dna = lineFromAppointment(session({ attendance: 'did_not_attend', fee: 8000, charged: 4000 }), DEFAULT_CANCELLATION_POLICY)
     expect(dna?.unitPence).toBe(4000)
     expect(dna?.description).toContain('Did not attend')
+    const booked = lineForInvoice(session({ attendance: null, fee: 8000 }), DEFAULT_CANCELLATION_POLICY, 'booked')
+    expect(booked?.unitPence).toBe(8000)
+    expect(lineForInvoice(session({ attendance: null, fee: 8000 }), DEFAULT_CANCELLATION_POLICY, 'held')).toBeNull()
+  })
+
+  it('sends to a billing contact instead of the client', () => {
+    expect(invoiceRecipient({
+      clientName: 'Ada Young',
+      clientEmail: 'ada@example.com',
+      contacts: [{ name: 'Local Authority', email: 'finance@council.test', sendInvoices: true }],
+    })).toEqual({ billToName: 'Local Authority', billToEmail: 'finance@council.test' })
+    expect(invoiceRecipient({
+      clientName: 'Ada Young',
+      clientEmail: 'ada@example.com',
+      contacts: [{ name: 'Parent', email: 'parent@example.com', sendInvoices: false }],
+    })).toEqual({ billToName: 'Ada Young', billToEmail: 'ada@example.com' })
   })
 
   it('keeps a voided session free to invoice again', () => {

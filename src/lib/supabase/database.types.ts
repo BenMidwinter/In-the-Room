@@ -864,6 +864,7 @@ export type Database = {
       invoices: {
         Row: {
           bill_to_name: string
+          bill_to_email: string
           client_id: string | null
           created_at: string
           due_on: string | null
@@ -879,6 +880,7 @@ export type Database = {
         }
         Insert: {
           bill_to_name: string
+          bill_to_email?: string
           client_id?: string | null
           created_at?: string
           due_on?: string | null
@@ -894,6 +896,7 @@ export type Database = {
         }
         Update: {
           bill_to_name?: string
+          bill_to_email?: string
           client_id?: string | null
           created_at?: string
           due_on?: string | null
