@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { to: '/screener', label: 'Screener' },
   { to: '/practice', label: 'My Practice' },
   { to: '/finance', label: '[Finance]' },
-  { to: '/reporting', label: '[Reporting]' },
+  { to: '/reporting', label: 'Reporting' },
 ]
 
 function GearIcon() {

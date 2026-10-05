@@ -33,7 +33,6 @@ import TagsSettingsPage from './features/settings/TagsSettingsPage'
 import FormDesignerPage from './features/settings/FormDesignerPage'
 import MeasureDesignerPage from './features/settings/MeasureDesignerPage'
 import TemplatesSettingsPage from './features/settings/TemplatesSettingsPage'
-import LoginSettingsPage from './features/settings/LoginSettingsPage'
 import JournalPage from './features/journal/JournalPage'
 import PracticeLayout from './features/practice/PracticeLayout'
 import PracticeDocumentsPage from './features/practice/PracticeDocumentsPage'
@@ -41,7 +40,7 @@ import PracticeLogPage from './features/practice/PracticeLogPage'
 import Resources from './components/Resources'
 import About from './components/About'
 import NotesHistoryPanel from './features/client/NotesHistoryPanel'
-import Reporting from './components/Reporting'
+import ReportingPage from './features/reporting/ReportingPage'
 import FinancePage from './features/finance/FinancePage'
 
 export default function App() {
@@ -59,7 +58,7 @@ export default function App() {
       <Route element={<AppLayout />}>
         <Route path="home" element={<Home />} />
         <Route path="calendar" element={<Calendar />} />
-        <Route path="reporting" element={<Reporting />} />
+        <Route path="reporting" element={<ReportingPage />} />
         <Route path="finance" element={<FinancePage />} />
         <Route path="journal" element={<Navigate to="/practice/journal" replace />} />
         <Route path="practice" element={<PracticeLayout />}>
@@ -148,8 +147,8 @@ export default function App() {
           <Route path="tags" element={<TagsSettingsPage />} />
           <Route path="forms/edit/:formId" element={<FormDesignerPage />} />
           <Route path="forms/questionnaires/:measureId" element={<MeasureDesignerPage />} />
-          <Route path="login" element={<LoginSettingsPage />} />
-          <Route path="password" element={<Navigate to="/settings/login" replace />} />
+          <Route path="login" element={<Navigate to="/settings/account" replace />} />
+          <Route path="password" element={<Navigate to="/settings/account" replace />} />
           <Route path="2fa" element={<TwoFactorSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
         </Route>

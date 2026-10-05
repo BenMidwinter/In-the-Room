@@ -76,6 +76,8 @@ export type Database = {
           appointment_type: string
           attendance_status: string | null
           block_role: string
+          charged_pence: number | null
+          do_not_invoice: boolean
           client_id: string | null
           clinician_id: string
           created_at: string
@@ -95,8 +97,10 @@ export type Database = {
           appointment_type?: string
           attendance_status?: string | null
           block_role?: string
+          charged_pence?: number | null
           client_id?: string | null
           clinician_id: string
+          do_not_invoice?: boolean
           created_at?: string
           encrypted_payload?: Json | null
           ends_at: string
@@ -114,8 +118,10 @@ export type Database = {
           appointment_type?: string
           attendance_status?: string | null
           block_role?: string
+          charged_pence?: number | null
           client_id?: string | null
           clinician_id?: string
+          do_not_invoice?: boolean
           created_at?: string
           encrypted_payload?: Json | null
           ends_at?: string
@@ -1070,6 +1076,10 @@ export type Database = {
       profiles: {
         Row: {
           bio: string | null
+          cancel_early_fee: string
+          cancel_late_fee: string
+          cancel_notice_hours: number
+          dna_fee: string
           created_at: string
           display_name: string | null
           email: string | null
@@ -1095,6 +1105,10 @@ export type Database = {
         }
         Insert: {
           bio?: string | null
+          cancel_early_fee?: string
+          cancel_late_fee?: string
+          cancel_notice_hours?: number
+          dna_fee?: string
           created_at?: string
           display_name?: string | null
           email?: string | null
@@ -1120,6 +1134,10 @@ export type Database = {
         }
         Update: {
           bio?: string | null
+          cancel_early_fee?: string
+          cancel_late_fee?: string
+          cancel_notice_hours?: number
+          dna_fee?: string
           created_at?: string
           display_name?: string | null
           email?: string | null

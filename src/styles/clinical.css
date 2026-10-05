@@ -1896,6 +1896,20 @@ button.agenda-event {
   margin-top: 0.5rem;
 }
 
+.appointment-card__invoice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.75rem;
+  margin-top: 0.85rem;
+}
+
+.appointment-card__do-not-invoice--on {
+  background: var(--col-accent);
+  color: var(--bg-surface);
+  border-color: var(--col-accent);
+}
+
 .attendance-actions {
   display: flex;
   flex-wrap: wrap;
