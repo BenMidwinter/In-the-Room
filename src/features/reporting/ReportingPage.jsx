@@ -49,21 +49,28 @@ const SECTIONS = [
 
 const NOTE_LABEL = { complete: 'Signed off', draft: 'Draft', missing: 'Missing' }
 const EMPTY_LIST = []
+const OPEN_RANGE = { from: '0001-01-01', to: '9999-12-31' }
 
 export default function ReportingPage() {
   const { session } = useAppSession()
   const userId = session?.user?.id
   const today = todayYmd()
   const [section, setSection] = useState('overview')
-  const [applied, setApplied] = useState(() => ({ range: rollingWeekRange(todayYmd()), serviceId: '', tagId: '' }))
+  const [applied, setApplied] = useState(() => ({
+    datesOn: false,
+    range: rollingWeekRange(todayYmd()),
+    serviceId: '',
+    tagId: '',
+  }))
   const [draft, setDraft] = useState(() => ({
+    datesOn: false,
     range: rollingWeekRange(todayYmd()),
     serviceId: '',
     tagId: '',
     serviceOn: false,
     tagOn: false,
   }))
-  const range = applied.range
+  const range = applied.datesOn ? applied.range : OPEN_RANGE
   const serviceId = applied.serviceId
   const tagId = applied.tagId
 
@@ -122,11 +129,23 @@ export default function ReportingPage() {
     queryFn: () => listInvoices().catch(() => []),
     enabled: Boolean(userId),
   })
+  const diarySpan = useMemo(() => {
+    let from = today
+    let to = today
+    for (const appointment of appointmentsQuery.data || []) {
+      const date = String(appointment.session_date || '').slice(0, 10)
+      if (!date) continue
+      if (date < from) from = date
+      if (date > to) to = date
+    }
+    return { from, to }
+  }, [appointmentsQuery.data, today])
+  const busyRange = applied.datesOn ? applied.range : diarySpan
   const busyQuery = useQuery({
-    queryKey: ['external-busy', 'reporting', range.from, range.to],
+    queryKey: ['external-busy', 'reporting', busyRange.from, busyRange.to],
     queryFn: () => listExternalCalendarBlocks({
-      fromIso: `${range.from}T00:00:00`,
-      toIso: `${range.to}T23:59:59`,
+      fromIso: `${busyRange.from}T00:00:00`,
+      toIso: `${busyRange.to}T23:59:59`,
     }),
     enabled: Boolean(userId),
   })
@@ -188,12 +207,13 @@ export default function ReportingPage() {
     [scoped, range, notesByAppointment, policyQuery.data],
   )
   const efficiency = useMemo(() => {
+    const window = applied.datesOn ? applied.range : diarySpan
     const buckets = timeBuckets(mapped, range)
     return efficiencyFromMinutes({
-      availability: availabilityMinutes(availabilityQuery.data || [], range),
+      availability: availabilityMinutes(availabilityQuery.data || [], window),
       ...buckets,
     })
-  }, [mapped, range, availabilityQuery.data])
+  }, [mapped, range, applied.datesOn, applied.range, diarySpan, availabilityQuery.data])
 
   const changeSection = (next) => {
     setSection(next)
@@ -205,7 +225,7 @@ export default function ReportingPage() {
     <div className="page reporting-page">
       <PageHeader
         title="Reporting"
-        help="A rolling week, until you choose other dates."
+        help="Add a filter, then run the report."
       />
 
       <ReportingFilterBar
@@ -335,7 +355,7 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
   }, [menu])
 
   const choices = [
-    { id: 'dates', label: 'Date range', enabled: false },
+    { id: 'dates', label: 'Date range', enabled: !draft.datesOn },
     { id: 'service', label: 'Service', enabled: !draft.serviceOn },
     { id: 'client-tag', label: 'Client tag', enabled: showTag && tagKind === 'client' && !draft.tagOn },
     { id: 'waitlist-tag', label: 'Waitlist tag', enabled: section === 'waitlist' && !draft.tagOn },
@@ -347,8 +367,8 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
   })
   const pendingService = draft.serviceOn ? draft.serviceId : ''
   const pendingTag = draft.tagOn && showTag ? draft.tagId : ''
-  const dirty = draft.range.from !== applied.range.from
-    || draft.range.to !== applied.range.to
+  const dirty = Boolean(draft.datesOn) !== Boolean(applied.datesOn)
+    || (draft.datesOn && (draft.range.from !== applied.range.from || draft.range.to !== applied.range.to))
     || pendingService !== applied.serviceId
     || pendingTag !== applied.tagId
 
@@ -360,6 +380,7 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
 
   const addChoice = (choice) => {
     if (!choice.enabled) return
+    if (choice.id === 'dates') onDraft((current) => ({ ...current, datesOn: true, range: presetRange('week', today) }))
     if (choice.id === 'service') onDraft((current) => ({ ...current, serviceOn: true }))
     if (choice.id === 'client-tag' || choice.id === 'waitlist-tag') onDraft((current) => ({ ...current, tagOn: true, tagId: '' }))
     setMenu(null)
@@ -368,6 +389,7 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
 
   const run = () => {
     onRun({
+      datesOn: draft.datesOn,
       range: draft.range,
       serviceId: pendingService,
       tagId: pendingTag,
@@ -383,6 +405,7 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
     next.push({
       id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now()),
       name: trimmed,
+      datesOn: draft.datesOn,
       range: draft.range,
       serviceOn: draft.serviceOn,
       serviceId: draft.serviceId,
@@ -396,6 +419,7 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
 
   const load = (item) => {
     onDraft({
+      datesOn: item.datesOn != null ? Boolean(item.datesOn) : Boolean(item.range?.from),
       range: item.range?.from && item.range?.to ? item.range : draft.range,
       serviceOn: Boolean(item.serviceOn),
       serviceId: item.serviceId || '',
@@ -473,41 +497,51 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
             </div>
           )}
         </div>
-        <button type="button" className="primary reporting-bar__run" onClick={run} aria-label={dirty ? 'Run report with these filters' : 'Run report'}>
-          Run report
-        </button>
-      </div>
-
-      <div className="reporting-filter-rows">
-        <div className="reporting-filter-row">
-          <span className="reporting-filter-row__name">Date range</span>
-          {['week', 'month', 'quarter'].map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              className={activePreset === preset ? 'secondary reporting-preset--on' : 'secondary'}
-              onClick={() => onDraft((current) => ({ ...current, range: presetRange(preset, today) }))}
+        {(draft.datesOn || draft.serviceOn || (draft.tagOn && showTag)) && (
+          <>
+        {draft.datesOn && (
+          <div className="reporting-filter-row">
+            <span className="reporting-filter-row__name">Date range</span>
+            <select
+              className="paper-input reporting-filter-row__preset"
+              aria-label="Date preset"
+              value={activePreset || 'custom'}
+              onChange={(event) => {
+                const preset = event.target.value
+                if (preset === 'custom') return
+                onDraft((current) => ({ ...current, range: presetRange(preset, today) }))
+              }}
             >
-              {preset === 'week' ? 'Rolling week' : preset === 'month' ? 'This month' : 'This quarter'}
+              <option value="week">Rolling week</option>
+              <option value="month">This month</option>
+              <option value="quarter">This quarter</option>
+              <option value="custom">Custom</option>
+            </select>
+            <input
+              className="paper-input"
+              type="date"
+              aria-label="From"
+              value={draft.range.from}
+              onChange={(event) => onDraft((current) => ({ ...current, range: { ...current.range, from: event.target.value } }))}
+            />
+            <span className="reporting-filter-row__hint" aria-hidden="true">–</span>
+            <input
+              className="paper-input"
+              type="date"
+              aria-label="To"
+              value={draft.range.to}
+              onChange={(event) => onDraft((current) => ({ ...current, range: { ...current.range, to: event.target.value } }))}
+            />
+            <button
+              type="button"
+              className="secondary reporting-filter-row__remove"
+              aria-label="Remove date range"
+              onClick={() => onDraft((current) => ({ ...current, datesOn: false }))}
+            >
+              ×
             </button>
-          ))}
-          <span className="reporting-filter-row__hint">From</span>
-          <input
-            className="paper-input"
-            type="date"
-            aria-label="From"
-            value={draft.range.from}
-            onChange={(event) => onDraft((current) => ({ ...current, range: { ...current.range, from: event.target.value } }))}
-          />
-          <span className="reporting-filter-row__hint">To</span>
-          <input
-            className="paper-input"
-            type="date"
-            aria-label="To"
-            value={draft.range.to}
-            onChange={(event) => onDraft((current) => ({ ...current, range: { ...current.range, to: event.target.value } }))}
-          />
-        </div>
+          </div>
+        )}
         {draft.serviceOn && (
           <div className="reporting-filter-row">
             <span className="reporting-filter-row__name">Service</span>
@@ -556,6 +590,11 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
             </button>
           </div>
         )}
+          </>
+        )}
+        <button type="button" className="primary reporting-bar__run" onClick={run} aria-label={dirty ? 'Run report with these filters' : 'Run report'}>
+          Run report
+        </button>
       </div>
     </div>
   )
