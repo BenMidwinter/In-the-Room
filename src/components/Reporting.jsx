@@ -5,7 +5,6 @@ export default function Reporting() {
     <div className="page">
       <PageHeader
         title="Reporting"
-        subtitle="Practice analytics and exportable reports for your caseload."
       />
       <div className="reporting-placeholder">
         <p className="reporting-placeholder__lead">

@@ -1,3 +1,5 @@
+import HelpTip from './HelpTip'
+
 /**
  * Consistent shell for list-first client modules (appointments, notes, letters, etc.).
  */
@@ -15,11 +17,9 @@ export default function RecordListLayout({
   return (
     <div className={`flex min-w-0 flex-col gap-0 ${className}`.trim()}>
       <header className="mb-0 flex flex-wrap items-start justify-between gap-3 border-b border-line-light pb-4">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-1.5">
           <h2 className="m-0 text-lg font-bold leading-tight text-accent">{title}</h2>
-          {subtitle && (
-            <p className="mt-1.5 mb-0 max-w-[36rem] text-sm leading-normal text-subtle">{subtitle}</p>
-          )}
+          {subtitle ? <HelpTip text={subtitle} label={`About ${title}`} /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {headerActions}

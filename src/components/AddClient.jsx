@@ -94,7 +94,6 @@ export default function AddClient() {
     <div className="page">
       <PageHeader
         title={isEditMode ? 'Edit client' : 'New client'}
-        subtitle={isEditMode ? 'Update client record details.' : 'Add a client to your caseload.'}
         actions={<button type="button" className="secondary" onClick={() => navigate('/clients')}>Cancel</button>}
       />
 

@@ -53,9 +53,6 @@ export default function AuthPage() {
         <h1 className="auth-page__title">
           {mode === 'signin' ? 'Sign in to your practice' : 'Create your practice account'}
         </h1>
-        <p className="auth-page__lead">
-          Freelance clinical workspace — encrypted notes, calendar, and caseload in one place.
-        </p>
 
         {!configured && (
           <p className="auth-page__alert" role="alert">

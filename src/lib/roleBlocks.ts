@@ -5,7 +5,6 @@ export const ROLE_BLOCK_META = {
     id: 'clinician',
     label: 'Practice',
     title: 'Your practice',
-    description: 'Your upcoming sessions and active cases.',
   },
 }
 

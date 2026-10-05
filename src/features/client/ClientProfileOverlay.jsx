@@ -71,7 +71,6 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
       >
         <header className="client-profile-overlay__header">
           <div className="client-profile-overlay__intro">
-            <p className="client-profile-overlay__eyebrow">Client clinical profile</p>
             <h2 id="client-profile-overlay-title" className="client-profile-overlay__title">{client.real_name}</h2>
             <p className="client-profile-overlay__meta">
               DOB {client.dob || '—'}

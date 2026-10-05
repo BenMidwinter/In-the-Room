@@ -6,7 +6,6 @@ export default function ProfileLayout() {
     <div className="page page--profile">
       <PageHeader
         title="Profile"
-        subtitle="Clinician settings, letterhead, and reflective journal."
         toolbar={(
           <nav className="profile-actions profile-actions--inline" aria-label="Profile sections">
             <NavLink to="/profile" end className="profile-actions__link">

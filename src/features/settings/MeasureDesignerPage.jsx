@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useConfirm, useToast } from '../../components/ui'
+import HelpTip from '../../components/HelpTip'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { blankMeasure, measureScoresCsv, moveListItem, newFormId } from '../../lib/formModel'
 import {
@@ -152,10 +153,13 @@ function MeasureDesigner({ draft, onChange, userId }) {
       </div>
       <div className="form-designer__layout">
         <aside className="form-designer__palette">
-          <p className="form-designer__palette-title">Scale</p>
-          <p className="text-small text-muted">
-            A few statements, each scored the same, suits something like YP-CORE. One overall score suits something like CGAS.
-          </p>
+          <div className="form-designer__palette-head">
+            <p className="form-designer__palette-title">Scale</p>
+            <HelpTip
+              text="A few statements, each scored the same, suits something like YP-CORE. One overall score suits something like CGAS."
+              label="About the scale"
+            />
+          </div>
           {schema.kind === 'items' && !locked && (
             <button
               type="button"

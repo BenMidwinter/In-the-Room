@@ -1,4 +1,5 @@
 import { ROLE_BLOCK_META, PROFILE_BLOCK_META } from '../lib/roleBlocks'
+import HelpTip from './HelpTip'
 
 const BLOCK_META = { ...ROLE_BLOCK_META, ...PROFILE_BLOCK_META }
 
@@ -17,17 +18,18 @@ export default function SectionCard({
 }) {
   const meta = BLOCK_META[blockId] || {}
   const heading = title ?? meta.title
+  const helpText = description || meta.description || ''
 
   return (
     <section className={`section-card section-card--${blockId}`} aria-labelledby={`section-card-${blockId}`}>
       <header className="section-card__header">
         <div className="section-card__heading">
-          <h2 id={`section-card-${blockId}`} className="section-card__title">
-            {heading}
-          </h2>
-          {(description || meta.description) && (
-            <p className="section-card__desc">{description || meta.description}</p>
-          )}
+          <div className="section-card__title-row">
+            <h2 id={`section-card-${blockId}`} className="section-card__title">
+              {heading}
+            </h2>
+            {helpText ? <HelpTip text={helpText} label={`About ${heading}`} /> : null}
+          </div>
         </div>
         {actions && <div className="section-card__actions">{actions}</div>}
       </header>

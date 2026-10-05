@@ -206,7 +206,7 @@ export default function ReportingPage() {
     <div className="page reporting-page">
       <PageHeader
         title="Reporting"
-        subtitle="A rolling week, until you choose other dates."
+        help="A rolling week, until you choose other dates."
       />
 
       <div className="reporting-filters">
