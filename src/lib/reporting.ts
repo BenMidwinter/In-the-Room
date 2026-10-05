@@ -1,4 +1,4 @@
-import { addDaysYmd, daysBetweenYmd, startOfMonthYmd } from './dateArchitecture'
+import { addDaysYmd, daysBetweenYmd, endOfMonthYmd, startOfMonthYmd } from './dateArchitecture'
 import { dayKeyFromYmd, timeToMinutes, type WorkplaceClinicianSetting } from './clinicianAvailability'
 import {
   chargeForAttendance,
@@ -14,6 +14,10 @@ export function rollingWeekRange(today: string): ReportRange {
 
 export function monthToDateRange(today: string): ReportRange {
   return { from: startOfMonthYmd(today), to: today }
+}
+
+export function calendarMonthRange(today: string): ReportRange {
+  return { from: startOfMonthYmd(today), to: endOfMonthYmd(today) }
 }
 
 export function quarterToDateRange(today: string): ReportRange {

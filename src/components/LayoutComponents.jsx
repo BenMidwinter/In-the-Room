@@ -612,6 +612,9 @@ function StandardEventBody({
   onAttendanceChange,
   onToggleDoNotInvoice,
   invoiceSummary = '',
+  onAddInvoice,
+  addInvoiceLabel = 'Add invoice',
+  addInvoicePending = false,
   showAttendance = true,
   showProcessNote = false,
   linkedNote = null,
@@ -706,6 +709,13 @@ function StandardEventBody({
             </button>
           )}
           {invoiceSummary ? <p className="text-small text-muted">{invoiceSummary}</p> : null}
+        </div>
+      )}
+      {onAddInvoice && (
+        <div className="appointment-card__invoice">
+          <button type="button" className="secondary" disabled={addInvoicePending} onClick={onAddInvoice}>
+            {addInvoiceLabel}
+          </button>
         </div>
       )}
     </SafetyLock>
@@ -846,6 +856,9 @@ export function EventDrawer({
   onAttendanceChange,
   onToggleDoNotInvoice,
   invoiceSummary,
+  onAddInvoice,
+  addInvoiceLabel,
+  addInvoicePending,
   onEdit,
   onMove,
   onDelete,
@@ -916,6 +929,9 @@ export function EventDrawer({
           onAttendanceChange={onAttendanceChange}
           onToggleDoNotInvoice={onToggleDoNotInvoice}
           invoiceSummary={invoiceSummary}
+          onAddInvoice={onAddInvoice}
+          addInvoiceLabel={addInvoiceLabel}
+          addInvoicePending={addInvoicePending}
           showAttendance={kind === 'standard'}
           showProcessNote={kind === 'standard'}
           linkedNote={linkedNote}

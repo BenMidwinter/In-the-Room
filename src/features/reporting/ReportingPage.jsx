@@ -33,7 +33,7 @@ import {
   summariseAppointments,
   timeBuckets,
 } from '../../lib/reporting'
-import { activeBilledAppointmentIds } from '../../lib/invoices'
+import { activeBilledAppointmentIds, invoiceBalancePence } from '../../lib/invoices'
 import { listInvoices } from '../../lib/supabase/invoicesRepo'
 
 const SECTIONS = [
@@ -586,7 +586,7 @@ function FinanceSection({ summary, invoices, range }) {
   const outstanding = invoices.filter((invoice) => (
     invoice.status === 'issued' && invoice.issuedOn && inDateRange(invoice.issuedOn, range)
   ))
-  const outstandingPence = outstanding.reduce((sum, invoice) => sum + invoice.totalPence, 0)
+  const outstandingPence = outstanding.reduce((sum, invoice) => sum + invoiceBalancePence(invoice), 0)
   const uninvoiced = summary.rows.filter((row) => row.earnedPence > 0 && !billed.has(row.id))
   const rows = uninvoiced.map((row) => ({
     id: row.id,
@@ -607,7 +607,7 @@ function FinanceSection({ summary, invoices, range }) {
         <Stat
           label="Outstanding invoices"
           value={formatGbpFromPence(outstandingPence)}
-          detail={outstanding.length ? `${outstanding.length} issued in these dates` : 'Issued in these dates, not marked paid'}
+          detail={outstanding.length ? `${outstanding.length} awaiting payment in these dates` : 'Awaiting payment in these dates'}
         />
         <Stat label="Sessions not yet invoiced" value={uninvoiced.length} />
       </div>

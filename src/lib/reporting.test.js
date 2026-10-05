@@ -4,6 +4,7 @@ import {
   availabilityMinutes,
   averageWaitDays,
   efficiencyFromMinutes,
+  calendarMonthRange,
   monthToDateRange,
   noteStateFor,
   rollingWeekRange,
@@ -17,6 +18,7 @@ describe('reporting', () => {
     const range = rollingWeekRange('2026-10-07')
     expect(range).toEqual({ from: '2026-10-01', to: '2026-10-07' })
     expect(monthToDateRange('2026-10-07').from).toBe('2026-10-01')
+    expect(calendarMonthRange('2026-10-07')).toEqual({ from: '2026-10-01', to: '2026-10-31' })
   })
 
   it('counts weekday availability and leaves the weekend out', () => {

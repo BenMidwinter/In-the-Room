@@ -2,7 +2,9 @@ import { attendanceLabel } from './appointmentUtils'
 import { addDaysYmd, formatDisplayDate } from './dateArchitecture'
 import {
   billablePence,
+  formatHoursFromMinutes,
   roleOf,
+  slotMinutes,
   type ReportAppointment,
 } from './reporting'
 import type { CancellationPolicy } from './cancellationPolicy'
@@ -30,12 +32,21 @@ export type InvoiceLineInput = {
   description: string
   sessionDate: string | null
   unitPence: number
+  quantity?: number
   includesVat: boolean
 }
 
 export type InvoiceLine = InvoiceLineInput & {
   id: string
+  quantity: number
   released: boolean
+}
+
+export type InvoicePayment = {
+  id: string
+  amountPence: number
+  paidOn: string
+  note: string
 }
 
 export type InvoiceRecord = {
@@ -44,12 +55,33 @@ export type InvoiceRecord = {
   status: InvoiceStatus
   clientId: string | null
   billToName: string
+  forName: string
   issuedOn: string | null
   dueOn: string | null
   totalPence: number
   paymentDetails: string
   billToEmail: string
   lines: InvoiceLine[]
+  payments: InvoicePayment[]
+}
+
+export type InvoiceDisplay = 'draft' | 'awaiting' | 'partial' | 'paid' | 'overdue' | 'void'
+
+export type BatchLine = {
+  clientId: string
+  clientName: string
+  billToName: string
+  billToEmail: string
+  line: InvoiceLineInput
+}
+
+export type InvoiceBatch = {
+  key: string
+  clientId: string | null
+  billToName: string
+  billToEmail: string
+  forName: string
+  lines: InvoiceLineInput[]
 }
 
 export function formatInvoiceNumber(sequence: number): string {
@@ -107,6 +139,7 @@ export function lineForInvoice(
       description,
       sessionDate: appointment.sessionDate || null,
       unitPence: pence,
+      quantity: 1,
       includesVat: Boolean(appointment.feeIncludesVat),
     }
   }
@@ -118,7 +151,27 @@ export function lineForInvoice(
     description: when ? `${when} — ${service}` : service,
     sessionDate: appointment.sessionDate || null,
     unitPence: appointment.feePence,
+    quantity: 1,
     includesVat: Boolean(appointment.feeIncludesVat),
+  }
+}
+
+export function activityLineForInvoice(appointment: ReportAppointment): InvoiceLineInput | null {
+  const role = roleOf(appointment)
+  if (role !== 'support' && role !== 'admin') return null
+  if (appointment.externalBusy || appointment.doNotInvoice) return null
+  const kind = role === 'support' ? 'Support' : 'Admin'
+  const title = appointment.serviceName || appointment.clientName || kind
+  const when = appointment.sessionDate ? formatDisplayDate(appointment.sessionDate) : ''
+  const hours = formatHoursFromMinutes(slotMinutes(appointment.startTime, appointment.endTime))
+  const detail = `${kind}: ${title} (${hours})`
+  return {
+    appointmentId: appointment.id,
+    description: when ? `${when} — ${detail}` : detail,
+    sessionDate: appointment.sessionDate || null,
+    unitPence: 0,
+    quantity: 1,
+    includesVat: false,
   }
 }
 
@@ -144,8 +197,94 @@ export function invoiceRecipient({
   }
 }
 
-export function invoiceTotalPence(lines: Array<{ unitPence: number }>): number {
-  return lines.reduce((sum, line) => sum + Math.max(0, Math.trunc(Number(line.unitPence)) || 0), 0)
+export function lineQuantity(value: unknown): number {
+  const qty = Math.trunc(Number(value))
+  return Number.isFinite(qty) && qty >= 1 ? qty : 1
+}
+
+export function lineAmountPence(line: { unitPence: number; quantity?: number }): number {
+  return Math.max(0, Math.trunc(Number(line.unitPence)) || 0) * lineQuantity(line.quantity)
+}
+
+export function invoiceTotalPence(lines: Array<{ unitPence: number; quantity?: number }>): number {
+  return lines.reduce((sum, line) => sum + lineAmountPence(line), 0)
+}
+
+export function paidPence(payments: Array<{ amountPence: number }> = []): number {
+  return payments.reduce((sum, payment) => sum + Math.max(0, Math.trunc(Number(payment.amountPence)) || 0), 0)
+}
+
+export function invoiceBalancePence(invoice: { totalPence: number; payments?: Array<{ amountPence: number }> }): number {
+  return Math.max(0, Math.max(0, Math.trunc(Number(invoice.totalPence)) || 0) - paidPence(invoice.payments))
+}
+
+export function invoiceDisplayStatus(
+  invoice: {
+    status: string
+    totalPence?: number
+    dueOn?: string | null
+    payments?: Array<{ amountPence: number }>
+  },
+  today: string,
+): InvoiceDisplay {
+  if (invoice.status === 'void') return 'void'
+  if (invoice.status === 'draft') return 'draft'
+  const total = Math.max(0, Math.trunc(Number(invoice.totalPence)) || 0)
+  const paid = paidPence(invoice.payments)
+  if (invoice.status === 'paid' || (total > 0 && paid >= total)) return 'paid'
+  if (invoice.dueOn && today && invoice.dueOn < today) return 'overdue'
+  if (paid > 0) return 'partial'
+  return 'awaiting'
+}
+
+const DISPLAY_LABELS: Record<InvoiceDisplay, string> = {
+  draft: 'Draft',
+  awaiting: 'Awaiting payment',
+  partial: 'Partially paid',
+  paid: 'Paid',
+  overdue: 'Overdue',
+  void: 'Void',
+}
+
+export function invoiceStatusLabel(
+  invoice: {
+    status: string
+    totalPence?: number
+    dueOn?: string | null
+    payments?: Array<{ amountPence: number }>
+  },
+  today: string,
+): string {
+  return DISPLAY_LABELS[invoiceDisplayStatus(invoice, today)]
+}
+
+export function batchInvoiceGroups(rows: BatchLine[], mode: 'client' | 'payer'): InvoiceBatch[] {
+  const groups = new Map<string, InvoiceBatch & { names: string[] }>()
+  for (const row of rows) {
+    const payerKey = row.billToEmail.trim().toLowerCase() || row.billToName.trim().toLowerCase() || row.clientId
+    const key = mode === 'payer' ? `payer:${payerKey}` : `client:${row.clientId}`
+    const current = groups.get(key) || {
+      key,
+      clientId: row.clientId,
+      billToName: row.billToName,
+      billToEmail: row.billToEmail,
+      forName: '',
+      lines: [],
+      names: [],
+    }
+    if (mode === 'payer' && current.clientId && current.clientId !== row.clientId) current.clientId = null
+    if (!current.names.includes(row.clientName)) current.names.push(row.clientName)
+    current.lines.push(row.line)
+    groups.set(key, current)
+  }
+  return [...groups.values()].map((group) => ({
+    key: group.key,
+    clientId: group.clientId,
+    billToName: group.billToName,
+    billToEmail: group.billToEmail,
+    forName: group.names.join(', '),
+    lines: group.lines,
+  }))
 }
 
 export function activeBilledAppointmentIds(
@@ -161,10 +300,3 @@ export function activeBilledAppointmentIds(
   return ids
 }
 
-export function invoiceStatusLabel(status: string): string {
-  if (status === 'draft') return 'Draft'
-  if (status === 'issued') return 'Issued'
-  if (status === 'paid') return 'Paid'
-  if (status === 'void') return 'Void'
-  return status
-}

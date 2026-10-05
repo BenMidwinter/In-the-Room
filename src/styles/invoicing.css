@@ -78,8 +78,21 @@
   font-weight: 700;
 }
 
+.invoicing-add-line > p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.invoicing-add-line__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .invoicing-add-line input[type="text"],
 .invoicing-add-line input[type="date"],
+.invoicing-add-line select,
 .invoicing-add-line input:not([type="checkbox"]) {
   font: inherit;
   font-weight: 500;
@@ -226,8 +239,10 @@
   vertical-align: top;
 }
 
+.invoice-sheet__table th:nth-child(2),
 .invoice-sheet__table th:last-child,
 .invoice-sheet__table td:nth-child(2),
+.invoice-sheet__table td:last-child,
 .invoice-sheet__table tfoot td {
   text-align: right;
   white-space: nowrap;
@@ -251,6 +266,40 @@
 .invoice-sheet__pay h3 {
   margin: 0;
   font-size: 0.95rem;
+}
+
+.invoice-sheet__overdue {
+  font-weight: 700;
+}
+
+.invoice-sheet__payments {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.invoice-sheet__payments li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.25rem 0;
+}
+
+.invoicing-picker {
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.invoicing-picker input {
+  width: 6.5rem;
+  font: inherit;
+  font-weight: 500;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.4rem;
+  background: var(--bg-page);
+  color: var(--txt-primary);
 }
 
 @media print {

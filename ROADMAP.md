@@ -7,24 +7,25 @@ Living plan. The clinical workspace (caseload, calendar, notes, services, forms,
 ## 1. Missing features
 
 - [x] **Reporting.** Overview, Appointments & Notes, Clients, Waitlist, My Practice, and Finance. It opens on a rolling week, and every section can take other dates. Efficiency is appointment, support, and admin time as a percentage of availability minus busy time.
-- [x] **Invoicing, first slice.** Create an invoice from marked sessions, print it, and mark it issued or paid. Payment details are copied on when it is issued. Xero sync, expenses, and emailing the invoice are still to do.
+- [x] **Invoicing.** A draft can start with no sessions. Lines come from uninvoiced appointments, support or admin time, or a free line, and the description, quantity, and price stay editable until it is sent. Bill-to starts from the client email, or from the contact marked Send invoices to, and can change on that draft alone. Batch invoicing is a filtered list you tick: one invoice per client, or one invoice per payer when several clients share one. Marking a draft as sent makes it Awaiting payment. Recording a payment amount can leave it Partially paid or Paid. Overdue is past the due date with a balance still open. Print is how it is sent until email exists. Xero sync and expenses are still to do.
 
 Service prices, including whether the price already includes VAT, live on each service.
 
-## 2. Data management
+## 2. Encryption and login — next
+
+Do this next, as one patch, tied into the login process.
+
+- [ ] Envelope encryption for clinical records: notes, letters, reports, form answers, and outcome totals. One organisation per signup, with roles owner, practitioner, and practice manager. The practice manager can read appointments, attendance, and invoice totals, and is kept out of note, report, letter, and form bodies. Operational columns stay readable: appointment times, attendance, note status, invoice amounts, and service prices.
+- [ ] Data processing agreement and mandatory MFA. A clinical payload is readable only after the second factor. Turn that check on at the same time as MFA enrolment.
+
+Delete the current rows before trialling this. They are fake test data. The trial starts from new fake clients. Those existing rows are removed rather than encrypted in place.
+
+## 3. Data management
 
 - [ ] Private document storage in a London S3 bucket, linked to AWS, with short-lived upload and download links.
 - [ ] A caseload export the clinician can open, with clinical records decrypted for them.
 
-The decrypted export has to follow encryption. Hours, fees, and attendance can be exported before that, because they are not the clinical note.
-
-## 3. Encryption
-
-- [ ] Encrypt clinical records end to end: notes, letters, reports, form answers, and outcome totals.
-
-## 4. Login, DPA, and account security
-
-The data processing agreement belongs with this patch, including mandatory MFA. It waits until the three items above.
+This follows the encryption and login patch, because the export has to decrypt notes. Hours, fees, and attendance can be exported before that, because they are not the clinical note.
 
 ---
 

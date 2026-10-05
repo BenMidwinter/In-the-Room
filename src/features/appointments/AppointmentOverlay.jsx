@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useAppClients } from '../../lib/queries'
@@ -8,7 +9,7 @@ import {
   useDeleteAppointmentsMutation,
   useSaveAppointmentMutation,
 } from '../../lib/appointmentQueries'
-import { EventDrawer, RecurringSchedulePanel, ScheduleSessionPanel } from '../../components/LayoutComponents'
+import { EventDrawer, RecurringSchedulePanel, ScheduleSessionPanel, resolveEventKind } from '../../components/LayoutComponents'
 import FormOverlay from '../../components/FormOverlay'
 import SeriesScopeDialog from '../../components/SeriesScopeDialog'
 import { useConfirm, useToast } from '../../components/ui'
@@ -19,6 +20,10 @@ import { listServices } from '../../lib/supabase/servicesRepo'
 import { loadCancellationPolicy } from '../../lib/supabase/cancellationPolicyRepo'
 import { chargeForAttendance, DEFAULT_CANCELLATION_POLICY } from '../../lib/cancellationPolicy'
 import { formatGbpFromPence } from '../../lib/money'
+import { activityLineForInvoice, invoiceRecipient, lineForInvoice } from '../../lib/invoices'
+import { roleOf } from '../../lib/reporting'
+import { listContacts } from '../../lib/supabase/contactsRepo'
+import { createInvoice, listInvoices } from '../../lib/supabase/invoicesRepo'
 
 const AppointmentOverlayContext = createContext(null)
 
@@ -141,6 +146,7 @@ function AppointmentOverlayHost({
   openRecurring,
 }) {
   const { session } = useAppSession()
+  const navigate = useNavigate()
   const { clients: remoteClients = [] } = useAppClients()
   const { data: allAppointments = [] } = useAllAppointmentsQuery()
   const saveAppointmentMutation = useSaveAppointmentMutation()
@@ -159,6 +165,7 @@ function AppointmentOverlayHost({
   })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [addingInvoice, setAddingInvoice] = useState(false)
   const [deleteScopeFor, setDeleteScopeFor] = useState(null)
 
   const clients = useMemo(
@@ -180,6 +187,22 @@ function AppointmentOverlayHost({
       || null
     )
     : null
+  const invoicesQuery = useQuery({
+    queryKey: ['invoices', session?.user?.id],
+    queryFn: listInvoices,
+    enabled: Boolean(session?.user?.id) && state?.mode === 'view',
+  })
+  const contactsQuery = useQuery({
+    queryKey: ['contacts', 'invoice-session', viewed?.client_id],
+    queryFn: () => listContacts(viewed.client_id),
+    enabled: Boolean(session?.user?.id) && Boolean(viewed?.client_id),
+  })
+  const existingInvoice = (invoicesQuery.data || []).find((invoice) => (
+    invoice.status !== 'void'
+    && invoice.lines.some((line) => line.appointmentId === viewed?.id && !line.released)
+  ))
+  const invoiceKind = viewed ? resolveEventKind(viewed) : ''
+  const canInvoice = Boolean(viewed) && !viewed.do_not_invoice && (invoiceKind === 'standard' || invoiceKind === 'support')
 
   const handleSave = async (payload, scope = 'this') => {
     if (!session?.user?.id) {
@@ -382,6 +405,65 @@ function AppointmentOverlayHost({
     return `${charge.summary} ${formatGbpFromPence(charge.chargedPence)}.`
   })()
 
+  const handleAddInvoice = async () => {
+    if (!viewed || addingInvoice) return
+    if (existingInvoice) {
+      close()
+      navigate(`/invoicing?invoice=${existingInvoice.id}`)
+      return
+    }
+    const service = (servicesQuery.data || []).find((row) => row.id === viewed.service_id)
+    const report = {
+      id: viewed.id,
+      clientId: viewed.client_id || null,
+      clientName: viewed.client_name || '',
+      serviceId: viewed.service_id || null,
+      serviceName: viewed.service_name || service?.name || '',
+      sessionDate: viewed.session_date,
+      startTime: viewed.start_time,
+      endTime: viewed.end_time,
+      attendance: viewed.attendance_status || null,
+      blockRole: viewed.block_role || 'client_session',
+      externalBusy: false,
+      doNotInvoice: Boolean(viewed.do_not_invoice),
+      chargedPence: viewed.charged_pence ?? null,
+      feePence: service?.fee_pence ?? null,
+      feeIncludesVat: Boolean(service?.fee_includes_vat),
+    }
+    const marked = Boolean(viewed.attendance_status)
+    const line = roleOf(report) === 'appointment'
+      ? lineForInvoice(report, policyQuery.data || DEFAULT_CANCELLATION_POLICY, marked ? 'held' : 'booked')
+      : activityLineForInvoice(report)
+    if (!line) {
+      toast.error('Set a price on the service before invoicing this session.')
+      return
+    }
+    const client = remoteClients.find((item) => item.id === viewed.client_id)
+    const recipient = viewed.client_id
+      ? invoiceRecipient({
+        clientName: client?.real_name || viewed.client_name || 'Client',
+        clientEmail: client?.email || '',
+        contacts: contactsQuery.data || [],
+      })
+      : { billToName: report.serviceName || 'Invoice', billToEmail: '' }
+    setAddingInvoice(true)
+    try {
+      const invoice = await createInvoice({
+        clientId: viewed.client_id || null,
+        billToName: recipient.billToName,
+        billToEmail: recipient.billToEmail,
+        forName: client?.real_name || viewed.client_name || '',
+        lines: [line],
+      })
+      close()
+      navigate(`/invoicing?invoice=${invoice.id}`)
+    } catch (err) {
+      toast.error(err?.message || 'Could not create the invoice')
+    } finally {
+      setAddingInvoice(false)
+    }
+  }
+
   const handleMove = (appointment) => {
     if (handlersRef.current.onMove) {
       setState(null)
@@ -481,6 +563,9 @@ function AppointmentOverlayHost({
           onAttendanceChange={handleAttendanceChange}
           onToggleDoNotInvoice={handleToggleDoNotInvoice}
           invoiceSummary={invoiceSummary}
+          onAddInvoice={canInvoice ? handleAddInvoice : undefined}
+          addInvoiceLabel={existingInvoice ? 'Open invoice' : 'Add invoice'}
+          addInvoicePending={addingInvoice}
           onEdit={openEdit}
           onMove={handleMove}
           onDelete={handleDelete}

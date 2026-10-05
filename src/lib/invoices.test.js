@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_CANCELLATION_POLICY } from './cancellationPolicy'
 import {
   activeBilledAppointmentIds,
+  activityLineForInvoice,
+  batchInvoiceGroups,
   dueDateFrom,
   formatInvoiceNumber,
+  invoiceDisplayStatus,
   invoiceTotalPence,
   invoiceRecipient,
   lineForInvoice,
@@ -70,8 +73,62 @@ describe('invoices', () => {
     ])
     expect([...ids]).toEqual(['a'])
     expect(invoiceTotalPence([{ unitPence: 8000 }, { unitPence: 1500 }])).toBe(9500)
+    expect(invoiceTotalPence([{ unitPence: 8000, quantity: 2 }])).toBe(16000)
+  })
+
+  it('names draft, awaiting payment, partial, overdue, and paid', () => {
+    expect(invoiceDisplayStatus({ status: 'draft', totalPence: 0 }, '2026-10-20')).toBe('draft')
+    expect(invoiceDisplayStatus({ status: 'issued', totalPence: 8000, dueOn: '2026-10-25', payments: [] }, '2026-10-20')).toBe('awaiting')
+    expect(invoiceDisplayStatus({ status: 'issued', totalPence: 8000, dueOn: '2026-10-25', payments: [{ amountPence: 1000 }] }, '2026-10-20')).toBe('partial')
+    expect(invoiceDisplayStatus({ status: 'issued', totalPence: 8000, dueOn: '2026-10-19', payments: [{ amountPence: 1000 }] }, '2026-10-20')).toBe('overdue')
+    expect(invoiceDisplayStatus({ status: 'issued', totalPence: 8000, dueOn: '2026-10-19', payments: [{ amountPence: 8000 }] }, '2026-10-20')).toBe('paid')
+    expect(invoiceDisplayStatus({ status: 'paid', totalPence: 8000, payments: [{ amountPence: 8000 }] }, '2026-10-20')).toBe('paid')
+    expect(invoiceDisplayStatus({ status: 'void', totalPence: 8000 }, '2026-10-20')).toBe('void')
+  })
+
+  it('puts clients who share a payer on one invoice', () => {
+    const rows = [
+      batchRow('a', 'Ada'),
+      batchRow('b', 'Ben'),
+    ]
+    expect(batchInvoiceGroups(rows, 'client')).toHaveLength(2)
+    const shared = batchInvoiceGroups(rows, 'payer')
+    expect(shared).toHaveLength(1)
+    expect(shared[0].clientId).toBeNull()
+    expect(shared[0].forName).toBe('Ada, Ben')
+    expect(shared[0].billToEmail).toBe('finance@council.test')
+  })
+
+  it('builds a support line the clinician can price', () => {
+    const line = activityLineForInvoice({
+      ...session({ attendance: null, fee: null }),
+      blockRole: 'support',
+      serviceName: 'School meeting',
+      startTime: '10:00',
+      endTime: '11:00',
+    })
+    expect(line?.description).toContain('Support: School meeting')
+    expect(line?.unitPence).toBe(0)
+    expect(line?.quantity).toBe(1)
   })
 })
+
+function batchRow(clientId, clientName) {
+  return {
+    clientId,
+    clientName,
+    billToName: 'Council',
+    billToEmail: 'finance@council.test',
+    line: {
+      appointmentId: clientId,
+      description: clientName,
+      sessionDate: '2026-10-06',
+      unitPence: 8000,
+      quantity: 1,
+      includesVat: false,
+    },
+  }
+}
 
 function session({ attendance, fee, charged = null }) {
   return {

@@ -829,6 +829,7 @@ export type Database = {
           invoice_id: string
           owner_id: string
           position: number
+          quantity: number
           released_at: string | null
           session_date: string | null
           unit_pence: number
@@ -842,6 +843,7 @@ export type Database = {
           invoice_id: string
           owner_id: string
           position?: number
+          quantity?: number
           released_at?: string | null
           session_date?: string | null
           unit_pence: number
@@ -855,6 +857,7 @@ export type Database = {
           invoice_id?: string
           owner_id?: string
           position?: number
+          quantity?: number
           released_at?: string | null
           session_date?: string | null
           unit_pence?: number
@@ -868,6 +871,7 @@ export type Database = {
           client_id: string | null
           created_at: string
           due_on: string | null
+          for_name: string
           id: string
           issued_on: string | null
           number: string
@@ -884,6 +888,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           due_on?: string | null
+          for_name?: string
           id?: string
           issued_on?: string | null
           number: string
@@ -900,6 +905,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           due_on?: string | null
+          for_name?: string
           id?: string
           issued_on?: string | null
           number?: string
@@ -909,6 +915,36 @@ export type Database = {
           total_pence?: number
           updated_at?: string
           xero_invoice_id?: string | null
+        }
+        Relationships: []
+      }
+      invoice_payments: {
+        Row: {
+          amount_pence: number
+          created_at: string
+          id: string
+          invoice_id: string
+          note: string
+          owner_id: string
+          paid_on: string
+        }
+        Insert: {
+          amount_pence: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          note?: string
+          owner_id: string
+          paid_on: string
+        }
+        Update: {
+          amount_pence?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          note?: string
+          owner_id?: string
+          paid_on?: string
         }
         Relationships: []
       }
