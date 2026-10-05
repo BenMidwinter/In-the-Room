@@ -6,6 +6,7 @@ import { useAppClients } from '../../lib/queries'
 import { useUpcomingAppointmentsQuery, useAllAppointmentsQuery } from '../../lib/appointmentQueries'
 import { getProgressNoteByAppointment } from '../../lib/store'
 import { getNextProgressNoteTask } from '../../lib/homeBlocks'
+import { useProgressNoteIndexQuery } from '../../lib/progressNoteQueries'
 import {
   formatAppointmentDate,
   formatAppointmentTime,
@@ -140,19 +141,40 @@ export default function HomePage() {
     organisationWide: false,
   })
   const { data: allAppointments = [] } = useAllAppointmentsQuery()
+  const noteIndex = useProgressNoteIndexQuery(Boolean(session?.user?.id))
 
   const nextSession = upcoming[0] || null
   const timelineAppointments = upcoming.slice(0, 8)
 
+  const notesByAppointment = useMemo(() => {
+    const map = new Map()
+    for (const note of noteIndex.data || []) {
+      if (!note?.appointment_id) continue
+      const current = map.get(note.appointment_id)
+      if (!current || Number(note.note_number || 0) >= Number(current.note_number || 0)) {
+        map.set(note.appointment_id, note)
+      }
+    }
+    return map
+  }, [noteIndex.data])
+
   const nextTask = useMemo(
     () => getNextProgressNoteTask(allAppointments, {
-      getNote: getProgressNoteByAppointment,
+      getNote: (appointmentId) => (
+        noteIndex.isSuccess
+          ? notesByAppointment.get(appointmentId) || null
+          : getProgressNoteByAppointment(appointmentId)
+      ),
       today: todayYmd(),
     }),
-    [allAppointments],
+    [allAppointments, noteIndex.isSuccess, notesByAppointment],
   )
 
-  const nextTaskNote = nextTask ? getProgressNoteByAppointment(nextTask.id) : null
+  const nextTaskNote = nextTask
+    ? (noteIndex.isSuccess
+      ? notesByAppointment.get(nextTask.id) || null
+      : getProgressNoteByAppointment(nextTask.id))
+    : null
   const nextTaskHref = nextTask
     ? `/clients/${nextTask.client_id}/progress-notes?appointment=${nextTask.id}`
     : null
@@ -238,13 +260,15 @@ export default function HomePage() {
               </HomeStatCard>
 
               <HomeStatCard title="Next task">
-                {nextTask && nextTaskHref ? (
+                {noteIndex.isPending ? (
+                  <p className="section-card__empty">Loading tasks…</p>
+                ) : nextTask && nextTaskHref ? (
                   <Link
                     to={nextTaskHref}
                     className="home-stat-card__link"
                   >
                     <p className="home-stat-card__primary">
-                      {nextTaskNote ? 'Finish Process Note' : 'Write Process Note'}
+                      {nextTaskNote ? 'Finish Process Note' : 'Start Process Note'}
                     </p>
                     <p className="home-stat-card__meta">
                       {clientLabel(clients, nextTask.client_id)}

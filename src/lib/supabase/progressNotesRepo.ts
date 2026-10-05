@@ -189,6 +189,22 @@ export async function fetchProgressNote(noteId: string) {
   return remember(toAppNote(data as NoteRow))
 }
 
+export async function listProgressNotesIndex() {
+  if (!isSupabaseConfigured()) {
+    return db.progressNotes.map((row) => enrichProgressNoteLock(row as Record<string, unknown>))
+  }
+  const supabase = getSupabase()
+  if (!supabase) {
+    return db.progressNotes.map((row) => enrichProgressNoteLock(row as Record<string, unknown>))
+  }
+  const { data, error } = await supabase
+    .from('progress_notes')
+    .select(NOTE_COLUMNS)
+    .order('note_number', { ascending: false })
+  if (error) throw error
+  return (data || []).map((row) => remember(toAppNote(row as NoteRow)))
+}
+
 export async function fetchProgressNoteByAppointment(appointmentId: string) {
   if (!appointmentId) return null
   if (!isSupabaseConfigured() || !isUuid(appointmentId)) return getProgressNoteByAppointment(appointmentId)

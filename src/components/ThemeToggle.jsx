@@ -8,13 +8,11 @@ import {
   getThemeGroupId,
 } from '../lib/themeEngine'
 
-function PaintbrushIcon() {
+function PersonIcon() {
   return (
     <svg className="top-nav__utility-icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden focusable="false">
-      <path
-        fill="currentColor"
-        d="M7 21c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v1H7v-1zm8.7-12.3l1.6 1.6-8.4 8.4-2.3.5.5-2.3 8.6-8.2zm1.4-1.4l1.4 1.4c.4.4.4 1 0 1.4l-1.1 1.1-2.8-2.8 1.1-1.1c.4-.4 1-.4 1.4 0z"
-      />
+      <circle cx="12" cy="4.6" r="2.3" fill="currentColor" />
+      <path fill="currentColor" d="M3.5 9.2h17v2.1h-6.4V20h-4.2v-8.7H3.5z" />
     </svg>
   )
 }
@@ -81,11 +79,11 @@ export default function ThemeToggle() {
         type="button"
         className="top-nav__utility-btn theme-toggle__trigger"
         onClick={toggleMenu}
-        aria-label={`App theme: ${active?.label || 'Practice linen'}`}
+        aria-label={`Reading and theme: ${active?.label || 'Practice linen'}`}
         aria-expanded={open}
-        title={`App theme: ${active?.label || 'Practice linen'}`}
+        title={`Reading and theme: ${active?.label || 'Practice linen'}`}
       >
-        <PaintbrushIcon />
+        <PersonIcon />
       </button>
       {open && (
         <div className="theme-toggle__menu" role="menu">
