@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
 import HelpTip from '../../components/HelpTip'
@@ -324,9 +324,25 @@ export default function ReportingPage() {
 }
 
 function Overview({ summary, efficiency }) {
+  const rows = summary.byService.map((row) => ({
+    id: row.serviceId,
+    filterValues: { service: row.name },
+    sortValues: {
+      service: row.name,
+      hours: row.minutes,
+      attended: row.sessions,
+      fees: row.earnedPence,
+    },
+    cells: {
+      service: row.name,
+      hours: formatHoursFromMinutes(row.minutes),
+      attended: row.sessions,
+      fees: formatGbpFromPence(row.earnedPence),
+    },
+  }))
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
+      <div className="reporting-metrics">
         <Stat label="Hours delivered" value={formatHoursFromMinutes(summary.deliveredMinutes)} help="Attended sessions." />
         <Stat
           label="Sessions attended"
@@ -342,29 +358,17 @@ function Overview({ summary, efficiency }) {
           detail={`${formatHoursFromMinutes(efficiency.used)} used · ${formatHoursFromMinutes(efficiency.open)} open`}
         />
       </div>
-      <table className="reporting-table">
-        <thead>
-          <tr>
-            <th>Service</th>
-            <th>Hours</th>
-            <th>Attended</th>
-            <th>Fees</th>
-          </tr>
-        </thead>
-        <tbody>
-          {summary.byService.length === 0 && (
-            <tr><td colSpan={4}>Nothing in these dates.</td></tr>
-          )}
-          {summary.byService.map((row) => (
-            <tr key={row.serviceId}>
-              <td>{row.name}</td>
-              <td>{formatHoursFromMinutes(row.minutes)}</td>
-              <td>{row.sessions}</td>
-              <td>{formatGbpFromPence(row.earnedPence)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <RecordTable
+        columns={[
+          { key: 'service', label: 'Service', filter: 'choice', sort: 'text' },
+          { key: 'hours', label: 'Hours', sort: 'number' },
+          { key: 'attended', label: 'Attended', sort: 'number' },
+          { key: 'fees', label: 'Fees', sort: 'number' },
+        ]}
+        rows={rows}
+        countNoun="services"
+        emptyMessage="Nothing in these dates."
+      />
     </div>
   )
 }
@@ -397,9 +401,24 @@ function AppointmentsSection({ summary }) {
   }))
   return (
     <div className="reporting-section">
-      <p className="reporting-note">
-        {signed} of {summary.attended} attended sessions have a signed Process Note.
-      </p>
+      <div className="reporting-metrics">
+        <Stat
+          label="Sessions attended"
+          value={summary.attended}
+          detail={`${summary.dna} did not attend · ${summary.cancelled} cancelled`}
+        />
+        <Stat
+          label="Signed notes"
+          value={signed}
+          detail={`of ${summary.attended} attended`}
+          help="Attended sessions with a signed Process Note."
+        />
+        <Stat
+          label="Notes to finish"
+          value={summary.notesToFinish}
+          help="Attended sessions without a signed Process Note."
+        />
+      </div>
       <RecordTable
         columns={[
           { key: 'date', label: 'Date', sort: 'text' },
@@ -460,7 +479,7 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByC
   })
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
+      <div className="reporting-metrics">
         <Stat label="Active now" value={active.length} />
         <Stat label="Seen in these dates" value={seen.size} />
         <Stat label="New in these dates" value={newcomers.length} />
@@ -509,7 +528,7 @@ function WaitlistSection({ people, tags, services, range, tagId, serviceId, toda
   })
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
+      <div className="reporting-metrics">
         <Stat label="On the waitlist now" value={matching.length} />
         <Stat label="Joined in these dates" value={joined.length} />
         <Stat label="Average days waiting" value={average == null ? '—' : average} help="People on the waitlist now, counted to today." />
@@ -561,7 +580,7 @@ function PracticeSection({ cpd, supervision, appointments, range, serviceId }) {
   }))
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
+      <div className="reporting-metrics">
         <Stat label="Clinical hours" value={formatHoursFromMinutes(clinical)} help="Attended appointments." />
         <Stat label="CPD" value={formatHoursFromMinutes(cpdMinutes)} />
         <Stat
@@ -608,7 +627,7 @@ function FinanceSection({ summary, invoices, range }) {
   }))
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
+      <div className="reporting-metrics">
         <Stat label="Money earned" value={formatGbpFromPence(summary.earnedPence)} />
         <Stat
           label="Outstanding invoices"
@@ -636,14 +655,29 @@ function FinanceSection({ summary, invoices, range }) {
 
 function Stat({ label, value, detail, help }) {
   return (
-    <div className="section-card__stat">
-      <span className="section-card__stat-value">{value}</span>
-      <span className="section-card__stat-label">
-        {label}
-        {help ? <HelpTip text={help} label={`About ${label}`} /> : null}
-      </span>
-      {detail ? <span className="reporting-stat__detail">{detail}</span> : null}
+    <div className="reporting-metric">
+      <div className="reporting-metric__label">
+        <span>{label}</span>
+        {help ? <MetricInfo text={help} label={`About ${label}`} /> : null}
+      </div>
+      <div className="reporting-metric__value">{value}</div>
+      <div className="reporting-metric__detail">{detail || '\u00a0'}</div>
     </div>
+  )
+}
+
+function MetricInfo({ text, label }) {
+  const tipId = useId()
+  return (
+    <span className="reporting-metric__info">
+      <button type="button" className="reporting-metric__info-btn" aria-label={label} aria-describedby={tipId}>
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden focusable="false">
+          <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          <path fill="currentColor" d="M7.2 7.05h1.6V11.7H7.2zM7.2 4.25h1.6V5.85H7.2z" />
+        </svg>
+      </button>
+      <span id={tipId} className="reporting-metric__tip" role="tooltip">{text}</span>
+    </span>
   )
 }
 
