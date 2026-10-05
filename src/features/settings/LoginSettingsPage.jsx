@@ -73,10 +73,11 @@ export default function LoginSettingsPage() {
 
   return (
     <>
-      <SettingsSectionCard blockId="settings_login_email" title="Email">
-        <p className="text-muted" style={{ marginTop: 0 }}>
-          Change the address you use to sign in. Supabase may send a confirmation link to the new inbox.
-        </p>
+      <SettingsSectionCard
+        blockId="settings_login_email"
+        title="Email"
+        description="Change the address you use to sign in. A confirmation link may be sent to the new inbox."
+      >
         <form className="settings-form" onSubmit={updateEmail}>
           <label className="settings-form__field">
             <span>Login email</span>

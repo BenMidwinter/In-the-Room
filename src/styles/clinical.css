@@ -2694,6 +2694,21 @@ button.agenda-event {
   padding-right: 0.2rem;
 }
 
+.form-designer__palette-head {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  margin: 0.85rem 0 0.35rem;
+}
+
+.form-designer__palette-head:first-child {
+  margin-top: 0;
+}
+
+.form-designer__palette-head .form-designer__palette-title {
+  margin: 0;
+}
+
 .form-designer__palette-title {
   margin: 0.85rem 0 0.2rem;
   font-size: 0.75rem;

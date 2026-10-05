@@ -18,6 +18,7 @@ import {
 import { appointmentDisplayName } from '../../lib/calendarServiceStyles'
 import { formatDisplayDate, todayYmd } from '../../lib/dateArchitecture'
 import PageHeader from '../../components/PageHeader'
+import HelpTip from '../../components/HelpTip'
 import SectionCard from '../../components/SectionCard'
 import RecordTable from '../../components/RecordTable'
 
@@ -80,9 +81,7 @@ function UpcomingTimeline({ appointments, clients, onSelect }) {
     <div className="timeline-card timeline-card--horizontal home-upcoming-timeline">
       <div className="timeline-card__header">
         <h3 className="card__title">Upcoming appointments</h3>
-        <p className="timeline-card__hint text-small text-muted">
-          Earliest on the left — scroll for later sessions
-        </p>
+        <HelpTip text="Earliest on the left. Scroll for later sessions." label="About upcoming appointments" />
       </div>
       <div ref={scrollRef} className="timeline-card__scroll timeline-card__scroll--horizontal">
         <ul className="timeline timeline--horizontal">

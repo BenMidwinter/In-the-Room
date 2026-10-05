@@ -13,7 +13,7 @@ export default function InvoicePaymentSettings({ userId }) {
     <SettingsSectionCard
       blockId="settings_invoice_payment"
       title="Payment details"
-      description="Copied onto an invoice when you issue it. Hidden until you enter your password."
+      description="Copied onto an invoice when you send it."
     >
       {revealed ? (
         <PaymentDetailsForm userId={userId} onHide={() => setRevealed(false)} />

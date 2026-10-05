@@ -1013,12 +1013,23 @@ export function EventDrawer({
     </>
   )
 
+  const clientHref = appointment.client_id ? `/clients/${appointment.client_id}` : ''
+  const clientNameLink = clientHref ? (
+    <Link to={clientHref} className="appointment-card__client-link" onClick={() => onClose?.()}>
+      {appointment.client_name || 'Client'}
+    </Link>
+  ) : null
+  const overlayTitle = kind === 'standard' && clientNameLink ? clientNameLink : title
+  const overlayMeta = kind === 'support' && clientNameLink
+    ? <>{clientNameLink}{' · '}{whenLine}</>
+    : subtitle
+
   if (presentation === 'overlay') {
     return (
       <FormOverlay
-        title={title}
+        title={overlayTitle}
         eyebrow={kind === 'busy' ? 'Busy' : kind === 'support' ? 'Support activity' : kind === 'group' ? 'Group' : 'Appointment'}
-        meta={subtitle}
+        meta={overlayMeta}
         onClose={onClose}
         size="md"
       >

@@ -625,11 +625,15 @@ button.home-stat-card__link {
   outline-offset: 2px;
 }
 
-.section-card__desc {
-  margin: 0.3rem 0 0;
-  font-size: 0.875rem;
-  color: var(--txt-muted);
-  line-height: 1.45;
+.section-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.section-card__title-row .section-card__title {
+  margin: 0;
 }
 
 .section-card__actions {
@@ -962,6 +966,9 @@ button.home-stat-card__link {
 .section-card__stat-value--warn { color: #9a5b14; }
 
 .section-card__stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;

@@ -8,7 +8,6 @@ export default function About() {
     <div className="page">
       <PageHeader
         title="About In the Room"
-        subtitle="Clinical documentation for creative arts therapists — spend more time in the work, and less on the admin."
       />
 
       <div className="tabs">

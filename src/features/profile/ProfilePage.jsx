@@ -33,7 +33,7 @@ export default function ProfilePage() {
 
   return (
     <div className="page">
-      <PageHeader title="Profile" subtitle="Your clinician profile and private practice details." />
+      <PageHeader title="Profile" />
 
       <form onSubmit={handleSave} className="card" style={{ maxWidth: '560px', marginBottom: '1.25rem' }}>
         <h3 className="card__title">Clinician details</h3>

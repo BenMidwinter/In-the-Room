@@ -60,6 +60,7 @@ const UNBILLED_COLUMNS = [
   { key: 'date', label: 'Date', sort: 'date', sortFirst: 'desc' },
   { key: 'client', label: 'Client', filter: 'text', sort: 'text' },
   { key: 'service', label: 'Service', filter: 'choice', sort: 'text' },
+  { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
   { key: 'rate', label: 'Rate', sort: 'number' },
   { key: 'action', label: '', sort: false },
 ]
@@ -203,7 +204,7 @@ export default function InvoicingPage() {
     .filter((invoice) => invoice.status !== 'void')
     .reduce((sum, invoice) => sum + paidPence(invoice.payments), 0)
 
-  const unbilled = items.filter((item) => item.held)
+  const unbilled = items
   const pricedUnbilled = unbilled.filter((item) => item.hasFee)
   const selectedItems = pricedUnbilled.filter((item) => selected[item.appointmentId])
   const pickedInvoiceList = invoices.filter((invoice) => pickedInvoices[invoice.id])
@@ -246,6 +247,7 @@ export default function InvoicingPage() {
       date: item.sessionDate ? formatDisplayDate(item.sessionDate) : '—',
       client: item.clientName,
       service: item.serviceName,
+      status: item.held ? 'Held' : 'Booked',
       rate: item.hasFee
         ? formatGbpFromPence(item.line.unitPence)
         : (
@@ -259,11 +261,12 @@ export default function InvoicingPage() {
         </button>
       ) : null,
     },
-    filterValues: { client: item.clientName, service: item.serviceName },
+    filterValues: { client: item.clientName, service: item.serviceName, status: item.held ? 'Held' : 'Booked' },
     sortValues: {
       date: item.sessionDate || '',
       client: item.clientName,
       service: item.serviceName,
+      status: item.held ? 'Held' : 'Booked',
       rate: item.hasFee ? item.line.unitPence : null,
     },
   }))
@@ -635,7 +638,7 @@ export default function InvoicingPage() {
             columns={UNBILLED_COLUMNS}
             rows={unbilledRows}
             countNoun="sessions"
-            emptyMessage="Nothing held is waiting to invoice."
+            emptyMessage="Nothing is waiting to invoice."
             defaultSort={{ key: 'date', direction: 'desc' }}
             selection={{
               isSelected: (row) => Boolean(selected[row.id]),

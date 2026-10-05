@@ -256,7 +256,7 @@ export default function ScreenerPage() {
     <div className="page">
       <PageHeader
         title="Screener"
-        subtitle={view === 'waitlist'
+        help={view === 'waitlist'
           ? 'People you have accepted, waiting for a session.'
           : view === 'rejected'
             ? 'People who were referred and not taken onto the waitlist.'

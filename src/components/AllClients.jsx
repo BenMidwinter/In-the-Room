@@ -60,7 +60,7 @@ export default function AllClients() {
     <div className="page">
       <PageHeader
         title="All clients"
-        subtitle="Everyone on your list, including the screener, the waitlist, and people you have discharged."
+        help="Everyone on your list, including the screener, the waitlist, and people you have discharged."
         actions={(
           <button type="button" className="primary" onClick={() => navigate('/clients/add')}>New client</button>
         )}

@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
 import RecordTable from '../../components/RecordTable'
 import TagLabel from '../../components/TagLabel'
+import { usePrompt } from '../../components/ui'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useClientsQuery } from '../../lib/queries'
 import { useAllAppointmentsQuery } from '../../lib/appointmentQueries'
@@ -46,26 +47,32 @@ const SECTIONS = [
   { id: 'finance', label: 'Finance' },
 ]
 
-const FILTER_NOTE = {
-  overview: 'Service narrows hours, fees, and notes. Efficiency uses the whole diary.',
-  appointments: 'Filter by service, and by a client tag.',
-  clients: 'Filter by a client tag. Service stays on the appointment sections.',
-  waitlist: 'Filter by a waitlist tag, and by the appointment type they are waiting for.',
-  practice: 'Service narrows the clinical rows. Filter the table by type, activity, or service. CPD and supervision stay in the list.',
-  finance: 'Filter by service, and by a client tag.',
-}
-
 const NOTE_LABEL = { complete: 'Signed off', draft: 'Draft', missing: 'Missing' }
 const EMPTY_LIST = []
+const OPEN_RANGE = { from: '0001-01-01', to: '9999-12-31' }
 
 export default function ReportingPage() {
   const { session } = useAppSession()
   const userId = session?.user?.id
   const today = todayYmd()
   const [section, setSection] = useState('overview')
-  const [range, setRange] = useState(() => rollingWeekRange(todayYmd()))
-  const [serviceId, setServiceId] = useState('')
-  const [tagId, setTagId] = useState('')
+  const [applied, setApplied] = useState(() => ({
+    datesOn: false,
+    range: rollingWeekRange(todayYmd()),
+    serviceId: '',
+    tagId: '',
+  }))
+  const [draft, setDraft] = useState(() => ({
+    datesOn: false,
+    range: rollingWeekRange(todayYmd()),
+    serviceId: '',
+    tagId: '',
+    serviceOn: false,
+    tagOn: false,
+  }))
+  const range = applied.datesOn ? applied.range : OPEN_RANGE
+  const serviceId = applied.serviceId
+  const tagId = applied.tagId
 
   const appointmentsQuery = useAllAppointmentsQuery()
   const noteIndex = useProgressNoteIndexQuery(Boolean(userId))
@@ -112,16 +119,33 @@ export default function ReportingPage() {
     queryFn: () => listScreenerBoard().catch(() => []),
     enabled: Boolean(userId),
   })
+  const placementsQuery = useQuery({
+    queryKey: ['waitlist-placements', 'reporting'],
+    queryFn: listWaitlistPlacements,
+    enabled: Boolean(userId),
+  })
   const invoicesQuery = useQuery({
     queryKey: ['invoices', userId],
     queryFn: () => listInvoices().catch(() => []),
     enabled: Boolean(userId),
   })
+  const diarySpan = useMemo(() => {
+    let from = today
+    let to = today
+    for (const appointment of appointmentsQuery.data || []) {
+      const date = String(appointment.session_date || '').slice(0, 10)
+      if (!date) continue
+      if (date < from) from = date
+      if (date > to) to = date
+    }
+    return { from, to }
+  }, [appointmentsQuery.data, today])
+  const busyRange = applied.datesOn ? applied.range : diarySpan
   const busyQuery = useQuery({
-    queryKey: ['external-busy', 'reporting', range.from, range.to],
+    queryKey: ['external-busy', 'reporting', busyRange.from, busyRange.to],
     queryFn: () => listExternalCalendarBlocks({
-      fromIso: `${range.from}T00:00:00`,
-      toIso: `${range.to}T23:59:59`,
+      fromIso: `${busyRange.from}T00:00:00`,
+      toIso: `${busyRange.to}T23:59:59`,
     }),
     enabled: Boolean(userId),
   })
@@ -167,10 +191,9 @@ export default function ReportingPage() {
 
   const tagKind = section === 'waitlist' ? 'waitlist' : 'client'
   const tagOptions = tagKind === 'waitlist' ? (waitlistTagsQuery.data || []) : (clientTagsQuery.data || [])
-  const showService = section !== 'clients'
   const showTag = section === 'appointments' || section === 'clients' || section === 'waitlist' || section === 'finance'
   const activeTag = showTag ? tagId : ''
-  const activeService = showService && section !== 'practice' ? serviceId : ''
+  const activeService = section !== 'clients' && section !== 'practice' ? serviceId : ''
 
   const scoped = useMemo(
     () => mapped.filter((appointment) => (
@@ -184,79 +207,40 @@ export default function ReportingPage() {
     [scoped, range, notesByAppointment, policyQuery.data],
   )
   const efficiency = useMemo(() => {
+    const window = applied.datesOn ? applied.range : diarySpan
     const buckets = timeBuckets(mapped, range)
     return efficiencyFromMinutes({
-      availability: availabilityMinutes(availabilityQuery.data || [], range),
+      availability: availabilityMinutes(availabilityQuery.data || [], window),
       ...buckets,
     })
-  }, [mapped, range, availabilityQuery.data])
-
-  const choosePreset = (preset) => {
-    if (preset === 'week') setRange(rollingWeekRange(today))
-    if (preset === 'month') setRange(monthToDateRange(today))
-    if (preset === 'quarter') setRange(quarterToDateRange(today))
-  }
+  }, [mapped, range, applied.datesOn, applied.range, diarySpan, availabilityQuery.data])
 
   const changeSection = (next) => {
     setSection(next)
-    setTagId('')
+    setDraft((current) => ({ ...current, tagOn: false, tagId: '' }))
+    setApplied((current) => ({ ...current, tagId: '' }))
   }
 
   return (
     <div className="page reporting-page">
       <PageHeader
         title="Reporting"
-        subtitle="A rolling week, until you choose other dates."
+        help="Add a filter, then run the report."
       />
 
-      <div className="reporting-filters">
-        <div className="reporting-filters__presets">
-          <button type="button" className="secondary" onClick={() => choosePreset('week')}>Rolling week</button>
-          <button type="button" className="secondary" onClick={() => choosePreset('month')}>This month</button>
-          <button type="button" className="secondary" onClick={() => choosePreset('quarter')}>This quarter</button>
-        </div>
-        <label className="reporting-filters__field">
-          From
-          <input
-            className="paper-input"
-            type="date"
-            value={range.from}
-            onChange={(event) => setRange((current) => ({ ...current, from: event.target.value }))}
-          />
-        </label>
-        <label className="reporting-filters__field">
-          To
-          <input
-            className="paper-input"
-            type="date"
-            value={range.to}
-            onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))}
-          />
-        </label>
-        {showService && (
-          <label className="reporting-filters__field">
-            Service
-            <select className="paper-input" value={serviceId} onChange={(event) => setServiceId(event.target.value)}>
-              <option value="">All services</option>
-              {services.filter((service) => service.is_active !== false).map((service) => (
-                <option key={service.id} value={service.id}>{service.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        {showTag && (
-          <label className="reporting-filters__field">
-            {tagKind === 'waitlist' ? 'Waitlist tag' : 'Client tag'}
-            <select className="paper-input" value={tagId} onChange={(event) => setTagId(event.target.value)}>
-              <option value="">All tags</option>
-              {tagOptions.map((tag) => (
-                <option key={tag.id} value={tag.id}>{tag.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
-      </div>
-      <p className="text-muted reporting-note">{FILTER_NOTE[section]}</p>
+      <ReportingFilterBar
+        today={today}
+        section={section}
+        draft={draft}
+        applied={applied}
+        services={services}
+        tagOptions={tagOptions}
+        showTag={showTag}
+        tagKind={tagKind}
+        userId={userId}
+        onDraft={setDraft}
+        onRun={setApplied}
+      />
 
       <div className="finance-tabs" role="tablist" aria-label="Reporting sections">
         {SECTIONS.map((item) => (
@@ -286,6 +270,7 @@ export default function ReportingPage() {
           episodes={episodesQuery.data || []}
           range={range}
           tagId={tagId}
+          serviceId={serviceId}
           tagsByClient={tagsByClient}
         />
       )}
@@ -298,6 +283,10 @@ export default function ReportingPage() {
           tagId={tagId}
           serviceId={serviceId}
           today={today}
+          placements={placementsQuery.data || EMPTY_LIST}
+          clients={clientsQuery.data || EMPTY_LIST}
+          appointments={appointmentsQuery.data || EMPTY_LIST}
+          tagsByClient={tagsByClient}
         />
       )}
       {section === 'practice' && (
@@ -320,51 +309,343 @@ export default function ReportingPage() {
   )
 }
 
+const SAVED_FILTERS_KEY = 'reporting-saved-filters'
+
+function readSavedFilters(userId) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(`${SAVED_FILTERS_KEY}:${userId || 'local'}`) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeSavedFilters(userId, rows) {
+  localStorage.setItem(`${SAVED_FILTERS_KEY}:${userId || 'local'}`, JSON.stringify(rows))
+}
+
+function presetRange(preset, today) {
+  if (preset === 'week') return rollingWeekRange(today)
+  if (preset === 'month') return monthToDateRange(today)
+  return quarterToDateRange(today)
+}
+
+function ReportingFilterBar({ today, section, draft, applied, services, tagOptions, showTag, tagKind, userId, onDraft, onRun }) {
+  const prompt = usePrompt()
+  const rootRef = useRef(null)
+  const [menu, setMenu] = useState(null)
+  const [query, setQuery] = useState('')
+  const [saved, setSaved] = useState([])
+
+  useEffect(() => {
+    if (!menu) return undefined
+    const onKey = (event) => {
+      if (event.key === 'Escape') setMenu(null)
+    }
+    const onPointer = (event) => {
+      if (rootRef.current?.contains(event.target)) return
+      setMenu(null)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onPointer)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onPointer)
+    }
+  }, [menu])
+
+  const choices = [
+    { id: 'dates', label: 'Date range', enabled: !draft.datesOn },
+    { id: 'service', label: 'Service', enabled: !draft.serviceOn },
+    { id: 'client-tag', label: 'Client tag', enabled: showTag && tagKind === 'client' && !draft.tagOn },
+    { id: 'waitlist-tag', label: 'Waitlist tag', enabled: section === 'waitlist' && !draft.tagOn },
+  ]
+  const visibleChoices = choices.filter((choice) => choice.label.toLowerCase().includes(query.trim().toLowerCase()))
+  const activePreset = ['week', 'month', 'quarter'].find((preset) => {
+    const next = presetRange(preset, today)
+    return next.from === draft.range.from && next.to === draft.range.to
+  })
+  const pendingService = draft.serviceOn ? draft.serviceId : ''
+  const pendingTag = draft.tagOn && showTag ? draft.tagId : ''
+  const dirty = Boolean(draft.datesOn) !== Boolean(applied.datesOn)
+    || (draft.datesOn && (draft.range.from !== applied.range.from || draft.range.to !== applied.range.to))
+    || pendingService !== applied.serviceId
+    || pendingTag !== applied.tagId
+
+  const openMenu = (next) => {
+    setSaved(readSavedFilters(userId))
+    setMenu((current) => (current === next ? null : next))
+    setQuery('')
+  }
+
+  const addChoice = (choice) => {
+    if (!choice.enabled) return
+    if (choice.id === 'dates') onDraft((current) => ({ ...current, datesOn: true, range: presetRange('week', today) }))
+    if (choice.id === 'service') onDraft((current) => ({ ...current, serviceOn: true }))
+    if (choice.id === 'client-tag' || choice.id === 'waitlist-tag') onDraft((current) => ({ ...current, tagOn: true, tagId: '' }))
+    setMenu(null)
+    setQuery('')
+  }
+
+  const run = () => {
+    onRun({
+      datesOn: draft.datesOn,
+      range: draft.range,
+      serviceId: pendingService,
+      tagId: pendingTag,
+    })
+    setMenu(null)
+  }
+
+  const save = async () => {
+    const name = await prompt({ title: 'Save filters', label: 'Name these filters', confirmLabel: 'Save' })
+    const trimmed = String(name || '').trim()
+    if (!trimmed) return
+    const next = readSavedFilters(userId).filter((item) => item.name !== trimmed)
+    next.push({
+      id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now()),
+      name: trimmed,
+      datesOn: draft.datesOn,
+      range: draft.range,
+      serviceOn: draft.serviceOn,
+      serviceId: draft.serviceId,
+      tagOn: draft.tagOn,
+      tagId: draft.tagId,
+    })
+    writeSavedFilters(userId, next)
+    setSaved(next)
+    setMenu(null)
+  }
+
+  const load = (item) => {
+    onDraft({
+      datesOn: item.datesOn != null ? Boolean(item.datesOn) : Boolean(item.range?.from),
+      range: item.range?.from && item.range?.to ? item.range : draft.range,
+      serviceOn: Boolean(item.serviceOn),
+      serviceId: item.serviceId || '',
+      tagOn: Boolean(item.tagOn) && showTag,
+      tagId: showTag ? (item.tagId || '') : '',
+    })
+    setMenu(null)
+  }
+
+  const removeSaved = (id) => {
+    const next = readSavedFilters(userId).filter((item) => item.id !== id)
+    writeSavedFilters(userId, next)
+    setSaved(next)
+  }
+
+  return (
+    <div ref={rootRef}>
+      <div className="reporting-bar">
+        <div className="reporting-menu">
+          <button
+            type="button"
+            className="secondary"
+            aria-expanded={menu === 'add'}
+            onClick={() => openMenu('add')}
+          >
+            Add filter
+          </button>
+          {menu === 'add' && (
+            <div className="reporting-menu__panel" role="dialog" aria-label="Add filter">
+              <div className="reporting-menu__search">
+                <input
+                  className="paper-input"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-label="Find a filter"
+                  autoFocus
+                />
+              </div>
+              {visibleChoices.length === 0 && <p className="reporting-menu__empty">No matching filters.</p>}
+              {visibleChoices.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  className="reporting-menu__item"
+                  disabled={!choice.enabled}
+                  onClick={() => addChoice(choice)}
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button type="button" className="secondary" onClick={save}>Save filters</button>
+        <div className="reporting-menu">
+          <button
+            type="button"
+            className="secondary"
+            aria-expanded={menu === 'load'}
+            onClick={() => openMenu('load')}
+          >
+            Load filters
+          </button>
+          {menu === 'load' && (
+            <div className="reporting-menu__panel" role="dialog" aria-label="Load filters">
+              {saved.length === 0 && <p className="reporting-menu__empty">No saved filters.</p>}
+              {saved.map((item) => (
+                <div key={item.id} className="reporting-menu__row">
+                  <button type="button" className="reporting-menu__item" onClick={() => load(item)}>{item.name}</button>
+                  <button type="button" className="reporting-menu__delete" aria-label={`Delete ${item.name}`} onClick={() => removeSaved(item.id)}>
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {(draft.datesOn || draft.serviceOn || (draft.tagOn && showTag)) && (
+          <>
+        {draft.datesOn && (
+          <div className="reporting-filter-row">
+            <span className="reporting-filter-row__name">Date range</span>
+            <select
+              className="paper-input reporting-filter-row__preset"
+              aria-label="Date preset"
+              value={activePreset || 'custom'}
+              onChange={(event) => {
+                const preset = event.target.value
+                if (preset === 'custom') return
+                onDraft((current) => ({ ...current, range: presetRange(preset, today) }))
+              }}
+            >
+              <option value="week">Rolling week</option>
+              <option value="month">This month</option>
+              <option value="quarter">This quarter</option>
+              <option value="custom">Custom</option>
+            </select>
+            <input
+              className="paper-input"
+              type="date"
+              aria-label="From"
+              value={draft.range.from}
+              onChange={(event) => onDraft((current) => ({ ...current, range: { ...current.range, from: event.target.value } }))}
+            />
+            <span className="reporting-filter-row__hint" aria-hidden="true">–</span>
+            <input
+              className="paper-input"
+              type="date"
+              aria-label="To"
+              value={draft.range.to}
+              onChange={(event) => onDraft((current) => ({ ...current, range: { ...current.range, to: event.target.value } }))}
+            />
+            <button
+              type="button"
+              className="secondary reporting-filter-row__remove"
+              aria-label="Remove date range"
+              onClick={() => onDraft((current) => ({ ...current, datesOn: false }))}
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {draft.serviceOn && (
+          <div className="reporting-filter-row">
+            <span className="reporting-filter-row__name">Service</span>
+            <select
+              className="paper-input"
+              aria-label="Service"
+              value={draft.serviceId}
+              onChange={(event) => onDraft((current) => ({ ...current, serviceId: event.target.value }))}
+            >
+              <option value="">All services</option>
+              {services.filter((service) => service.is_active !== false).map((service) => (
+                <option key={service.id} value={service.id}>{service.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="secondary reporting-filter-row__remove"
+              aria-label="Remove service filter"
+              onClick={() => onDraft((current) => ({ ...current, serviceOn: false, serviceId: '' }))}
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {draft.tagOn && showTag && (
+          <div className="reporting-filter-row">
+            <span className="reporting-filter-row__name">{tagKind === 'waitlist' ? 'Waitlist tag' : 'Client tag'}</span>
+            <select
+              className="paper-input"
+              aria-label={tagKind === 'waitlist' ? 'Waitlist tag' : 'Client tag'}
+              value={draft.tagId}
+              onChange={(event) => onDraft((current) => ({ ...current, tagId: event.target.value }))}
+            >
+              <option value="">All tags</option>
+              {tagOptions.map((tag) => (
+                <option key={tag.id} value={tag.id}>{tag.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="secondary reporting-filter-row__remove"
+              aria-label="Remove tag filter"
+              onClick={() => onDraft((current) => ({ ...current, tagOn: false, tagId: '' }))}
+            >
+              ×
+            </button>
+          </div>
+        )}
+          </>
+        )}
+        <button type="button" className="primary reporting-bar__run" onClick={run} aria-label={dirty ? 'Run report with these filters' : 'Run report'}>
+          Run report
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function Overview({ summary, efficiency }) {
+  const rows = summary.byService.map((row) => ({
+    id: row.serviceId,
+    filterValues: { service: row.name },
+    sortValues: {
+      service: row.name,
+      hours: row.minutes,
+      attended: row.sessions,
+      fees: row.earnedPence,
+    },
+    cells: {
+      service: row.name,
+      hours: formatHoursFromMinutes(row.minutes),
+      attended: row.sessions,
+      fees: formatGbpFromPence(row.earnedPence),
+    },
+  }))
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
-        <Stat label="Hours delivered" value={formatHoursFromMinutes(summary.deliveredMinutes)} detail="Attended sessions" />
+      <div className="reporting-metrics">
+        <Stat label="Hours delivered" value={formatHoursFromMinutes(summary.deliveredMinutes)} help="Attended sessions." />
         <Stat
           label="Sessions attended"
           value={summary.attended}
           detail={`${summary.dna} did not attend · ${summary.cancelled} cancelled`}
         />
-        <Stat label="Fees" value={formatGbpFromPence(summary.earnedPence)} detail="Attended, cancelled, and DNA, after the policy" />
-        <Stat label="Notes to finish" value={summary.notesToFinish} detail="Attended sessions without a signed Process Note" />
+        <Stat label="Fees" value={formatGbpFromPence(summary.earnedPence)} help="Attended, cancelled, and DNA, after the cancellation policy." />
+        <Stat label="Notes to finish" value={summary.notesToFinish} help="Attended sessions without a signed Process Note." />
         <Stat
           label="Efficiency"
           value={efficiency.rate == null ? '—' : `${efficiency.rate}%`}
+          help="Appointment, support, and admin time as a percentage of availability minus busy time. Open time is what is left after that."
           detail={`${formatHoursFromMinutes(efficiency.used)} used · ${formatHoursFromMinutes(efficiency.open)} open`}
         />
       </div>
-      <p className="text-muted reporting-note">
-        Efficiency is appointment, support, and admin time as a percentage of availability minus busy time.
-        Open time is what is left after that.
-      </p>
-      <table className="reporting-table">
-        <thead>
-          <tr>
-            <th>Service</th>
-            <th>Hours</th>
-            <th>Attended</th>
-            <th>Fees</th>
-          </tr>
-        </thead>
-        <tbody>
-          {summary.byService.length === 0 && (
-            <tr><td colSpan={4}>Nothing in these dates.</td></tr>
-          )}
-          {summary.byService.map((row) => (
-            <tr key={row.serviceId}>
-              <td>{row.name}</td>
-              <td>{formatHoursFromMinutes(row.minutes)}</td>
-              <td>{row.sessions}</td>
-              <td>{formatGbpFromPence(row.earnedPence)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <RecordTable
+        columns={[
+          { key: 'service', label: 'Service', filter: 'choice', sort: 'text' },
+          { key: 'hours', label: 'Hours', sort: 'number' },
+          { key: 'attended', label: 'Attended', sort: 'number' },
+          { key: 'fees', label: 'Fees', sort: 'number' },
+        ]}
+        rows={rows}
+        countNoun="services"
+        emptyMessage="Nothing in these dates."
+      />
     </div>
   )
 }
@@ -397,9 +678,24 @@ function AppointmentsSection({ summary }) {
   }))
   return (
     <div className="reporting-section">
-      <p className="reporting-note">
-        {signed} of {summary.attended} attended sessions have a signed Process Note.
-      </p>
+      <div className="reporting-metrics">
+        <Stat
+          label="Sessions attended"
+          value={summary.attended}
+          detail={`${summary.dna} did not attend · ${summary.cancelled} cancelled`}
+        />
+        <Stat
+          label="Signed notes"
+          value={signed}
+          detail={`of ${summary.attended} attended`}
+          help="Attended sessions with a signed Process Note."
+        />
+        <Stat
+          label="Notes to finish"
+          value={summary.notesToFinish}
+          help="Attended sessions without a signed Process Note."
+        />
+      </div>
       <RecordTable
         columns={[
           { key: 'date', label: 'Date', sort: 'text' },
@@ -416,12 +712,19 @@ function AppointmentsSection({ summary }) {
   )
 }
 
-function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByClient }) {
+function ClientsSection({ clients, appointments, episodes, range, tagId, serviceId, tagsByClient }) {
+  const clientsForService = new Set()
+  for (const appointment of appointments) {
+    if (!isClientSession(appointment) || !appointment.clientId) continue
+    if (serviceId && appointment.serviceId !== serviceId) continue
+    clientsForService.add(appointment.clientId)
+  }
+  const onService = (clientId) => !serviceId || clientsForService.has(clientId)
   const seen = new Map()
   for (const appointment of appointments) {
-    if (appointment.externalBusy || appointment.blockRole === 'busy' || appointment.blockRole === 'support' || appointment.blockRole === 'admin') continue
-    if (appointment.attendance === 'cancelled') continue
+    if (!isClientSession(appointment)) continue
     if (!inDateRange(appointment.sessionDate, range)) continue
+    if (serviceId && appointment.serviceId !== serviceId) continue
     if (!matchesClientTag(appointment.clientId, tagId, tagsByClient)) continue
     if (!appointment.clientId) continue
     const current = seen.get(appointment.clientId) || { sessions: 0, last: appointment.sessionDate }
@@ -429,7 +732,7 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByC
     if (appointment.sessionDate > current.last) current.last = appointment.sessionDate
     seen.set(appointment.clientId, current)
   }
-  const tagged = (client) => matchesClientTag(client.id, tagId, tagsByClient)
+  const tagged = (client) => matchesClientTag(client.id, tagId, tagsByClient) && onService(client.id)
   const active = clients.filter((client) => client.status === 'active' && tagged(client))
   const newcomers = clients.filter((client) => (
     tagged(client)
@@ -442,6 +745,7 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByC
     episode.status === 'discharged'
     && inDateRange(episode.end_date || '', range)
     && matchesClientTag(episode.client_id, tagId, tagsByClient)
+    && onService(episode.client_id)
   ))
   const byId = new Map(clients.map((client) => [client.id, client]))
   const rows = [...seen.entries()].map(([id, info]) => {
@@ -460,7 +764,7 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByC
   })
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
+      <div className="reporting-metrics">
         <Stat label="Active now" value={active.length} />
         <Stat label="Seen in these dates" value={seen.size} />
         <Stat label="New in these dates" value={newcomers.length} />
@@ -480,7 +784,7 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, tagsByC
   )
 }
 
-function WaitlistSection({ people, tags, services, range, tagId, serviceId, today }) {
+function WaitlistSection({ people, tags, services, range, tagId, serviceId, today, placements, clients, appointments, tagsByClient }) {
   const tagById = new Map(tags.map((tag) => [tag.id, tag]))
   const serviceById = new Map(services.map((service) => [service.id, service]))
   const matching = people.filter((person) => (
@@ -488,6 +792,7 @@ function WaitlistSection({ people, tags, services, range, tagId, serviceId, toda
     && (!serviceId || person.serviceId === serviceId)
   ))
   const joined = matching.filter((person) => inDateRange(String(person.createdAt || '').slice(0, 10), range))
+  const left = leftWaitlistInRange({ placements, clients, appointments, range, tagId, serviceId, tagsByClient })
   const average = averageWaitDays(matching.map((person) => person.createdAt), today)
   const rows = matching.map((person) => {
     const labels = (person.tagIds || []).map((id) => tagById.get(id)).filter(Boolean)
@@ -509,10 +814,15 @@ function WaitlistSection({ people, tags, services, range, tagId, serviceId, toda
   })
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
+      <div className="reporting-metrics">
         <Stat label="On the waitlist now" value={matching.length} />
         <Stat label="Joined in these dates" value={joined.length} />
-        <Stat label="Average days waiting" value={average == null ? '—' : average} detail="People on the waitlist now" />
+        <Stat
+          label="Left in these dates"
+          value={left}
+          help="Booked into the diary in these dates, and no longer on the waitlist."
+        />
+        <Stat label="Average days waiting" value={average == null ? '—' : average} help="People on the waitlist now, counted to today." />
       </div>
       <RecordTable
         columns={[
@@ -561,8 +871,8 @@ function PracticeSection({ cpd, supervision, appointments, range, serviceId }) {
   }))
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
-        <Stat label="Clinical hours" value={formatHoursFromMinutes(clinical)} detail="Attended appointments" />
+      <div className="reporting-metrics">
+        <Stat label="Clinical hours" value={formatHoursFromMinutes(clinical)} help="Attended appointments." />
         <Stat label="CPD" value={formatHoursFromMinutes(cpdMinutes)} />
         <Stat
           label="Supervision"
@@ -608,12 +918,13 @@ function FinanceSection({ summary, invoices, range }) {
   }))
   return (
     <div className="reporting-section">
-      <div className="section-card__stat-row">
+      <div className="reporting-metrics">
         <Stat label="Money earned" value={formatGbpFromPence(summary.earnedPence)} />
         <Stat
           label="Outstanding invoices"
           value={formatGbpFromPence(outstandingPence)}
-          detail={outstanding.length ? `${outstanding.length} awaiting payment in these dates` : 'Awaiting payment in these dates'}
+          help="Issued in these dates and not yet paid."
+          detail={outstanding.length ? `${outstanding.length} awaiting payment` : ''}
         />
         <Stat label="Sessions not yet invoiced" value={uninvoiced.length} />
       </div>
@@ -633,13 +944,31 @@ function FinanceSection({ summary, invoices, range }) {
   )
 }
 
-function Stat({ label, value, detail }) {
+function Stat({ label, value, detail, help }) {
   return (
-    <div className="section-card__stat">
-      <span className="section-card__stat-value">{value}</span>
-      <span className="section-card__stat-label">{label}</span>
-      {detail ? <span className="reporting-stat__detail">{detail}</span> : null}
+    <div className="reporting-metric">
+      <div className="reporting-metric__label">
+        <span>{label}</span>
+        {help ? <MetricInfo text={help} label={`About ${label}`} /> : null}
+      </div>
+      <div className="reporting-metric__value">{value}</div>
+      <div className="reporting-metric__detail">{detail || '\u00a0'}</div>
     </div>
+  )
+}
+
+function MetricInfo({ text, label }) {
+  const tipId = useId()
+  return (
+    <span className="reporting-metric__info">
+      <button type="button" className="reporting-metric__info-btn" aria-label={label} aria-describedby={tipId}>
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden focusable="false">
+          <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.4" />
+          <path fill="currentColor" d="M7.2 7.05h1.6V11.7H7.2zM7.2 4.25h1.6V5.85H7.2z" />
+        </svg>
+      </button>
+      <span id={tipId} className="reporting-metric__tip" role="tooltip">{text}</span>
+    </span>
   )
 }
 
@@ -669,6 +998,46 @@ function toReportAppointment(appointment, serviceById, client) {
     priceNote: price.phrase,
     feeIncludesVat: Boolean(service?.fee_includes_vat),
   }
+}
+
+function isClientSession(appointment) {
+  if (appointment.externalBusy || appointment.blockRole === 'busy' || appointment.blockRole === 'support' || appointment.blockRole === 'admin') return false
+  if (appointment.attendance === 'cancelled') return false
+  return true
+}
+
+function leftWaitlistInRange({ placements, clients, appointments, range, tagId, serviceId, tagsByClient }) {
+  const clientById = new Map(clients.map((client) => [client.id, client]))
+  const bookedOn = new Map()
+  for (const appointment of appointments) {
+    if (!appointment.client_id || appointment.is_external_busy) continue
+    const role = appointment.block_role || 'client_session'
+    if (role !== 'client_session') continue
+    const booked = String(appointment.created_at || '').slice(0, 10)
+    if (!booked) continue
+    const dates = bookedOn.get(appointment.client_id) || []
+    dates.push(booked)
+    bookedOn.set(appointment.client_id, dates)
+  }
+  return placements.filter((placement) => {
+    const client = clientById.get(placement.client_id)
+    if (!client || client.status === 'waitlist' || client.status === 'screener' || client.status === 'rejected') return false
+    if (serviceId && placement.service_id !== serviceId) return false
+    if (!matchesClientTag(placement.client_id, tagId, tagsByClient)) return false
+    const placedOn = String(placement.created_at || '').slice(0, 10)
+    const leftOn = (bookedOn.get(placement.client_id) || [])
+      .filter((date) => !placedOn || date >= placedOn)
+      .sort()[0]
+    return Boolean(leftOn && inDateRange(leftOn, range))
+  }).length
+}
+
+async function listWaitlistPlacements() {
+  const supabase = getSupabase()
+  if (!supabase) return []
+  const { data, error } = await supabase.from('waitlist_placements').select('client_id, service_id, created_at')
+  if (error) throw error
+  return data || []
 }
 
 async function listClientTagLinks() {
