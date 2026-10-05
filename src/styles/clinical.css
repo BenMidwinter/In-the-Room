@@ -353,7 +353,7 @@ select.paper-input {
   display: inline-block;
   padding: 0.2rem 0.55rem;
   border-radius: var(--radius-sm);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   font-weight: 600;
 }
 
@@ -361,8 +361,8 @@ a.badge {
   text-decoration: none;
 }
 
-.badge-green { background: #e6f4ea; color: #1e7e34; border: 1px solid #b7dfc4; }
-.badge-grey { background: var(--bg-page); color: var(--txt-muted); border: 1px solid var(--border-color); }
+.badge-green { background: #e6f4ea; color: #0d4f2b; border: 1px solid #0d4f2b; }
+.badge-grey { background: var(--bg-page); color: var(--text-primary); border: 1px solid var(--border-strong); }
 .badge-blue { background: var(--col-primary-light); color: var(--col-primary-dark); border: 1px solid #b8e4f2; }
 
 .tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 1.5rem; }

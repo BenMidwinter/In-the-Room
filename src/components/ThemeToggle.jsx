@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   THEME_GROUPS,
+  applyReading,
   applyTheme,
+  getStoredReading,
   getStoredThemeId,
   getThemeGroupId,
 } from '../lib/themeEngine'
@@ -34,6 +36,7 @@ function ChevronIcon({ open }) {
 
 export default function ThemeToggle() {
   const [themeId, setThemeId] = useState(getStoredThemeId)
+  const [reading, setReading] = useState(getStoredReading)
   const [open, setOpen] = useState(false)
   const [expandedGroupId, setExpandedGroupId] = useState(() => getThemeGroupId(getStoredThemeId()))
   const rootRef = useRef(null)
@@ -51,6 +54,11 @@ export default function ThemeToggle() {
     const applied = applyTheme(id)
     setThemeId(applied)
     setExpandedGroupId(getThemeGroupId(applied))
+  }
+
+  const setReadingPref = (key, value) => {
+    const next = applyReading({ ...reading, [key]: value })
+    setReading(next)
   }
 
   const toggleMenu = () => {
@@ -101,6 +109,7 @@ export default function ThemeToggle() {
                 </button>
                 {isExpanded && (
                   <ul className="theme-toggle__list theme-toggle__accordion-panel">
+                    {group.note ? <li className="theme-toggle__group-note">{group.note}</li> : null}
                     {group.themes.map(theme => (
                       <li key={theme.id}>
                         <button
@@ -121,6 +130,31 @@ export default function ThemeToggle() {
               </div>
             )
           })}
+          <div className="theme-toggle__reading">
+            <p className="theme-toggle__menu-title">Keep this theme</p>
+            <label className="theme-toggle__switch">
+              <input
+                type="checkbox"
+                checked={reading.strongerText}
+                onChange={(event) => setReadingPref('strongerText', event.target.checked)}
+              />
+              <span>
+                <span className="theme-toggle__option-label">Stronger text</span>
+                <span className="theme-toggle__option-hint">Darker hints, labels, and borders</span>
+              </span>
+            </label>
+            <label className="theme-toggle__switch">
+              <input
+                type="checkbox"
+                checked={reading.plainType}
+                onChange={(event) => setReadingPref('plainType', event.target.checked)}
+              />
+              <span>
+                <span className="theme-toggle__option-label">Plain type</span>
+                <span className="theme-toggle__option-hint">Atkinson Hyperlegible, with wider line spacing</span>
+              </span>
+            </label>
+          </div>
         </div>
       )}
     </div>
