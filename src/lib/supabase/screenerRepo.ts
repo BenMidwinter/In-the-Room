@@ -13,14 +13,17 @@ export const TAG_COLOURS = [
   { value: '#5c6b73', label: 'Slate' },
 ] as const
 
+const TAG_HEX = /^#[0-9a-f]{6}$/
+
 export function tagColour(value: string | null | undefined): string {
-  const normalised = String(value || '').toLowerCase()
-  return TAG_COLOURS.find((row) => row.value === normalised)?.value || TAG_COLOURS[6].value
+  const normalised = String(value || '').trim().toLowerCase()
+  if (TAG_HEX.test(normalised)) return normalised
+  return TAG_COLOURS[6].value
 }
 
 export function tagColourLabel(value: string | null | undefined): string {
   const colour = tagColour(value)
-  return TAG_COLOURS.find((row) => row.value === colour)?.label || 'Slate'
+  return TAG_COLOURS.find((row) => row.value === colour)?.label || 'Custom'
 }
 
 export type TagRecord = {

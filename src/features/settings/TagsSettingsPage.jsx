@@ -146,6 +146,15 @@ function TagList({ kind, title, description }) {
                     onClick={() => setColor(swatch.value)}
                   />
                 ))}
+                <label className={TAG_COLOURS.some((swatch) => swatch.value === color) ? 'tag-colour-picker__wheel' : 'tag-colour-picker__wheel is-on'}>
+                  <input
+                    type="color"
+                    value={color}
+                    aria-label="Colour wheel"
+                    onChange={(event) => setColor(event.target.value.toLowerCase())}
+                  />
+                  <span>Colour wheel</span>
+                </label>
               </div>
             </fieldset>
           </form>

@@ -265,7 +265,7 @@ export default function FormsSettingsPage() {
       <SettingsSectionCard
         blockId="settings_forms"
         title="Forms"
-        description="A form you send is added on a course. A shared form can be copied as a link or an embed. Open a shared form, or use its menu, to place the person on the screener."
+        description="A form you send is added on a course. A shared form can be copied as a link or an embed. Open the form and use the settings wheel for the screener, auto fill, and email."
       >
         <RecordTable
           headerAction={(

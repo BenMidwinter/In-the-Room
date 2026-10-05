@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import FormOverlay from '../../components/FormOverlay'
 import { useConfirm, useToast } from '../../components/ui'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { CLIENT_BINDS, bindLabel, blankForm, moveListItem, newFormId } from '../../lib/formModel'
@@ -140,10 +141,95 @@ function PaletteButton({ spec, onAdd }) {
   )
 }
 
+function SettingsWheel() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden focusable="false">
+      <path
+        fill="currentColor"
+        d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.2 7.2 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.22-1.13.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.22 1.13-.53 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
+      />
+    </svg>
+  )
+}
+
+function FormSettings({ draft, onChange, onClose }) {
+  const screenerLocked = Boolean(draft.id) && draft.audience !== 'public'
+  const autofillLocked = draft.audience === 'public'
+  return (
+    <FormOverlay
+      title="Form settings"
+      eyebrow={draft.name.trim() || 'New form'}
+      meta="These apply when you save the form."
+      size="sm"
+      onClose={onClose}
+      footer={(
+        <div className="form-actions">
+          <button type="button" className="primary" onClick={onClose}>Done</button>
+        </div>
+      )}
+    >
+      <div className="form-group">
+        <label htmlFor="form-screener">Place the person on the screener</label>
+        <select
+          id="form-screener"
+          className="paper-input"
+          value={draft.placeOnScreener ? 'yes' : 'no'}
+          disabled={screenerLocked}
+          onChange={(event) => {
+            const yes = event.target.value === 'yes'
+            onChange({
+              ...draft,
+              placeOnScreener: yes,
+              audience: yes && !draft.id ? 'public' : draft.audience,
+            })
+          }}
+        >
+          <option value="no">No</option>
+          <option value="yes">Yes</option>
+        </select>
+        <p className="form-designer__hint">
+          {draft.audience === 'public'
+            ? 'Yes creates the client, opens a course, and puts them on the screener when they send the form.'
+            : screenerLocked
+              ? 'A shared form places someone new on the screener. This form is sent to a client you already see.'
+              : 'Yes shares this form as a link. Someone new who sends it is added to the screener.'}
+        </p>
+      </div>
+      <div className="form-group">
+        <label htmlFor="form-autofill">Auto fill client details</label>
+        <select
+          id="form-autofill"
+          className="paper-input"
+          value={autofillLocked || draft.autofillClient === false ? 'no' : 'yes'}
+          disabled={autofillLocked}
+          onChange={(event) => onChange({ ...draft, autofillClient: event.target.value === 'yes' })}
+        >
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+        <p className="form-designer__hint">
+          {autofillLocked
+            ? 'Name, date of birth, and the other profile fields already on the form are filled in when you send a form to a client you already see.'
+            : 'Name, date of birth, and the other profile fields already on the form are filled in when you send it.'}
+        </p>
+      </div>
+      <fieldset className="form-group" disabled>
+        <legend>Email notification</legend>
+        <label className="form-builder__required">
+          <input type="checkbox" disabled />
+          Email me when someone sends this form
+        </label>
+        <p className="form-designer__hint">This is not available yet.</p>
+      </fieldset>
+    </FormOverlay>
+  )
+}
+
 function FormDesigner({ draft, onChange, measures, userId }) {
   const navigate = useNavigate()
   const toast = useToast()
   const confirm = useConfirm()
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const save = useSaveFormMutation(userId)
   const remove = useDeleteFormMutation(userId)
   const letterheadsQuery = useQuery({
@@ -251,6 +337,10 @@ function FormDesigner({ draft, onChange, measures, userId }) {
         <span className={`badge ${published ? 'badge-green' : 'badge-grey'}`}>
           {published ? 'Published' : 'Draft'}
         </span>
+        <button type="button" className="secondary form-designer__settings" onClick={() => setSettingsOpen(true)}>
+          <SettingsWheel />
+          Settings
+        </button>
         {!published && (
           <button type="button" className="secondary" onClick={() => persist(false)} disabled={save.isPending}>
             Save draft
@@ -318,51 +408,6 @@ function FormDesigner({ draft, onChange, measures, userId }) {
               </select>
             </div>
             <div className="form-group" style={{ marginTop: '0.8rem' }}>
-              <label htmlFor="form-screener">Place the person on the screener</label>
-              <select
-                id="form-screener"
-                className="paper-input"
-                value={draft.placeOnScreener ? 'yes' : 'no'}
-                disabled={Boolean(draft.id) && draft.audience !== 'public'}
-                onChange={(event) => {
-                  const yes = event.target.value === 'yes'
-                  onChange({
-                    ...draft,
-                    placeOnScreener: yes,
-                    audience: yes && !draft.id ? 'public' : draft.audience,
-                  })
-                }}
-              >
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
-              <p className="form-designer__hint">
-                {draft.audience === 'public'
-                  ? 'Yes creates the client, opens a course, and puts them on the screener when they send the form.'
-                  : draft.id
-                    ? 'A shared form places someone new on the screener. This form is sent to a client you already see.'
-                    : 'Yes shares this form as a link. Someone new who sends it is added to the screener.'}
-              </p>
-            </div>
-            <div className="form-group" style={{ marginTop: '0.8rem' }}>
-              <label htmlFor="form-autofill">Auto fill client details</label>
-              <select
-                id="form-autofill"
-                className="paper-input"
-                value={draft.audience === 'public' || draft.autofillClient === false ? 'no' : 'yes'}
-                disabled={draft.audience === 'public'}
-                onChange={(event) => onChange({ ...draft, autofillClient: event.target.value === 'yes' })}
-              >
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </select>
-              <p className="form-designer__hint">
-                {draft.audience === 'public'
-                  ? 'Name, date of birth, and the other profile fields already on the form are filled in when you send a form to a client you already see.'
-                  : 'Name, date of birth, and the other profile fields already on the form are filled in when you send it.'}
-              </p>
-            </div>
-            <div className="form-group" style={{ marginTop: '0.8rem' }}>
               <label htmlFor="form-letterhead">Letterhead</label>
               <select
                 id="form-letterhead"
@@ -380,8 +425,13 @@ function FormDesigner({ draft, onChange, measures, userId }) {
               {draft.audience === 'public'
                 ? 'Publish this, then copy the link or the embed from the forms list. The letterhead sits at the top of the form and the PDF.'
                 : 'Add a published form from the client’s course. A draft cannot be added there.'}
+              {' '}
+              The settings wheel holds the screener, auto fill, and email notification.
             </p>
           </div>
+          {settingsOpen ? (
+            <FormSettings draft={draft} onChange={onChange} onClose={() => setSettingsOpen(false)} />
+          ) : null}
           {schema.blocks.map((block, index) => (
             <div
               key={block.id}

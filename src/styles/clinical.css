@@ -2286,6 +2286,49 @@ button.agenda-event {
   box-shadow: 0 0 0 2px #fffdf8, 0 0 0 4px #241f1a;
 }
 
+.tag-colour-picker__wheel {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: 0.25rem;
+  color: var(--txt-body);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.tag-colour-picker__wheel input[type="color"] {
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(36, 31, 26, 0.18);
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.tag-colour-picker__wheel input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.tag-colour-picker__wheel input[type="color"]::-webkit-color-swatch {
+  border: 0;
+  border-radius: 999px;
+}
+
+.tag-colour-picker__wheel.is-on input[type="color"] {
+  border-color: #241f1a;
+  box-shadow: 0 0 0 2px #fffdf8, 0 0 0 4px #241f1a;
+}
+
+.form-designer__settings {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .record-table__col--swatch {
   width: 4.5rem;
 }

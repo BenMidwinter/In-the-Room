@@ -41,7 +41,7 @@ function PlacementEditor({ person, mode, services, tags, onClose, onSaved }) {
         clientId: person.id,
         preferredTimes,
         information,
-        serviceId: serviceId || null,
+        serviceId: services.some((service) => service.id === serviceId) ? serviceId : null,
         tagIds,
         accept: mode === 'accept',
       })
@@ -79,14 +79,14 @@ function PlacementEditor({ person, mode, services, tags, onClose, onSaved }) {
         />
       </div>
       <div className="form-group">
-        <label htmlFor="waitlist-session">Session</label>
+        <label htmlFor="waitlist-session">Appointment type</label>
         <select
           id="waitlist-session"
           className="paper-input"
-          value={serviceId}
+          value={services.some((service) => service.id === serviceId) ? serviceId : ''}
           onChange={(event) => setServiceId(event.target.value)}
         >
-          <option value="">Choose a session</option>
+          <option value="">Choose an appointment type</option>
           {services.map((service) => (
             <option key={service.id} value={service.id}>{service.name}</option>
           ))}
@@ -163,7 +163,10 @@ export default function ScreenerPage() {
   })
   const people = (board.data || []).filter((person) => person.status === view)
   const tagById = new Map((tags.data || []).map((tag) => [tag.id, tag]))
-  const serviceName = new Map((services.data || []).map((service) => [service.id, service.name]))
+  const appointmentTypes = (services.data || []).filter((service) => (
+    service.service_type === 'appointment' && service.is_active !== false
+  ))
+  const serviceName = new Map(appointmentTypes.map((service) => [service.id, service.name]))
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ['screener-board'] })
@@ -241,7 +244,7 @@ export default function ScreenerPage() {
     { key: 'name', label: 'Name', filter: 'text' },
     { key: 'note', label: 'Form', filter: 'text' },
     { key: 'times', label: 'Preferred times', filter: 'text' },
-    { key: 'session', label: 'Session', filter: 'text' },
+    { key: 'session', label: 'Appointment type', filter: 'text' },
     { key: 'tags', label: 'Tags', filter: 'text' },
     { key: 'menu', label: '', sort: false, className: 'record-table__menu' },
   ]
@@ -293,7 +296,7 @@ export default function ScreenerPage() {
           key={`${editor.person.id}-${editor.mode}`}
           person={editor.person}
           mode={editor.mode}
-          services={services.data || []}
+          services={appointmentTypes}
           tags={tags.data || []}
           onClose={() => setEditor(null)}
           onSaved={() => {
