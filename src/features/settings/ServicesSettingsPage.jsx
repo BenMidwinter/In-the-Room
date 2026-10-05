@@ -7,6 +7,7 @@ import { useConfirm, useToast } from '../../components/ui'
 import FormOverlay from '../../components/FormOverlay'
 import RecordTable from '../../components/RecordTable'
 import { SERVICE_COLOR_PRESETS, normalizeServiceColor } from '../../lib/serviceColors'
+import { feePenceToInput, formatServiceFee, parseFeePounds } from '../../lib/money'
 
 const TYPE_LABELS = {
   appointment: 'Appointment',
@@ -19,6 +20,7 @@ const SERVICE_COLUMNS = [
   { key: 'name', label: 'Service', filter: 'text' },
   { key: 'type', label: 'Type', filter: 'choice' },
   { key: 'duration', label: 'Duration', sort: 'number' },
+  { key: 'price', label: 'Price', sort: 'number' },
   { key: 'follow', label: 'Follow-on', filter: 'text' },
   { key: 'meet', label: 'Meet', filter: 'choice' },
   { key: 'status', label: 'Status', filter: 'choice' },
@@ -36,6 +38,8 @@ const EMPTY_FORM = {
   buffer_minutes: 0,
   color: '#263e34',
   create_meet_link: false,
+  fee_pounds: '',
+  fee_includes_vat: false,
   is_active: true,
 }
 
@@ -60,6 +64,8 @@ function toForm(service) {
     buffer_minutes: service.buffer_minutes ?? 0,
     color: service.color || '#263e34',
     create_meet_link: Boolean(service.create_meet_link),
+    fee_pounds: feePenceToInput(service.fee_pence),
+    fee_includes_vat: Boolean(service.fee_includes_vat) && service.fee_pence != null,
     is_active: service.is_active !== false,
   }
 }
@@ -99,6 +105,11 @@ export default function ServicesSettingsPage() {
     setError(null)
     try {
       const slug = form.slug || slugify(form.name)
+      const fee = parseFeePounds(form.fee_pounds)
+      if (fee.error) {
+        setError(fee.error)
+        return
+      }
       await upsertService({
         ...(form.id ? { id: form.id } : {}),
         name: form.name.trim(),
@@ -112,6 +123,8 @@ export default function ServicesSettingsPage() {
         buffer_minutes: Number(form.buffer_minutes) || 0,
         color: normalizeServiceColor(form.color, form.service_type),
         create_meet_link: Boolean(form.create_meet_link),
+        fee_pence: fee.pence,
+        fee_includes_vat: fee.pence != null && form.fee_includes_vat,
         is_active: form.is_active !== false,
       })
       closeOverlay()
@@ -169,6 +182,8 @@ export default function ServicesSettingsPage() {
         buffer_minutes: service.buffer_minutes,
         color: service.color,
         create_meet_link: !service.create_meet_link,
+        fee_pence: service.fee_pence ?? null,
+        fee_includes_vat: Boolean(service.fee_includes_vat),
         is_active: service.is_active,
       })
       await writeAuditEvent({
@@ -194,6 +209,7 @@ export default function ServicesSettingsPage() {
     const meetLabel = service.service_type === 'appointment'
       ? (service.create_meet_link ? 'On' : 'Off')
       : ''
+    const priceLabel = formatServiceFee(service.fee_pence, service.fee_includes_vat)
     return {
       id: service.id,
       service,
@@ -209,6 +225,7 @@ export default function ServicesSettingsPage() {
         name: service.name,
         type: typeLabel,
         duration: Number(service.default_duration_minutes) || 0,
+        price: service.fee_pence == null ? -1 : Number(service.fee_pence),
         follow: followLabel,
         status: active ? 'Active' : 'Inactive',
       },
@@ -225,6 +242,7 @@ export default function ServicesSettingsPage() {
         ),
         type: typeLabel,
         duration: `${service.default_duration_minutes}m`,
+        price: priceLabel || <span className="record-table__cell-muted">—</span>,
         follow: followLabel || <span className="record-table__cell-muted">—</span>,
         meet: service.service_type === 'appointment' ? (
           <button
@@ -337,6 +355,33 @@ export default function ServicesSettingsPage() {
                 required
               />
             </label>
+            <div className="settings-form__field">
+              <span>Price (£)</span>
+              <input
+                className="paper-input"
+                inputMode="decimal"
+                placeholder="80.00"
+                value={form.fee_pounds}
+                onChange={(e) => setForm((f) => ({
+                  ...f,
+                  fee_pounds: e.target.value,
+                  fee_includes_vat: e.target.value.trim() ? f.fee_includes_vat : false,
+                }))}
+              />
+              <p className="settings-form__hint">Leave blank if this service is not billed.</p>
+            </div>
+            <label className="settings-service-list__meet">
+              <input
+                type="checkbox"
+                checked={Boolean(form.fee_includes_vat)}
+                disabled={!String(form.fee_pounds || '').trim()}
+                onChange={(e) => setForm((f) => ({ ...f, fee_includes_vat: e.target.checked }))}
+              />
+              Price includes VAT
+            </label>
+            <p className="settings-form__hint">
+              Turn this on when the price already includes VAT. Leave it off if you are not VAT registered, or if VAT is added on top.
+            </p>
             <div className="settings-form__field">
               <span>Colour</span>
               <div className="settings-service-colors">

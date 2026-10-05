@@ -1,16 +1,34 @@
 # In the Room — Product Roadmap
 
-Living plan for clinical product hardening, compliance, and infrastructure beyond the current calendar/caseload MVP.
+Living plan. The clinical workspace (caseload, calendar, notes, services, forms, screener, Google Calendar busy sync) is in use. The order below is the broader list.
 
 ---
 
-## Phase 1: Clinical Workspace Foundations (in progress)
+## 1. Missing features
 
-Core caseload, calendar, encrypted notes, services catalogue, and Google Calendar busy sync.
+- [ ] **Reporting.** A practice dashboard of hours, attendance, caseload, fees, and outcome totals. See the reporting notes in the product discussion. Do not invent population norms or clinical cutoffs.
+- [ ] **Invoicing.** Start by tallying hours and session totals from service prices. A full invoice, expenses, and accounting sync come after the tally.
+
+Service prices, including whether the price already includes VAT, live on each service.
+
+## 2. Data management
+
+- [ ] Private document storage in a London S3 bucket, linked to AWS, with short-lived upload and download links.
+- [ ] A caseload export the clinician can open, with clinical records decrypted for them.
+
+The decrypted export has to follow encryption. Hours, fees, and attendance can be exported before that, because they are not the clinical note.
+
+## 3. Encryption
+
+- [ ] Encrypt clinical records end to end: notes, letters, reports, form answers, and outcome totals.
+
+## 4. Login, DPA, and account security
+
+The data processing agreement belongs with this patch, including mandatory MFA. It waits until the three items above.
 
 ---
 
-## Phase 2: Authentication Hardening, DPA Governance, & Data Portability
+## Later detail: Authentication Hardening, DPA Governance, & Data Portability
 
 ### Account Security, Legal Compliance (DPA), & Caseload Portability
 
@@ -70,7 +88,7 @@ Core caseload, calendar, encrypted notes, services catalogue, and Google Calenda
 
 ---
 
-## Phase 2: Confidential Clinical Document Storage & Compliance
+## Later detail: Confidential document storage
 
 ### Low-Velocity Confidential Document Storage (AWS S3 + Supabase Architecture)
 

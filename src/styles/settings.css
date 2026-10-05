@@ -57,6 +57,16 @@
   letter-spacing: 0.03em;
 }
 
+.settings-form__hint {
+  margin: 0.15rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--txt-muted);
+  line-height: 1.45;
+}
+
 .settings-form__actions {
   display: flex;
   flex-wrap: wrap;

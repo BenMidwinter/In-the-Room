@@ -1428,6 +1428,8 @@ export type Database = {
           created_at: string
           default_duration_minutes: number
           description: string | null
+          fee_includes_vat: boolean
+          fee_pence: number | null
           follow_on_duration_minutes: number | null
           follow_on_service_id: string | null
           id: string
@@ -1446,6 +1448,8 @@ export type Database = {
           created_at?: string
           default_duration_minutes?: number
           description?: string | null
+          fee_includes_vat?: boolean
+          fee_pence?: number | null
           follow_on_duration_minutes?: number | null
           follow_on_service_id?: string | null
           id?: string
@@ -1464,6 +1468,8 @@ export type Database = {
           created_at?: string
           default_duration_minutes?: number
           description?: string | null
+          fee_includes_vat?: boolean
+          fee_pence?: number | null
           follow_on_duration_minutes?: number | null
           follow_on_service_id?: string | null
           id?: string
