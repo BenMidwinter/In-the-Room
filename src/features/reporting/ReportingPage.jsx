@@ -33,6 +33,8 @@ import {
   summariseAppointments,
   timeBuckets,
 } from '../../lib/reporting'
+import { activeBilledAppointmentIds } from '../../lib/invoices'
+import { listInvoices } from '../../lib/supabase/invoicesRepo'
 
 const SECTIONS = [
   { id: 'overview', label: 'Overview' },
@@ -107,6 +109,11 @@ export default function ReportingPage() {
   const boardQuery = useQuery({
     queryKey: ['screener-board', 'reporting'],
     queryFn: () => listScreenerBoard().catch(() => []),
+    enabled: Boolean(userId),
+  })
+  const invoicesQuery = useQuery({
+    queryKey: ['invoices', userId],
+    queryFn: () => listInvoices().catch(() => []),
     enabled: Boolean(userId),
   })
   const busyQuery = useQuery({
@@ -297,7 +304,11 @@ export default function ReportingPage() {
         />
       )}
       {section === 'finance' && (
-        <FinanceSection summary={summary} />
+        <FinanceSection
+          summary={summary}
+          invoices={invoicesQuery.data || EMPTY_LIST}
+          range={range}
+        />
       )}
     </div>
   )
@@ -570,8 +581,13 @@ function PracticeSection({ cpd, supervision, appointments, range, serviceId }) {
   )
 }
 
-function FinanceSection({ summary }) {
-  const uninvoiced = summary.rows.filter((row) => row.earnedPence > 0)
+function FinanceSection({ summary, invoices, range }) {
+  const billed = activeBilledAppointmentIds(invoices)
+  const outstanding = invoices.filter((invoice) => (
+    invoice.status === 'issued' && invoice.issuedOn && inDateRange(invoice.issuedOn, range)
+  ))
+  const outstandingPence = outstanding.reduce((sum, invoice) => sum + invoice.totalPence, 0)
+  const uninvoiced = summary.rows.filter((row) => row.earnedPence > 0 && !billed.has(row.id))
   const rows = uninvoiced.map((row) => ({
     id: row.id,
     filterValues: { client: row.clientName, service: row.serviceName, attendance: attendanceLabel(row.attendance) },
@@ -588,7 +604,11 @@ function FinanceSection({ summary }) {
     <div className="reporting-section">
       <div className="section-card__stat-row">
         <Stat label="Money earned" value={formatGbpFromPence(summary.earnedPence)} />
-        <Stat label="Outstanding invoices" value={formatGbpFromPence(0)} detail="Invoices are not available yet" />
+        <Stat
+          label="Outstanding invoices"
+          value={formatGbpFromPence(outstandingPence)}
+          detail={outstanding.length ? `${outstanding.length} issued in these dates` : 'Issued in these dates, not marked paid'}
+        />
         <Stat label="Sessions not yet invoiced" value={uninvoiced.length} />
       </div>
       <RecordTable

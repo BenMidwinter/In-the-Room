@@ -819,6 +819,96 @@ export type Database = {
           },
         ]
       }
+      invoice_lines: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          description: string
+          id: string
+          includes_vat: boolean
+          invoice_id: string
+          owner_id: string
+          position: number
+          released_at: string | null
+          session_date: string | null
+          unit_pence: number
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          description: string
+          id?: string
+          includes_vat?: boolean
+          invoice_id: string
+          owner_id: string
+          position?: number
+          released_at?: string | null
+          session_date?: string | null
+          unit_pence: number
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          description?: string
+          id?: string
+          includes_vat?: boolean
+          invoice_id?: string
+          owner_id?: string
+          position?: number
+          released_at?: string | null
+          session_date?: string | null
+          unit_pence?: number
+        }
+        Relationships: []
+      }
+      invoices: {
+        Row: {
+          bill_to_name: string
+          client_id: string | null
+          created_at: string
+          due_on: string | null
+          id: string
+          issued_on: string | null
+          number: string
+          owner_id: string
+          payment_details: string
+          status: string
+          total_pence: number
+          updated_at: string
+          xero_invoice_id: string | null
+        }
+        Insert: {
+          bill_to_name: string
+          client_id?: string | null
+          created_at?: string
+          due_on?: string | null
+          id?: string
+          issued_on?: string | null
+          number: string
+          owner_id: string
+          payment_details?: string
+          status?: string
+          total_pence?: number
+          updated_at?: string
+          xero_invoice_id?: string | null
+        }
+        Update: {
+          bill_to_name?: string
+          client_id?: string | null
+          created_at?: string
+          due_on?: string | null
+          id?: string
+          issued_on?: string | null
+          number?: string
+          owner_id?: string
+          payment_details?: string
+          status?: string
+          total_pence?: number
+          updated_at?: string
+          xero_invoice_id?: string | null
+        }
+        Relationships: []
+      }
       journal_entries: {
         Row: {
           author_id: string
@@ -1080,6 +1170,12 @@ export type Database = {
           cancel_late_fee: string
           cancel_notice_hours: number
           dna_fee: string
+          invoice_account_name: string | null
+          invoice_account_number: string | null
+          invoice_due_days: number
+          invoice_next_number: number
+          invoice_payment_note: string | null
+          invoice_sort_code: string | null
           created_at: string
           display_name: string | null
           email: string | null
@@ -1109,6 +1205,12 @@ export type Database = {
           cancel_late_fee?: string
           cancel_notice_hours?: number
           dna_fee?: string
+          invoice_account_name?: string | null
+          invoice_account_number?: string | null
+          invoice_due_days?: number
+          invoice_next_number?: number
+          invoice_payment_note?: string | null
+          invoice_sort_code?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
@@ -1138,6 +1240,12 @@ export type Database = {
           cancel_late_fee?: string
           cancel_notice_hours?: number
           dna_fee?: string
+          invoice_account_name?: string | null
+          invoice_account_number?: string | null
+          invoice_due_days?: number
+          invoice_next_number?: number
+          invoice_payment_note?: string | null
+          invoice_sort_code?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null

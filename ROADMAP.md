@@ -7,7 +7,7 @@ Living plan. The clinical workspace (caseload, calendar, notes, services, forms,
 ## 1. Missing features
 
 - [x] **Reporting.** Overview, Appointments & Notes, Clients, Waitlist, My Practice, and Finance. It opens on a rolling week, and every section can take other dates. Efficiency is appointment, support, and admin time as a percentage of availability minus busy time.
-- [ ] **Invoicing.** Start by tallying hours and session totals from service prices. A full invoice, expenses, and accounting sync come after the tally.
+- [x] **Invoicing, first slice.** Create an invoice from marked sessions, print it, and mark it issued or paid. Payment details are copied on when it is issued. Xero sync, expenses, and emailing the invoice are still to do.
 
 Service prices, including whether the price already includes VAT, live on each service.
 

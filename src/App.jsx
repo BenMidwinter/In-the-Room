@@ -41,7 +41,7 @@ import Resources from './components/Resources'
 import About from './components/About'
 import NotesHistoryPanel from './features/client/NotesHistoryPanel'
 import ReportingPage from './features/reporting/ReportingPage'
-import FinancePage from './features/finance/FinancePage'
+import InvoicingPage from './features/invoicing/InvoicingPage'
 
 export default function App() {
   return (
@@ -59,7 +59,8 @@ export default function App() {
         <Route path="home" element={<Home />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="reporting" element={<ReportingPage />} />
-        <Route path="finance" element={<FinancePage />} />
+        <Route path="invoicing" element={<InvoicingPage />} />
+        <Route path="finance" element={<Navigate to="/invoicing" replace />} />
         <Route path="journal" element={<Navigate to="/practice/journal" replace />} />
         <Route path="practice" element={<PracticeLayout />}>
           <Route index element={<Navigate to="journal" replace />} />
