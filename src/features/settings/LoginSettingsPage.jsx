@@ -72,7 +72,7 @@ export default function LoginSettingsPage() {
   }
 
   return (
-    <div className="section-card-stack">
+    <>
       <SettingsSectionCard blockId="settings_login_email" title="Email">
         <p className="text-muted" style={{ marginTop: 0 }}>
           Change the address you use to sign in. Supabase may send a confirmation link to the new inbox.
@@ -128,6 +128,6 @@ export default function LoginSettingsPage() {
       </SettingsSectionCard>
 
       {error && <p className="auth-page__alert" role="alert">{error}</p>}
-    </div>
+    </>
   )
 }

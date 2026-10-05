@@ -610,6 +610,8 @@ function StandardEventBody({
   appointment,
   locked,
   onAttendanceChange,
+  onToggleDoNotInvoice,
+  invoiceSummary = '',
   showAttendance = true,
   showProcessNote = false,
   linkedNote = null,
@@ -685,12 +687,26 @@ function StandardEventBody({
       </section>
 
       {showAttendance && (
-        <AttendanceMarking
-          value={appointment.attendance_status}
-          onChange={onAttendanceChange}
-          locked={locked}
-          compact
-        />
+        <div className="appointment-card__invoice">
+          <AttendanceMarking
+            value={appointment.attendance_status}
+            onChange={onAttendanceChange}
+            locked={locked}
+            compact
+          />
+          {(appointment.attendance_status === 'cancelled' || appointment.attendance_status === 'did_not_attend') && (
+            <button
+              type="button"
+              className={`secondary appointment-card__do-not-invoice${appointment.do_not_invoice ? ' appointment-card__do-not-invoice--on' : ''}`}
+              disabled={locked}
+              aria-pressed={Boolean(appointment.do_not_invoice)}
+              onClick={() => onToggleDoNotInvoice?.()}
+            >
+              Do not invoice
+            </button>
+          )}
+          {invoiceSummary ? <p className="text-small text-muted">{invoiceSummary}</p> : null}
+        </div>
       )}
     </SafetyLock>
   )
@@ -828,6 +844,8 @@ export function EventDrawer({
   allAppointments = [],
   onClose,
   onAttendanceChange,
+  onToggleDoNotInvoice,
+  invoiceSummary,
   onEdit,
   onMove,
   onDelete,
@@ -896,6 +914,8 @@ export function EventDrawer({
           appointment={appointment}
           locked={locked}
           onAttendanceChange={onAttendanceChange}
+          onToggleDoNotInvoice={onToggleDoNotInvoice}
+          invoiceSummary={invoiceSummary}
           showAttendance={kind === 'standard'}
           showProcessNote={kind === 'standard'}
           linkedNote={linkedNote}

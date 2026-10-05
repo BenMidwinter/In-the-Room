@@ -212,6 +212,12 @@ export function saveAppointment(payload, userId) {
       attendance_status: payload.attendance_status !== undefined
         ? payload.attendance_status
         : prev.attendance_status,
+      do_not_invoice: payload.do_not_invoice !== undefined
+        ? Boolean(payload.do_not_invoice)
+        : prev.do_not_invoice,
+      charged_pence: payload.charged_pence !== undefined
+        ? payload.charged_pence
+        : prev.charged_pence,
       location: payload.location ?? prev.location ?? '',
       notes: payload.notes !== undefined ? payload.notes : prev.notes,
       other_info: payload.other_info !== undefined ? payload.other_info : prev.other_info ?? '',

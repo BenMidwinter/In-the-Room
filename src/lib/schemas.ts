@@ -106,6 +106,8 @@ export const appointmentInputSchema = z
     appointment_type: z.enum(appointmentTypeKeys).optional(),
     therapy_modality: z.string().optional(),
     attendance_status: z.enum(attendanceStatusKeys).nullish(),
+    do_not_invoice: z.boolean().optional(),
+    charged_pence: z.number().int().nonnegative().nullish(),
     location: optionalText,
     notes: z.string().optional(),
     other_info: z.string().optional(),

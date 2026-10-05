@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useAppClients } from '../../lib/queries'
 import {
@@ -14,6 +15,10 @@ import { useConfirm, useToast } from '../../components/ui'
 import { appointmentBelongsToSeries, countSeriesScope, newSeriesId } from '../../lib/appointmentSeries'
 import { addDaysYmd, todayYmd } from '../../lib/dateArchitecture'
 import { BOOKING_KINDS, bookingKindById, bookingKindForBlockRole } from '../../lib/scheduling/bookingKinds'
+import { listServices } from '../../lib/supabase/servicesRepo'
+import { loadCancellationPolicy } from '../../lib/supabase/cancellationPolicyRepo'
+import { chargeForAttendance, DEFAULT_CANCELLATION_POLICY } from '../../lib/cancellationPolicy'
+import { formatGbpFromPence } from '../../lib/money'
 
 const AppointmentOverlayContext = createContext(null)
 
@@ -142,6 +147,16 @@ function AppointmentOverlayHost({
   const deleteAppointmentsMutation = useDeleteAppointmentsMutation()
   const confirm = useConfirm()
   const toast = useToast()
+  const policyQuery = useQuery({
+    queryKey: ['cancellation-policy', session?.user?.id],
+    queryFn: loadCancellationPolicy,
+    enabled: Boolean(session?.user?.id),
+  })
+  const servicesQuery = useQuery({
+    queryKey: ['services', 'invoice-fees'],
+    queryFn: listServices,
+    enabled: Boolean(session?.user?.id),
+  })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteScopeFor, setDeleteScopeFor] = useState(null)
@@ -299,29 +314,73 @@ function AppointmentOverlayHost({
     await runDelete(appointment, 'this')
   }
 
-  const handleAttendanceChange = async (status) => {
-    if (!viewed || !session?.user?.id) return
+  const feeFor = (appointment) => {
+    const service = (servicesQuery.data || []).find((row) => row.id === appointment?.service_id)
+    return service?.fee_pence ?? null
+  }
+
+  const saveAttendance = async (appointment, { status, doNotInvoice }) => {
+    if (!appointment || !session?.user?.id) return
+    const charge = chargeForAttendance({
+      attendance: status,
+      sessionDate: appointment.session_date,
+      startTime: appointment.start_time,
+      feePence: feeFor(appointment),
+      policy: policyQuery.data || DEFAULT_CANCELLATION_POLICY,
+      doNotInvoice,
+    })
     const saved = await saveAppointmentMutation.mutateAsync({
       payload: {
-        id: viewed.id,
-        client_id: viewed.client_id,
-        session_date: viewed.session_date,
-        start_time: viewed.start_time,
-        end_time: viewed.end_time,
-        appointment_type: viewed.appointment_type,
-        therapy_modality: viewed.therapy_modality,
-        service_id: viewed.service_id,
-        service_name: viewed.service_name,
-        location: viewed.location,
-        other_info: viewed.other_info,
-        block_role: viewed.block_role || 'client_session',
-        clinician_id: viewed.clinician_id,
+        id: appointment.id,
+        client_id: appointment.client_id,
+        session_date: appointment.session_date,
+        start_time: appointment.start_time,
+        end_time: appointment.end_time,
+        appointment_type: appointment.appointment_type,
+        therapy_modality: appointment.therapy_modality,
+        service_id: appointment.service_id,
+        service_name: appointment.service_name,
+        location: appointment.location,
+        other_info: appointment.other_info,
+        block_role: appointment.block_role || 'client_session',
+        clinician_id: appointment.clinician_id,
         attendance_status: status,
+        do_not_invoice: charge.doNotInvoice,
+        charged_pence: charge.chargedPence,
       },
       userId: session.user.id,
     })
     if (saved) setState({ mode: 'view', appointment: saved })
   }
+
+  const handleAttendanceChange = (status) => saveAttendance(viewed, { status, doNotInvoice: false })
+
+  const handleToggleDoNotInvoice = () => {
+    if (!viewed) return
+    saveAttendance(viewed, {
+      status: viewed.attendance_status,
+      doNotInvoice: !viewed.do_not_invoice,
+    })
+  }
+
+  const invoiceSummary = (() => {
+    if (!viewed?.attendance_status) return ''
+    if (viewed.do_not_invoice) return 'Do not invoice.'
+    if (viewed.charged_pence != null) {
+      return viewed.charged_pence === 0
+        ? 'No fee for this session.'
+        : `This session is ${formatGbpFromPence(viewed.charged_pence)}.`
+    }
+    const charge = chargeForAttendance({
+      attendance: viewed.attendance_status,
+      sessionDate: viewed.session_date,
+      startTime: viewed.start_time,
+      feePence: feeFor(viewed),
+      policy: policyQuery.data || DEFAULT_CANCELLATION_POLICY,
+    })
+    if (!charge.chargedPence) return charge.summary
+    return `${charge.summary} ${formatGbpFromPence(charge.chargedPence)}.`
+  })()
 
   const handleMove = (appointment) => {
     if (handlersRef.current.onMove) {
@@ -420,6 +479,8 @@ function AppointmentOverlayHost({
           presentation="overlay"
           onClose={close}
           onAttendanceChange={handleAttendanceChange}
+          onToggleDoNotInvoice={handleToggleDoNotInvoice}
+          invoiceSummary={invoiceSummary}
           onEdit={openEdit}
           onMove={handleMove}
           onDelete={handleDelete}
