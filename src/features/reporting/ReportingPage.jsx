@@ -1,8 +1,9 @@
-import { useId, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
 import RecordTable from '../../components/RecordTable'
 import TagLabel from '../../components/TagLabel'
+import { usePrompt } from '../../components/ui'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useClientsQuery } from '../../lib/queries'
 import { useAllAppointmentsQuery } from '../../lib/appointmentQueries'
@@ -54,9 +55,17 @@ export default function ReportingPage() {
   const userId = session?.user?.id
   const today = todayYmd()
   const [section, setSection] = useState('overview')
-  const [range, setRange] = useState(() => rollingWeekRange(todayYmd()))
-  const [serviceId, setServiceId] = useState('')
-  const [tagId, setTagId] = useState('')
+  const [applied, setApplied] = useState(() => ({ range: rollingWeekRange(todayYmd()), serviceId: '', tagId: '' }))
+  const [draft, setDraft] = useState(() => ({
+    range: rollingWeekRange(todayYmd()),
+    serviceId: '',
+    tagId: '',
+    serviceOn: false,
+    tagOn: false,
+  }))
+  const range = applied.range
+  const serviceId = applied.serviceId
+  const tagId = applied.tagId
 
   const appointmentsQuery = useAllAppointmentsQuery()
   const noteIndex = useProgressNoteIndexQuery(Boolean(userId))
@@ -186,15 +195,10 @@ export default function ReportingPage() {
     })
   }, [mapped, range, availabilityQuery.data])
 
-  const choosePreset = (preset) => {
-    if (preset === 'week') setRange(rollingWeekRange(today))
-    if (preset === 'month') setRange(monthToDateRange(today))
-    if (preset === 'quarter') setRange(quarterToDateRange(today))
-  }
-
   const changeSection = (next) => {
     setSection(next)
-    setTagId('')
+    setDraft((current) => ({ ...current, tagOn: false, tagId: '' }))
+    setApplied((current) => ({ ...current, tagId: '' }))
   }
 
   return (
@@ -204,51 +208,19 @@ export default function ReportingPage() {
         help="A rolling week, until you choose other dates."
       />
 
-      <div className="reporting-filters">
-        <div className="reporting-filters__presets">
-          <button type="button" className="secondary" onClick={() => choosePreset('week')}>Rolling week</button>
-          <button type="button" className="secondary" onClick={() => choosePreset('month')}>This month</button>
-          <button type="button" className="secondary" onClick={() => choosePreset('quarter')}>This quarter</button>
-        </div>
-        <label className="reporting-filters__field">
-          From
-          <input
-            className="paper-input"
-            type="date"
-            value={range.from}
-            onChange={(event) => setRange((current) => ({ ...current, from: event.target.value }))}
-          />
-        </label>
-        <label className="reporting-filters__field">
-          To
-          <input
-            className="paper-input"
-            type="date"
-            value={range.to}
-            onChange={(event) => setRange((current) => ({ ...current, to: event.target.value }))}
-          />
-        </label>
-        <label className="reporting-filters__field">
-          Service
-          <select className="paper-input" value={serviceId} onChange={(event) => setServiceId(event.target.value)}>
-            <option value="">All services</option>
-            {services.filter((service) => service.is_active !== false).map((service) => (
-              <option key={service.id} value={service.id}>{service.name}</option>
-            ))}
-          </select>
-        </label>
-        {showTag && (
-          <label className="reporting-filters__field">
-            {tagKind === 'waitlist' ? 'Waitlist tag' : 'Client tag'}
-            <select className="paper-input" value={tagId} onChange={(event) => setTagId(event.target.value)}>
-              <option value="">All tags</option>
-              {tagOptions.map((tag) => (
-                <option key={tag.id} value={tag.id}>{tag.name}</option>
-              ))}
-            </select>
-          </label>
-        )}
-      </div>
+      <ReportingFilterBar
+        today={today}
+        section={section}
+        draft={draft}
+        applied={applied}
+        services={services}
+        tagOptions={tagOptions}
+        showTag={showTag}
+        tagKind={tagKind}
+        userId={userId}
+        onDraft={setDraft}
+        onRun={setApplied}
+      />
 
       <div className="finance-tabs" role="tablist" aria-label="Reporting sections">
         {SECTIONS.map((item) => (
@@ -313,6 +285,278 @@ export default function ReportingPage() {
           range={range}
         />
       )}
+    </div>
+  )
+}
+
+const SAVED_FILTERS_KEY = 'reporting-saved-filters'
+
+function readSavedFilters(userId) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(`${SAVED_FILTERS_KEY}:${userId || 'local'}`) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function writeSavedFilters(userId, rows) {
+  localStorage.setItem(`${SAVED_FILTERS_KEY}:${userId || 'local'}`, JSON.stringify(rows))
+}
+
+function presetRange(preset, today) {
+  if (preset === 'week') return rollingWeekRange(today)
+  if (preset === 'month') return monthToDateRange(today)
+  return quarterToDateRange(today)
+}
+
+function ReportingFilterBar({ today, section, draft, applied, services, tagOptions, showTag, tagKind, userId, onDraft, onRun }) {
+  const prompt = usePrompt()
+  const rootRef = useRef(null)
+  const [menu, setMenu] = useState(null)
+  const [query, setQuery] = useState('')
+  const [saved, setSaved] = useState([])
+
+  useEffect(() => {
+    if (!menu) return undefined
+    const onKey = (event) => {
+      if (event.key === 'Escape') setMenu(null)
+    }
+    const onPointer = (event) => {
+      if (rootRef.current?.contains(event.target)) return
+      setMenu(null)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onPointer)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onPointer)
+    }
+  }, [menu])
+
+  const choices = [
+    { id: 'dates', label: 'Date range', enabled: false },
+    { id: 'service', label: 'Service', enabled: !draft.serviceOn },
+    { id: 'client-tag', label: 'Client tag', enabled: showTag && tagKind === 'client' && !draft.tagOn },
+    { id: 'waitlist-tag', label: 'Waitlist tag', enabled: section === 'waitlist' && !draft.tagOn },
+  ]
+  const visibleChoices = choices.filter((choice) => choice.label.toLowerCase().includes(query.trim().toLowerCase()))
+  const activePreset = ['week', 'month', 'quarter'].find((preset) => {
+    const next = presetRange(preset, today)
+    return next.from === draft.range.from && next.to === draft.range.to
+  })
+  const pendingService = draft.serviceOn ? draft.serviceId : ''
+  const pendingTag = draft.tagOn && showTag ? draft.tagId : ''
+  const dirty = draft.range.from !== applied.range.from
+    || draft.range.to !== applied.range.to
+    || pendingService !== applied.serviceId
+    || pendingTag !== applied.tagId
+
+  const openMenu = (next) => {
+    setSaved(readSavedFilters(userId))
+    setMenu((current) => (current === next ? null : next))
+    setQuery('')
+  }
+
+  const addChoice = (choice) => {
+    if (!choice.enabled) return
+    if (choice.id === 'service') onDraft((current) => ({ ...current, serviceOn: true }))
+    if (choice.id === 'client-tag' || choice.id === 'waitlist-tag') onDraft((current) => ({ ...current, tagOn: true, tagId: '' }))
+    setMenu(null)
+    setQuery('')
+  }
+
+  const run = () => {
+    onRun({
+      range: draft.range,
+      serviceId: pendingService,
+      tagId: pendingTag,
+    })
+    setMenu(null)
+  }
+
+  const save = async () => {
+    const name = await prompt({ title: 'Save filters', label: 'Name these filters', confirmLabel: 'Save' })
+    const trimmed = String(name || '').trim()
+    if (!trimmed) return
+    const next = readSavedFilters(userId).filter((item) => item.name !== trimmed)
+    next.push({
+      id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now()),
+      name: trimmed,
+      range: draft.range,
+      serviceOn: draft.serviceOn,
+      serviceId: draft.serviceId,
+      tagOn: draft.tagOn,
+      tagId: draft.tagId,
+    })
+    writeSavedFilters(userId, next)
+    setSaved(next)
+    setMenu(null)
+  }
+
+  const load = (item) => {
+    onDraft({
+      range: item.range?.from && item.range?.to ? item.range : draft.range,
+      serviceOn: Boolean(item.serviceOn),
+      serviceId: item.serviceId || '',
+      tagOn: Boolean(item.tagOn) && showTag,
+      tagId: showTag ? (item.tagId || '') : '',
+    })
+    setMenu(null)
+  }
+
+  const removeSaved = (id) => {
+    const next = readSavedFilters(userId).filter((item) => item.id !== id)
+    writeSavedFilters(userId, next)
+    setSaved(next)
+  }
+
+  return (
+    <div ref={rootRef}>
+      <div className="reporting-bar">
+        <div className="reporting-menu">
+          <button
+            type="button"
+            className="secondary"
+            aria-expanded={menu === 'add'}
+            onClick={() => openMenu('add')}
+          >
+            Add filter
+          </button>
+          {menu === 'add' && (
+            <div className="reporting-menu__panel" role="dialog" aria-label="Add filter">
+              <div className="reporting-menu__search">
+                <input
+                  className="paper-input"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-label="Find a filter"
+                  autoFocus
+                />
+              </div>
+              {visibleChoices.length === 0 && <p className="reporting-menu__empty">No matching filters.</p>}
+              {visibleChoices.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  className="reporting-menu__item"
+                  disabled={!choice.enabled}
+                  onClick={() => addChoice(choice)}
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button type="button" className="secondary" onClick={save}>Save filters</button>
+        <div className="reporting-menu">
+          <button
+            type="button"
+            className="secondary"
+            aria-expanded={menu === 'load'}
+            onClick={() => openMenu('load')}
+          >
+            Load filters
+          </button>
+          {menu === 'load' && (
+            <div className="reporting-menu__panel" role="dialog" aria-label="Load filters">
+              {saved.length === 0 && <p className="reporting-menu__empty">No saved filters.</p>}
+              {saved.map((item) => (
+                <div key={item.id} className="reporting-menu__row">
+                  <button type="button" className="reporting-menu__item" onClick={() => load(item)}>{item.name}</button>
+                  <button type="button" className="reporting-menu__delete" aria-label={`Delete ${item.name}`} onClick={() => removeSaved(item.id)}>
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <button type="button" className="primary reporting-bar__run" onClick={run} aria-label={dirty ? 'Run report with these filters' : 'Run report'}>
+          Run report
+        </button>
+      </div>
+
+      <div className="reporting-filter-rows">
+        <div className="reporting-filter-row">
+          <span className="reporting-filter-row__name">Date range</span>
+          {['week', 'month', 'quarter'].map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className={activePreset === preset ? 'secondary reporting-preset--on' : 'secondary'}
+              onClick={() => onDraft((current) => ({ ...current, range: presetRange(preset, today) }))}
+            >
+              {preset === 'week' ? 'Rolling week' : preset === 'month' ? 'This month' : 'This quarter'}
+            </button>
+          ))}
+          <span className="reporting-filter-row__hint">From</span>
+          <input
+            className="paper-input"
+            type="date"
+            aria-label="From"
+            value={draft.range.from}
+            onChange={(event) => onDraft((current) => ({ ...current, range: { ...current.range, from: event.target.value } }))}
+          />
+          <span className="reporting-filter-row__hint">To</span>
+          <input
+            className="paper-input"
+            type="date"
+            aria-label="To"
+            value={draft.range.to}
+            onChange={(event) => onDraft((current) => ({ ...current, range: { ...current.range, to: event.target.value } }))}
+          />
+        </div>
+        {draft.serviceOn && (
+          <div className="reporting-filter-row">
+            <span className="reporting-filter-row__name">Service</span>
+            <select
+              className="paper-input"
+              aria-label="Service"
+              value={draft.serviceId}
+              onChange={(event) => onDraft((current) => ({ ...current, serviceId: event.target.value }))}
+            >
+              <option value="">All services</option>
+              {services.filter((service) => service.is_active !== false).map((service) => (
+                <option key={service.id} value={service.id}>{service.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="secondary reporting-filter-row__remove"
+              aria-label="Remove service filter"
+              onClick={() => onDraft((current) => ({ ...current, serviceOn: false, serviceId: '' }))}
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {draft.tagOn && showTag && (
+          <div className="reporting-filter-row">
+            <span className="reporting-filter-row__name">{tagKind === 'waitlist' ? 'Waitlist tag' : 'Client tag'}</span>
+            <select
+              className="paper-input"
+              aria-label={tagKind === 'waitlist' ? 'Waitlist tag' : 'Client tag'}
+              value={draft.tagId}
+              onChange={(event) => onDraft((current) => ({ ...current, tagId: event.target.value }))}
+            >
+              <option value="">All tags</option>
+              {tagOptions.map((tag) => (
+                <option key={tag.id} value={tag.id}>{tag.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="secondary reporting-filter-row__remove"
+              aria-label="Remove tag filter"
+              onClick={() => onDraft((current) => ({ ...current, tagOn: false, tagId: '' }))}
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
