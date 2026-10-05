@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
+import HelpTip from '../../components/HelpTip'
 import RecordTable from '../../components/RecordTable'
 import TagLabel from '../../components/TagLabel'
 import { useAppSession } from '../../lib/AppSessionContext'
@@ -255,8 +256,10 @@ export default function ReportingPage() {
             </select>
           </label>
         )}
+        <div className="reporting-filters__help">
+          <HelpTip text={FILTER_NOTE[section]} label="About this report" />
+        </div>
       </div>
-      <p className="text-muted reporting-note">{FILTER_NOTE[section]}</p>
 
       <div className="finance-tabs" role="tablist" aria-label="Reporting sections">
         {SECTIONS.map((item) => (
@@ -324,24 +327,21 @@ function Overview({ summary, efficiency }) {
   return (
     <div className="reporting-section">
       <div className="section-card__stat-row">
-        <Stat label="Hours delivered" value={formatHoursFromMinutes(summary.deliveredMinutes)} detail="Attended sessions" />
+        <Stat label="Hours delivered" value={formatHoursFromMinutes(summary.deliveredMinutes)} help="Attended sessions." />
         <Stat
           label="Sessions attended"
           value={summary.attended}
           detail={`${summary.dna} did not attend · ${summary.cancelled} cancelled`}
         />
-        <Stat label="Fees" value={formatGbpFromPence(summary.earnedPence)} detail="Attended, cancelled, and DNA, after the policy" />
-        <Stat label="Notes to finish" value={summary.notesToFinish} detail="Attended sessions without a signed Process Note" />
+        <Stat label="Fees" value={formatGbpFromPence(summary.earnedPence)} help="Attended, cancelled, and DNA, after the cancellation policy." />
+        <Stat label="Notes to finish" value={summary.notesToFinish} help="Attended sessions without a signed Process Note." />
         <Stat
           label="Efficiency"
           value={efficiency.rate == null ? '—' : `${efficiency.rate}%`}
+          help="Appointment, support, and admin time as a percentage of availability minus busy time. Open time is what is left after that."
           detail={`${formatHoursFromMinutes(efficiency.used)} used · ${formatHoursFromMinutes(efficiency.open)} open`}
         />
       </div>
-      <p className="text-muted reporting-note">
-        Efficiency is appointment, support, and admin time as a percentage of availability minus busy time.
-        Open time is what is left after that.
-      </p>
       <table className="reporting-table">
         <thead>
           <tr>
@@ -512,7 +512,7 @@ function WaitlistSection({ people, tags, services, range, tagId, serviceId, toda
       <div className="section-card__stat-row">
         <Stat label="On the waitlist now" value={matching.length} />
         <Stat label="Joined in these dates" value={joined.length} />
-        <Stat label="Average days waiting" value={average == null ? '—' : average} detail="People on the waitlist now" />
+        <Stat label="Average days waiting" value={average == null ? '—' : average} help="People on the waitlist now, counted to today." />
       </div>
       <RecordTable
         columns={[
@@ -562,7 +562,7 @@ function PracticeSection({ cpd, supervision, appointments, range, serviceId }) {
   return (
     <div className="reporting-section">
       <div className="section-card__stat-row">
-        <Stat label="Clinical hours" value={formatHoursFromMinutes(clinical)} detail="Attended appointments" />
+        <Stat label="Clinical hours" value={formatHoursFromMinutes(clinical)} help="Attended appointments." />
         <Stat label="CPD" value={formatHoursFromMinutes(cpdMinutes)} />
         <Stat
           label="Supervision"
@@ -613,7 +613,8 @@ function FinanceSection({ summary, invoices, range }) {
         <Stat
           label="Outstanding invoices"
           value={formatGbpFromPence(outstandingPence)}
-          detail={outstanding.length ? `${outstanding.length} awaiting payment in these dates` : 'Awaiting payment in these dates'}
+          help="Issued in these dates and not yet paid."
+          detail={outstanding.length ? `${outstanding.length} awaiting payment` : ''}
         />
         <Stat label="Sessions not yet invoiced" value={uninvoiced.length} />
       </div>
@@ -633,11 +634,14 @@ function FinanceSection({ summary, invoices, range }) {
   )
 }
 
-function Stat({ label, value, detail }) {
+function Stat({ label, value, detail, help }) {
   return (
     <div className="section-card__stat">
       <span className="section-card__stat-value">{value}</span>
-      <span className="section-card__stat-label">{label}</span>
+      <span className="section-card__stat-label">
+        {label}
+        {help ? <HelpTip text={help} label={`About ${label}`} /> : null}
+      </span>
       {detail ? <span className="reporting-stat__detail">{detail}</span> : null}
     </div>
   )

@@ -66,6 +66,21 @@
   line-height: 1.25;
 }
 
+.form-overlay__title a,
+.form-overlay__meta a,
+.appointment-card__client-link {
+  color: inherit;
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+}
+
+.form-overlay__title a:hover,
+.form-overlay__meta a:hover,
+.appointment-card__client-link:hover {
+  color: var(--col-primary);
+}
+
 .form-overlay__meta {
   margin: 0.35rem 0 0;
   font-size: 0.875rem;

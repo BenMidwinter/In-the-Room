@@ -966,6 +966,9 @@ button.home-stat-card__link {
 .section-card__stat-value--warn { color: #9a5b14; }
 
 .section-card__stat-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: uppercase;
