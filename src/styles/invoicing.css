@@ -22,6 +22,17 @@
   font-weight: 700;
 }
 
+.invoicing-filters__check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  align-self: end;
+  min-width: 12rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
 .invoicing-filters input,
 .invoicing-filters select {
   font: inherit;
@@ -122,6 +133,18 @@
   justify-content: space-between;
   gap: 1rem;
   align-items: center;
+}
+
+.invoicing-ready__tick {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  font-weight: 500;
+}
+
+.invoicing-ready__tick h3 {
+  margin: 0;
+  font-size: 1rem;
 }
 
 .invoicing-ready__head h3 {
@@ -286,6 +309,29 @@
   padding: 0.25rem 0;
 }
 
+.invoicing-client-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.invoicing-sent-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1rem 0 0;
+}
+
+.invoice-print-stack {
+  display: none;
+}
+
 .invoicing-picker {
   max-height: 18rem;
   overflow: auto;
@@ -319,5 +365,25 @@
     border-radius: 0;
     background: white !important;
     color: black !important;
+  }
+
+  body:has(.page--print-batch) .invoicing-screen,
+  body:has(.page--print-batch) .top-nav,
+  body:has(.page--print-batch) .top-nav__mobile-bar {
+    display: none !important;
+  }
+
+  body:has(.page--print-batch) .invoice-print-stack {
+    display: block;
+  }
+
+  .invoice-print-stack .invoice-sheet {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .invoice-print-stack .invoice-sheet:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
 }

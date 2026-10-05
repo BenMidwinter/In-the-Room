@@ -10,6 +10,7 @@ import {
   invoiceTotalPence,
   invoiceRecipient,
   lineForInvoice,
+  readyInvoiceGroups,
   lineFromAppointment,
   paymentInstructions,
   sequenceFromInvoiceNumber,
@@ -58,12 +59,40 @@ describe('invoices', () => {
       clientName: 'Ada Young',
       clientEmail: 'ada@example.com',
       contacts: [{ name: 'Local Authority', email: 'finance@council.test', sendInvoices: true }],
-    })).toEqual({ billToName: 'Local Authority', billToEmail: 'finance@council.test' })
+    })).toEqual({ billToName: 'Local Authority', billToEmail: 'finance@council.test', billedToContact: true })
     expect(invoiceRecipient({
       clientName: 'Ada Young',
       clientEmail: 'ada@example.com',
       contacts: [{ name: 'Parent', email: 'parent@example.com', sendInvoices: false }],
-    })).toEqual({ billToName: 'Ada Young', billToEmail: 'ada@example.com' })
+    })).toEqual({ billToName: 'Ada Young', billToEmail: 'ada@example.com', billedToContact: false })
+  })
+
+  it('prepares a batch for whoever is ready, at any count', () => {
+    const council = { billToName: 'Local Authority', billToEmail: 'finance@council.test', billedToContact: true }
+    const ada = readyRow('a', 'Ada', { ...council, marked: true })
+    const ben = readyRow('b', 'Ben', { ...council, marked: true })
+    const cara = readyRow('c', 'Cara', { marked: false, billToName: 'Cara', billToEmail: 'cara@example.com', billedToContact: false })
+    const dee = readyRow('d', 'Dee', { marked: true, billToName: 'Dee', billToEmail: 'dee@example.com', billedToContact: false })
+    const heldOnly = readyInvoiceGroups([ada, ben, cara, dee])
+    expect(heldOnly.map((group) => group.forName)).toEqual(['Dee', 'Ada, Ben'])
+    expect(heldOnly.find((group) => group.forName === 'Ada, Ben')?.clientId).toBeNull()
+    expect(heldOnly.find((group) => group.forName === 'Ada, Ben')?.lines).toHaveLength(2)
+    expect(heldOnly.find((group) => group.forName === 'Dee')?.clientId).toBe('d')
+    const withBookings = readyInvoiceGroups([ada, ben, cara, dee], { includeUnheld: true })
+    expect(withBookings).toHaveLength(3)
+    const twinA = readyRow('e', 'Eve', { marked: true, billToName: 'Eve', billToEmail: 'same@example.com', billedToContact: false })
+    const twinB = readyRow('f', 'Finn', { marked: true, billToName: 'Finn', billToEmail: 'same@example.com', billedToContact: false })
+    expect(readyInvoiceGroups([twinA, twinB])).toHaveLength(2)
+    expect(readyInvoiceGroups([readyRow('z', 'Zero', { marked: true, unitPence: 0, billedToContact: false, billToName: 'Zero', billToEmail: 'z@example.com' })])).toHaveLength(0)
+    const support = readyInvoiceGroups([readyRow(null, 'Practice', {
+      marked: false,
+      pricedActivity: true,
+      billToName: 'Practice',
+      billToEmail: '',
+      unitPence: 4000,
+    })])
+    expect(support).toHaveLength(1)
+    expect(support[0].lines[0].unitPence).toBe(4000)
   })
 
   it('keeps a voided session free to invoice again', () => {
@@ -132,6 +161,26 @@ describe('invoices', () => {
     expect(line?.quantity).toBe(1)
   })
 })
+
+function readyRow(clientId, clientName, extras = {}) {
+  return {
+    clientId,
+    clientName,
+    billToName: extras.billToName || 'Council',
+    billToEmail: extras.billToEmail || 'finance@council.test',
+    billedToContact: extras.billedToContact !== false,
+    marked: Boolean(extras.marked),
+    pricedActivity: Boolean(extras.pricedActivity),
+    line: {
+      appointmentId: clientId || 'practice',
+      description: clientName,
+      sessionDate: extras.sessionDate || '2026-10-06',
+      unitPence: extras.unitPence ?? 8000,
+      quantity: 1,
+      includesVat: false,
+    },
+  }
+}
 
 function batchRow(clientId, clientName) {
   return {

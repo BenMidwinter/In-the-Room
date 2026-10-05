@@ -12,6 +12,119 @@ import {
   paidPence,
 } from '../../lib/invoices'
 
+export function InvoiceDocument({
+  invoice,
+  today,
+  letterhead,
+  paymentText,
+  draftEditor = null,
+  onRemovePayment,
+}) {
+  const display = invoiceDisplayStatus(invoice, today)
+  const balance = invoiceBalancePence(invoice)
+  const anyVat = invoice.lines.some((line) => line.includesVat)
+  const showFor = invoice.forName && invoice.forName !== invoice.billToName
+  return (
+    <article className="invoice-sheet">
+      <LetterheadPreview letterhead={letterhead} />
+      <div className="invoice-sheet__meta">
+        <div>
+          <p className="invoice-sheet__kicker">{invoice.status === 'draft' ? 'Draft invoice' : 'Invoice'}</p>
+          <h2>{invoice.number}</h2>
+        </div>
+        <dl>
+          <div>
+            <dt>Status</dt>
+            <dd className={display === 'overdue' ? 'invoice-sheet__overdue' : undefined}>{invoiceStatusLabel(invoice, today)}</dd>
+          </div>
+          <div>
+            <dt>Issued</dt>
+            <dd>{invoice.issuedOn ? formatDisplayDate(invoice.issuedOn) : 'When you send it'}</dd>
+          </div>
+          <div>
+            <dt>Due</dt>
+            <dd>{invoice.dueOn ? formatDisplayDate(invoice.dueOn) : 'Set when you send it'}</dd>
+          </div>
+        </dl>
+      </div>
+      <p className="invoice-sheet__to">
+        <span>To</span>
+        {invoice.billToName}
+        {invoice.billToEmail ? <span className="invoice-sheet__email">{invoice.billToEmail}</span> : null}
+      </p>
+      {draftEditor}
+      {showFor ? <p className="invoice-sheet__to"><span>For</span> {invoice.forName}</p> : null}
+      <table className="invoice-sheet__table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Qty</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoice.lines.length === 0 ? (
+            <tr>
+              <td colSpan={3}>No lines yet.</td>
+            </tr>
+          ) : invoice.lines.map((line) => (
+            <tr key={line.id}>
+              <td>
+                {line.description}
+                {line.includesVat ? <span className="invoice-sheet__vat"> incl. VAT</span> : null}
+              </td>
+              <td>{line.quantity}</td>
+              <td>{formatGbpFromPence(lineAmountPence(line))}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th>Total</th>
+            <td />
+            <td>{formatGbpFromPence(invoice.totalPence)}</td>
+          </tr>
+          {invoice.payments.length > 0 && (
+            <tr>
+              <th>Paid</th>
+              <td />
+              <td>{formatGbpFromPence(paidPence(invoice.payments))}</td>
+            </tr>
+          )}
+          {invoice.status !== 'draft' && invoice.status !== 'void' && (
+            <tr>
+              <th>{balance === 0 ? 'Balance' : 'Balance due'}</th>
+              <td />
+              <td>{formatGbpFromPence(balance)}</td>
+            </tr>
+          )}
+        </tfoot>
+      </table>
+      {anyVat ? <p className="invoice-sheet__note">Lines marked incl. VAT already include VAT. The total is the amount to pay.</p> : null}
+      {invoice.payments.length > 0 && (
+        <ul className="invoice-sheet__payments">
+          {invoice.payments.map((payment) => (
+            <li key={payment.id}>
+              <span>{formatDisplayDate(payment.paidOn)} · {formatGbpFromPence(payment.amountPence)}</span>
+              {onRemovePayment ? (
+                <button type="button" className="secondary invoicing-no-print" onClick={() => onRemovePayment(payment.id)}>Remove</button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {paymentText ? (
+        <footer className="invoice-sheet__pay">
+          <h3>How to pay</h3>
+          {paymentText.split('\n').map((line) => <p key={line}>{line}</p>)}
+        </footer>
+      ) : (
+        <p className="invoice-sheet__note invoicing-no-print">Add payment details in Account settings before you send this, so the client knows where to pay.</p>
+      )}
+    </article>
+  )
+}
+
 export default function InvoiceSheet({
   invoice,
   today,
@@ -31,11 +144,8 @@ export default function InvoiceSheet({
   onRecordPayment,
   onRemovePayment,
 }) {
-  const display = invoiceDisplayStatus(invoice, today)
   const draft = invoice.status === 'draft'
   const balance = invoiceBalancePence(invoice)
-  const anyVat = invoice.lines.some((line) => line.includesVat)
-  const showFor = invoice.forName && invoice.forName !== invoice.billToName
 
   return (
     <div className="invoicing-sheet-wrap">
@@ -55,105 +165,16 @@ export default function InvoiceSheet({
         <p className="text-muted invoicing-no-print">Mark as sent when the draft is ready. It becomes Awaiting payment. Print is how you send it until email is connected.</p>
       )}
 
-      <article className="invoice-sheet">
-        <LetterheadPreview letterhead={letterhead} />
-        <div className="invoice-sheet__meta">
-          <div>
-            <p className="invoice-sheet__kicker">{draft ? 'Draft invoice' : 'Invoice'}</p>
-            <h2>{invoice.number}</h2>
-          </div>
-          <dl>
-            <div>
-              <dt>Status</dt>
-              <dd className={display === 'overdue' ? 'invoice-sheet__overdue' : undefined}>{invoiceStatusLabel(invoice, today)}</dd>
-            </div>
-            <div>
-              <dt>Issued</dt>
-              <dd>{invoice.issuedOn ? formatDisplayDate(invoice.issuedOn) : 'When you send it'}</dd>
-            </div>
-            <div>
-              <dt>Due</dt>
-              <dd>{invoice.dueOn ? formatDisplayDate(invoice.dueOn) : 'Set when you send it'}</dd>
-            </div>
-          </dl>
-        </div>
-        <p className="invoice-sheet__to">
-          <span>To</span>
-          {invoice.billToName}
-          {invoice.billToEmail ? <span className="invoice-sheet__email">{invoice.billToEmail}</span> : null}
-        </p>
-        {draft ? (
+      <InvoiceDocument
+        invoice={invoice}
+        today={today}
+        letterhead={letterhead}
+        paymentText={paymentText}
+        draftEditor={draft ? (
           <RecipientEditor key={`${invoice.id}:${invoice.billToName}:${invoice.billToEmail}`} invoice={invoice} onSave={onSaveRecipient} />
         ) : null}
-        {showFor ? <p className="invoice-sheet__to"><span>For</span> {invoice.forName}</p> : null}
-        <table className="invoice-sheet__table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th>Qty</th>
-              <th>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoice.lines.length === 0 ? (
-              <tr>
-                <td colSpan={3}>No lines yet.</td>
-              </tr>
-            ) : invoice.lines.map((line) => (
-              <tr key={line.id}>
-                <td>
-                  {line.description}
-                  {line.includesVat ? <span className="invoice-sheet__vat"> incl. VAT</span> : null}
-                </td>
-                <td>{line.quantity}</td>
-                <td>{formatGbpFromPence(lineAmountPence(line))}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr>
-              <th>Total</th>
-              <td />
-              <td>{formatGbpFromPence(invoice.totalPence)}</td>
-            </tr>
-            {invoice.payments.length > 0 && (
-              <tr>
-                <th>Paid</th>
-                <td />
-                <td>{formatGbpFromPence(paidPence(invoice.payments))}</td>
-              </tr>
-            )}
-            {invoice.status !== 'draft' && invoice.status !== 'void' && (
-              <tr>
-                <th>{balance === 0 ? 'Balance' : 'Balance due'}</th>
-                <td />
-                <td>{formatGbpFromPence(balance)}</td>
-              </tr>
-            )}
-          </tfoot>
-        </table>
-        {anyVat ? <p className="invoice-sheet__note">Lines marked incl. VAT already include VAT. The total is the amount to pay.</p> : null}
-        {invoice.payments.length > 0 && (
-          <ul className="invoice-sheet__payments">
-            {invoice.payments.map((payment) => (
-              <li key={payment.id}>
-                <span>{formatDisplayDate(payment.paidOn)} · {formatGbpFromPence(payment.amountPence)}</span>
-                {invoice.status !== 'void' ? (
-                  <button type="button" className="secondary invoicing-no-print" onClick={() => onRemovePayment(payment.id)}>Remove</button>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-        {paymentText ? (
-          <footer className="invoice-sheet__pay">
-            <h3>How to pay</h3>
-            {paymentText.split('\n').map((line) => <p key={line}>{line}</p>)}
-          </footer>
-        ) : (
-          <p className="invoice-sheet__note invoicing-no-print">Add payment details in Account settings before you send this, so the client knows where to pay.</p>
-        )}
-      </article>
+        onRemovePayment={invoice.status === 'void' ? undefined : onRemovePayment}
+      />
 
       {draft && (
         <div className="invoicing-no-print">

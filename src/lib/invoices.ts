@@ -214,11 +214,13 @@ export function invoiceRecipient({
     return {
       billToName: billing.map((contact) => String(contact.name || '').trim() || String(contact.email).trim()).join(', '),
       billToEmail: billing.map((contact) => String(contact.email).trim()).join(', '),
+      billedToContact: true,
     }
   }
   return {
     billToName: clientName || 'Client',
     billToEmail: String(clientEmail || '').trim(),
+    billedToContact: false,
   }
 }
 
@@ -281,6 +283,48 @@ export function invoiceStatusLabel(
   today: string,
 ): string {
   return DISPLAY_LABELS[invoiceDisplayStatus(invoice, today)]
+}
+
+export type ReadyInvoiceRow = BatchLine & {
+  billedToContact?: boolean
+  marked?: boolean
+  pricedActivity?: boolean
+}
+
+/** Sessions already held, plus any priced support or admin. Bookings join when includeUnheld is set. Clients who share a Send invoices to contact land on one invoice. */
+export function readyInvoiceGroups(rows: ReadyInvoiceRow[], options: { includeUnheld?: boolean } = {}): InvoiceBatch[] {
+  const includeUnheld = Boolean(options.includeUnheld)
+  const groups = new Map<string, InvoiceBatch & { names: string[] }>()
+  for (const row of rows) {
+    const pence = Math.trunc(Number(row.line?.unitPence) || 0)
+    if (pence <= 0) continue
+    if (!row.pricedActivity && !row.marked && !includeUnheld) continue
+    const share = Boolean(row.billedToContact && row.billToEmail.trim())
+    const key = share
+      ? `payer:${row.billToEmail.trim().toLowerCase()}`
+      : `client:${row.clientId || 'practice'}`
+    const current = groups.get(key) || {
+      key,
+      clientId: row.clientId,
+      billToName: row.billToName,
+      billToEmail: row.billToEmail,
+      forName: '',
+      lines: [],
+      names: [],
+    }
+    if (current.clientId && row.clientId && current.clientId !== row.clientId) current.clientId = null
+    if (!current.names.includes(row.clientName)) current.names.push(row.clientName)
+    current.lines.push(row.line)
+    groups.set(key, current)
+  }
+  return [...groups.values()].map((group) => ({
+    key: group.key,
+    clientId: group.names.length > 1 ? null : group.clientId,
+    billToName: group.billToName,
+    billToEmail: group.billToEmail,
+    forName: group.names.join(', '),
+    lines: [...group.lines].sort((a, b) => String(a.sessionDate || '').localeCompare(String(b.sessionDate || '')) || a.description.localeCompare(b.description)),
+  })).sort((a, b) => a.billToName.localeCompare(b.billToName) || a.forName.localeCompare(b.forName))
 }
 
 export function batchInvoiceGroups(rows: BatchLine[], mode: 'client' | 'payer'): InvoiceBatch[] {

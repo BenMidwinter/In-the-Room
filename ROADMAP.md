@@ -7,7 +7,7 @@ Living plan. The clinical workspace (caseload, calendar, notes, services, forms,
 ## 1. Missing features
 
 - [x] **Reporting.** Overview, Appointments & Notes, Clients, Waitlist, My Practice, and Finance. It opens on a rolling week, and every section can take other dates. Efficiency is appointment, support, and admin time as a percentage of availability minus busy time.
-- [x] **Invoicing.** A draft can start with no sessions. Lines come from uninvoiced appointments, support or admin time, or a free line, and the description, quantity, and price stay editable until it is sent. Bill-to starts from the client email, or from the contact marked Send invoices to, and can change on that draft alone. Batch invoicing is a filtered list you tick: one invoice per client, or one invoice per payer when several clients share one. Marking a draft as sent makes it Awaiting payment. Recording a payment amount can leave it Partially paid or Paid. Overdue is past the due date with a balance still open. Print is how it is sent until email exists. Xero sync and expenses are still to do.
+- [x] **Invoicing.** Ready to invoice lists everyone with a fee still to bill. Dates are optional. Sessions not yet held stay off until you include them. Create and send writes the invoices, marks them sent, and prints them together. People who share a Send invoices to contact go on one invoice. A single draft can still start empty, or from one session. Xero sync and expenses are still to do.
 
 Service prices, including whether the price already includes VAT, live on each service.
 
