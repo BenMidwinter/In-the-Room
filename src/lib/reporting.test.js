@@ -7,6 +7,7 @@ import {
   monthToDateRange,
   noteStateFor,
   rollingWeekRange,
+  practiceActivities,
   summariseAppointments,
   timeBuckets,
 } from './reporting'
@@ -68,6 +69,38 @@ describe('reporting', () => {
   it('reads a signed-off note as complete', () => {
     expect(noteStateFor([{ status: 'draft' }, { status: 'signed_off' }])).toBe('complete')
     expect(noteStateFor([])).toBe('missing')
+  })
+
+  it('lists clinical, CPD, and supervision hours together', () => {
+    const other = session({ id: 'c', attendance: 'attended', minutes: 60 })
+    other.serviceId = 'other'
+    other.serviceName = 'Other'
+    other.clientName = 'Bea'
+    const rows = practiceActivities(
+      [
+        session({ id: 'a', attendance: 'attended', minutes: 50 }),
+        session({ id: 'b', attendance: 'did_not_attend', minutes: 50 }),
+        other,
+      ],
+      {
+        cpd: [{ id: 'p1', occurred_on: '2026-10-02', minutes: 90, label: 'Conference' }],
+        supervision: [
+          { id: 's1', occurred_on: '2026-10-04', minutes: 60, label: 'Peer group', direction: 'received' },
+          { id: 's2', occurred_on: '2026-09-01', minutes: 60, label: 'Old', direction: 'delivered' },
+        ],
+      },
+      { from: '2026-10-01', to: '2026-10-07' },
+      'svc',
+    )
+    expect(rows.map((row) => row.kind)).toEqual(['Clinical', 'Supervision received', 'CPD'])
+    expect(rows[0]).toMatchObject({ activity: 'Ada', service: 'Session', minutes: 50 })
+    expect(rows.find((row) => row.kind === 'CPD')).toMatchObject({ activity: 'Conference', minutes: 90, service: '—' })
+    const unfiltered = practiceActivities(
+      [session({ id: 'a', attendance: 'attended', minutes: 50 }), other],
+      { cpd: [], supervision: [] },
+      { from: '2026-10-01', to: '2026-10-07' },
+    )
+    expect(unfiltered).toHaveLength(2)
   })
 
   it('averages days on the waitlist', () => {

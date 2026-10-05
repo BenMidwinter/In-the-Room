@@ -22,10 +22,12 @@ import {
   averageWaitDays,
   efficiencyFromMinutes,
   formatHoursFromMinutes,
+  formatPracticeHours,
   inDateRange,
   matchesClientTag,
   monthToDateRange,
   noteStateFor,
+  practiceActivities,
   quarterToDateRange,
   rollingWeekRange,
   summariseAppointments,
@@ -46,7 +48,7 @@ const FILTER_NOTE = {
   appointments: 'Filter by service, and by a client tag.',
   clients: 'Filter by a client tag. Service stays on the appointment sections.',
   waitlist: 'Filter by a waitlist tag, and by the appointment type they are waiting for.',
-  practice: 'Service narrows clinical hours. CPD and supervision stay the whole practice.',
+  practice: 'Service narrows the clinical rows. Filter the table by type, activity, or service. CPD and supervision stay in the list.',
   finance: 'Filter by service, and by a client tag.',
 }
 
@@ -511,27 +513,58 @@ function WaitlistSection({ people, tags, services, range, tagId, serviceId, toda
 }
 
 function PracticeSection({ cpd, supervision, appointments, range, serviceId }) {
-  const cpdMinutes = sumLogMinutes(cpd, range)
-  const supervisionMinutes = sumLogMinutes(supervision, range)
-  const received = sumLogMinutes(supervision.filter((entry) => entry.direction === 'received'), range)
-  const delivered = sumLogMinutes(supervision.filter((entry) => entry.direction === 'delivered'), range)
-  let clinical = 0
-  for (const appointment of appointments) {
-    if (appointment.externalBusy) continue
-    if (appointment.blockRole === 'support' || appointment.blockRole === 'admin' || appointment.blockRole === 'busy') continue
-    if (appointment.attendance !== 'attended') continue
-    if (!inDateRange(appointment.sessionDate, range)) continue
-    if (serviceId && appointment.serviceId !== serviceId) continue
-    clinical += minutesOf(appointment)
-  }
+  const activities = practiceActivities(appointments, { cpd, supervision }, range, serviceId)
+  const cpdMinutes = activities.filter((row) => row.kind === 'CPD').reduce((sum, row) => sum + row.minutes, 0)
+  const supervisionRows = activities.filter((row) => row.kind.startsWith('Supervision'))
+  const supervisionMinutes = supervisionRows.reduce((sum, row) => sum + row.minutes, 0)
+  const received = supervisionRows.filter((row) => row.kind === 'Supervision received').reduce((sum, row) => sum + row.minutes, 0)
+  const delivered = supervisionRows.filter((row) => row.kind === 'Supervision delivered').reduce((sum, row) => sum + row.minutes, 0)
+  const clinical = activities.filter((row) => row.kind === 'Clinical').reduce((sum, row) => sum + row.minutes, 0)
+  const rows = activities.map((row) => ({
+    id: row.id,
+    filterValues: {
+      kind: row.kind,
+      activity: row.activity,
+      service: row.service,
+    },
+    sortValues: {
+      date: row.date,
+      kind: row.kind,
+      activity: row.activity,
+      service: row.service,
+      hours: row.minutes,
+    },
+    cells: {
+      date: formatDisplayDate(row.date),
+      kind: row.kind,
+      activity: row.activity,
+      service: row.service,
+      hours: formatPracticeHours(row.minutes),
+    },
+  }))
   return (
-    <div className="section-card__stat-row">
-      <Stat label="Clinical hours" value={formatHoursFromMinutes(clinical)} detail="Attended appointments" />
-      <Stat label="CPD" value={formatHoursFromMinutes(cpdMinutes)} />
-      <Stat
-        label="Supervision"
-        value={formatHoursFromMinutes(supervisionMinutes)}
-        detail={`${formatHoursFromMinutes(received)} received · ${formatHoursFromMinutes(delivered)} delivered`}
+    <div className="reporting-section">
+      <div className="section-card__stat-row">
+        <Stat label="Clinical hours" value={formatHoursFromMinutes(clinical)} detail="Attended appointments" />
+        <Stat label="CPD" value={formatHoursFromMinutes(cpdMinutes)} />
+        <Stat
+          label="Supervision"
+          value={formatHoursFromMinutes(supervisionMinutes)}
+          detail={`${formatHoursFromMinutes(received)} received · ${formatHoursFromMinutes(delivered)} delivered`}
+        />
+      </div>
+      <RecordTable
+        columns={[
+          { key: 'date', label: 'Date', sort: 'date' },
+          { key: 'kind', label: 'Type', filter: 'choice', sort: 'text' },
+          { key: 'activity', label: 'Activity', filter: 'text', sort: 'text' },
+          { key: 'service', label: 'Service', filter: 'choice', sort: 'text' },
+          { key: 'hours', label: 'Hours', sort: 'number' },
+        ]}
+        rows={rows}
+        defaultSort={{ key: 'date', direction: 'desc' }}
+        countNoun="entries"
+        emptyMessage="No clinical hours, CPD, or supervision in these dates."
       />
     </div>
   )
@@ -603,18 +636,6 @@ function toReportAppointment(appointment, serviceById) {
     feePence: service?.fee_pence ?? null,
     feeIncludesVat: Boolean(service?.fee_includes_vat),
   }
-}
-
-function minutesOf(appointment) {
-  const [sh, sm] = String(appointment.startTime || '0:0').split(':').map(Number)
-  const [eh, em] = String(appointment.endTime || '0:0').split(':').map(Number)
-  return Math.max(0, (eh * 60 + em) - (sh * 60 + sm))
-}
-
-function sumLogMinutes(entries, range) {
-  return entries.reduce((sum, entry) => (
-    inDateRange(entry.occurred_on, range) ? sum + Number(entry.minutes || 0) : sum
-  ), 0)
 }
 
 async function listClientTagLinks() {

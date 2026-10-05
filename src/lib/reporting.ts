@@ -256,6 +256,80 @@ export function averageWaitDays(createdAts: string[], today: string): number | n
   return Math.round((total / createdAts.length) * 10) / 10
 }
 
+export type PracticeLogSource = {
+  id: string
+  occurred_on: string
+  minutes: number
+  label?: string | null
+  direction?: string | null
+}
+
+export type PracticeActivity = {
+  id: string
+  date: string
+  kind: string
+  activity: string
+  service: string
+  minutes: number
+}
+
+export function formatPracticeHours(minutes: number): string {
+  const hours = Math.round((Number(minutes) / 60) * 100) / 100
+  return `${hours}h`
+}
+
+export function practiceActivities(
+  appointments: ReportAppointment[],
+  logs: { cpd?: PracticeLogSource[]; supervision?: PracticeLogSource[] },
+  range: ReportRange,
+  serviceId = '',
+): PracticeActivity[] {
+  const rows: PracticeActivity[] = []
+  for (const appointment of appointments) {
+    if (roleOf(appointment) !== 'appointment') continue
+    if (appointment.attendance !== 'attended') continue
+    if (!inDateRange(appointment.sessionDate, range)) continue
+    if (serviceId && appointment.serviceId !== serviceId) continue
+    rows.push({
+      id: `clinical:${appointment.id}`,
+      date: appointment.sessionDate,
+      kind: 'Clinical',
+      activity: appointment.clientName || '—',
+      service: appointment.serviceName || '—',
+      minutes: slotMinutes(appointment.startTime, appointment.endTime),
+    })
+  }
+  for (const entry of logs.cpd || []) {
+    if (!inDateRange(String(entry.occurred_on || '').slice(0, 10), range)) continue
+    rows.push({
+      id: `cpd:${entry.id}`,
+      date: String(entry.occurred_on).slice(0, 10),
+      kind: 'CPD',
+      activity: String(entry.label || '').trim() || 'CPD',
+      service: '—',
+      minutes: Number(entry.minutes) || 0,
+    })
+  }
+  for (const entry of logs.supervision || []) {
+    if (!inDateRange(String(entry.occurred_on || '').slice(0, 10), range)) continue
+    const direction = entry.direction === 'delivered' || entry.direction === 'received' ? entry.direction : ''
+    rows.push({
+      id: `supervision:${entry.id}`,
+      date: String(entry.occurred_on).slice(0, 10),
+      kind: direction === 'delivered'
+        ? 'Supervision delivered'
+        : direction === 'received'
+          ? 'Supervision received'
+          : 'Supervision',
+      activity: String(entry.label || '').trim() || 'Supervision',
+      service: '—',
+      minutes: Number(entry.minutes) || 0,
+    })
+  }
+  rows.sort((a, b) => b.date.localeCompare(a.date) || a.kind.localeCompare(b.kind) || a.activity.localeCompare(b.activity))
+  return rows
+}
+
 export function matchesClientTag(
   clientId: string | null | undefined,
   tagId: string,
