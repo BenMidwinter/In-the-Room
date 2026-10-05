@@ -28,7 +28,6 @@ import {
   listInvoices,
   loadPaymentDetails,
   removeInvoiceLine,
-  savePaymentDetails,
   setInvoiceStatus,
 } from '../../lib/supabase/invoicesRepo'
 
@@ -46,11 +45,6 @@ export default function InvoicingPage() {
   const invoicesQuery = useQuery({
     queryKey: ['invoices', userId],
     queryFn: listInvoices,
-    enabled: Boolean(userId),
-  })
-  const paymentQuery = useQuery({
-    queryKey: ['invoice-payment', userId],
-    queryFn: loadPaymentDetails,
     enabled: Boolean(userId),
   })
   const appointmentsQuery = useAllAppointmentsQuery()
@@ -106,6 +100,11 @@ export default function InvoicingPage() {
   }, [appointmentsQuery.data, serviceById, invoices, policy, clientName])
 
   const open = invoices.find((invoice) => invoice.id === openId) || null
+  const paymentQuery = useQuery({
+    queryKey: ['invoice-payment', userId],
+    queryFn: loadPaymentDetails,
+    enabled: Boolean(userId) && open?.status === 'draft',
+  })
   const letterhead = printLetterheadFromRow(
     preferredLetterhead(letterheadsQuery.data || []),
     identityQuery.data || { clinicianName: '', professionalTitle: '' },
@@ -210,7 +209,7 @@ export default function InvoicingPage() {
       <PageHeader
         className={open ? 'invoicing-no-print' : ''}
         title="Invoicing"
-        subtitle="Create an invoice from sessions, then print it and send it to the client."
+        subtitle="Create an invoice from sessions, then print it and send it. Payment details are in Account settings."
       />
 
       {open ? (
@@ -230,16 +229,6 @@ export default function InvoicingPage() {
             <Stat label="Drafts" value={draftCount} />
             <Stat label="Outstanding" value={formatGbpFromPence(outstandingPence)} detail="Issued, not marked paid" />
           </div>
-
-          <PaymentDetailsCard
-            key={JSON.stringify(paymentQuery.data || EMPTY_PAYMENT)}
-            details={paymentQuery.data || EMPTY_PAYMENT}
-            onSave={async (details) => {
-              await savePaymentDetails(details)
-              await queryClient.invalidateQueries({ queryKey: ['invoice-payment', userId] })
-              toast.success('Payment details saved')
-            }}
-          />
 
           <section className="invoicing-block">
             <h2 className="invoicing-block__title">Sessions to invoice</h2>
@@ -292,69 +281,6 @@ export default function InvoicingPage() {
         </>
       )}
     </div>
-  )
-}
-
-function PaymentDetailsCard({ details, onSave }) {
-  const toast = useToast()
-  const [accountName, setAccountName] = useState(details.accountName)
-  const [sortCode, setSortCode] = useState(details.sortCode)
-  const [accountNumber, setAccountNumber] = useState(details.accountNumber)
-  const [note, setNote] = useState(details.note)
-  const [dueDays, setDueDays] = useState(String(details.dueDays ?? 14))
-  const [saving, setSaving] = useState(false)
-
-  async function onSubmit(event) {
-    event.preventDefault()
-    const days = Number(dueDays)
-    if (!Number.isFinite(days) || days < 0 || days > 365) {
-      toast.error('Due days should be from 0 to 365.')
-      return
-    }
-    setSaving(true)
-    try {
-      await onSave({
-        accountName,
-        sortCode,
-        accountNumber,
-        note,
-        dueDays: days,
-      })
-    } catch (err) {
-      toast.error(err?.message || 'Could not save payment details')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <form className="invoicing-payment" onSubmit={onSubmit}>
-      <div>
-        <h2 className="invoicing-block__title">Payment details</h2>
-        <p className="text-muted">These are copied onto an invoice when you issue it.</p>
-      </div>
-      <label>
-        Account name
-        <input value={accountName} onChange={(event) => setAccountName(event.target.value)} />
-      </label>
-      <label>
-        Sort code
-        <input value={sortCode} onChange={(event) => setSortCode(event.target.value)} placeholder="00-00-00" />
-      </label>
-      <label>
-        Account number
-        <input value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} />
-      </label>
-      <label>
-        Note
-        <input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Use the invoice number as the reference" />
-      </label>
-      <label>
-        Due in days
-        <input type="number" min="0" max="365" value={dueDays} onChange={(event) => setDueDays(event.target.value)} />
-      </label>
-      <button type="submit" className="secondary" disabled={saving}>Save payment details</button>
-    </form>
   )
 }
 
