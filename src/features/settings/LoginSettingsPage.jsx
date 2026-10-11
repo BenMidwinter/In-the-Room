@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
 import { SettingsSectionCard } from './SettingsPlaceholders'
 import { getSupabase } from '../../lib/supabase/client'
+import { confirmCurrentPassword } from '../../lib/auth/confirmPassword'
 import { useToast } from '../../components/ui'
 
 export default function LoginSettingsPage() {
   const toast = useToast()
   const [email, setEmail] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState(null)
+  const [passwordError, setPasswordError] = useState(null)
   const [busyEmail, setBusyEmail] = useState(false)
   const [busyPassword, setBusyPassword] = useState(false)
 
@@ -45,30 +48,41 @@ export default function LoginSettingsPage() {
 
   const updatePassword = async (event) => {
     event.preventDefault()
-    setError(null)
+    setPasswordError(null)
+    if (!currentPassword) {
+      setPasswordError('Enter your current password.')
+      return
+    }
     if (password.length < 8) {
-      setError('Use at least 8 characters.')
+      setPasswordError('Use at least 8 characters.')
       return
     }
     if (password !== confirm) {
-      setError('Passwords do not match.')
+      setPasswordError('Passwords do not match.')
       return
     }
     const supabase = getSupabase()
     if (!supabase) {
-      setError('Supabase is not configured.')
+      setPasswordError('Supabase is not configured.')
       return
     }
     setBusyPassword(true)
-    const { error: updateError } = await supabase.auth.updateUser({ password })
-    setBusyPassword(false)
-    if (updateError) {
-      setError(updateError.message)
-      return
+    try {
+      await confirmCurrentPassword(currentPassword)
+      const { error: updateError } = await supabase.auth.updateUser({ password })
+      if (updateError) {
+        setPasswordError(updateError.message)
+        return
+      }
+      setCurrentPassword('')
+      setPassword('')
+      setConfirm('')
+      toast.saved()
+    } catch (err) {
+      setPasswordError(err?.message || 'That password does not match.')
+    } finally {
+      setBusyPassword(false)
     }
-    setPassword('')
-    setConfirm('')
-    toast.saved()
   }
 
   return (
@@ -99,6 +113,17 @@ export default function LoginSettingsPage() {
       <SettingsSectionCard blockId="settings_login_password" title="Password">
         <form className="settings-form" onSubmit={updatePassword}>
           <label className="settings-form__field">
+            <span>Current password</span>
+            <input
+              className="paper-input"
+              type="password"
+              autoComplete="current-password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              required
+            />
+          </label>
+          <label className="settings-form__field">
             <span>New password</span>
             <input
               className="paper-input"
@@ -122,6 +147,7 @@ export default function LoginSettingsPage() {
               minLength={8}
             />
           </label>
+          {passwordError && <p className="auth-page__alert" role="alert">{passwordError}</p>}
           <button type="submit" className="btn btn-primary" disabled={busyPassword}>
             {busyPassword ? 'Saving…' : 'Update password'}
           </button>

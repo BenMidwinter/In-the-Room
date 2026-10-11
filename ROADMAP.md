@@ -32,13 +32,13 @@ Encryption wiring is the next piece of work. Organisation id is the owner of the
 ## 3. Data management
 
 - [ ] Private document storage in a London S3 bucket, linked to AWS, with short-lived upload and download links.
-- [ ] A caseload export the clinician can open, with clinical records decrypted for them.
+- [ ] **Export by email.** One client, or the whole practice, as a `.zip` of the individual files. The clinician chooses what is included. The server builds the file and emails a one-time link to the account address. The browser session never receives the file.
 
-This follows the encryption and login patch, because the export has to decrypt notes. Hours, fees, and attendance can be exported before that, because they are not the clinical note.
+The export uses the private London store for the zip, and the same mail provider as invoice email for the link. Clinical text is decrypted on the server for the person who asked, then placed in the zip. See the export plan below.
 
 ## Later, not the next piece of work
 
-- [ ] **Add clients to the waitlist manually.** A clinician can place someone on the waitlist without sending a public form.
+- [x] **Add clients to the waitlist manually.** On the waitlist, Add client records someone without a public form.
 - [ ] **Groups.** Record who attended a group session, with a note and a fee for each person, and invoice those people from that session. On the list, and not a priority.
 - [ ] **Mandatory MFA, as a final step.** Enrol a phone code, then turn on the second-factor lock so a clinical payload is readable only after that code. Leave it until the rest of the product is in place.
 
@@ -79,13 +79,17 @@ This follows the encryption and login patch, because the export has to decrypt n
       );
       ```
 
-- [ ] **Self-Serve Caseload Portability & Off-Boarding Engine**
-  - Build a background worker / Supabase Edge Function to generate an asynchronous **Full Caseload Export**:
-    - Serialises client demographics, clinical session notes, outcome measures, and assessment scores into clean JSON and CSV formats.
-    - Fetches and bundles all associated client PDFs (psychiatrist letters, reports) from AWS S3 storage.
-    - Bundles everything into an encrypted `.zip` archive delivered via a time-limited, signed S3 download link (valid for 24 hours).
-  - Guarantees zero vendor lock-in, enabling clinicians to satisfy HCPC/NCIP statutory retention duties or migrate data if closing an account.
-  - Automatically records an audit log event upon export request and download completion.
+- [ ] **Export plan (Splose-style, emailed to the account)**
+  - Two places to ask:
+    - A client profile action, **Export**. Tick what to include, or select all: profile, contacts, notes, letters, documents, working documents, reports, forms and scores, appointments, support, and invoices.
+    - **Settings → Export** for the whole practice. Same client groups, for every client, plus services, availability, journal, practice documents, CPD, supervision, templates, form designs, questionnaires, tags, and letterheads. A date range can limit notes, appointments, invoices, the journal, and the logs. Bank and invoice details are included, because they belong to the account.
+  - The file is one `.zip`. Each note, letter, document, report, and form is its own file under that client. Lists such as appointments and contacts are tables inside the same zip. A contents list names every file.
+  - The request is stored, then a background job builds the zip. It opens sealed text through the existing clinical record path, for the signed-in clinician only. The browser does not download the zip from that request.
+  - The finished zip sits in the private London bucket. A random token is stored only as a hash. The message goes to the account email, not to an address typed on the form.
+  - The link opens a page on this site with a **Download** button. Opening the page does not use the token up, so a mail scanner does not expire it. The button works once, and only within 24 hours of the file being ready. After that the zip is deleted.
+  - Settings can show that an export is preparing, emailed, or expired. It does not offer the file itself. A stolen sign-in can ask for an export, and still cannot collect the zip without the account inbox.
+  - Record `export.requested` and `export.downloaded` in the audit log.
+  - Splose also lets a workspace pick which colleague receives a client export, and its settings page can download the file directly. This plan keeps the email link and the checklist, and leaves those two out.
 
 ---
 

@@ -11,6 +11,13 @@ const PRIMARY_TABS = [
   { to: '/settings/tags', label: 'Tags' },
   { to: '/settings/2fa', label: '[2FA]' },
   { to: '/settings/integrations', label: 'Integrations' },
+  { to: '/settings/legal', label: 'Legal' },
+]
+
+const LEGAL_TABS = [
+  { to: '/settings/legal/dpa', label: 'Data processing agreement' },
+  { to: '/settings/legal/privacy', label: 'Privacy policy' },
+  { to: '/settings/legal/terms', label: 'Terms and conditions' },
 ]
 
 const TEMPLATE_TABS = [
@@ -23,6 +30,7 @@ const TEMPLATE_TABS = [
 export default function SettingsLayout() {
   const { pathname } = useLocation()
   const onTemplates = pathname.startsWith('/settings/templates')
+  const onLegal = pathname.startsWith('/settings/legal')
 
   return (
     <div className="page page--settings">
@@ -30,6 +38,7 @@ export default function SettingsLayout() {
         <PageHeader title="Settings" />
         <SectionNav label="Settings" items={PRIMARY_TABS} />
         {onTemplates && <SectionNav label="Template types" items={TEMPLATE_TABS} />}
+        {onLegal && <SectionNav label="Legal documents" items={LEGAL_TABS} />}
       </div>
       <div className="settings-panel">
         <Outlet />

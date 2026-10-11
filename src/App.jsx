@@ -29,6 +29,7 @@ import AccountSettingsPage from './features/settings/AccountSettingsPage'
 import AvailabilitySettingsPage from './features/settings/AvailabilitySettingsPage'
 import ServicesSettingsPage from './features/settings/ServicesSettingsPage'
 import IntegrationsSettingsPage from './features/settings/IntegrationsSettingsPage'
+import LegalSettingsPage from './features/settings/LegalSettingsPage'
 import { TwoFactorSettingsPage } from './features/settings/SettingsPlaceholders'
 import FormsSettingsPage from './features/settings/FormsSettingsPage'
 import TagsSettingsPage from './features/settings/TagsSettingsPage'
@@ -144,6 +145,8 @@ export default function App() {
           <Route path="password" element={<Navigate to="/settings/account" replace />} />
           <Route path="2fa" element={<TwoFactorSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
+          <Route path="legal" element={<Navigate to="dpa" replace />} />
+          <Route path="legal/:doc" element={<LegalSettingsPage />} />
         </Route>
         <Route path="resources" element={<Resources />} />
         <Route path="about" element={<About />} />

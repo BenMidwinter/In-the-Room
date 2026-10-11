@@ -1,3 +1,4 @@
+import { upsertClientRemote } from './clientsRepo'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase } from './client'
 import type { Json } from './database.types'
@@ -281,6 +282,43 @@ export async function saveWaitlistPlacement(input: {
       .from('client_tag_links')
       .insert(tagIds.map((tagId) => ({ client_id: input.clientId, tag_id: tagId })))
     if (error) throw error
+  }
+}
+
+export async function addClientToWaitlist(input: {
+  userId: string
+  firstName: string
+  surname: string
+  dob: string
+  email: string
+  preferredTimes: string
+  information: string
+  serviceId: string | null
+  tagIds: string[]
+}): Promise<void> {
+  const created = await upsertClientRemote({
+    first_name: input.firstName,
+    surname: input.surname,
+    dob: input.dob,
+    email: input.email,
+    status: 'waitlist',
+  }, input.userId)
+  try {
+    await saveWaitlistPlacement({
+      clientId: created.id,
+      preferredTimes: input.preferredTimes,
+      information: input.information,
+      serviceId: input.serviceId,
+      tagIds: input.tagIds,
+      accept: false,
+    })
+  } catch (err) {
+    try {
+      await supabaseOrThrow().from('clients').delete().eq('id', created.id)
+    } catch {
+      // Show the reason the waitlist record failed.
+    }
+    throw err
   }
 }
 

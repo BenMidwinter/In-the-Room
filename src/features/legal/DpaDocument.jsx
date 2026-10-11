@@ -1,6 +1,6 @@
-export default function DpaDocument() {
+export default function DpaDocument({ embedded = false }) {
   return (
-    <article className="legal-doc">
+    <article className={embedded ? 'legal-doc legal-doc--embedded' : 'legal-doc'}>
       <header className="legal-doc__header">
         <h1>Data Processing Agreement</h1>
         <p className="legal-doc__meta">Last Updated: October 2026</p>
