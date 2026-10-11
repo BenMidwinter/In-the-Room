@@ -1,4 +1,4 @@
-# In the Room — Product Roadmap
+# Process&Note — Product Roadmap
 
 Living plan. The clinical workspace (caseload, calendar, notes, services, forms, screener, Google Calendar busy sync) is in use. The order below is the broader list.
 
@@ -18,15 +18,15 @@ Noted from the hosted site. These stay on the list while encryption is the next 
 - [ ] Standardise text size between pages.
 - [ ] Evaluate the calendar layout. The text is a bit squeezed.
 - [ ] Make back buttons return to the previous screen.
-- [ ] Rename the product to Process&Note, and use the logos already chosen.
+- [x] Rename the product to Process&Note, and use the logos already chosen.
 
 ## 2. Encryption and login — next
 
-Encryption wiring is the next piece of work. Organisation id is the owner of the clients, ready for a later workspace. The people using the app now are freelance clinicians, one account each. MFA enrolment follows encryption, and the second-factor lock stays off until the phone code works.
+Encryption wiring is the next piece of work. Organisation id is the owner of the clients, ready for a later workspace. The people using the app now are freelance clinicians, one account each. MFA stays off for now. Enrolment and the second-factor lock are a final step, after the rest of the product is in place.
 
 - [ ] Envelope encryption for client text and editor text, on top of notes, letters, reports, form answers, and outcome totals. Client names, contacts, clinical profiles, appointment notes, waitlist text, tags, and invoice addressees are included. Journal, working documents, practice documents, templates, form wording, questionnaires, and CPD or supervision notes are included. Bank details are included. The clinician’s name, email, phone, bio, registration, and letterhead stay readable so an account can be supported. Operational columns stay readable: appointment times, attendance, note status, invoice amounts, and service prices.
 - [ ] Keep the current dummy rows. New writes use the envelope. Existing rows stay plain, so the two can be compared. Wipe every test row in one go only when a stable beta is ready.
-- [ ] Data processing agreement and mandatory MFA. A clinical payload is readable only after the second factor. Turn that check on at the same time as MFA enrolment, once the code from the phone has been confirmed.
+- [ ] Data processing agreement. The second-factor lock stays off until MFA is enrolled as a final step.
 
 ## 3. Data management
 
@@ -37,7 +37,9 @@ This follows the encryption and login patch, because the export has to decrypt n
 
 ## Later, not the next piece of work
 
+- [ ] **Add clients to the waitlist manually.** A clinician can place someone on the waitlist without sending a public form.
 - [ ] **Groups.** Record who attended a group session, with a note and a fee for each person, and invoice those people from that session. On the list, and not a priority.
+- [ ] **Mandatory MFA, as a final step.** Enrol a phone code, then turn on the second-factor lock so a clinical payload is readable only after that code. Leave it until the rest of the product is in place.
 
 ---
 

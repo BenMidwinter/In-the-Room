@@ -157,7 +157,7 @@ Deno.serve(async (req) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          summary: summary || 'In the Room session',
+          summary: summary || 'Process&Note session',
           start: { dateTime: startsAt },
           end: { dateTime: endsAt },
           transparency: 'opaque',

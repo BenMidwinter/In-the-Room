@@ -1,5 +1,5 @@
 /* ─────────────────────────────────────────────────────────────────────────
-   In the Room — design tokens + Tailwind @theme bridge.
+   Process&Note — design tokens + Tailwind @theme bridge.
    ───────────────────────────────────────────────────────────────────────── */
 
 @theme {
@@ -38,7 +38,7 @@
 :root,
 [data-theme='practice'] {
   /* Layout & typography */
-  --nav-width: 13.75rem;
+  --nav-width: 11.25rem;
   --nav-height: 0px;
   --space-inline: 1.5rem;
   --space-block: 1.25rem;

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import PageHeader from './PageHeader'
+import { PRODUCT_NAME } from '../lib/brand'
 
 export default function About() {
   const [activeTab, setActiveTab] = useState('overview')
@@ -7,7 +8,7 @@ export default function About() {
   return (
     <div className="page">
       <PageHeader
-        title="About In the Room"
+        title={`About ${PRODUCT_NAME}`}
       />
 
       <div className="tabs">

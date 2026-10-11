@@ -48,7 +48,7 @@ export function isInTheRoomGoogleEvent(
   const priv = event.extendedProperties?.private || {}
   if (priv.source === ITR_GOOGLE_SOURCE || priv.in_the_room === '1') return true
   const summary = String(event.summary || '').trim()
-  if (/^in the room\b/i.test(summary)) return true
+  if (/^in the room\b/i.test(summary) || /^process&note\b/i.test(summary)) return true
   return false
 }
 

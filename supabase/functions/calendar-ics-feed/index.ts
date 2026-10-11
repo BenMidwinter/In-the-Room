@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     const lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//In the Room//EN',
+      'PRODID:-//Process&Note//EN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
     ]

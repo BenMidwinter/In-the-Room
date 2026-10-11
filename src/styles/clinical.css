@@ -106,7 +106,7 @@
     left: 0;
     right: auto;
     bottom: 0;
-    width: min(14rem, 86vw);
+    width: min(var(--nav-width), 86vw);
     flex: none;
     height: 100vh;
     height: 100dvh;
@@ -144,12 +144,11 @@
 
   .top-nav__mobile-bar .top-nav__brand {
     min-width: 0;
-    font-size: 0.98rem;
   }
 
-  .top-nav__mobile-bar .top-nav__brand-text {
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .top-nav__mobile-bar .top-nav__brand-mark {
+    width: 2rem;
+    height: 2rem;
   }
 
   .top-nav__mobile-bar .top-nav__menu-btn {

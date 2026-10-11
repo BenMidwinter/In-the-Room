@@ -17,13 +17,11 @@
   box-shadow: var(--elevation-paper-1, none);
 }
 
-.auth-page__brand {
-  margin: 0 0 0.75rem;
-  font-family: var(--font-head);
-  font-size: 1.35rem;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: var(--col-accent);
+.auth-page__logo {
+  display: block;
+  width: min(16.5rem, 100%);
+  height: auto;
+  margin: 0 auto 1.15rem;
 }
 
 .auth-page__title {

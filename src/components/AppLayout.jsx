@@ -7,6 +7,7 @@ import { AppSessionProvider } from '../lib/AppSessionContext'
 import { AppointmentOverlayProvider } from '../features/appointments/AppointmentOverlay'
 import { useAuth } from '../lib/auth/AuthProvider'
 import RequireAuth from './RequireAuth'
+import { brandIconUrl, PRODUCT_NAME } from '../lib/brand'
 
 const NAV_ITEMS = [
   { to: '/home', label: 'Home', end: true },
@@ -86,10 +87,8 @@ function AppShell() {
       <header className={`top-nav${menuOpen ? ' top-nav--open' : ''}`}>
         <div className="top-nav__inner">
           <div className="top-nav__brand-row">
-            <NavLink to="/home" className="top-nav__brand">
-              <span className="top-nav__brand-text">
-                <span className="top-nav__brand-name">In the Room</span>
-              </span>
+            <NavLink to="/home" className="top-nav__brand" aria-label={PRODUCT_NAME}>
+              <img className="top-nav__brand-mark" src={brandIconUrl} alt="" />
             </NavLink>
             <button
               type="button"
@@ -152,10 +151,8 @@ function AppShell() {
 
       <main className={`main-content${isProgressNotes ? ' main-content--progress-notes' : ''}`}>
         <div className="top-nav__mobile-bar">
-          <NavLink to="/home" className="top-nav__brand top-nav__brand--compact">
-            <span className="top-nav__brand-text">
-              <span className="top-nav__brand-name">In the Room</span>
-            </span>
+          <NavLink to="/home" className="top-nav__brand top-nav__brand--compact" aria-label={PRODUCT_NAME}>
+            <img className="top-nav__brand-mark" src={brandIconUrl} alt="" />
           </NavLink>
           <button
             type="button"

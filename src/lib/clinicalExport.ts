@@ -452,7 +452,7 @@ export function exportClinicalNotes(
         const body = notes.map((n: { author_id?: string }) =>
           noteToPlainBlock(n, getAuthorName?.(n.author_id || ''), branding),
         ).join('\n\n---\n\n')
-        const header = `${branding.name}\n${formatWorkplaceAddress(branding)}\n\nIn the Room Clinical Record — ${clientName || 'Client'}\nExported: ${timestamp}\nNotes: ${notes.length}\n\n`
+        const header = `${branding.name}\n${formatWorkplaceAddress(branding)}\n\nProcess&Note Clinical Record — ${clientName || 'Client'}\nExported: ${timestamp}\nNotes: ${notes.length}\n\n`
         downloadBlob(
           `${safeName}-clinical-record-${timestamp}.pdf`,
           new Blob([header + body], { type: 'application/pdf' }),

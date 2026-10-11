@@ -665,7 +665,7 @@ async function ensureMeetLink(appointment: AppAppointment, requested: boolean): 
       appointmentId: appointment.id,
       startsAt: new Date(`${appointment.session_date}T${appointment.start_time}:00`).toISOString(),
       endsAt: new Date(`${appointment.session_date}T${appointment.end_time}:00`).toISOString(),
-      summary: appointment.service_name || 'In the Room session',
+      summary: appointment.service_name || 'Process&Note session',
     })
     if (!meet.meetUrl) return appointment
     const next = { ...appointment, meet_url: meet.meetUrl }

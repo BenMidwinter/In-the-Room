@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth/AuthProvider'
+import { brandLogoUrl, PRODUCT_NAME } from '../lib/brand'
 
 export default function RequireAuth({ children }) {
   const { configured, loading, user } = useAuth()
@@ -9,7 +10,7 @@ export default function RequireAuth({ children }) {
     return (
       <div className="auth-page">
         <div className="auth-page__card">
-          <p className="auth-page__brand">In the Room</p>
+          <img className="auth-page__logo" src={brandLogoUrl} alt={PRODUCT_NAME} />
           <h1 className="auth-page__title">Configuration needed</h1>
           <p className="auth-page__lead">
             Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> to connect auth.
@@ -23,7 +24,7 @@ export default function RequireAuth({ children }) {
     return (
       <div className="auth-page">
         <div className="auth-page__card">
-          <p className="auth-page__brand">In the Room</p>
+          <img className="auth-page__logo" src={brandLogoUrl} alt={PRODUCT_NAME} />
           <p className="auth-page__lead">Checking your session…</p>
         </div>
       </div>

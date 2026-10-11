@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../lib/auth/AuthProvider'
+import { brandLogoUrl, PRODUCT_NAME } from '../../lib/brand'
 
 export default function AuthPage() {
   const { configured, loading, user, signIn, signUp } = useAuth()
@@ -49,7 +50,7 @@ export default function AuthPage() {
   return (
     <div className="auth-page">
       <div className="auth-page__card">
-        <p className="auth-page__brand">In the Room</p>
+        <img className="auth-page__logo" src={brandLogoUrl} alt={PRODUCT_NAME} />
         <h1 className="auth-page__title">
           {mode === 'signin' ? 'Sign in to your practice' : 'Create your practice account'}
         </h1>

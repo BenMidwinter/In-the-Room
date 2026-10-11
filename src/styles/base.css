@@ -56,7 +56,7 @@ a:hover { text-decoration: underline; }
 .top-nav__inner {
   width: 100%;
   height: 100%;
-  padding: 1rem 0.85rem 1.1rem;
+  padding: 0.85rem 0.6rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -77,41 +77,21 @@ a:hover { text-decoration: underline; }
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0;
-  font-weight: 600;
-  font-size: 1.85rem;
   color: var(--col-accent);
   text-decoration: none;
-  flex-shrink: 1;
-  min-width: 0;
-  text-align: right;
-}
-
-.top-nav__brand-text {
-  display: block;
+  flex-shrink: 0;
   min-width: 0;
 }
 
-.top-nav__brand-name {
+.top-nav__brand-mark {
   display: block;
-  font-family: var(--font-head);
-  font-weight: 600;
-  font-size: 1.85rem;
-  font-variation-settings: var(--font-head-variation-brand);
-  font-optical-sizing: none;
-  line-height: 1.15;
-  color: var(--col-accent);
-  letter-spacing: -0.025em;
-  white-space: normal;
-  text-align: right;
-}
-
-.top-nav__brand-suffix {
-  display: none;
+  width: 3.15rem;
+  height: 3.15rem;
+  object-fit: contain;
 }
 
 .top-nav__brand:hover { text-decoration: none; }
-.top-nav__brand:hover .top-nav__brand-name { color: var(--col-primary-dark); }
+.top-nav__brand:hover .top-nav__brand-mark { opacity: 0.82; }
 
 .top-nav__links {
   display: flex;
