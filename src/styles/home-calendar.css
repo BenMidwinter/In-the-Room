@@ -1222,42 +1222,6 @@ button.home-stat-card__link {
   flex-shrink: 0;
 }
 
-.calendar-toolbar__btn {
-  padding: 0.4rem 0.7rem;
-  font-size: var(--text-ui);
-  font-weight: 600;
-  color: var(--txt-primary);
-  background: var(--bg-page);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-}
-
-.calendar-toolbar__btn:hover {
-  background: var(--bg-zone-accent);
-  border-color: var(--col-accent);
-}
-
-.calendar-toolbar__btn--today {
-  background: var(--col-primary-light);
-  border-color: var(--col-primary);
-  color: var(--col-primary-dark);
-}
-
-.calendar-toolbar__btn--add {
-  background: var(--col-primary);
-  border-color: var(--col-primary-dark);
-  color: #fff;
-  flex-shrink: 0;
-}
-
-.calendar-toolbar__btn--add:hover {
-  background: var(--col-primary-dark);
-  border-color: var(--col-primary-dark);
-  color: #fff;
-}
-
 .calendar-toolbar__period {
   margin: 0;
   font-size: var(--text-card);

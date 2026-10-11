@@ -185,50 +185,61 @@ button, .btn {
   border-radius: var(--radius-md);
 }
 
+/* One action-button style, used as a button or a link. */
+.primary,
+.secondary,
+.danger,
+.btn-primary,
+.btn-secondary,
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--text-ui);
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .primary, .btn-primary {
   background-color: var(--col-primary);
   color: var(--txt-inverse);
   border: 1px solid var(--col-primary-dark);
-  padding: 0.5rem 1rem;
-  font-size: var(--text-ui);
 }
 
 .primary:hover, .btn-primary:hover {
   background-color: var(--col-primary-dark);
   border-color: var(--col-primary-dark);
+  text-decoration: none;
 }
 
 .danger, .btn-danger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   background: #b42318;
   color: #fff;
   border: 1px solid #8f1d14;
-  padding: 0.5rem 1rem;
-  font-size: var(--text-ui);
 }
 
 .danger:hover, .btn-danger:hover {
   background: #8f1d14;
   border-color: #8f1d14;
+  text-decoration: none;
 }
 
 .secondary, .btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--bg-surface);
+  background: var(--bg-page);
   color: var(--col-accent);
   border: 1px solid var(--border-color);
-  padding: 0.5rem 1rem;
-  font-size: var(--text-ui);
-  text-decoration: none;
-  cursor: pointer;
 }
 
 .secondary:hover, .btn-secondary:hover {
-  background: var(--bg-page);
+  background: var(--bg-muted);
   border-color: var(--col-accent);
   text-decoration: none;
 }
@@ -1453,6 +1464,7 @@ a.badge {
   background: none;
   border: 0;
   border-bottom: 2px solid transparent;
+  border-radius: 0;
   white-space: nowrap;
   line-height: 1.2;
   cursor: pointer;

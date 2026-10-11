@@ -1116,16 +1116,16 @@ export default function CalendarModule({ persona }) {
         </div>
         <div className="page-header__toolbar calendar-toolbar">
           <div className="calendar-toolbar__primary">
-            <button type="button" className="calendar-toolbar__btn calendar-toolbar__btn--add" onClick={openAddAppointment}>
+            <button type="button" className="primary" onClick={openAddAppointment}>
               + New booking
             </button>
-            <button type="button" className="calendar-toolbar__btn calendar-toolbar__btn--today" onClick={jumpToday}>
+            <button type="button" className="secondary" onClick={jumpToday}>
               Today
             </button>
             {viewMode !== 'upcoming' && (
               <div className="calendar-toolbar__nav">
-                <button type="button" className="calendar-toolbar__btn" onClick={() => navigateDate(viewMode === 'month' ? -30 : viewMode === 'day' ? -1 : -7)} aria-label="Previous period">←</button>
-                <button type="button" className="calendar-toolbar__btn" onClick={() => navigateDate(viewMode === 'month' ? 30 : viewMode === 'day' ? 1 : 7)} aria-label="Next period">→</button>
+                <button type="button" className="secondary" onClick={() => navigateDate(viewMode === 'month' ? -30 : viewMode === 'day' ? -1 : -7)} aria-label="Previous period">←</button>
+                <button type="button" className="secondary" onClick={() => navigateDate(viewMode === 'month' ? 30 : viewMode === 'day' ? 1 : 7)} aria-label="Next period">→</button>
               </div>
             )}
             <p className="calendar-toolbar__period">{periodLabel}</p>
