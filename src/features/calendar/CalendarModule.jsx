@@ -98,6 +98,10 @@ function eventEndMinutes(appt) {
   return start + 60
 }
 
+function appointmentMinutes(appt) {
+  return Math.max(0, eventEndMinutes(appt) - parseMinutes(appt.start_time))
+}
+
 function isCancelled(appt) {
   return appt.attendance_status === 'cancelled'
 }
@@ -188,6 +192,7 @@ function EventChip({
     !externalBusy && 'calendar-event--interactive',
     'calendar-event--block',
     'calendar-event--service',
+    appointmentMinutes(appointment) < 40 && 'calendar-event--brief',
     externalBusy && 'calendar-event--external-busy',
     compact && 'calendar-event--compact',
     otherInfo && !externalBusy && 'calendar-event--has-info',
@@ -566,7 +571,7 @@ function DayColumn({
   )
 }
 
-const FIT_HOUR_MIN_PX = 68
+const FIT_HOUR_MIN_PX = 80
 
 function TimeGridView({
   dates,

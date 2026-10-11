@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
+import SectionNav from '../../components/SectionNav'
 import RecordTable from '../../components/RecordTable'
 import TagLabel from '../../components/TagLabel'
 import { usePrompt } from '../../components/ui'
@@ -223,10 +224,21 @@ export default function ReportingPage() {
 
   return (
     <div className="page reporting-page">
-      <PageHeader
-        title="Reporting"
-        help="Add a filter, then run the report."
-      />
+      <div className="page-mast">
+        <PageHeader
+          title="Reporting"
+          help="Add a filter, then run the report."
+        />
+        <SectionNav
+          label="Reporting sections"
+          items={SECTIONS.map((item) => ({
+            key: item.id,
+            label: item.label,
+            active: section === item.id,
+            onSelect: () => changeSection(item.id),
+          }))}
+        />
+      </div>
 
       <ReportingFilterBar
         today={today}
@@ -241,21 +253,6 @@ export default function ReportingPage() {
         onDraft={setDraft}
         onRun={setApplied}
       />
-
-      <div className="finance-tabs" role="tablist" aria-label="Reporting sections">
-        {SECTIONS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            role="tab"
-            aria-selected={section === item.id}
-            className={`finance-tabs__btn${section === item.id ? ' finance-tabs__btn--active' : ''}`}
-            onClick={() => changeSection(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
 
       {section === 'overview' && (
         <Overview summary={summary} efficiency={efficiency} />

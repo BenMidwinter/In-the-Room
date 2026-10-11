@@ -1445,13 +1445,17 @@ a.badge {
   display: inline-flex;
   align-items: center;
   padding: 0.5rem 0.8rem;
+  font-family: inherit;
   font-size: var(--text-ui);
   font-weight: 600;
   color: var(--txt-muted);
   text-decoration: none;
+  background: none;
+  border: 0;
   border-bottom: 2px solid transparent;
   white-space: nowrap;
   line-height: 1.2;
+  cursor: pointer;
 }
 
 .client-nav-bar__link:hover {

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
+import SectionNav from '../../components/SectionNav'
 import FormOverlay from '../../components/FormOverlay'
 import RecordTable from '../../components/RecordTable'
 import { useConfirm, useToast } from '../../components/ui'
@@ -576,31 +577,31 @@ export default function InvoicingPage() {
 
   return (
     <div className={pickedInvoiceList.length > 0 && tab === 'invoices' ? 'page page--invoicing page--invoice-selecting' : 'page page--invoicing'}>
-      <PageHeader
-        title="Invoicing"
-        actions={(
-          <>
-            <button type="button" className="secondary" onClick={() => setBatchOpen(true)}>Batch Invoice</button>
-            <button type="button" className="primary" onClick={() => { setChooserOpen(true); setClientQuery('') }}>
-              + New Invoice
-            </button>
-          </>
-        )}
-      />
+      <div className="page-mast">
+        <PageHeader
+          title="Invoicing"
+          actions={(
+            <>
+              <button type="button" className="secondary" onClick={() => setBatchOpen(true)}>Batch Invoice</button>
+              <button type="button" className="primary" onClick={() => { setChooserOpen(true); setClientQuery('') }}>
+                + New Invoice
+              </button>
+            </>
+          )}
+        />
+        <SectionNav
+          label="Invoicing sections"
+          items={[
+            { key: 'invoices', label: 'All Invoices', active: tab === 'invoices', onSelect: () => setTab('invoices') },
+            { key: 'unbilled', label: 'Unbilled Sessions', active: tab === 'unbilled', onSelect: () => setTab('unbilled') },
+          ]}
+        />
+      </div>
 
       <div className="section-card__stat-row">
         <Stat label="Total outstanding" value={formatGbpFromPence(outstandingPence)} />
         <Stat label="Drafts" value={String(draftCount)} />
         <Stat label="Paid" value={formatGbpFromPence(paidTotal)} />
-      </div>
-
-      <div className="invoice-tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === 'invoices'} className={tab === 'invoices' ? 'invoice-tabs__tab invoice-tabs__tab--on' : 'invoice-tabs__tab'} onClick={() => setTab('invoices')}>
-          All Invoices
-        </button>
-        <button type="button" role="tab" aria-selected={tab === 'unbilled'} className={tab === 'unbilled' ? 'invoice-tabs__tab invoice-tabs__tab--on' : 'invoice-tabs__tab'} onClick={() => setTab('unbilled')}>
-          Unbilled Sessions
-        </button>
       </div>
 
       {tab === 'invoices' ? (

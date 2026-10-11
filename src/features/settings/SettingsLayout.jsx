@@ -1,5 +1,6 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import PageHeader from '../../components/PageHeader'
+import SectionNav from '../../components/SectionNav'
 
 const PRIMARY_TABS = [
   { to: '/settings/account', label: 'Account settings', end: true },
@@ -25,35 +26,11 @@ export default function SettingsLayout() {
 
   return (
     <div className="page page--settings">
-      <PageHeader title="Settings" />
-      <nav className="settings-tabs" aria-label="Settings">
-        {PRIMARY_TABS.map(({ to, label, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) => {
-              const active = isActive || (to === '/settings/templates' && onTemplates)
-              return `settings-tabs__link${active ? ' settings-tabs__link--active' : ''}`
-            }}
-          >
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-      {onTemplates && (
-        <nav className="settings-subtabs" aria-label="Template types">
-          {TEMPLATE_TABS.map(({ to, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) => `settings-subtabs__link${isActive ? ' settings-subtabs__link--active' : ''}`}
-            >
-              {label}
-            </NavLink>
-          ))}
-        </nav>
-      )}
+      <div className="page-mast">
+        <PageHeader title="Settings" />
+        <SectionNav label="Settings" items={PRIMARY_TABS} />
+        {onTemplates && <SectionNav label="Template types" items={TEMPLATE_TABS} />}
+      </div>
       <div className="settings-panel">
         <Outlet />
       </div>

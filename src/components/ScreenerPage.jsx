@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import FormOverlay from './FormOverlay'
 import TagLabel from './TagLabel'
 import PageHeader from './PageHeader'
+import SectionNav from './SectionNav'
 import RecordTable from './RecordTable'
 import RowMenu from '../features/forms/RowMenu'
 import { useConfirm, useToast } from './ui'
@@ -254,45 +255,24 @@ export default function ScreenerPage() {
 
   return (
     <div className="page">
-      <PageHeader
-        title="Screener"
-        help={view === 'waitlist'
-          ? 'People you have accepted, waiting for a session.'
-          : view === 'rejected'
-            ? 'People who were referred and not taken onto the waitlist.'
-            : 'People who sent a form that places them here, waiting to be screened.'}
-        toolbar={(
-          <div className="screener-switch" role="tablist" aria-label="Screener lists">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === 'screener'}
-              className={`screener-switch__btn${view === 'screener' ? ' screener-switch__btn--on' : ''}`}
-              onClick={() => setView('screener')}
-            >
-              Screener
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === 'waitlist'}
-              className={`screener-switch__btn${view === 'waitlist' ? ' screener-switch__btn--on' : ''}`}
-              onClick={() => setView('waitlist')}
-            >
-              Waitlist
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={view === 'rejected'}
-              className={`screener-switch__btn${view === 'rejected' ? ' screener-switch__btn--on' : ''}`}
-              onClick={() => setView('rejected')}
-            >
-              Rejected
-            </button>
-          </div>
-        )}
-      />
+      <div className="page-mast">
+        <PageHeader
+          title="Screener"
+          help={view === 'waitlist'
+            ? 'People you have accepted, waiting for a session.'
+            : view === 'rejected'
+              ? 'People who were referred and not taken onto the waitlist.'
+              : 'People who sent a form that places them here, waiting to be screened.'}
+        />
+        <SectionNav
+          label="Screener lists"
+          items={[
+            { key: 'screener', label: 'Screener', active: view === 'screener', onSelect: () => setView('screener') },
+            { key: 'waitlist', label: 'Waitlist', active: view === 'waitlist', onSelect: () => setView('waitlist') },
+            { key: 'rejected', label: 'Rejected', active: view === 'rejected', onSelect: () => setView('rejected') },
+          ]}
+        />
+      </div>
       <RecordTable
         key={view}
         columns={view === 'waitlist' ? waitlistColumns : view === 'rejected' ? rejectedColumns : screenerColumns}

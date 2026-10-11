@@ -1094,8 +1094,12 @@ button.home-stat-card__link {
 
 .page-header--calendar {
   /* page--calendar zeros top padding; cancel the shared negative header pull */
+  height: auto;
   margin-top: 0;
   margin-bottom: 0.65rem;
+  padding-top: 0.65rem;
+  padding-bottom: 0.65rem;
+  flex-wrap: wrap;
   overflow: visible;
   flex-shrink: 0;
 }
@@ -1352,8 +1356,8 @@ button.home-stat-card__link {
   padding: 0.35rem 0.45rem;
   margin-bottom: 0.25rem;
   border-radius: 0;
-  font-size: var(--text-body);
-  line-height: 1.35;
+  font-size: var(--text-ui);
+  line-height: 1.2;
   border: 1px solid transparent;
   box-shadow: var(--shadow-sm);
   font-family: var(--font-body);
@@ -1375,7 +1379,7 @@ button.calendar-event {
 
 .calendar-event--compact {
   padding: 0.2rem 0.35rem;
-  font-size: var(--text-body);
+  font-size: var(--text-ui);
 }
 
 /* Duration-sized block (absolutely placed inside a day column). Height reflects
@@ -1384,7 +1388,8 @@ button.calendar-event {
   position: absolute;
   margin: 0;
   overflow: hidden;
-  min-height: 1.4rem;
+  min-height: 1.25rem;
+  padding: 0.12rem 0.3rem;
   box-shadow: var(--shadow-sm);
   pointer-events: auto;
   display: flex;
@@ -1392,14 +1397,30 @@ button.calendar-event {
   gap: 0.05rem;
 }
 
+.calendar-event--block.calendar-event--brief {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.calendar-event--brief .calendar-event__info {
+  display: none;
+}
+
 .calendar-event--block .calendar-event__time {
   display: block;
-  font-size: var(--text-ui);
+  flex-shrink: 0;
+  font-size: var(--text-meta);
   font-weight: 700;
   opacity: 0.85;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.calendar-event--block .calendar-event__client {
+  font-size: var(--text-ui);
+  min-width: 0;
 }
 
 /* Google Calendar busy overlay — non-interactive hatch. */
@@ -1648,7 +1669,7 @@ button.calendar-event {
 
 .calendar-time-grid {
   --calendar-hour-border: color-mix(in srgb, var(--border-color) 85%, var(--txt-muted));
-  --calendar-hour-size: 4.5rem;
+  --calendar-hour-size: 5rem;
   display: grid;
   grid-template-columns: 4.15rem repeat(var(--calendar-cols, 7), minmax(0, 1fr));
   grid-template-rows: auto repeat(var(--calendar-hours, 9), var(--calendar-hour-size));
@@ -1711,7 +1732,7 @@ button.calendar-event {
 }
 
 .calendar-time-grid__date {
-  font-size: var(--text-section);
+  font-size: var(--text-ui);
   font-weight: 700;
   color: var(--txt-primary);
 }

@@ -276,13 +276,28 @@ a:hover { text-decoration: underline; }
   flex-direction: row;
   align-items: center;
   gap: 0.85rem 1.25rem;
+  box-sizing: border-box;
+  height: 4.25rem;
   margin: calc(-1 * var(--space-block)) calc(-1 * var(--space-inline)) var(--section-gap);
-  padding: 0.95rem var(--space-inline);
-  flex-wrap: wrap;
+  padding: 0 var(--space-inline);
+  flex-wrap: nowrap;
   width: auto;
   background: var(--bg-surface);
   border-bottom: 1px solid var(--border-color);
   position: relative;
+  overflow: hidden;
+}
+
+.page-mast {
+  margin: calc(-1 * var(--space-block)) calc(-1 * var(--space-inline)) var(--section-gap);
+}
+
+.page-mast > .page-header {
+  margin: 0;
+}
+
+.page--practice .page-mast {
+  margin: 0;
 }
 
 .page-header--with-toolbar {
@@ -294,9 +309,9 @@ a:hover { text-decoration: underline; }
 }
 
 .page-header__text {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 22rem;
+  max-width: none;
 }
 
 .page-header--with-toolbar .page-header__text {
@@ -316,7 +331,7 @@ a:hover { text-decoration: underline; }
 
 .page-header__title-row {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 0.15rem 0.35rem;
   min-width: 0;
@@ -331,6 +346,9 @@ a:hover { text-decoration: underline; }
   font-optical-sizing: auto;
   line-height: 1.2;
   color: var(--col-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .page-header--with-toolbar .page-header__title {
@@ -381,7 +399,7 @@ a:hover { text-decoration: underline; }
 .page-header__actions {
   display: flex;
   gap: 0.65rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   flex: 0 0 auto;
   margin-left: auto;
@@ -435,6 +453,21 @@ a:hover { text-decoration: underline; }
   padding: 0.35rem 0.55rem;
   font-size: var(--text-meta);
   min-width: 7.5rem;
+}
+
+@media (max-width: 720px) {
+  .page-header:not(.page-header--calendar) {
+    height: auto;
+    min-height: 4.25rem;
+    flex-wrap: wrap;
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+    overflow: visible;
+  }
+
+  .page-header:not(.page-header--calendar) .page-header__actions {
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 900px) {
