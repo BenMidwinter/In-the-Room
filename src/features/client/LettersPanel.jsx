@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import RichTextEditor from '../../components/RichTextEditor'
 import { useClientSession } from '../../lib/useClientSession'
-import { getLetters, saveLetter, getProfile } from '../../lib/store'
+import { getProfile } from '../../lib/store'
+import { listLettersForClient, saveLetterForUser } from '../../lib/supabase/lettersRepo'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { useTemplatesQuery } from '../../lib/templateQueries'
@@ -35,8 +36,16 @@ const LETTER_COLUMNS = [
 
 export default function LettersPanel() {
   const { clientId, session, client } = useClientSession()
-  const [letters, setLetters] = useState(() => getLetters(clientId))
+  const { data: letters = [], refetch } = useQuery({
+    queryKey: ['letters', clientId],
+    queryFn: () => listLettersForClient(clientId),
+  })
   const [selectedId, setSelectedId] = useState(null)
+  const [seenClientId, setSeenClientId] = useState(clientId)
+  if (seenClientId !== clientId) {
+    setSeenClientId(clientId)
+    setSelectedId(null)
+  }
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('<p></p>')
   const [recipient, setRecipient] = useState('')
@@ -81,12 +90,7 @@ export default function LettersPanel() {
     return () => setEditorOpen(false)
   }, [selectedId, setEditorOpen])
 
-  useEffect(() => {
-    setLetters(getLetters(clientId))
-    setSelectedId(null)
-  }, [clientId])
-
-  const refresh = () => setLetters(getLetters(clientId))
+  const refresh = () => refetch()
 
   const handleCancel = () => setSelectedId(null)
 
@@ -123,7 +127,7 @@ export default function LettersPanel() {
     setLetterDate(todayISO())
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!title.trim()) {
       toast.error('Please add a letter title.')
       return
@@ -134,7 +138,7 @@ export default function LettersPanel() {
     }
     setSaving(true)
     try {
-      const saved = saveLetter({
+      const saved = await saveLetterForUser({
         id: selectedId === 'new' ? undefined : selectedId,
         client_id: clientId,
         title: title.trim(),
@@ -142,9 +146,11 @@ export default function LettersPanel() {
         recipient,
         letter_date: letterDate,
       }, session.user.id)
-      refresh()
+      await refresh()
       setSelectedId(saved.id)
       toast.saved()
+    } catch (err) {
+      toast.error(err?.message || 'The letter could not be saved.')
     } finally {
       setSaving(false)
     }

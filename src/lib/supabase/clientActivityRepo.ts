@@ -1,3 +1,4 @@
+import { withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 
@@ -39,13 +40,13 @@ export async function listClientActivity(clientId: string): Promise<ClientActivi
   const [lettersRes, reportsRes, formsRes, eventsRes] = await Promise.all([
     supabase
       .from('letters')
-      .select('id, client_id, author_id, letter_date, encrypted_payload, created_at, updated_at')
+      .select('id, client_id, author_id, letter_date, encrypted_payload, payload_format, created_at, updated_at')
       .eq('client_id', clientId)
       .order('updated_at', { ascending: false })
       .then((res) => res, () => ({ data: null, error: true })),
     supabase
       .from('reports')
-      .select('id, client_id, author_id, report_date, encrypted_payload, created_at, updated_at')
+      .select('id, client_id, author_id, report_date, encrypted_payload, payload_format, created_at, updated_at')
       .eq('client_id', clientId)
       .order('updated_at', { ascending: false })
       .then((res) => res, () => ({ data: null, error: true })),
@@ -64,8 +65,10 @@ export async function listClientActivity(clientId: string): Promise<ClientActivi
   ])
 
   const items: ClientActivityItem[] = []
+  const letters = await withOpenedPayloads('letters', lettersRes.data || [])
+  const reports = await withOpenedPayloads('reports', reportsRes.data || [])
 
-  for (const row of lettersRes.data || []) {
+  for (const row of letters) {
     items.push({
       id: `timeline-letter-${row.id}`,
       client_id: clientId,
@@ -83,7 +86,7 @@ export async function listClientActivity(clientId: string): Promise<ClientActivi
     })
   }
 
-  for (const row of reportsRes.data || []) {
+  for (const row of reports) {
     items.push({
       id: `timeline-report-${row.id}`,
       client_id: clientId,

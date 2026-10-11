@@ -18,6 +18,7 @@ Noted from the hosted site. These stay on the list while encryption is the next 
 - [ ] Standardise text size between pages.
 - [ ] Evaluate the calendar layout. The text is a bit squeezed.
 - [ ] Make back buttons return to the previous screen.
+- [ ] Rename the product to Process&Note, and use the logos already chosen.
 
 ## 2. Encryption and login — next
 

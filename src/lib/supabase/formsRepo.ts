@@ -14,6 +14,7 @@ import {
   type FormSchema,
   type MeasureSchema,
 } from '../formModel'
+import { createClinicalRecord, invokeFormRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase } from './client'
 import type { Json } from './database.types'
 
@@ -516,11 +517,12 @@ export async function listEpisodeForms(episodeId: string): Promise<EpisodeFormRo
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('form_submissions')
-    .select('id, access_token, status, submitted_at, updated_at, encrypted_payload, form_definitions(name)')
+    .select('id, access_token, status, submitted_at, updated_at, encrypted_payload, payload_format, form_definitions(name)')
     .eq('episode_id', episodeId)
     .order('updated_at', { ascending: false })
   throwIf(error)
-  return (data || []).map((row) => {
+  const rows = await withOpenedPayloads('form_submissions', data || [])
+  return rows.map((row) => {
     const def = one(row.form_definitions as { name?: string } | { name?: string }[] | null)
     return {
       id: row.id,
@@ -539,12 +541,13 @@ export async function listEpisodeOutcomes(episodeId: string): Promise<EpisodeOut
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('outcome_entries')
-    .select('id, measure_id, recorded_on, encrypted_payload, outcome_measure_defs(name, schema)')
+    .select('id, measure_id, recorded_on, encrypted_payload, payload_format, outcome_measure_defs(name, schema)')
     .eq('episode_id', episodeId)
     .eq('completion_status', 'complete')
     .order('recorded_on', { ascending: false })
   throwIf(error)
-  return (data || []).map((row) => {
+  const rows = await withOpenedPayloads('outcome_entries', data || [])
+  return rows.map((row) => {
     const def = one(row.outcome_measure_defs as { name?: string; schema?: Json } | { name?: string; schema?: Json }[] | null)
     const scored = scorePayload(row.encrypted_payload)
     return {
@@ -569,13 +572,14 @@ export async function listMeasureScores(measureId: string, clientId?: string): P
   rowOrThrow(def, error, 'Could not load that questionnaire.')
   let query = supabase
     .from('outcome_entries')
-    .select('recorded_on, encrypted_payload, client_id')
+    .select('id, recorded_on, encrypted_payload, payload_format, client_id')
     .eq('measure_id', measureId)
     .eq('completion_status', 'complete')
   if (clientId) query = query.eq('client_id', clientId)
   const { data: entries, error: entryError } = await query
   throwIf(entryError)
-  const ids = [...new Set((entries || []).map((row) => row.client_id))]
+  const openedEntries = await withOpenedPayloads('outcome_entries', entries || [])
+  const ids = [...new Set(openedEntries.map((row) => row.client_id))]
   const names = new Map<string, ReturnType<typeof identityBits>>()
   if (ids.length) {
     const { data: identities, error: identityError } = await supabase
@@ -589,7 +593,7 @@ export async function listMeasureScores(measureId: string, clientId?: string): P
     name: def.name,
     slug: def.slug,
     schema: parseMeasureSchema(def.schema),
-    rows: (entries || []).map((row) => {
+    rows: openedEntries.map((row) => {
       const who = names.get(row.client_id)
       const scored = scorePayload(row.encrypted_payload)
       return {
@@ -610,7 +614,7 @@ export async function createPrivateSubmission(input: {
   episodeId: string
   organizationId: string | null
 }): Promise<{ id: string; token: string }> {
-  const { supabase, user } = await signedIn()
+  const { supabase } = await signedIn()
   const { data: form, error } = await supabase
     .from('form_definitions')
     .select('id, version, audience, status, schema, autofill_client')
@@ -633,7 +637,7 @@ export async function createPrivateSubmission(input: {
   }
   const { data: openRows, error: openError } = await supabase
     .from('form_submissions')
-    .select('id, access_token, encrypted_payload')
+    .select('id, access_token, encrypted_payload, payload_format')
     .eq('form_definition_id', form.id)
     .eq('episode_id', input.episodeId)
     .eq('client_id', input.clientId)
@@ -641,19 +645,13 @@ export async function createPrivateSubmission(input: {
     .limit(1)
   throwIf(openError)
   if (openRows?.[0]) {
-    const open = openRows[0]
+    const [open] = await withOpenedPayloads('form_submissions', openRows)
     if (autofill) {
       const payload = asObject(open.encrypted_payload)
       const savedSchema = parseFormSchema(payload.schema ?? form.schema)
       const merged = mergeEmptyClientAnswers(asObject(payload.answers), await clientPrefill(savedSchema))
       if (merged.changed) {
-        const { error: updateError } = await supabase
-          .from('form_submissions')
-          .update({
-            encrypted_payload: { ...payload, answers: merged.answers } as unknown as Json,
-          })
-          .eq('id', open.id)
-        throwIf(updateError)
+        await sealClinicalRecord('form_submissions', open.id, { ...payload, answers: merged.answers })
       }
     }
     return { id: open.id, token: open.access_token }
@@ -672,28 +670,25 @@ export async function createPrivateSubmission(input: {
     if (measureIds.some((id) => !measures[id])) throw new Error('A questionnaire on this form is missing.')
   }
   const answers = autofill ? await clientPrefill(schema) : {}
-  const { data, error: insertError } = await supabase
+  const created = await createClinicalRecord('form_submissions', {
+    form_definition_id: form.id,
+    form_version: form.version,
+    client_id: input.clientId,
+    episode_id: input.episodeId,
+    submitted_at: null,
+  }, {
+    v: 0,
+    schema,
+    measures,
+    answers,
+  })
+  const { data, error: tokenError } = await supabase
     .from('form_submissions')
-    .insert({
-      owner_id: user.id,
-      organization_id: input.organizationId,
-      form_definition_id: form.id,
-      form_version: form.version,
-      client_id: input.clientId,
-      episode_id: input.episodeId,
-      status: 'in_progress',
-      submitted_at: null,
-      encrypted_payload: {
-        v: 0,
-        schema,
-        measures,
-        answers,
-      } as unknown as Json,
-    })
-    .select('id, access_token')
+    .select('access_token')
+    .eq('id', created.id)
     .single()
-  rowOrThrow(data, insertError, 'Could not send the form.')
-  return { id: data.id, token: data.access_token }
+  rowOrThrow(data, tokenError, 'Could not send the form.')
+  return { id: created.id, token: data.access_token }
 }
 
 export async function recordMeasureScore(input: {
@@ -704,7 +699,7 @@ export async function recordMeasureScore(input: {
   recordedOn: string
   answer: unknown
 }): Promise<void> {
-  const { supabase, user } = await signedIn()
+  const { supabase } = await signedIn()
   const { data: def, error } = await supabase
     .from('outcome_measure_defs')
     .select('schema')
@@ -713,36 +708,26 @@ export async function recordMeasureScore(input: {
   rowOrThrow(def, error, 'Could not load that questionnaire.')
   const schema = parseMeasureSchema(def.schema)
   const scored = scoreMeasure(schema, input.answer)
-  const { error: insertError } = await supabase.from('outcome_entries').insert({
-    owner_id: user.id,
-    organization_id: input.organizationId,
+  await createClinicalRecord('outcome_entries', {
     client_id: input.clientId,
     episode_id: input.episodeId,
     measure_id: input.measureId,
     recorded_on: input.recordedOn,
     completion_status: 'complete',
-    encrypted_payload: {
-      v: 0,
-      total: scored.total,
-      items: scored.items,
-    } as unknown as Json,
+  }, {
+    v: 0,
+    total: scored.total,
+    items: scored.items,
   })
-  throwIf(insertError)
 }
 
 export async function startPublicForm(formId: string): Promise<string> {
-  const supabase = getSupabase()
-  if (!supabase) throw new Error('This form is not available.')
-  const { data, error } = await supabase.rpc('form_public_start', { form_id: formId })
-  if (error) throw cleanError(error)
-  return data
+  const data = await invokeFormRecord<{ token: string }>('form-start', { formId })
+  return data.token
 }
 
 export async function openFormLink(token: string): Promise<OpenFormLink> {
-  const supabase = getSupabase()
-  if (!supabase) throw new Error('This link does not open a form.')
-  const { data, error } = await supabase.rpc('form_link_open', { token })
-  if (error) throw cleanError(error)
+  const data = await invokeFormRecord<Record<string, unknown>>('form-open', { token })
   const row = asObject(data)
   const measuresRaw = asObject(row.measures)
   const measures: Record<string, MeasureSchema> = {}
@@ -791,11 +776,12 @@ export async function getFormDocument(submissionId: string): Promise<FormDocumen
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('form_submissions')
-    .select('id, client_id, status, submitted_at, encrypted_payload, form_definitions(name, letterhead_id)')
+    .select('id, client_id, status, submitted_at, encrypted_payload, payload_format, form_definitions(name, letterhead_id)')
     .eq('id', submissionId)
     .single()
   rowOrThrow(data, error, 'Could not open this form.')
-  const payload = asObject(data.encrypted_payload)
+  const [opened] = await withOpenedPayloads('form_submissions', [data])
+  const payload = asObject(opened.encrypted_payload)
   const measuresRaw = asObject(payload.measures)
   const measures: Record<string, MeasureSchema> = {}
   for (const [id, schema] of Object.entries(measuresRaw)) {
@@ -816,20 +802,11 @@ export async function getFormDocument(submissionId: string): Promise<FormDocumen
 }
 
 export async function saveFormLink(token: string, answers: Record<string, unknown>): Promise<void> {
-  const supabase = getSupabase()
-  if (!supabase) throw new Error('These answers could not be saved.')
-  const { error } = await supabase.rpc('form_link_save', {
-    token,
-    answers: answers as Json,
-  })
-  if (error) throw cleanError(error)
+  await invokeFormRecord('form-save', { token, answers })
 }
 
 export async function submitFormLink(token: string): Promise<void> {
-  const supabase = getSupabase()
-  if (!supabase) throw new Error('This form could not be sent.')
-  const { error } = await supabase.rpc('form_link_submit', { token })
-  if (error) throw cleanError(error)
+  await invokeFormRecord('form-submit', { token })
 }
 
 export async function startOrResumePublicForm(formId: string): Promise<string> {

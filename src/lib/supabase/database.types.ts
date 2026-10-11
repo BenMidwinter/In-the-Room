@@ -770,6 +770,7 @@ export type Database = {
           client_id: string | null
           created_at: string
           encrypted_payload: Json
+          payload_format: string
           episode_id: string | null
           form_definition_id: string
           form_version: number
@@ -785,6 +786,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           encrypted_payload: Json
+          payload_format?: string
           episode_id?: string | null
           form_definition_id: string
           form_version: number
@@ -800,6 +802,7 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           encrypted_payload?: Json
+          payload_format?: string
           episode_id?: string | null
           form_definition_id?: string
           form_version?: number
@@ -1020,6 +1023,7 @@ export type Database = {
           client_id: string
           created_at: string
           encrypted_payload: Json
+          payload_format: string
           episode_id: string | null
           id: string
           letter_date: string | null
@@ -1033,6 +1037,7 @@ export type Database = {
           client_id: string
           created_at?: string
           encrypted_payload: Json
+          payload_format?: string
           episode_id?: string | null
           id?: string
           letter_date?: string | null
@@ -1046,6 +1051,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           encrypted_payload?: Json
+          payload_format?: string
           episode_id?: string | null
           id?: string
           letter_date?: string | null
@@ -1085,6 +1091,7 @@ export type Database = {
           completion_status: string
           created_at: string
           encrypted_payload: Json
+          payload_format: string
           episode_id: string | null
           id: string
           measure_id: string
@@ -1099,6 +1106,7 @@ export type Database = {
           completion_status?: string
           created_at?: string
           encrypted_payload: Json
+          payload_format?: string
           episode_id?: string | null
           id?: string
           measure_id: string
@@ -1113,6 +1121,7 @@ export type Database = {
           completion_status?: string
           created_at?: string
           encrypted_payload?: Json
+          payload_format?: string
           episode_id?: string | null
           id?: string
           measure_id?: string
@@ -1347,6 +1356,7 @@ export type Database = {
           client_id: string
           created_at: string
           encrypted_payload: Json
+          payload_format: string
           episode_id: string
           id: string
           lock_until: string | null
@@ -1366,6 +1376,7 @@ export type Database = {
           client_id: string
           created_at?: string
           encrypted_payload: Json
+          payload_format?: string
           episode_id: string
           id?: string
           lock_until?: string | null
@@ -1385,6 +1396,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           encrypted_payload?: Json
+          payload_format?: string
           episode_id?: string
           id?: string
           lock_until?: string | null
@@ -1557,6 +1569,7 @@ export type Database = {
           client_id: string
           created_at: string
           encrypted_payload: Json
+          payload_format: string
           episode_id: string | null
           id: string
           organization_id: string | null
@@ -1570,6 +1583,7 @@ export type Database = {
           client_id: string
           created_at?: string
           encrypted_payload: Json
+          payload_format?: string
           episode_id?: string | null
           id?: string
           organization_id?: string | null
@@ -1583,6 +1597,7 @@ export type Database = {
           client_id?: string
           created_at?: string
           encrypted_payload?: Json
+          payload_format?: string
           episode_id?: string | null
           id?: string
           organization_id?: string | null

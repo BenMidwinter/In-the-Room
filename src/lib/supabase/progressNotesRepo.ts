@@ -1,3 +1,4 @@
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 import { db } from '../data/collections'
@@ -17,12 +18,10 @@ import {
   signOffProgressNote,
 } from '../store/clinicalDocs'
 import { getAppointment } from '../store/scheduling'
-import { getLocalEpisode } from '../store/episodes'
-
 const NOTE_NEEDS_APPOINTMENT = 'A Process Note is saved against an appointment.'
 const NOTE_NEEDS_EPISODE = 'Add this appointment to an episode before saving the Process Note.'
 
-const NOTE_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, appointment_id, author_id, note_number, session_date, noted_at, status, signed_off_at, lock_until, template_id, encrypted_payload, created_at, updated_at'
+const NOTE_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, appointment_id, author_id, note_number, session_date, noted_at, status, signed_off_at, lock_until, template_id, encrypted_payload, payload_format, created_at, updated_at'
 
 type NoteAddendum = {
   id: string
@@ -57,8 +56,13 @@ type NoteRow = {
   lock_until: string | null
   template_id: string | null
   encrypted_payload: Json
+  payload_format: string
   created_at: string
   updated_at: string
+}
+
+async function materializeNotes(rows: NoteRow[]): Promise<NoteRow[]> {
+  return withOpenedPayloads('progress_notes', rows)
 }
 
 function asId(value: unknown): string | null {
@@ -134,13 +138,6 @@ function remember(note: ReturnType<typeof toAppNote>) {
   return enrichProgressNoteLock(db.progressNotes[idx === -1 ? db.progressNotes.length - 1 : idx] as Record<string, unknown>)
 }
 
-async function organizationFor(clientId: string, episodeId: string | null): Promise<string | null> {
-  const episode = episodeId ? getLocalEpisode(episodeId) : null
-  if (episode?.organization_id) return episode.organization_id
-  const client = db.clients.find((row) => row.id === clientId) as { workplace_id?: string | null } | undefined
-  return client?.workplace_id || null
-}
-
 async function episodeIdFromAppointment(appointmentId: string | null): Promise<string> {
   if (!appointmentId) throw new Error(NOTE_NEEDS_APPOINTMENT)
   let episodeId = asId(getAppointment(appointmentId)?.episode_id)
@@ -170,7 +167,7 @@ export async function fetchProgressNotesForClient(clientId: string) {
     .eq('client_id', clientId)
     .order('session_date', { ascending: false })
   if (error) throw error
-  for (const row of data || []) remember(toAppNote(row as NoteRow))
+  for (const row of await materializeNotes((data || []) as NoteRow[])) remember(toAppNote(row))
   return getProgressNotes(clientId)
 }
 
@@ -186,7 +183,8 @@ export async function fetchProgressNote(noteId: string) {
     .maybeSingle()
   if (error) throw error
   if (!data) return getProgressNote(noteId)
-  return remember(toAppNote(data as NoteRow))
+  const [row] = await materializeNotes([data as NoteRow])
+  return remember(toAppNote(row))
 }
 
 export async function listProgressNotesIndex() {
@@ -202,7 +200,8 @@ export async function listProgressNotesIndex() {
     .select(NOTE_COLUMNS)
     .order('note_number', { ascending: false })
   if (error) throw error
-  return (data || []).map((row) => remember(toAppNote(row as NoteRow)))
+  const rows = await materializeNotes((data || []) as NoteRow[])
+  return rows.map((row) => remember(toAppNote(row)))
 }
 
 export async function fetchProgressNoteByAppointment(appointmentId: string) {
@@ -219,7 +218,8 @@ export async function fetchProgressNoteByAppointment(appointmentId: string) {
     .maybeSingle()
   if (error) throw error
   if (!data) return getProgressNoteByAppointment(appointmentId)
-  return remember(toAppNote(data as NoteRow))
+  const [row] = await materializeNotes([data as NoteRow])
+  return remember(toAppNote(row))
 }
 
 async function nextNoteNumber(episodeId: string): Promise<number> {
@@ -272,11 +272,10 @@ export async function saveProgressNoteForUser(payload: Record<string, unknown>, 
     appointment_id: isUuid(remoteAppointmentId) ? remoteAppointmentId : null,
     session_date: String(parsed.session_date || today),
     template_id: isUuid(parsed.template_id) ? String(parsed.template_id) : null,
-    encrypted_payload: extras as unknown as Json,
-    organization_id: await organizationFor(clientId, remoteEpisodeId),
   }
 
   if (existingId) {
+    await sealClinicalRecord('progress_notes', existingId, extras)
     const { data, error } = await supabase
       .from('progress_notes')
       .update(shared)
@@ -284,23 +283,21 @@ export async function saveProgressNoteForUser(payload: Record<string, unknown>, 
       .select(NOTE_COLUMNS)
       .single()
     if (error) throw error
-    return remember(toAppNote(data as NoteRow))
+    return remember(toAppNote({ ...(data as NoteRow), encrypted_payload: extras as unknown as Json, payload_format: 'envelope' }))
   }
 
+  const created = await createClinicalRecord('progress_notes', {
+    ...shared,
+    note_number: await nextNoteNumber(remoteEpisodeId),
+    noted_at: new Date().toISOString(),
+  }, extras)
   const { data, error } = await supabase
     .from('progress_notes')
-    .insert({
-      ...shared,
-      owner_id: userId,
-      author_id: userId,
-      note_number: await nextNoteNumber(remoteEpisodeId),
-      noted_at: new Date().toISOString(),
-      status: 'draft',
-    })
     .select(NOTE_COLUMNS)
+    .eq('id', created.id)
     .single()
   if (error) throw error
-  return remember(toAppNote(data as NoteRow))
+  return remember(toAppNote({ ...(data as NoteRow), encrypted_payload: extras as unknown as Json, payload_format: 'envelope' }))
 }
 
 export async function appendProgressNoteAddendumForUser(noteId: string, body: string) {
@@ -319,7 +316,7 @@ export async function appendProgressNoteAddendumForUser(noteId: string, body: st
     .maybeSingle()
   if (readError) throw readError
   if (!row) throw new Error('Note not found')
-  const noteRow = row as NoteRow
+  const [noteRow] = await materializeNotes([row as NoteRow])
   if (!enrichProgressNoteLock(noteRow).is_locked) {
     throw new Error('An addendum is added after the note locks.')
   }
@@ -328,14 +325,14 @@ export async function appendProgressNoteAddendumForUser(noteId: string, body: st
     ...payload.addendums,
     { id: crypto.randomUUID(), body: html, created_at: new Date().toISOString() },
   ]
+  await sealClinicalRecord('progress_notes', noteId, payload)
   const { data, error } = await supabase
     .from('progress_notes')
-    .update({ encrypted_payload: payload as unknown as Json })
-    .eq('id', noteId)
     .select(NOTE_COLUMNS)
+    .eq('id', noteId)
     .single()
   if (error) throw error
-  return remember(toAppNote(data as NoteRow))
+  return remember(toAppNote({ ...(data as NoteRow), encrypted_payload: payload as unknown as Json, payload_format: 'envelope' }))
 }
 
 export async function signOffProgressNoteForUser(payload: Record<string, unknown>, userId: string) {
@@ -357,5 +354,6 @@ export async function signOffProgressNoteForUser(payload: Record<string, unknown
     .select(NOTE_COLUMNS)
     .single()
   if (error) throw error
-  return remember(toAppNote(data as NoteRow))
+  const [row] = await materializeNotes([data as NoteRow])
+  return remember(toAppNote(row))
 }

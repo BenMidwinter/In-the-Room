@@ -1,3 +1,4 @@
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 import {
@@ -7,7 +8,7 @@ import {
   type AppReport,
 } from '../store/reports'
 
-const REPORT_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, author_id, report_date, encrypted_payload, created_at, updated_at'
+const REPORT_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, author_id, report_date, encrypted_payload, payload_format, created_at, updated_at'
 
 type ReportRow = {
   id: string
@@ -18,6 +19,7 @@ type ReportRow = {
   author_id: string
   report_date: string | null
   encrypted_payload: Json
+  payload_format: string
   created_at: string
   updated_at: string
 }
@@ -60,7 +62,8 @@ export async function listReportsForEpisode(episodeId: string): Promise<AppRepor
     .eq('episode_id', episodeId)
     .order('report_date', { ascending: false })
   if (error) throw error
-  for (const row of data || []) rememberLocalReport(toAppReport(row as ReportRow))
+  const rows = await withOpenedPayloads('reports', (data || []) as ReportRow[])
+  for (const row of rows) rememberLocalReport(toAppReport(row))
   return listLocalReports(episodeId)
 }
 
@@ -106,37 +109,42 @@ export async function saveReportForUser(input: {
   }
 
   const summary = body.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 180)
-  const encrypted_payload = { v: 0, title, body, summary } as unknown as Json
+  const payload = { v: 0, title, body, summary }
   const existingId = input.id && /^[0-9a-f-]{36}$/i.test(input.id) ? input.id : null
 
   if (existingId) {
+    await sealClinicalRecord('reports', existingId, payload)
     const { data, error } = await supabase
       .from('reports')
       .update({
         episode_id: input.episodeId,
         report_date: reportDate,
-        encrypted_payload,
       })
       .eq('id', existingId)
       .select(REPORT_COLUMNS)
       .single()
     if (error) throw error
-    return rememberLocalReport(toAppReport(data as ReportRow))
+    return rememberLocalReport(toAppReport({
+      ...(data as ReportRow),
+      encrypted_payload: payload as unknown as Json,
+      payload_format: 'envelope',
+    }))
   }
 
+  const created = await createClinicalRecord('reports', {
+    client_id: input.clientId,
+    episode_id: input.episodeId,
+    report_date: reportDate,
+  }, payload)
   const { data, error } = await supabase
     .from('reports')
-    .insert({
-      owner_id: input.userId,
-      organization_id: input.organizationId || null,
-      client_id: input.clientId,
-      episode_id: input.episodeId,
-      author_id: input.userId,
-      report_date: reportDate,
-      encrypted_payload,
-    })
     .select(REPORT_COLUMNS)
+    .eq('id', created.id)
     .single()
   if (error) throw error
-  return rememberLocalReport(toAppReport(data as ReportRow))
+  return rememberLocalReport(toAppReport({
+    ...(data as ReportRow),
+    encrypted_payload: payload as unknown as Json,
+    payload_format: 'envelope',
+  }))
 }
