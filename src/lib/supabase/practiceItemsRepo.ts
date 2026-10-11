@@ -1,4 +1,5 @@
 import { type PracticeItem, type PracticeKind } from '../practiceItems'
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 
@@ -8,6 +9,7 @@ type PracticeRow = {
   kind: string
   name: string
   encrypted_payload: Json | null
+  payload_format?: string | null
   created_at: string
   updated_at: string
 }
@@ -22,12 +24,20 @@ function contentFromPayload(payload: Json | null | undefined): string {
 
 function toItem(row: PracticeRow): PracticeItem {
   const kind: PracticeKind = row.kind === 'folder' ? 'folder' : 'document'
+  const body = row.encrypted_payload && typeof row.encrypted_payload === 'object' && !Array.isArray(row.encrypted_payload)
+    ? row.encrypted_payload as { name?: unknown; content?: unknown }
+    : {}
+  const sealed = row.payload_format === 'envelope'
   return {
     id: row.id,
     parent_id: row.parent_id,
     kind,
-    name: row.name,
-    content: kind === 'folder' ? '' : (contentFromPayload(row.encrypted_payload) || '<p></p>'),
+    name: sealed ? String(body.name || row.name) : row.name,
+    content: kind === 'folder'
+      ? ''
+      : sealed
+        ? (typeof body.content === 'string' && body.content.trim() ? body.content : '<p></p>')
+        : (contentFromPayload(row.encrypted_payload) || '<p></p>'),
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
@@ -71,10 +81,11 @@ export async function listPracticeItems(): Promise<PracticeItem[]> {
   if (!supabase) return localItems.map((item) => ({ ...item }))
   const { data, error } = await supabase
     .from('practice_items')
-    .select('id, parent_id, kind, name, encrypted_payload, created_at, updated_at')
+    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at')
     .order('name', { ascending: true })
   if (error) throw error
-  return (data || []).map((row) => toItem(row as PracticeRow))
+  const rows = await withOpenedPayloads('practice_items', (data || []) as PracticeRow[])
+  return rows.map((row) => toItem(row)).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 async function insertRemote(input: {
@@ -87,22 +98,22 @@ async function insertRemote(input: {
   if (!supabase) throw new Error('Supabase is not configured')
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Sign in required')
-  const encrypted_payload = input.kind === 'document'
-    ? { v: 0, content: input.content || '<p></p>' } as unknown as Json
-    : null
+  const encrypted_payload = {
+    v: 0,
+    name: input.name,
+    content: input.kind === 'document' ? (input.content || '<p></p>') : '',
+  } as unknown as Json
+  const created = await createClinicalRecord('practice_items', {
+    parent_id: input.parentId,
+    kind: input.kind,
+  }, encrypted_payload)
   const { data, error } = await supabase
     .from('practice_items')
-    .insert({
-      owner_id: user.id,
-      parent_id: input.parentId,
-      kind: input.kind,
-      name: input.name,
-      encrypted_payload,
-    })
-    .select('id, parent_id, kind, name, encrypted_payload, created_at, updated_at')
+    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at')
+    .eq('id', created.id)
     .single()
   if (error) throw error
-  return toItem(data as PracticeRow)
+  return toItem({ ...(data as PracticeRow), encrypted_payload, payload_format: 'envelope' })
 }
 
 export async function createPracticeItem(input: {
@@ -164,18 +175,16 @@ export async function savePracticeDocument(input: {
 
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
+  const encrypted_payload = { v: 0, name, content } as unknown as Json
+  await sealClinicalRecord('practice_items', existingId, encrypted_payload)
   const { data, error } = await supabase
     .from('practice_items')
-    .update({
-      name,
-      encrypted_payload: { v: 0, content } as unknown as Json,
-    })
+    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at')
     .eq('id', existingId)
     .eq('kind', 'document')
-    .select('id, parent_id, kind, name, encrypted_payload, created_at, updated_at')
     .single()
   if (error) throw error
-  return toItem(data as PracticeRow)
+  return toItem({ ...(data as PracticeRow), encrypted_payload, payload_format: 'envelope' })
 }
 
 export async function renamePracticeItem(id: string, name: string): Promise<PracticeItem> {
@@ -189,14 +198,22 @@ export async function renamePracticeItem(id: string, name: string): Promise<Prac
   }
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
-  const { data, error } = await supabase
+  const { data: current, error: readError } = await supabase
     .from('practice_items')
-    .update({ name: nextName })
+    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at')
     .eq('id', id)
-    .select('id, parent_id, kind, name, encrypted_payload, created_at, updated_at')
     .single()
-  if (error) throw error
-  return toItem(data as PracticeRow)
+  if (readError) throw readError
+  const [opened] = await withOpenedPayloads('practice_items', [current as PracticeRow])
+  const body = opened.encrypted_payload && typeof opened.encrypted_payload === 'object' && !Array.isArray(opened.encrypted_payload)
+    ? opened.encrypted_payload as { content?: unknown }
+    : {}
+  const content = opened.payload_format === 'envelope'
+    ? String(body.content || '')
+    : contentFromPayload(current.encrypted_payload)
+  const encrypted_payload = { v: 0, name: nextName, content } as unknown as Json
+  await sealClinicalRecord('practice_items', id, encrypted_payload)
+  return toItem({ ...(current as PracticeRow), encrypted_payload, payload_format: 'envelope', name: nextName })
 }
 
 export async function deletePracticeItem(id: string): Promise<void> {

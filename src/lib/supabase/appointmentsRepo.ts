@@ -1,6 +1,7 @@
 import { promoteWaitlistClient } from './clientsRepo'
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
-import type { Json } from './database.types'
+import type { Database, Json } from './database.types'
 import { db } from '../data/collections'
 import type { StoreRecord } from '../types/collections'
 import {
@@ -190,11 +191,15 @@ export async function listAppointmentsFromSupabase(): Promise<AppAppointment[]> 
 
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, fee_override_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, fee_override_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, payload_format, created_at, updated_at')
     .order('starts_at', { ascending: false })
 
   if (error) throw error
-  const mapped = await attachMeetUrls((data || []).map((row) => toAppAppointment(row)))
+  const opened = await withOpenedPayloads('appointments', (data || []).map((row) => ({
+    ...row,
+    encrypted_payload: row.encrypted_payload ?? {},
+  })))
+  const mapped = await attachMeetUrls(opened.map((row) => toAppAppointment(row)))
   hydrateLocal(mapped)
   return mapped
 }
@@ -222,12 +227,13 @@ export async function fetchAppointment(appointmentId: string): Promise<AppAppoin
   if (!supabase) return null
   const { data, error } = await supabase
     .from('appointments')
-    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, fee_override_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at')
+    .select('id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, fee_override_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, payload_format, created_at, updated_at')
     .eq('id', appointmentId)
     .maybeSingle()
   if (error) throw error
   if (!data) return null
-  const [mapped] = await attachMeetUrls([toAppAppointment(data)])
+  const [opened] = await withOpenedPayloads('appointments', [{ ...data, encrypted_payload: data.encrypted_payload ?? {} }])
+  const [mapped] = await attachMeetUrls([toAppAppointment(opened)])
   return mapped
 }
 
@@ -262,7 +268,31 @@ export async function fetchUpcomingAppointments(
   ).reverse() as AppAppointment[]
 }
 
-const APPOINTMENT_COLUMNS = 'id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, fee_override_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, created_at, updated_at'
+const APPOINTMENT_COLUMNS = 'id, client_id, clinician_id, episode_id, service_id, appointment_type, attendance_status, do_not_invoice, charged_pence, fee_override_pence, starts_at, ends_at, block_role, parent_appointment_id, series_id, encrypted_payload, payload_format, created_at, updated_at'
+
+async function storeAppointment(existingId: string | null, fields: Record<string, unknown>, extras: AppointmentExtras) {
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const operational = { ...fields }
+  delete operational.owner_id
+  delete operational.organization_id
+  delete operational.encrypted_payload
+  if (existingId) {
+    await sealClinicalRecord('appointments', existingId, extras)
+    const { error } = await supabase
+      .from('appointments')
+      .update(operational as Database['public']['Tables']['appointments']['Update'])
+      .eq('id', existingId)
+    if (error) throw error
+    const { data, error: readError } = await supabase.from('appointments').select(APPOINTMENT_COLUMNS).eq('id', existingId).single()
+    if (readError) throw readError
+    return { ...data, encrypted_payload: extras as unknown as Json, payload_format: 'envelope' }
+  }
+  const created = await createClinicalRecord('appointments', operational, extras)
+  const { data, error } = await supabase.from('appointments').select(APPOINTMENT_COLUMNS).eq('id', created.id).single()
+  if (error) throw error
+  return { ...data, encrypted_payload: extras as unknown as Json, payload_format: 'envelope' }
+}
 
 async function attachMeetUrls(rows: AppAppointment[]): Promise<AppAppointment[]> {
   const supabase = getSupabase()
@@ -481,13 +511,7 @@ export async function upsertAppointmentRemote(
   }
 
   if (existingId) {
-    const { data, error } = await supabase
-      .from('appointments')
-      .update(row)
-      .eq('id', existingId)
-      .select(APPOINTMENT_COLUMNS)
-      .single()
-    if (error) throw error
+    const data = await storeAppointment(existingId, row, extras)
     let mapped = toAppAppointment(data)
     rememberLocal(mapped)
     if (!data.parent_appointment_id && !serviceLookupFailed) {
@@ -506,12 +530,7 @@ export async function upsertAppointmentRemote(
     return mapped
   }
 
-  const { data, error } = await supabase
-    .from('appointments')
-    .insert(row)
-    .select(APPOINTMENT_COLUMNS)
-    .single()
-  if (error) throw error
+  const data = await storeAppointment(null, row, extras)
   let mapped = toAppAppointment(data)
   rememberLocal(mapped)
   if (!serviceLookupFailed) {
@@ -610,23 +629,12 @@ async function syncRemoteFollowOn(opts: {
   }
 
   if (write.keepId) {
-    const { data, error } = await supabase
-      .from('appointments')
-      .update(childRow)
-      .eq('id', write.keepId)
-      .select(APPOINTMENT_COLUMNS)
-      .single()
-    if (error) throw error
+    const data = await storeAppointment(write.keepId, childRow, extras)
     rememberLocal(toAppAppointment(data))
     return
   }
 
-  const { data, error } = await supabase
-    .from('appointments')
-    .insert(childRow)
-    .select(APPOINTMENT_COLUMNS)
-    .single()
-  if (error) throw error
+  const data = await storeAppointment(null, childRow, extras)
   rememberLocal(toAppAppointment(data))
 }
 

@@ -1,15 +1,13 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import RichTextEditor from '../../components/RichTextEditor'
 import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { useClientSession } from '../../lib/useClientSession'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { useTemplatesQuery } from '../../lib/templateQueries'
-import {
-  getWorkingDocuments,
-  saveWorkingDocument,
-  getProfile,
-} from '../../lib/store'
+import { getProfile } from '../../lib/store'
+import { listWorkingDocuments, saveWorkingDocumentForUser } from '../../lib/supabase/workingDocumentsRepo'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import { useToast, useConfirm } from '../../components/ui'
@@ -33,8 +31,16 @@ const DOC_COLUMNS = [
 
 export default function WorkingDocumentsPanel() {
   const { clientId, client, session } = useClientSession()
-  const [documents, setDocuments] = useState(() => getWorkingDocuments(clientId))
+  const { data: documents = [], refetch } = useQuery({
+    queryKey: ['working-documents', clientId],
+    queryFn: () => listWorkingDocuments(clientId),
+  })
   const [selectedId, setSelectedId] = useState(null)
+  const [seenClientId, setSeenClientId] = useState(clientId)
+  if (seenClientId !== clientId) {
+    setSeenClientId(clientId)
+    setSelectedId(null)
+  }
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('<p></p>')
   const [saving, setSaving] = useState(false)
@@ -66,12 +72,7 @@ export default function WorkingDocumentsPanel() {
     [client, clinicianProfile],
   )
 
-  useEffect(() => {
-    setDocuments(getWorkingDocuments(clientId))
-    setSelectedId(null)
-  }, [clientId])
-
-  const refresh = () => setDocuments(getWorkingDocuments(clientId))
+  const refresh = () => refetch()
 
   const handleCancel = () => setSelectedId(null)
 
@@ -118,19 +119,20 @@ export default function WorkingDocumentsPanel() {
       return
     }
     setSaving(true)
-    try {
-      const saved = saveWorkingDocument({
-        id: selectedId === 'new' ? undefined : selectedId,
-        client_id: clientId,
-        title: title.trim(),
-        content,
-      }, session.user.id)
+    saveWorkingDocumentForUser({
+      id: selectedId === 'new' ? undefined : selectedId,
+      client_id: clientId,
+      title: title.trim(),
+      content,
+    }, session.user.id).then((saved) => {
       refresh()
       setSelectedId(saved.id)
       toast.saved()
-    } finally {
+    }).catch((err) => {
+      toast.error(err.message || 'Could not save the document.')
+    }).finally(() => {
       setSaving(false)
-    }
+    })
   }
 
   const rows = documents.map(doc => ({

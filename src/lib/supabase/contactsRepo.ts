@@ -1,4 +1,5 @@
 import { getSupabase } from './client'
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import type { Json } from './database.types'
 
 const ROLES = ['parent', 'guardian', 'referrer', 'gp', 'school', 'billing', 'other'] as const
@@ -57,13 +58,14 @@ export async function listContacts(clientId?: string): Promise<AppContact[]> {
   if (!user) return []
   let query = supabase
     .from('contacts')
-    .select('id, client_id, role, is_billing_contact, encrypted_payload')
+    .select('id, client_id, role, is_billing_contact, encrypted_payload, payload_format')
     .eq('owner_id', user.id)
     .order('created_at', { ascending: true })
   if (clientId) query = query.eq('client_id', clientId)
   const { data, error } = await query
   if (error) throw error
-  return ((data || []) as ContactRow[]).map(mapContact)
+  const rows = await withOpenedPayloads('contacts', (data || []) as ContactRow[])
+  return rows.map(mapContact)
 }
 
 export async function saveContact(input: {
@@ -91,21 +93,37 @@ export async function saveContact(input: {
     email,
     phone: String(input.phone || '').trim(),
   }
-  const row = {
-    owner_id: user.id,
-    client_id: input.clientId,
-    role: roleOf(input.role || 'other'),
-    is_billing_contact: Boolean(input.sendInvoices),
-    encrypted_payload: payload as unknown as Json,
+  const role = roleOf(input.role || 'other')
+  const billing = Boolean(input.sendInvoices)
+  if (input.id) {
+    await sealClinicalRecord('contacts', input.id, payload)
+    const { error } = await supabase
+      .from('contacts')
+      .update({ role, is_billing_contact: billing })
+      .eq('id', input.id)
+      .eq('owner_id', user.id)
+    if (error) throw error
+    return mapContact({
+      id: input.id,
+      client_id: input.clientId,
+      role,
+      is_billing_contact: billing,
+      encrypted_payload: payload as unknown as Json,
+    })
   }
-  const query = input.id
-    ? supabase.from('contacts').update(row).eq('id', input.id).eq('owner_id', user.id)
-    : supabase.from('contacts').insert(row)
-  const { data, error } = await query
-    .select('id, client_id, role, is_billing_contact, encrypted_payload')
-    .single()
-  if (error) throw error
-  return mapContact(data as ContactRow)
+  const created = await createClinicalRecord('contacts', {
+    client_id: input.clientId,
+    role,
+    is_billing_contact: billing,
+    is_primary: false,
+  }, payload)
+  return mapContact({
+    id: created.id,
+    client_id: input.clientId,
+    role,
+    is_billing_contact: billing,
+    encrypted_payload: payload as unknown as Json,
+  })
 }
 
 export async function deleteContact(id: string): Promise<void> {

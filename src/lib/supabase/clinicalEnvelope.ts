@@ -7,15 +7,30 @@ export const CLINICAL_TABLES = [
   'reports',
   'form_submissions',
   'outcome_entries',
+  'clients',
+  'client_identities',
+  'client_clinical_profiles',
+  'contacts',
+  'episodes',
+  'appointments',
+  'timeline_events',
+  'templates',
+  'working_documents',
+  'journal_entries',
+  'practice_items',
+  'cpd_entries',
+  'supervision_entries',
+  'waitlist_placements',
+  'tags',
+  'invoices',
+  'invoice_lines',
+  'invoice_payments',
+  'form_definitions',
+  'outcome_measure_defs',
+  'profiles',
 ] as const
 
 export type ClinicalTable = (typeof CLINICAL_TABLES)[number]
-
-type ClinicalRow = {
-  id: string
-  payload_format?: string | null
-  encrypted_payload: Json
-}
 
 const OPEN_LIMIT = 80
 
@@ -23,8 +38,16 @@ export function isEnvelopeFormat(format: string | null | undefined): boolean {
   return format === 'envelope'
 }
 
-export async function withOpenedPayloads<T extends ClinicalRow>(table: ClinicalTable, rows: T[]): Promise<T[]> {
-  const ids = rows.filter((row) => isEnvelopeFormat(row.payload_format)).map((row) => row.id)
+export async function withOpenedPayloads<T extends { id: string }>(
+  table: ClinicalTable,
+  rows: T[],
+  options?: { payloadKey?: string; formatKey?: string },
+): Promise<T[]> {
+  const payloadKey = options?.payloadKey ?? 'encrypted_payload'
+  const formatKey = options?.formatKey ?? 'payload_format'
+  const ids = rows
+    .filter((row) => isEnvelopeFormat((row as Record<string, unknown>)[formatKey] as string | null | undefined))
+    .map((row) => row.id)
   if (!ids.length) return rows
   const opened = new Map<string, Json>()
   for (let index = 0; index < ids.length; index += OPEN_LIMIT) {
@@ -36,7 +59,8 @@ export async function withOpenedPayloads<T extends ClinicalRow>(table: ClinicalT
   }
   return rows.map((row) => {
     const payload = opened.get(row.id)
-    return payload === undefined ? row : { ...row, encrypted_payload: payload }
+    if (payload === undefined) return row
+    return { ...row, [payloadKey]: payload } as T
   })
 }
 

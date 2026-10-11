@@ -73,6 +73,7 @@ export type Database = {
       }
       appointments: {
         Row: {
+          payload_format: string
           appointment_type: string
           attendance_status: string | null
           block_role: string
@@ -95,6 +96,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           appointment_type?: string
           attendance_status?: string | null
           block_role?: string
@@ -117,6 +119,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           appointment_type?: string
           attendance_status?: string | null
           block_role?: string
@@ -405,6 +408,7 @@ export type Database = {
       }
       client_clinical_profiles: {
         Row: {
+          payload_format: string
           client_id: string
           created_at: string
           encrypted_payload: Json
@@ -413,6 +417,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           client_id: string
           created_at?: string
           encrypted_payload: Json
@@ -421,6 +426,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           client_id?: string
           created_at?: string
           encrypted_payload?: Json
@@ -440,6 +446,7 @@ export type Database = {
       }
       client_identities: {
         Row: {
+          payload_format: string
           client_id: string
           created_at: string
           encrypted_payload: Json
@@ -448,6 +455,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           client_id: string
           created_at?: string
           encrypted_payload: Json
@@ -456,6 +464,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           client_id?: string
           created_at?: string
           encrypted_payload?: Json
@@ -475,6 +484,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          payload_format: string
           concession_kind: string
           concession_label: string | null
           concession_pence: number | null
@@ -488,6 +498,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           concession_kind?: string
           concession_label?: string | null
           concession_pence?: number | null
@@ -501,6 +512,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           concession_kind?: string
           concession_label?: string | null
           concession_pence?: number | null
@@ -517,6 +529,7 @@ export type Database = {
       }
       contacts: {
         Row: {
+          payload_format: string
           client_id: string
           created_at: string
           encrypted_payload: Json
@@ -529,6 +542,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           client_id: string
           created_at?: string
           encrypted_payload: Json
@@ -541,6 +555,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           client_id?: string
           created_at?: string
           encrypted_payload?: Json
@@ -564,6 +579,7 @@ export type Database = {
       }
       cpd_entries: {
         Row: {
+          payload_format: string
           created_at: string
           encrypted_payload: Json
           id: string
@@ -574,6 +590,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           created_at?: string
           encrypted_payload: Json
           id?: string
@@ -584,6 +601,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           created_at?: string
           encrypted_payload?: Json
           id?: string
@@ -597,6 +615,7 @@ export type Database = {
       }
       episodes: {
         Row: {
+          payload_format: string
           client_id: string
           created_at: string
           encrypted_payload: Json | null
@@ -611,6 +630,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           client_id: string
           created_at?: string
           encrypted_payload?: Json | null
@@ -625,6 +645,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           client_id?: string
           created_at?: string
           encrypted_payload?: Json | null
@@ -709,6 +730,8 @@ export type Database = {
       }
       form_definitions: {
         Row: {
+          payload_format: string
+          sealed_payload: Json | null
           audience: string
           created_at: string
           description: string | null
@@ -727,6 +750,8 @@ export type Database = {
           version: number
         }
         Insert: {
+          payload_format?: string
+          sealed_payload?: Json | null
           audience?: string
           created_at?: string
           description?: string | null
@@ -745,6 +770,8 @@ export type Database = {
           version?: number
         }
         Update: {
+          payload_format?: string
+          sealed_payload?: Json | null
           audience?: string
           created_at?: string
           description?: string | null
@@ -839,6 +866,8 @@ export type Database = {
       }
       invoice_lines: {
         Row: {
+          payload_format: string
+          sealed_payload: Json | null
           appointment_id: string | null
           created_at: string
           description: string
@@ -853,6 +882,8 @@ export type Database = {
           unit_pence: number
         }
         Insert: {
+          payload_format?: string
+          sealed_payload?: Json | null
           appointment_id?: string | null
           created_at?: string
           description: string
@@ -867,6 +898,8 @@ export type Database = {
           unit_pence: number
         }
         Update: {
+          payload_format?: string
+          sealed_payload?: Json | null
           appointment_id?: string | null
           created_at?: string
           description?: string
@@ -884,6 +917,8 @@ export type Database = {
       }
       invoices: {
         Row: {
+          payload_format: string
+          sealed_payload: Json | null
           bill_to_name: string
           bill_to_email: string
           client_id: string | null
@@ -906,6 +941,8 @@ export type Database = {
           xero_invoice_id: string | null
         }
         Insert: {
+          payload_format?: string
+          sealed_payload?: Json | null
           bill_to_name: string
           bill_to_email?: string
           client_id?: string | null
@@ -928,6 +965,8 @@ export type Database = {
           xero_invoice_id?: string | null
         }
         Update: {
+          payload_format?: string
+          sealed_payload?: Json | null
           bill_to_name?: string
           bill_to_email?: string
           client_id?: string | null
@@ -953,6 +992,8 @@ export type Database = {
       }
       invoice_payments: {
         Row: {
+          payload_format: string
+          sealed_payload: Json | null
           amount_pence: number
           created_at: string
           id: string
@@ -962,6 +1003,8 @@ export type Database = {
           paid_on: string
         }
         Insert: {
+          payload_format?: string
+          sealed_payload?: Json | null
           amount_pence: number
           created_at?: string
           id?: string
@@ -971,6 +1014,8 @@ export type Database = {
           paid_on: string
         }
         Update: {
+          payload_format?: string
+          sealed_payload?: Json | null
           amount_pence?: number
           created_at?: string
           id?: string
@@ -983,6 +1028,7 @@ export type Database = {
       }
       journal_entries: {
         Row: {
+          payload_format: string
           author_id: string
           created_at: string
           encrypted_payload: Json
@@ -994,6 +1040,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           author_id: string
           created_at?: string
           encrypted_payload: Json
@@ -1005,6 +1052,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           author_id?: string
           created_at?: string
           encrypted_payload?: Json
@@ -1163,6 +1211,8 @@ export type Database = {
       }
       outcome_measure_defs: {
         Row: {
+          payload_format: string
+          sealed_payload: Json | null
           created_at: string
           id: string
           is_active: boolean
@@ -1175,6 +1225,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
+          sealed_payload?: Json | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -1187,6 +1239,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
+          sealed_payload?: Json | null
           created_at?: string
           id?: string
           is_active?: boolean
@@ -1202,6 +1256,7 @@ export type Database = {
       }
       practice_items: {
         Row: {
+          payload_format: string
           created_at: string
           encrypted_payload: Json | null
           id: string
@@ -1212,6 +1267,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           created_at?: string
           encrypted_payload?: Json | null
           id?: string
@@ -1222,6 +1278,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           created_at?: string
           encrypted_payload?: Json | null
           id?: string
@@ -1243,6 +1300,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          bank_format: string
+          sealed_bank: Json | null
           bio: string | null
           cancel_early_fee: string
           cancel_late_fee: string
@@ -1278,6 +1337,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          bank_format?: string
+          sealed_bank?: Json | null
           bio?: string | null
           cancel_early_fee?: string
           cancel_late_fee?: string
@@ -1313,6 +1374,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          bank_format?: string
+          sealed_bank?: Json | null
           bio?: string | null
           cancel_early_fee?: string
           cancel_late_fee?: string
@@ -1703,6 +1766,7 @@ export type Database = {
       }
       supervision_entries: {
         Row: {
+          payload_format: string
           created_at: string
           direction: string
           encrypted_payload: Json
@@ -1714,6 +1778,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           created_at?: string
           direction: string
           encrypted_payload: Json
@@ -1725,6 +1790,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           created_at?: string
           direction?: string
           encrypted_payload?: Json
@@ -1739,6 +1805,7 @@ export type Database = {
       }
       templates: {
         Row: {
+          payload_format: string
           created_at: string
           description: string | null
           encrypted_payload: Json | null
@@ -1752,6 +1819,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           created_at?: string
           description?: string | null
           encrypted_payload?: Json | null
@@ -1765,6 +1833,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           created_at?: string
           description?: string | null
           encrypted_payload?: Json | null
@@ -1781,6 +1850,7 @@ export type Database = {
       }
       timeline_events: {
         Row: {
+          payload_format: string
           actor_id: string | null
           client_id: string
           created_at: string
@@ -1797,6 +1867,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           actor_id?: string | null
           client_id: string
           created_at?: string
@@ -1813,6 +1884,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           actor_id?: string | null
           client_id?: string
           created_at?: string
@@ -1847,6 +1919,7 @@ export type Database = {
       }
       working_documents: {
         Row: {
+          payload_format: string
           author_id: string
           client_id: string
           created_at: string
@@ -1859,6 +1932,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
           author_id: string
           client_id: string
           created_at?: string
@@ -1871,6 +1945,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
           author_id?: string
           client_id?: string
           created_at?: string
@@ -1908,6 +1983,8 @@ export type Database = {
       }
       tags: {
         Row: {
+          payload_format: string
+          sealed_payload: Json | null
           color: string
           created_at: string
           id: string
@@ -1918,6 +1995,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
+          sealed_payload?: Json | null
           color?: string
           created_at?: string
           id?: string
@@ -1928,6 +2007,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
+          sealed_payload?: Json | null
           color?: string
           created_at?: string
           id?: string
@@ -1967,6 +2048,8 @@ export type Database = {
       }
       waitlist_placements: {
         Row: {
+          payload_format: string
+          sealed_payload: Json | null
           client_id: string
           created_at: string
           information: string
@@ -1977,6 +2060,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          payload_format?: string
+          sealed_payload?: Json | null
           client_id: string
           created_at?: string
           information?: string
@@ -1987,6 +2072,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          payload_format?: string
+          sealed_payload?: Json | null
           client_id?: string
           created_at?: string
           information?: string

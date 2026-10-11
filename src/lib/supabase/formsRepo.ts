@@ -18,6 +18,35 @@ import { createClinicalRecord, invokeFormRecord, sealClinicalRecord, withOpenedP
 import { getSupabase } from './client'
 import type { Json } from './database.types'
 
+type Sealable = {
+  id: string
+  name?: string | null
+  schema?: Json | null
+  payload_format?: string | null
+  sealed_payload?: Json | null
+}
+
+function sealedBody(payload: unknown): { name: string; schema: unknown } {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return { name: '', schema: {} }
+  const row = payload as Record<string, unknown>
+  return { name: String(row.name || ''), schema: row.schema ?? {} }
+}
+
+async function revealNamed<T extends Sealable>(
+  table: 'form_definitions' | 'outcome_measure_defs',
+  rows: T[],
+): Promise<T[]> {
+  const opened = await withOpenedPayloads(table, rows.map((row) => ({
+    ...row,
+    sealed_payload: row.sealed_payload ?? {},
+  })), { payloadKey: 'sealed_payload' })
+  return opened.map((row) => {
+    if (row.payload_format !== 'envelope') return row
+    const body = sealedBody(row.sealed_payload)
+    return { ...row, name: body.name, schema: body.schema as Json }
+  })
+}
+
 export type MeasureRecord = {
   id: string
   name: string
@@ -199,17 +228,17 @@ export async function listMeasures(): Promise<MeasureRecord[]> {
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('outcome_measure_defs')
-    .select('id, name, slug, schema, is_active, status')
-    .order('name')
+    .select('id, name, slug, schema, is_active, status, payload_format, sealed_payload')
   throwIf(error)
+  const revealed = await revealNamed('outcome_measure_defs', data || [])
   const { data: scores, error: scoreError } = await supabase
     .from('outcome_entries')
     .select('measure_id')
   throwIf(scoreError)
   const used = new Set((scores || []).map((row) => row.measure_id))
-  return (data || []).map((row) => ({
+  return revealed.map((row) => ({
     id: row.id,
-    name: row.name,
+    name: row.name || '',
     slug: row.slug,
     schema: parseMeasureSchema(row.schema),
     is_active: row.is_active && measureStatus(row.status) === 'published',
@@ -228,7 +257,7 @@ export async function saveMeasure(input: {
   const schema = parseMeasureSchema(input.schema)
   const nameProblem = validateDraftName(name, 'questionnaire')
   if (nameProblem) throw new Error(nameProblem)
-  const { supabase, user } = await signedIn()
+  const { supabase } = await signedIn()
 
   if (input.id) {
     const { count, error: countError } = await supabase
@@ -238,12 +267,13 @@ export async function saveMeasure(input: {
     throwIf(countError)
     const { data: existing, error: existingError } = await supabase
       .from('outcome_measure_defs')
-      .select('schema, slug, status')
+      .select('schema, slug, status, payload_format, sealed_payload')
       .eq('id', input.id)
       .single()
     rowOrThrow(existing, existingError, 'Could not load that questionnaire.')
+    const [openedExisting] = await revealNamed('outcome_measure_defs', [{ ...existing, id: input.id }])
     const hasScores = (count || 0) > 0
-    if (measureEditIsBlocked(parseMeasureSchema(existing.schema), schema, hasScores)) {
+    if (measureEditIsBlocked(parseMeasureSchema(openedExisting.schema), schema, hasScores)) {
       throw new Error('Scores are already saved. You can change the wording. A new scale needs a new questionnaire.')
     }
     const status: 'draft' | 'published' = (input.publish || existing.status === 'published') ? 'published' : 'draft'
@@ -251,11 +281,10 @@ export async function saveMeasure(input: {
       const problem = validateMeasure(name, schema)
       if (problem) throw new Error(problem)
     }
+    await sealClinicalRecord('outcome_measure_defs', input.id, { v: 0, name, schema })
     const { error } = await supabase
       .from('outcome_measure_defs')
       .update({
-        name,
-        schema: schema as unknown as Json,
         status,
         is_active: status === 'published',
       })
@@ -278,19 +307,11 @@ export async function saveMeasure(input: {
     if (problem) throw new Error(problem)
   }
   const slug = await uniqueSlug('outcome_measure_defs', name)
-  const { data, error } = await supabase
-    .from('outcome_measure_defs')
-    .insert({
-      owner_id: user.id,
-      name,
-      slug,
-      schema: schema as unknown as Json,
-      is_active: status === 'published',
-      status,
-    })
-    .select('id')
-    .single()
-  rowOrThrow(data, error, 'Could not save the questionnaire.')
+  const data = await createClinicalRecord('outcome_measure_defs', {
+    slug,
+    is_active: status === 'published',
+    status,
+  }, { v: 0, name, schema })
   return { id: data.id, name, slug, schema, is_active: status === 'published', has_scores: false, status }
 }
 
@@ -310,13 +331,13 @@ export async function listForms(): Promise<FormRecord[]> {
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('form_definitions')
-    .select('id, name, slug, audience, status, is_onboarding, place_on_screener, autofill_client, letterhead_id, version, schema')
+    .select('id, name, slug, audience, status, is_onboarding, place_on_screener, autofill_client, letterhead_id, version, schema, payload_format, sealed_payload')
     .neq('status', 'archived')
-    .order('name')
   throwIf(error)
-  return (data || []).map((row) => ({
+  const revealed = await revealNamed('form_definitions', data || [])
+  return revealed.map((row) => ({
     id: row.id,
-    name: row.name,
+    name: row.name || '',
     slug: row.slug,
     audience: row.audience === 'public' ? 'public' : 'private',
     status: row.status,
@@ -362,7 +383,7 @@ export async function saveForm(input: {
   const schema = parseFormSchema(input.schema)
   const nameProblem = validateDraftName(name, 'form')
   if (nameProblem) throw new Error(nameProblem)
-  const { supabase, user } = await signedIn()
+  const { supabase } = await signedIn()
 
   if (input.id) {
     const { data: existing, error: existingError } = await supabase
@@ -382,11 +403,10 @@ export async function saveForm(input: {
       await assertPublishedMeasures(supabase, schema)
     }
     const version = (existing.version || 1) + 1
+    await sealClinicalRecord('form_definitions', input.id, { v: 0, name, description: '', schema })
     const { error } = await supabase
       .from('form_definitions')
       .update({
-        name,
-        schema: schema as unknown as Json,
         audience,
         is_onboarding: audience === 'public',
         place_on_screener: placeOnScreener,
@@ -423,35 +443,27 @@ export async function saveForm(input: {
     await assertPublishedMeasures(supabase, schema)
   }
   const slug = await uniqueSlug('form_definitions', name)
-  const { data, error } = await supabase
-    .from('form_definitions')
-    .insert({
-      owner_id: user.id,
-      name,
-      slug,
-      audience,
-      status,
-      is_onboarding: audience === 'public',
-      place_on_screener: placeOnScreener,
-      autofill_client: autofillClient,
-      letterhead_id: letterheadId,
-      version: 1,
-      schema: schema as unknown as Json,
-    })
-    .select('id, slug, version')
-    .single()
-  rowOrThrow(data, error, 'Could not save the form.')
-  return {
-    id: data.id,
-    name,
-    slug: data.slug,
+  const data = await createClinicalRecord('form_definitions', {
+    slug,
     audience,
     status,
     is_onboarding: audience === 'public',
     place_on_screener: placeOnScreener,
     autofill_client: autofillClient,
     letterhead_id: letterheadId,
-    version: data.version,
+    version: 1,
+  }, { v: 0, name, description: '', schema })
+  return {
+    id: data.id,
+    name,
+    slug,
+    audience,
+    status,
+    is_onboarding: audience === 'public',
+    place_on_screener: placeOnScreener,
+    autofill_client: autofillClient,
+    letterhead_id: letterheadId,
+    version: 1,
     schema,
   }
 }
@@ -517,17 +529,23 @@ export async function listEpisodeForms(episodeId: string): Promise<EpisodeFormRo
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('form_submissions')
-    .select('id, access_token, status, submitted_at, updated_at, encrypted_payload, payload_format, form_definitions(name)')
+    .select('id, access_token, status, submitted_at, updated_at, encrypted_payload, payload_format, form_definitions(id, name, payload_format, sealed_payload)')
     .eq('episode_id', episodeId)
     .order('updated_at', { ascending: false })
   throwIf(error)
   const rows = await withOpenedPayloads('form_submissions', data || [])
+  const defs = rows.flatMap((row) => {
+    const def = one(row.form_definitions as Sealable | Sealable[] | null)
+    return def?.id ? [def] : []
+  })
+  const openedDefs = await revealNamed('form_definitions', defs)
+  const defName = new Map(openedDefs.map((def) => [def.id, def.name || 'Form']))
   return rows.map((row) => {
-    const def = one(row.form_definitions as { name?: string } | { name?: string }[] | null)
+    const def = one(row.form_definitions as { id?: string } | { id?: string }[] | null)
     return {
       id: row.id,
       token: row.access_token,
-      name: def?.name || 'Form',
+      name: defName.get(def?.id || '') || 'Form',
       status: row.status,
       started: row.status !== 'in_progress' || answersStarted(row.encrypted_payload),
       updated_at: row.updated_at,
@@ -541,14 +559,21 @@ export async function listEpisodeOutcomes(episodeId: string): Promise<EpisodeOut
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('outcome_entries')
-    .select('id, measure_id, recorded_on, encrypted_payload, payload_format, outcome_measure_defs(name, schema)')
+    .select('id, measure_id, recorded_on, encrypted_payload, payload_format, outcome_measure_defs(id, name, schema, payload_format, sealed_payload)')
     .eq('episode_id', episodeId)
     .eq('completion_status', 'complete')
     .order('recorded_on', { ascending: false })
   throwIf(error)
   const rows = await withOpenedPayloads('outcome_entries', data || [])
+  const defs = rows.flatMap((row) => {
+    const def = one(row.outcome_measure_defs as Sealable | Sealable[] | null)
+    return def?.id ? [def] : []
+  })
+  const openedDefs = await revealNamed('outcome_measure_defs', defs)
+  const defById = new Map(openedDefs.map((def) => [def.id, def]))
   return rows.map((row) => {
-    const def = one(row.outcome_measure_defs as { name?: string; schema?: Json } | { name?: string; schema?: Json }[] | null)
+    const linked = one(row.outcome_measure_defs as { id?: string } | { id?: string }[] | null)
+    const def = linked?.id ? defById.get(linked.id) : null
     const scored = scorePayload(row.encrypted_payload)
     return {
       id: row.id,
@@ -566,10 +591,11 @@ export async function listMeasureScores(measureId: string, clientId?: string): P
   const supabase = supabaseOrThrow()
   const { data: def, error } = await supabase
     .from('outcome_measure_defs')
-    .select('name, slug, schema')
+    .select('id, name, slug, schema, payload_format, sealed_payload')
     .eq('id', measureId)
     .single()
   rowOrThrow(def, error, 'Could not load that questionnaire.')
+  const [openedDef] = await revealNamed('outcome_measure_defs', [def])
   let query = supabase
     .from('outcome_entries')
     .select('id, recorded_on, encrypted_payload, payload_format, client_id')
@@ -584,15 +610,20 @@ export async function listMeasureScores(measureId: string, clientId?: string): P
   if (ids.length) {
     const { data: identities, error: identityError } = await supabase
       .from('client_identities')
-      .select('client_id, encrypted_payload')
+      .select('client_id, encrypted_payload, payload_format')
       .in('client_id', ids)
     throwIf(identityError)
-    for (const row of identities || []) names.set(row.client_id, identityBits(row.encrypted_payload))
+    const openedIdentities = await withOpenedPayloads('client_identities', (identities || []).map((row) => ({
+      id: row.client_id,
+      payload_format: row.payload_format,
+      encrypted_payload: row.encrypted_payload,
+    })))
+    for (const row of openedIdentities) names.set(row.id, identityBits(row.encrypted_payload))
   }
   return {
-    name: def.name,
-    slug: def.slug,
-    schema: parseMeasureSchema(def.schema),
+    name: openedDef.name || '',
+    slug: openedDef.slug,
+    schema: parseMeasureSchema(openedDef.schema),
     rows: openedEntries.map((row) => {
       const who = names.get(row.client_id)
       const scored = scorePayload(row.encrypted_payload)
@@ -617,23 +648,31 @@ export async function createPrivateSubmission(input: {
   const { supabase } = await signedIn()
   const { data: form, error } = await supabase
     .from('form_definitions')
-    .select('id, version, audience, status, schema, autofill_client')
+    .select('id, version, audience, status, schema, autofill_client, payload_format, sealed_payload')
     .eq('id', input.formId)
     .single()
   rowOrThrow(form, error, 'Could not load that form.')
   if (form.audience !== 'private' || form.status !== 'published') {
     throw new Error('Publish a form for a client you already see before sending it.')
   }
-  const schema = parseFormSchema(form.schema)
+  const [openedForm] = await revealNamed('form_definitions', [form])
+  const schema = parseFormSchema(openedForm.schema)
   const autofill = form.autofill_client !== false
   const clientPrefill = async (target: FormSchema) => {
     const { data: identityRow, error: identityError } = await supabase
       .from('client_identities')
-      .select('encrypted_payload')
+      .select('encrypted_payload, payload_format')
       .eq('client_id', input.clientId)
       .maybeSingle()
     throwIf(identityError)
-    return prefillClientAnswers(target, clientBinds(identityRow?.encrypted_payload))
+    const [openedIdentity] = identityRow
+      ? await withOpenedPayloads('client_identities', [{
+        id: input.clientId,
+        payload_format: identityRow.payload_format,
+        encrypted_payload: identityRow.encrypted_payload,
+      }])
+      : []
+    return prefillClientAnswers(target, clientBinds(openedIdentity?.encrypted_payload ?? identityRow?.encrypted_payload))
   }
   const { data: openRows, error: openError } = await supabase
     .from('form_submissions')
@@ -663,10 +702,11 @@ export async function createPrivateSubmission(input: {
   if (measureIds.length) {
     const { data: defs, error: measureError } = await supabase
       .from('outcome_measure_defs')
-      .select('id, schema')
+      .select('id, schema, payload_format, sealed_payload')
       .in('id', measureIds)
     throwIf(measureError)
-    for (const def of defs || []) measures[def.id] = parseMeasureSchema(def.schema)
+    const openedDefs = await revealNamed('outcome_measure_defs', defs || [])
+    for (const def of openedDefs) measures[def.id] = parseMeasureSchema(def.schema)
     if (measureIds.some((id) => !measures[id])) throw new Error('A questionnaire on this form is missing.')
   }
   const answers = autofill ? await clientPrefill(schema) : {}
@@ -702,11 +742,12 @@ export async function recordMeasureScore(input: {
   const { supabase } = await signedIn()
   const { data: def, error } = await supabase
     .from('outcome_measure_defs')
-    .select('schema')
+    .select('id, schema, payload_format, sealed_payload')
     .eq('id', input.measureId)
     .single()
   rowOrThrow(def, error, 'Could not load that questionnaire.')
-  const schema = parseMeasureSchema(def.schema)
+  const [openedDef] = await revealNamed('outcome_measure_defs', [def])
+  const schema = parseMeasureSchema(openedDef.schema)
   const scored = scoreMeasure(schema, input.answer)
   await createClinicalRecord('outcome_entries', {
     client_id: input.clientId,
@@ -776,7 +817,7 @@ export async function getFormDocument(submissionId: string): Promise<FormDocumen
   const supabase = supabaseOrThrow()
   const { data, error } = await supabase
     .from('form_submissions')
-    .select('id, client_id, status, submitted_at, encrypted_payload, payload_format, form_definitions(name, letterhead_id)')
+    .select('id, client_id, status, submitted_at, encrypted_payload, payload_format, form_definitions(id, name, letterhead_id, payload_format, sealed_payload)')
     .eq('id', submissionId)
     .single()
   rowOrThrow(data, error, 'Could not open this form.')
@@ -787,7 +828,8 @@ export async function getFormDocument(submissionId: string): Promise<FormDocumen
   for (const [id, schema] of Object.entries(measuresRaw)) {
     measures[id] = parseMeasureSchema(schema)
   }
-  const definition = one(data.form_definitions as { name?: string; letterhead_id?: string | null } | { name?: string; letterhead_id?: string | null }[] | null)
+  const linked = one(data.form_definitions as Sealable & { letterhead_id?: string | null } | (Sealable & { letterhead_id?: string | null })[] | null)
+  const [definition] = linked?.id ? await revealNamed('form_definitions', [linked]) : []
   return {
     id: data.id,
     clientId: data.client_id,

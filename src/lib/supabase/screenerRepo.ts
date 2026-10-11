@@ -1,3 +1,4 @@
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase } from './client'
 import type { Json } from './database.types'
 
@@ -63,16 +64,25 @@ function supabaseOrThrow() {
 
 export async function listTags(kind?: TagKind): Promise<TagRecord[]> {
   const supabase = supabaseOrThrow()
-  let query = supabase.from('tags').select('id, kind, name, color').order('name')
+  let query = supabase.from('tags').select('id, kind, name, color, payload_format, sealed_payload').order('name')
   if (kind) query = query.eq('kind', kind)
   const { data, error } = await query
   if (error) throw error
-  return (data || []).map((row) => ({
-    id: row.id,
-    kind: row.kind === 'waitlist' ? 'waitlist' : 'client',
-    name: row.name,
-    color: tagColour(row.color),
-  }))
+  const rows = await withOpenedPayloads('tags', (data || []).map((row) => ({
+    ...row,
+    sealed_payload: row.sealed_payload ?? {},
+  })), { payloadKey: 'sealed_payload' })
+  return rows.map((row) => {
+    const body = row.payload_format === 'envelope' && row.sealed_payload && typeof row.sealed_payload === 'object'
+      ? row.sealed_payload as { name?: unknown }
+      : null
+    return {
+      id: row.id,
+      kind: row.kind === 'waitlist' ? 'waitlist' as const : 'client' as const,
+      name: body ? String(body.name || '') : row.name,
+      color: tagColour(row.color),
+    }
+  }).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function createTag(kind: TagKind, name: string, color: string): Promise<TagRecord> {
@@ -82,20 +92,20 @@ export async function createTag(kind: TagKind, name: string, color: string): Pro
   const chosen = tagColour(color)
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Sign in required')
-  const { data, error } = await supabase
-    .from('tags')
-    .insert({ owner_id: user.id, kind, name: trimmed, color: chosen })
-    .select('id, kind, name, color')
-    .single()
-  if (error) {
-    if (error.code === '23505') throw new Error('That tag is already in the list.')
-    throw error
+  const existing = await listTags(kind)
+  if (existing.some((tag) => tag.name.toLowerCase() === trimmed.toLowerCase())) {
+    throw new Error('That tag is already in the list.')
   }
+  const created = await createClinicalRecord('tags', {
+    kind,
+    name: crypto.randomUUID(),
+    color: chosen,
+  }, { v: 0, name: trimmed })
   return {
-    id: data.id,
-    kind: data.kind === 'waitlist' ? 'waitlist' : 'client',
-    name: data.name,
-    color: tagColour(data.color),
+    id: created.id,
+    kind,
+    name: trimmed,
+    color: chosen,
   }
 }
 
@@ -109,7 +119,7 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
   const supabase = supabaseOrThrow()
   const { data: clients, error } = await supabase
     .from('clients')
-    .select('id, status, created_at, client_identities(encrypted_payload)')
+    .select('id, status, created_at, client_identities(encrypted_payload, payload_format)')
     .in('status', ['screener', 'waitlist', 'rejected'])
     .order('created_at', { ascending: true })
   if (error) throw error
@@ -120,13 +130,13 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
   const [submissionsRes, placementsRes, linksRes] = await Promise.all([
     supabase
       .from('form_submissions')
-      .select('id, client_id, submitted_at, form_definitions(name)')
+      .select('id, client_id, submitted_at, form_definitions(id, name, payload_format, sealed_payload)')
       .in('client_id', ids)
       .eq('status', 'submitted')
       .order('submitted_at', { ascending: true }),
     supabase
       .from('waitlist_placements')
-      .select('client_id, preferred_times, information, service_id')
+      .select('client_id, preferred_times, information, service_id, payload_format, sealed_payload')
       .in('client_id', ids),
     supabase
       .from('client_tag_links')
@@ -137,13 +147,43 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
   if (placementsRes.error) throw placementsRes.error
   if (linksRes.error) throw linksRes.error
 
+  const definitionRows = (submissionsRes.data || []).flatMap((row) => {
+    const definition = Array.isArray(row.form_definitions) ? row.form_definitions[0] : row.form_definitions
+    return definition?.id ? [{
+      id: definition.id,
+      payload_format: definition.payload_format,
+      sealed_payload: definition.sealed_payload ?? {},
+      name: definition.name,
+    }] : []
+  })
+  const openedDefinitions = await withOpenedPayloads('form_definitions', definitionRows, { payloadKey: 'sealed_payload' })
+  const definitionName = new Map(openedDefinitions.map((row) => {
+    const body = row.payload_format === 'envelope' && row.sealed_payload && typeof row.sealed_payload === 'object'
+      ? row.sealed_payload as { name?: unknown }
+      : null
+    return [row.id, body ? String(body.name || 'Form') : (row.name || 'Form')]
+  }))
   const formByClient = new Map<string, { id: string; name: string }>()
   for (const row of submissionsRes.data || []) {
     if (!row.client_id || formByClient.has(row.client_id)) continue
     const definition = Array.isArray(row.form_definitions) ? row.form_definitions[0] : row.form_definitions
-    formByClient.set(row.client_id, { id: row.id, name: definition?.name || 'Form' })
+    formByClient.set(row.client_id, { id: row.id, name: definitionName.get(definition?.id || '') || definition?.name || 'Form' })
   }
-  const placementByClient = new Map((placementsRes.data || []).map((row) => [row.client_id, row]))
+  const identityRows = rows.flatMap((row) => {
+    const identity = Array.isArray(row.client_identities) ? row.client_identities[0] : row.client_identities
+    return identity ? [{ id: row.id, payload_format: identity.payload_format, encrypted_payload: identity.encrypted_payload }] : []
+  })
+  const openedIdentities = await withOpenedPayloads('client_identities', identityRows)
+  const identityByClient = new Map(openedIdentities.map((row) => [row.id, row.encrypted_payload]))
+  const openedPlacements = await withOpenedPayloads('waitlist_placements', (placementsRes.data || []).map((row) => ({
+    id: row.client_id,
+    payload_format: row.payload_format,
+    sealed_payload: row.sealed_payload ?? {},
+    preferred_times: row.preferred_times,
+    information: row.information,
+    service_id: row.service_id,
+  })), { payloadKey: 'sealed_payload' })
+  const placementByClient = new Map(openedPlacements.map((row) => [row.id, row]))
   const tagsByClient = new Map<string, string[]>()
   for (const row of linksRes.data || []) {
     const tag = Array.isArray(row.tags) ? row.tags[0] : row.tags
@@ -154,11 +194,13 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
   }
 
   return rows.map((row) => {
-    const identityRow = Array.isArray(row.client_identities) ? row.client_identities[0] : row.client_identities
-    const identity = identityOf(identityRow?.encrypted_payload)
+    const identity = identityOf(identityByClient.get(row.id))
     const name = `${identity.first_name || ''} ${identity.surname || ''}`.trim() || 'New referral'
     const form = formByClient.get(row.id)
     const placement = placementByClient.get(row.id)
+    const placementBody = placement?.payload_format === 'envelope' && placement.sealed_payload && typeof placement.sealed_payload === 'object'
+      ? placement.sealed_payload as { preferred_times?: unknown; information?: unknown }
+      : null
     return {
       id: row.id,
       name,
@@ -168,8 +210,8 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
       createdAt: row.created_at,
       submissionId: form?.id || null,
       formName: form?.name || '',
-      preferredTimes: placement?.preferred_times || '',
-      information: placement?.information || '',
+      preferredTimes: placementBody ? String(placementBody.preferred_times || '') : (placement?.preferred_times || ''),
+      information: placementBody ? String(placementBody.information || '') : (placement?.information || ''),
       serviceId: placement?.service_id || null,
       tagIds: tagsByClient.get(row.id) || [],
     }
@@ -197,16 +239,30 @@ export async function saveWaitlistPlacement(input: {
     if (error) throw error
   }
 
-  const { error: placeError } = await supabase
+  const placement = {
+    v: 0,
+    preferred_times: input.preferredTimes.trim(),
+    information: input.information.trim(),
+  }
+  const { data: existingPlace, error: existingError } = await supabase
     .from('waitlist_placements')
-    .upsert({
+    .select('client_id')
+    .eq('client_id', input.clientId)
+    .maybeSingle()
+  if (existingError) throw existingError
+  if (existingPlace) {
+    await sealClinicalRecord('waitlist_placements', input.clientId, placement)
+    const { error: placeError } = await supabase
+      .from('waitlist_placements')
+      .update({ service_id: input.serviceId || null })
+      .eq('client_id', input.clientId)
+    if (placeError) throw placeError
+  } else {
+    await createClinicalRecord('waitlist_placements', {
       client_id: input.clientId,
-      owner_id: user.id,
-      preferred_times: input.preferredTimes.trim(),
-      information: input.information.trim(),
       service_id: input.serviceId || null,
-    })
-  if (placeError) throw placeError
+    }, placement)
+  }
 
   const { data: owned, error: tagError } = await supabase.from('tags').select('id').eq('kind', 'waitlist')
   if (tagError) throw tagError

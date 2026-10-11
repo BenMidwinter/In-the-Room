@@ -22,11 +22,10 @@ Noted from the hosted site. These stay on the list while encryption is the next 
 
 ## 2. Encryption and login — next
 
-Encryption wiring is the next piece of work. Practice membership follows once a new encrypted note can be opened beside an existing plain note. MFA enrolment follows that, and the second-factor lock stays off until the phone code works.
+Encryption wiring is the next piece of work. Organisation id is the owner of the clients, ready for a later workspace. The people using the app now are freelance clinicians, one account each. MFA enrolment follows encryption, and the second-factor lock stays off until the phone code works.
 
-- [ ] Envelope encryption for clinical records: notes, letters, reports, form answers, and outcome totals. One organisation per signup, with roles owner, practitioner, and practice manager. The practice manager can read appointments, attendance, and invoice totals, and is kept out of note, report, letter, and form bodies. Operational columns stay readable: appointment times, attendance, note status, invoice amounts, and service prices.
-- [ ] Keep the current dummy rows. New clinical writes use the envelope. Existing rows stay plain, so the two can be compared on one client. Wipe every test row in one go only when a stable beta is ready.
-- [ ] After that comparison, invite a practitioner and a practice manager.
+- [ ] Envelope encryption for client text and editor text, on top of notes, letters, reports, form answers, and outcome totals. Client names, contacts, clinical profiles, appointment notes, waitlist text, tags, and invoice addressees are included. Journal, working documents, practice documents, templates, form wording, questionnaires, and CPD or supervision notes are included. Bank details are included. The clinician’s name, email, phone, bio, registration, and letterhead stay readable so an account can be supported. Operational columns stay readable: appointment times, attendance, note status, invoice amounts, and service prices.
+- [ ] Keep the current dummy rows. New writes use the envelope. Existing rows stay plain, so the two can be compared. Wipe every test row in one go only when a stable beta is ready.
 - [ ] Data processing agreement and mandatory MFA. A clinical payload is readable only after the second factor. Turn that check on at the same time as MFA enrolment, once the code from the phone has been confirmed.
 
 ## 3. Data management

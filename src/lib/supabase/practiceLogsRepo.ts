@@ -7,6 +7,7 @@ import {
   type PracticeLogInput,
   type SupervisionDirection,
 } from '../practiceLogs'
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 
@@ -25,8 +26,8 @@ type LogRow = {
 
 const localLogs: StoredLog[] = []
 
-const CPD_COLUMNS = 'id, occurred_on, minutes, label, encrypted_payload, created_at, updated_at'
-const SUPERVISION_COLUMNS = 'id, occurred_on, minutes, label, direction, encrypted_payload, created_at, updated_at'
+const CPD_COLUMNS = 'id, occurred_on, minutes, label, encrypted_payload, payload_format, created_at, updated_at'
+const SUPERVISION_COLUMNS = 'id, occurred_on, minutes, label, direction, encrypted_payload, payload_format, created_at, updated_at'
 
 function toLog(kind: LogKind, row: LogRow): PracticeLog {
   const direction = row.direction === 'delivered' || row.direction === 'received'
@@ -73,7 +74,8 @@ export async function listPracticeLogs(kind: LogKind, userId: string): Promise<P
       .select(CPD_COLUMNS)
       .order('occurred_on', { ascending: false })
     if (error) throw error
-    return sortLogs((data || []).map((row) => toLog(kind, row as LogRow)))
+    const rows = await withOpenedPayloads('cpd_entries', (data || []) as LogRow[])
+    return sortLogs(rows.map((row) => toLog(kind, row)))
   }
 
   const { data, error } = await supabase
@@ -81,7 +83,8 @@ export async function listPracticeLogs(kind: LogKind, userId: string): Promise<P
     .select(SUPERVISION_COLUMNS)
     .order('occurred_on', { ascending: false })
   if (error) throw error
-  return sortLogs((data || []).map((row) => toLog(kind, row as LogRow)))
+  const rows = await withOpenedPayloads('supervision_entries', (data || []) as LogRow[])
+  return sortLogs(rows.map((row) => toLog(kind, row)))
 }
 
 export async function savePracticeLog(kind: LogKind, userId: string, input: PracticeLogInput): Promise<PracticeLog> {
@@ -98,58 +101,37 @@ export async function savePracticeLog(kind: LogKind, userId: string, input: Prac
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Sign in required')
   const encrypted_payload = logPayload(parsed.content) as unknown as Json
+  const shared = { occurred_on: parsed.occurred_on, minutes: parsed.minutes, label: parsed.label }
 
   if (kind === 'cpd') {
-    const fields = {
-      occurred_on: parsed.occurred_on,
-      minutes: parsed.minutes,
-      label: parsed.label,
-      encrypted_payload,
-    }
     if (parsed.id) {
-      const { data, error } = await supabase
-        .from('cpd_entries')
-        .update(fields)
-        .eq('id', parsed.id)
-        .select(CPD_COLUMNS)
-        .single()
+      await sealClinicalRecord('cpd_entries', parsed.id, encrypted_payload)
+      const { error } = await supabase.from('cpd_entries').update(shared).eq('id', parsed.id)
       if (error) throw error
-      return toLog(kind, data as LogRow)
+      const { data, error: readError } = await supabase.from('cpd_entries').select(CPD_COLUMNS).eq('id', parsed.id).single()
+      if (readError) throw readError
+      return toLog(kind, { ...(data as LogRow), encrypted_payload })
     }
-    const { data, error } = await supabase
-      .from('cpd_entries')
-      .insert({ ...fields, owner_id: user.id })
-      .select(CPD_COLUMNS)
-      .single()
+    const created = await createClinicalRecord('cpd_entries', shared, encrypted_payload)
+    const { data, error } = await supabase.from('cpd_entries').select(CPD_COLUMNS).eq('id', created.id).single()
     if (error) throw error
-    return toLog(kind, data as LogRow)
+    return toLog(kind, { ...(data as LogRow), encrypted_payload })
   }
 
   const direction: SupervisionDirection = parsed.direction || 'received'
-  const fields = {
-    occurred_on: parsed.occurred_on,
-    minutes: parsed.minutes,
-    label: parsed.label,
-    direction,
-    encrypted_payload,
-  }
+  const fields = { ...shared, direction }
   if (parsed.id) {
-    const { data, error } = await supabase
-      .from('supervision_entries')
-      .update(fields)
-      .eq('id', parsed.id)
-      .select(SUPERVISION_COLUMNS)
-      .single()
+    await sealClinicalRecord('supervision_entries', parsed.id, encrypted_payload)
+    const { error } = await supabase.from('supervision_entries').update(fields).eq('id', parsed.id)
     if (error) throw error
-    return toLog(kind, data as LogRow)
+    const { data, error: readError } = await supabase.from('supervision_entries').select(SUPERVISION_COLUMNS).eq('id', parsed.id).single()
+    if (readError) throw readError
+    return toLog(kind, { ...(data as LogRow), encrypted_payload })
   }
-  const { data, error } = await supabase
-    .from('supervision_entries')
-    .insert({ ...fields, owner_id: user.id })
-    .select(SUPERVISION_COLUMNS)
-    .single()
+  const created = await createClinicalRecord('supervision_entries', fields, encrypted_payload)
+  const { data, error } = await supabase.from('supervision_entries').select(SUPERVISION_COLUMNS).eq('id', created.id).single()
   if (error) throw error
-  return toLog(kind, data as LogRow)
+  return toLog(kind, { ...(data as LogRow), encrypted_payload })
 }
 
 function saveLocal(

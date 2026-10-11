@@ -1,10 +1,11 @@
 import { journalEntryFromRow, type AppJournalEntry } from '../journalEntry'
 import { parseOrThrow, journalEntryInputSchema } from '../schemas'
 import { getJournalEntries, saveJournalEntry } from '../store/journal'
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 
-const JOURNAL_COLUMNS = 'id, author_id, entry_date, somatic_state, encrypted_payload'
+const JOURNAL_COLUMNS = 'id, author_id, entry_date, somatic_state, encrypted_payload, payload_format'
 
 type JournalRow = {
   id: string
@@ -12,6 +13,7 @@ type JournalRow = {
   entry_date: string
   somatic_state: string | null
   encrypted_payload: Json | null
+  payload_format?: string | null
 }
 
 function sortEntries(items: AppJournalEntry[]): AppJournalEntry[] {
@@ -24,16 +26,17 @@ function sortEntries(items: AppJournalEntry[]): AppJournalEntry[] {
 
 export async function listJournalEntries(userId: string): Promise<AppJournalEntry[]> {
   if (!userId) return []
-  if (!isSupabaseConfigured()) return getJournalEntries(userId)
+  if (!isSupabaseConfigured()) return getJournalEntries(userId) as AppJournalEntry[]
   const supabase = getSupabase()
-  if (!supabase) return getJournalEntries(userId)
+  if (!supabase) return getJournalEntries(userId) as AppJournalEntry[]
   const { data, error } = await supabase
     .from('journal_entries')
     .select(JOURNAL_COLUMNS)
     .eq('author_id', userId)
     .order('entry_date', { ascending: false })
   if (error) throw error
-  return sortEntries((data || []).map((row) => journalEntryFromRow(row as JournalRow)))
+  const rows = await withOpenedPayloads('journal_entries', (data || []) as JournalRow[])
+  return sortEntries(rows.map((row) => journalEntryFromRow(row)))
 }
 
 export async function saveJournalEntryForUser(userId: string, input: {
@@ -56,7 +59,7 @@ export async function saveJournalEntryForUser(userId: string, input: {
       time: entryTime,
       somatic_state: somaticState,
       body_text: bodyText,
-    })
+    }) as AppJournalEntry
   }
 
   const supabase = getSupabase()
@@ -68,31 +71,47 @@ export async function saveJournalEntryForUser(userId: string, input: {
   const existingId = parsed.id && parsed.id !== 'new' ? parsed.id : null
 
   if (existingId) {
-    const { data, error } = await supabase
+    await sealClinicalRecord('journal_entries', existingId, encrypted_payload)
+    const { error } = await supabase
       .from('journal_entries')
       .update({
         entry_date: parsed.date,
         somatic_state: somaticState,
-        encrypted_payload,
       })
       .eq('id', existingId)
-      .select(JOURNAL_COLUMNS)
-      .single()
     if (error) throw error
-    return journalEntryFromRow(data as JournalRow)
-  }
-
-  const { data, error } = await supabase
-    .from('journal_entries')
-    .insert({
-      owner_id: user.id,
-      author_id: user.id,
-      entry_date: parsed.date,
-      somatic_state: somaticState,
+    const { data, error: readError } = await supabase
+      .from('journal_entries')
+      .select(JOURNAL_COLUMNS)
+      .eq('id', existingId)
+      .single()
+    if (readError) throw readError
+    const row = data as JournalRow
+    return journalEntryFromRow({
+      id: row.id,
+      author_id: row.author_id,
+      entry_date: row.entry_date,
+      somatic_state: row.somatic_state,
       encrypted_payload,
     })
+  }
+
+  const created = await createClinicalRecord('journal_entries', {
+    entry_date: parsed.date,
+    somatic_state: somaticState,
+  }, encrypted_payload)
+  const { data, error } = await supabase
+    .from('journal_entries')
     .select(JOURNAL_COLUMNS)
+    .eq('id', created.id)
     .single()
   if (error) throw error
-  return journalEntryFromRow(data as JournalRow)
+  const row = data as JournalRow
+  return journalEntryFromRow({
+    id: row.id,
+    author_id: row.author_id,
+    entry_date: row.entry_date,
+    somatic_state: row.somatic_state,
+    encrypted_payload,
+  })
 }

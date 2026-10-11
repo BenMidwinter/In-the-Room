@@ -1,3 +1,4 @@
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase } from './client'
 import {
   dueDateFrom,
@@ -30,6 +31,8 @@ type InvoiceRow = {
   resend_batch_id: string | null
   last_delivery_error: string | null
   total_pence: number
+  payload_format?: string | null
+  sealed_payload?: unknown
 }
 
 type LineRow = {
@@ -43,6 +46,8 @@ type LineRow = {
   quantity: number
   includes_vat: boolean
   released_at: string | null
+  payload_format?: string | null
+  sealed_payload?: unknown
 }
 
 type PaymentRow = {
@@ -51,11 +56,54 @@ type PaymentRow = {
   amount_pence: number
   paid_on: string
   note: string
+  payload_format?: string | null
+  sealed_payload?: unknown
 }
 
-const INVOICE_COLUMNS = 'id, client_id, number, status, issued_on, due_on, bill_to_name, for_name, bill_to_email, recipient_email, sent_at, delivery_method, resend_batch_id, last_delivery_error, payment_details, total_pence'
-const LINE_COLUMNS = 'id, invoice_id, appointment_id, position, description, session_date, unit_pence, quantity, includes_vat, released_at'
-const PAYMENT_COLUMNS = 'id, invoice_id, amount_pence, paid_on, note'
+const INVOICE_COLUMNS = 'id, client_id, number, status, issued_on, due_on, bill_to_name, for_name, bill_to_email, recipient_email, sent_at, delivery_method, resend_batch_id, last_delivery_error, payment_details, total_pence, payload_format, sealed_payload'
+const LINE_COLUMNS = 'id, invoice_id, appointment_id, position, description, session_date, unit_pence, quantity, includes_vat, released_at, payload_format, sealed_payload'
+const PAYMENT_COLUMNS = 'id, invoice_id, amount_pence, paid_on, note, payload_format, sealed_payload'
+
+function sealedText(payload: unknown, key: string, fallback: string): string {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return fallback
+  const value = (payload as Record<string, unknown>)[key]
+  return typeof value === 'string' ? value : fallback
+}
+
+async function revealInvoices(rows: InvoiceRow[]): Promise<InvoiceRow[]> {
+  const opened = await withOpenedPayloads('invoices', rows.map((row) => ({
+    ...row,
+    sealed_payload: row.sealed_payload ?? {},
+  })), { payloadKey: 'sealed_payload' })
+  return opened.map((row) => row.payload_format === 'envelope' ? {
+    ...row,
+    bill_to_name: sealedText(row.sealed_payload, 'bill_to_name', ''),
+    bill_to_email: sealedText(row.sealed_payload, 'bill_to_email', ''),
+    for_name: sealedText(row.sealed_payload, 'for_name', ''),
+    recipient_email: sealedText(row.sealed_payload, 'recipient_email', ''),
+    payment_details: sealedText(row.sealed_payload, 'payment_details', ''),
+  } : row)
+}
+
+async function revealLines(rows: LineRow[]): Promise<LineRow[]> {
+  const opened = await withOpenedPayloads('invoice_lines', rows.map((row) => ({
+    ...row,
+    sealed_payload: row.sealed_payload ?? {},
+  })), { payloadKey: 'sealed_payload' })
+  return opened.map((row) => row.payload_format === 'envelope'
+    ? { ...row, description: sealedText(row.sealed_payload, 'description', '') }
+    : row)
+}
+
+async function revealPayments(rows: PaymentRow[]): Promise<PaymentRow[]> {
+  const opened = await withOpenedPayloads('invoice_payments', rows.map((row) => ({
+    ...row,
+    sealed_payload: row.sealed_payload ?? {},
+  })), { payloadKey: 'sealed_payload' })
+  return opened.map((row) => row.payload_format === 'envelope'
+    ? { ...row, note: sealedText(row.sealed_payload, 'note', '') }
+    : row)
+}
 
 function mapLine(row: LineRow): InvoiceLine {
   return {
@@ -108,20 +156,6 @@ function mapInvoice(row: InvoiceRow, lines: LineRow[], payments: PaymentRow[]): 
   }
 }
 
-function lineInsert(userId: string, invoiceId: string, line: InvoiceLineInput, position: number) {
-  return {
-    invoice_id: invoiceId,
-    owner_id: userId,
-    appointment_id: line.appointmentId,
-    position,
-    description: line.description.trim(),
-    session_date: line.sessionDate,
-    unit_pence: Math.max(0, Math.trunc(Number(line.unitPence)) || 0),
-    quantity: lineQuantity(line.quantity),
-    includes_vat: Boolean(line.includesVat),
-  }
-}
-
 function usableLines(lines: InvoiceLineInput[]): InvoiceLineInput[] {
   return lines.filter((line) => line.description.trim() && Math.trunc(Number(line.unitPence)) >= 0)
 }
@@ -162,9 +196,12 @@ export async function listInvoices(): Promise<InvoiceRecord[]> {
   ])
   if (lineError) throw lineError
   if (paymentError) throw paymentError
-  const lines = (lineData || []) as LineRow[]
-  const payments = (paymentData || []) as PaymentRow[]
-  return invoices.map((invoice) => mapInvoice(invoice, lines, payments))
+  const [openedInvoices, lines, payments] = await Promise.all([
+    revealInvoices(invoices),
+    revealLines((lineData || []) as LineRow[]),
+    revealPayments((paymentData || []) as PaymentRow[]),
+  ])
+  return openedInvoices.map((invoice) => mapInvoice(invoice, lines, payments))
 }
 
 export async function loadPaymentDetails(): Promise<PaymentDetails> {
@@ -174,16 +211,34 @@ export async function loadPaymentDetails(): Promise<PaymentDetails> {
   if (!user) return { ...EMPTY_PAYMENT }
   const { data, error } = await supabase
     .from('profiles')
-    .select('invoice_account_name, invoice_sort_code, invoice_account_number, invoice_payment_note, invoice_due_days')
+    .select('invoice_account_name, invoice_sort_code, invoice_account_number, invoice_payment_note, invoice_due_days, sealed_bank, bank_format')
     .eq('id', user.id)
     .maybeSingle()
   if (error) throw error
   if (!data) return { ...EMPTY_PAYMENT }
+  let accountName = data.invoice_account_name || ''
+  let sortCode = data.invoice_sort_code || ''
+  let accountNumber = data.invoice_account_number || ''
+  let note = data.invoice_payment_note || ''
+  if (data.bank_format === 'envelope') {
+    const [opened] = await withOpenedPayloads('profiles', [{
+      id: user.id,
+      bank_format: data.bank_format,
+      sealed_bank: data.sealed_bank ?? {},
+    }], { payloadKey: 'sealed_bank', formatKey: 'bank_format' })
+    const bank = opened?.sealed_bank && typeof opened.sealed_bank === 'object'
+      ? opened.sealed_bank as Record<string, unknown>
+      : {}
+    accountName = String(bank.invoice_account_name || '')
+    sortCode = String(bank.invoice_sort_code || '')
+    accountNumber = String(bank.invoice_account_number || '')
+    note = String(bank.invoice_payment_note || '')
+  }
   return {
-    accountName: data.invoice_account_name || '',
-    sortCode: data.invoice_sort_code || '',
-    accountNumber: data.invoice_account_number || '',
-    note: data.invoice_payment_note || '',
+    accountName,
+    sortCode,
+    accountNumber,
+    note,
     dueDays: Number(data.invoice_due_days ?? 14),
   }
 }
@@ -191,15 +246,16 @@ export async function loadPaymentDetails(): Promise<PaymentDetails> {
 export async function savePaymentDetails(details: PaymentDetails): Promise<void> {
   const { supabase, user } = await requireUser()
   const dueDays = Math.max(0, Math.min(365, Math.round(Number(details.dueDays) || 0)))
+  await sealClinicalRecord('profiles', user.id, {
+    v: 0,
+    invoice_account_name: details.accountName.trim(),
+    invoice_sort_code: details.sortCode.trim(),
+    invoice_account_number: details.accountNumber.trim(),
+    invoice_payment_note: details.note.trim(),
+  })
   const { error } = await supabase
     .from('profiles')
-    .update({
-      invoice_account_name: details.accountName.trim() || null,
-      invoice_sort_code: details.sortCode.trim() || null,
-      invoice_account_number: details.accountNumber.trim() || null,
-      invoice_payment_note: details.note.trim() || null,
-      invoice_due_days: dueDays,
-    })
+    .update({ invoice_due_days: dueDays })
     .eq('id', user.id)
   if (error) throw error
 }
@@ -228,7 +284,12 @@ async function reloadInvoice(supabase: NonNullable<ReturnType<typeof getSupabase
   ])
   if (lineError) throw lineError
   if (paymentError) throw paymentError
-  return mapInvoice(data as InvoiceRow, (lineData || []) as LineRow[], (paymentData || []) as PaymentRow[])
+  const [opened] = await revealInvoices([data as InvoiceRow])
+  const [lines, payments] = await Promise.all([
+    revealLines((lineData || []) as LineRow[]),
+    revealPayments((paymentData || []) as PaymentRow[]),
+  ])
+  return mapInvoice(opened, lines, payments)
 }
 
 async function storeTotal(supabase: NonNullable<ReturnType<typeof getSupabase>>, userId: string, invoiceId: string) {
@@ -252,35 +313,51 @@ export async function createInvoice(input: {
   let createdId = ''
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const number = formatInvoiceNumber(sequence)
-    const { data, error } = await supabase
-      .from('invoices')
-      .insert({
-        owner_id: user.id,
+    const email = String(input.billToEmail || '').trim()
+    try {
+      const created = await createClinicalRecord('invoices', {
         client_id: input.clientId,
         number,
         status: 'draft',
+        total_pence: invoiceTotalPence(lines),
+      }, {
+        v: 0,
         bill_to_name: input.billToName.trim() || 'Invoice',
-        bill_to_email: String(input.billToEmail || '').trim(),
-        recipient_email: String(input.billToEmail || '').trim(),
+        bill_to_email: email,
+        recipient_email: email,
         for_name: String(input.forName || '').trim(),
         payment_details: '',
-        total_pence: invoiceTotalPence(lines),
       })
-      .select('id')
-      .single()
-    if (error?.code === '23505' && !String(error.message || '').includes('appointment')) {
-      sequence += 1
-      continue
+      createdId = created.id
+      break
+    } catch (err) {
+      const message = err instanceof Error ? err.message : ''
+      if (message.includes('duplicate') && !message.includes('appointment')) {
+        sequence += 1
+        continue
+      }
+      throw err
     }
-    if (error) throw error
-    createdId = data.id
-    break
   }
   if (!createdId) throw new Error('Could not allocate an invoice number.')
   if (lines.length) {
-    const { error: lineError } = await supabase.from('invoice_lines').insert(
-      lines.map((line, index) => lineInsert(user.id, createdId, line, index)),
-    )
+    let lineError: { code?: string; message?: string } | null = null
+    try {
+      for (let index = 0; index < lines.length; index += 1) {
+        const line = lines[index]
+        await createClinicalRecord('invoice_lines', {
+          invoice_id: createdId,
+          appointment_id: line.appointmentId,
+          position: index,
+          session_date: line.sessionDate,
+          unit_pence: Math.max(0, Math.trunc(Number(line.unitPence)) || 0),
+          quantity: lineQuantity(line.quantity),
+          includes_vat: Boolean(line.includesVat),
+        }, { v: 0, description: line.description.trim() })
+      }
+    } catch (err) {
+      lineError = { message: err instanceof Error ? err.message : 'Could not save the invoice line.' }
+    }
     if (lineError) {
       await supabase.from('invoices').delete().eq('id', createdId)
       throw asInvoiceError(lineError)
@@ -300,12 +377,14 @@ export async function updateInvoiceRecipient(
   const current = await reloadInvoice(supabase, user.id, invoiceId)
   if (current.status !== 'draft') throw new Error('Sent invoices keep the recipient they were sent to.')
   const email = input.billToEmail.trim()
-  const { error } = await supabase.from('invoices').update({
+  await sealClinicalRecord('invoices', invoiceId, {
+    v: 0,
     bill_to_name: name,
     bill_to_email: email,
+    for_name: current.forName,
     recipient_email: email,
-  }).eq('id', invoiceId)
-  if (error) throw error
+    payment_details: current.paymentDetails,
+  })
   return reloadInvoice(supabase, user.id, invoiceId)
 }
 
@@ -315,8 +394,19 @@ export async function addInvoiceLine(invoiceId: string, line: InvoiceLineInput):
   const { supabase, user } = await requireUser()
   const current = await reloadInvoice(supabase, user.id, invoiceId)
   if (current.status !== 'draft') throw new Error('Sent invoices stay as they were sent.')
-  const { error } = await supabase.from('invoice_lines').insert(lineInsert(user.id, invoiceId, line, current.lines.length))
-  if (error) throw asInvoiceError(error)
+  try {
+    await createClinicalRecord('invoice_lines', {
+      invoice_id: invoiceId,
+      appointment_id: line.appointmentId,
+      position: current.lines.length,
+      session_date: line.sessionDate,
+      unit_pence: Math.max(0, Math.trunc(Number(line.unitPence)) || 0),
+      quantity: lineQuantity(line.quantity),
+      includes_vat: Boolean(line.includesVat),
+    }, { v: 0, description: line.description.trim() })
+  } catch (err) {
+    throw asInvoiceError({ message: err instanceof Error ? err.message : '' }) || err
+  }
   return storeTotal(supabase, user.id, invoiceId)
 }
 
@@ -326,8 +416,8 @@ export async function updateInvoiceLine(invoiceId: string, lineId: string, line:
   const { supabase, user } = await requireUser()
   const current = await reloadInvoice(supabase, user.id, invoiceId)
   if (current.status !== 'draft') throw new Error('Sent invoices stay as they were sent.')
+  await sealClinicalRecord('invoice_lines', lineId, { v: 0, description: line.description.trim() })
   const { error } = await supabase.from('invoice_lines').update({
-    description: line.description.trim(),
     session_date: line.sessionDate,
     unit_pence: Math.max(0, Math.trunc(Number(line.unitPence)) || 0),
     quantity: lineQuantity(line.quantity),
@@ -353,12 +443,18 @@ export async function setInvoiceStatus(invoiceId: string, status: InvoiceStatus)
     if (current.totalPence <= 0) throw new Error('Add a line with an amount before you mark this as sent.')
     const details = await loadPaymentDetails()
     const issuedOn = todayYmd()
+    await sealClinicalRecord('invoices', invoiceId, {
+      v: 0,
+      bill_to_name: current.billToName,
+      bill_to_email: current.billToEmail,
+      for_name: current.forName,
+      recipient_email: current.billToEmail || '',
+      payment_details: paymentInstructions(details),
+    })
     const { error } = await supabase.from('invoices').update({
       status: 'issued',
       issued_on: issuedOn,
       due_on: dueDateFrom(issuedOn, details.dueDays),
-      payment_details: paymentInstructions(details),
-      recipient_email: current.billToEmail || '',
       sent_at: new Date().toISOString(),
       delivery_method: 'manual',
       last_delivery_error: null,
@@ -390,14 +486,11 @@ export async function recordInvoicePayment(
   if (current.status === 'draft') throw new Error('Mark the invoice as sent before you record a payment.')
   if (current.status === 'void') throw new Error('A void invoice cannot take a payment.')
   if (current.status === 'paid' || invoiceBalancePence(current) <= 0) throw new Error('This invoice is already paid.')
-  const { error } = await supabase.from('invoice_payments').insert({
+  await createClinicalRecord('invoice_payments', {
     invoice_id: invoiceId,
-    owner_id: user.id,
     amount_pence: amount,
     paid_on: input.paidOn,
-    note: '',
-  })
-  if (error) throw error
+  }, { v: 0, note: '' })
   const next = await reloadInvoice(supabase, user.id, invoiceId)
   if (next.totalPence > 0 && paidPence(next.payments) >= next.totalPence) {
     const { error: paidError } = await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId)
@@ -415,21 +508,32 @@ export async function stampInvoiceDelivery(
     recipientEmail?: string
   },
 ): Promise<void> {
-  const { supabase } = await requireUser()
+  const { supabase, user } = await requireUser()
   const update: {
     delivery_method?: DeliveryMethod
     resend_batch_id?: string | null
     last_delivery_error?: string | null
-    recipient_email?: string
     sent_at?: string
   } = {}
   if (patch.deliveryMethod) update.delivery_method = patch.deliveryMethod
   if (patch.resendBatchId !== undefined) update.resend_batch_id = patch.resendBatchId
   if (patch.lastDeliveryError !== undefined) update.last_delivery_error = patch.lastDeliveryError
-  if (patch.recipientEmail !== undefined) update.recipient_email = patch.recipientEmail
   if (patch.deliveryMethod === 'resend') update.sent_at = new Date().toISOString()
-  const { error } = await supabase.from('invoices').update(update).eq('id', invoiceId)
-  if (error) throw error
+  if (Object.keys(update).length) {
+    const { error } = await supabase.from('invoices').update(update).eq('id', invoiceId)
+    if (error) throw error
+  }
+  if (patch.recipientEmail !== undefined) {
+    const current = await reloadInvoice(supabase, user.id, invoiceId)
+    await sealClinicalRecord('invoices', invoiceId, {
+      v: 0,
+      bill_to_name: current.billToName,
+      bill_to_email: current.billToEmail,
+      for_name: current.forName,
+      recipient_email: patch.recipientEmail,
+      payment_details: current.paymentDetails,
+    })
+  }
 }
 
 export async function deleteInvoice(invoiceId: string): Promise<void> {

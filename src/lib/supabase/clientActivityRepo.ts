@@ -52,13 +52,13 @@ export async function listClientActivity(clientId: string): Promise<ClientActivi
       .then((res) => res, () => ({ data: null, error: true })),
     supabase
       .from('form_submissions')
-      .select('id, client_id, form_definition_id, submitted_at, created_at, encrypted_payload, form_definitions(name, audience)')
+      .select('id, client_id, form_definition_id, submitted_at, created_at, encrypted_payload, form_definitions(id, name, audience, payload_format, sealed_payload)')
       .eq('client_id', clientId)
       .order('submitted_at', { ascending: false })
       .then((res) => res, () => ({ data: null, error: true })),
     supabase
       .from('timeline_events')
-      .select('id, client_id, actor_id, event_type, occurred_at, event_date, encrypted_summary, ref_id')
+      .select('id, client_id, actor_id, event_type, occurred_at, event_date, encrypted_summary, payload_format, ref_id')
       .eq('client_id', clientId)
       .order('occurred_at', { ascending: false })
       .then((res) => res, () => ({ data: null, error: true })),
@@ -104,23 +104,48 @@ export async function listClientActivity(clientId: string): Promise<ClientActivi
     })
   }
 
-  for (const row of formsRes.data || []) {
-    const def = row.form_definitions as { name?: string; audience?: string } | { name?: string; audience?: string }[] | null
+  const formDefs = (formsRes.data || []).flatMap((row) => {
+    const def = row.form_definitions as { id?: string; name?: string; audience?: string; payload_format?: string; sealed_payload?: Json } | { id?: string; name?: string; audience?: string; payload_format?: string; sealed_payload?: Json }[] | null
     const formDef = Array.isArray(def) ? def[0] : def
-    const formName = formDef?.name
+    return formDef?.id ? [{
+      id: formDef.id,
+      payload_format: formDef.payload_format,
+      sealed_payload: formDef.sealed_payload ?? {},
+      name: formDef.name,
+      audience: formDef.audience,
+    }] : []
+  })
+  const openedFormDefs = await withOpenedPayloads('form_definitions', formDefs, { payloadKey: 'sealed_payload' })
+  const formDefById = new Map(openedFormDefs.map((row) => {
+    const sealed = row.payload_format === 'envelope' && row.sealed_payload && typeof row.sealed_payload === 'object'
+      ? row.sealed_payload as { name?: unknown }
+      : null
+    return [row.id, { name: sealed ? String(sealed.name || '') : row.name, audience: row.audience }]
+  }))
+
+  for (const row of formsRes.data || []) {
+    const def = row.form_definitions as { id?: string } | { id?: string }[] | null
+    const formDef = Array.isArray(def) ? def[0] : def
+    const openedDef = formDef?.id ? formDefById.get(formDef.id) : null
+    const formName = openedDef?.name
     items.push({
       id: `timeline-form-${row.id}`,
       client_id: clientId,
       type: 'form',
       title: formName || payloadTitle(row.encrypted_payload, 'Form submitted'),
-      summary: formDef?.audience === 'public' ? 'Added to the screener' : 'Form submitted',
+      summary: openedDef?.audience === 'public' ? 'Added to the screener' : 'Form submitted',
       created_at: row.submitted_at || row.created_at,
       author_id: null,
       ref_id: row.id,
     })
   }
 
-  for (const row of eventsRes.data || []) {
+  const events = await withOpenedPayloads('timeline_events', (eventsRes.data || []).map((row) => ({
+    ...row,
+    encrypted_payload: row.encrypted_summary ?? {},
+  })))
+
+  for (const row of events) {
     const type = String(row.event_type || 'event')
     const mappedType = type.includes('letter')
       ? 'letter'
@@ -133,8 +158,8 @@ export async function listClientActivity(clientId: string): Promise<ClientActivi
       id: `timeline-remote-${row.id}`,
       client_id: clientId,
       type: mappedType,
-      title: payloadTitle(row.encrypted_summary, type.replace(/_/g, ' ')),
-      summary: payloadSummary(row.encrypted_summary, ''),
+      title: payloadTitle(row.encrypted_payload, type.replace(/_/g, ' ')),
+      summary: payloadSummary(row.encrypted_payload, ''),
       created_at: row.occurred_at
         || (row.event_date ? `${row.event_date}T12:00:00` : new Date().toISOString()),
       author_id: row.actor_id,

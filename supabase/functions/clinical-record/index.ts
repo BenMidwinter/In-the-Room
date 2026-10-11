@@ -1,51 +1,62 @@
-import { decryptDataKey, generateDataKey, kmsKeyId } from '../_shared/awsKms.ts'
+import { generateDataKey, kmsKeyId } from '../_shared/awsKms.ts'
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
-import { importDek, openJson, sealJson } from '../_shared/envelope.ts'
+import { openJson, sealJson } from '../_shared/envelope.ts'
+import { asObject, dekFor } from '../_shared/practiceKey.ts'
 import { adminClient, userClient } from '../_shared/supabaseAdmin.ts'
 
-const TABLES = new Set(['progress_notes', 'letters', 'reports', 'form_submissions', 'outcome_entries'])
 const OPEN_LIMIT = 80
 const CLINICAL_LIMIT = 1_500_000
 
-const CREATE_COLUMNS: Record<string, string[]> = {
-  progress_notes: ['client_id', 'episode_id', 'appointment_id', 'session_date', 'template_id', 'note_number', 'noted_at'],
-  letters: ['client_id', 'episode_id', 'letter_date', 'template_id'],
-  reports: ['client_id', 'episode_id', 'report_date', 'template_id'],
-  form_submissions: ['form_definition_id', 'form_version', 'client_id', 'episode_id', 'status', 'submitted_at'],
-  outcome_entries: ['client_id', 'episode_id', 'appointment_id', 'measure_id', 'recorded_on', 'completion_status'],
+type TableSpec = {
+  key: 'id' | 'client_id'
+  payload: string
+  format: string
+  org: boolean
+  owner: boolean
+  author: boolean
+  create: string[]
+  defaults: Record<string, unknown>
+  clear: Record<string, unknown>
 }
 
-const dekCache = new Map<string, { key: CryptoKey; exp: number }>()
+const SPECS: Record<string, TableSpec> = {
+  progress_notes: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: true, create: ['client_id', 'episode_id', 'appointment_id', 'session_date', 'template_id', 'note_number', 'noted_at'], defaults: { status: 'draft' }, clear: {} },
+  letters: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: true, create: ['client_id', 'episode_id', 'letter_date', 'template_id'], defaults: {}, clear: {} },
+  reports: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: true, create: ['client_id', 'episode_id', 'report_date', 'template_id'], defaults: {}, clear: {} },
+  form_submissions: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['form_definition_id', 'form_version', 'client_id', 'episode_id', 'submitted_at'], defaults: { status: 'in_progress' }, clear: {} },
+  outcome_entries: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['client_id', 'episode_id', 'appointment_id', 'measure_id', 'recorded_on', 'completion_status'], defaults: {}, clear: {} },
+  clients: { key: 'id', payload: 'encrypted_pseudonym', format: 'payload_format', org: true, owner: true, author: false, create: ['status', 'concession_kind', 'concession_percent', 'concession_pence'], defaults: {}, clear: { concession_label: null } },
+  client_identities: { key: 'client_id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['client_id'], defaults: {}, clear: {} },
+  client_clinical_profiles: { key: 'client_id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['client_id'], defaults: {}, clear: {} },
+  contacts: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['client_id', 'role', 'is_billing_contact', 'is_primary'], defaults: {}, clear: {} },
+  episodes: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['client_id', 'episode_number', 'status', 'referral_date', 'start_date', 'end_date'], defaults: {}, clear: {} },
+  appointments: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['client_id', 'clinician_id', 'episode_id', 'service_id', 'appointment_type', 'starts_at', 'ends_at', 'attendance_status', 'do_not_invoice', 'charged_pence', 'fee_override_pence', 'block_role', 'series_id', 'parent_appointment_id'], defaults: {}, clear: {} },
+  timeline_events: { key: 'id', payload: 'encrypted_summary', format: 'payload_format', org: true, owner: true, author: false, create: ['client_id', 'episode_id', 'event_date', 'occurred_at', 'event_type', 'ref_table', 'ref_id', 'actor_id'], defaults: {}, clear: {} },
+  templates: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['kind', 'is_active'], defaults: {}, clear: { name: 'Template', description: null } },
+  working_documents: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: true, create: ['client_id', 'episode_id', 'template_id'], defaults: {}, clear: {} },
+  journal_entries: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: true, owner: true, author: true, create: ['entry_date', 'somatic_state'], defaults: {}, clear: {} },
+  practice_items: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: false, owner: true, author: false, create: ['parent_id', 'kind'], defaults: {}, clear: { name: 'Item' } },
+  cpd_entries: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: false, owner: true, author: false, create: ['occurred_on', 'minutes', 'label'], defaults: {}, clear: {} },
+  supervision_entries: { key: 'id', payload: 'encrypted_payload', format: 'payload_format', org: false, owner: true, author: false, create: ['occurred_on', 'minutes', 'label', 'direction'], defaults: {}, clear: {} },
+  waitlist_placements: { key: 'client_id', payload: 'sealed_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['client_id', 'service_id'], defaults: {}, clear: { preferred_times: '', information: '' } },
+  tags: { key: 'id', payload: 'sealed_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['kind', 'name', 'color'], defaults: {}, clear: {} },
+  invoices: { key: 'id', payload: 'sealed_payload', format: 'payload_format', org: false, owner: true, author: false, create: ['client_id', 'number', 'status', 'issued_on', 'due_on', 'total_pence', 'sent_at', 'delivery_method', 'resend_batch_id', 'last_delivery_error'], defaults: {}, clear: { bill_to_name: '', bill_to_email: '', for_name: '', recipient_email: '', payment_details: '' } },
+  invoice_lines: { key: 'id', payload: 'sealed_payload', format: 'payload_format', org: false, owner: true, author: false, create: ['invoice_id', 'appointment_id', 'position', 'session_date', 'unit_pence', 'quantity', 'includes_vat', 'released_at'], defaults: {}, clear: { description: '' } },
+  invoice_payments: { key: 'id', payload: 'sealed_payload', format: 'payload_format', org: false, owner: true, author: false, create: ['invoice_id', 'amount_pence', 'paid_on'], defaults: {}, clear: { note: '' } },
+  form_definitions: { key: 'id', payload: 'sealed_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['slug', 'audience', 'status', 'version', 'is_onboarding', 'place_on_screener', 'autofill_client', 'letterhead_id'], defaults: {}, clear: { name: '', description: '', schema: { v: 1, blocks: [] } } },
+  outcome_measure_defs: { key: 'id', payload: 'sealed_payload', format: 'payload_format', org: true, owner: true, author: false, create: ['slug', 'is_active', 'status'], defaults: {}, clear: { name: '', schema: {} } },
+  profiles: { key: 'id', payload: 'sealed_bank', format: 'bank_format', org: false, owner: false, author: false, create: [], defaults: {}, clear: { invoice_account_name: null, invoice_sort_code: null, invoice_account_number: null, invoice_payment_note: null } },
+}
 
 function isUuid(value: unknown): value is string {
   return typeof value === 'string'
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 }
 
-function asObject(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {}
-}
-
 function assertClinical(role: string) {
   if (role === 'practice_manager') {
     throw new Error('This account cannot open clinical records.')
   }
-}
-
-async function dekFor(admin: ReturnType<typeof adminClient>, organizationId: string): Promise<CryptoKey> {
-  const hit = dekCache.get(organizationId)
-  if (hit && hit.exp > Date.now()) return hit.key
-  const { data, error } = await admin
-    .from('organization_keys')
-    .select('wrapped_dek')
-    .eq('organization_id', organizationId)
-    .maybeSingle()
-  if (error || !data?.wrapped_dek) throw new Error('The practice key could not be opened.')
-  const key = await importDek(await decryptDataKey(String(data.wrapped_dek)))
-  dekCache.set(organizationId, { key, exp: Date.now() + 10 * 60 * 1000 })
-  return key
 }
 
 async function ensureOrg(admin: ReturnType<typeof adminClient>, userId: string) {
@@ -88,27 +99,43 @@ async function ensureOrg(admin: ReturnType<typeof adminClient>, userId: string) 
 }
 
 function pickedRow(
-  table: string,
+  spec: TableSpec,
   row: Record<string, unknown>,
   userId: string,
   organizationId: string,
   envelope: Record<string, string | number>,
 ) {
   const out: Record<string, unknown> = {
-    owner_id: userId,
-    organization_id: organizationId,
-    encrypted_payload: envelope,
-    payload_format: 'envelope',
+    [spec.payload]: envelope,
+    [spec.format]: 'envelope',
+    ...spec.clear,
   }
-  for (const key of CREATE_COLUMNS[table] || []) {
+  if (spec.owner) out.owner_id = userId
+  if (spec.org) out.organization_id = organizationId
+  if (spec.author) out.author_id = userId
+  for (const key of spec.create) {
     if (row[key] !== undefined) out[key] = row[key]
   }
-  if (table === 'progress_notes' || table === 'letters' || table === 'reports') {
-    out.author_id = userId
-  }
-  if (table === 'progress_notes') out.status = 'draft'
-  if (table === 'form_submissions') out.status = 'in_progress'
+  Object.assign(out, spec.defaults)
   return out
+}
+
+function clientPatch(plain: Record<string, unknown>) {
+  const schema = asObject(plain.schema)
+  const blocks = Array.isArray(schema.blocks) ? schema.blocks : []
+  const answers = asObject(plain.answers)
+  const patch: Record<string, string> = {}
+  for (const block of blocks) {
+    const item = asObject(block)
+    if (item.type !== 'client') continue
+    const bind = String(item.bind || '')
+    if (!/^[a-z][a-z0-9_]{0,40}$/.test(bind)) continue
+    const val = typeof answers[String(item.id || '')] === 'string'
+      ? String(answers[String(item.id || '')]).trim()
+      : ''
+    if (val) patch[bind] = val.slice(0, 4000)
+  }
+  return patch
 }
 
 async function plainOf(
@@ -126,11 +153,17 @@ async function plainOf(
 async function letterheadFor(admin: ReturnType<typeof adminClient>, formDefinitionId: string) {
   const { data: form } = await admin
     .from('form_definitions')
-    .select('name, letterhead_id, owner_id')
+    .select('name, letterhead_id, owner_id, payload_format, sealed_payload')
     .eq('id', formDefinitionId)
     .maybeSingle()
   if (!form) return { title: 'Form', letterhead: null }
-  if (!form.letterhead_id) return { title: form.name || 'Form', letterhead: null }
+  let title = form.name || 'Form'
+  if (form.payload_format === 'envelope') {
+    const org = await ensureOrg(admin, form.owner_id)
+    const body = asObject(await openJson(await dekFor(admin, org.organizationId), asObject(form.sealed_payload)))
+    title = String(body.name || 'Form')
+  }
+  if (!form.letterhead_id) return { title, letterhead: null }
   const [{ data: letterhead }, { data: profile }] = await Promise.all([
     admin
       .from('letterheads')
@@ -151,7 +184,7 @@ async function letterheadFor(admin: ReturnType<typeof adminClient>, formDefiniti
     letterhead?.country,
   ].map((line) => String(line || '').trim()).filter(Boolean)
   return {
-    title: form.name || 'Form',
+    title,
     letterhead: {
       practiceName: letterhead?.practice_name || letterhead?.name || '',
       logoUrl: letterhead?.logo_url || '',
@@ -186,7 +219,7 @@ Deno.serve(async (req) => {
       if (!isUuid(formId)) return jsonResponse({ error: 'This form is not available.' }, 400)
       const { data: form, error } = await admin
         .from('form_definitions')
-        .select('id, owner_id, version, schema, status, audience')
+        .select('id, owner_id, version, schema, status, audience, payload_format, sealed_payload')
         .eq('id', formId)
         .maybeSingle()
       if (error) throw new Error(error.message)
@@ -194,7 +227,10 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: 'This form is not available.' }, 400)
       }
       const org = await ensureOrg(admin, form.owner_id)
-      const schema = asObject(form.schema)
+      const key = await dekFor(admin, org.organizationId)
+      const schema = form.payload_format === 'envelope'
+        ? asObject(asObject(await openJson(key, asObject(form.sealed_payload))).schema)
+        : asObject(form.schema)
       const blocks = Array.isArray(schema.blocks) ? schema.blocks : []
       if (blocks.length > 200) return jsonResponse({ error: 'This form is not available.' }, 400)
       const measureIds = [...new Set(blocks.flatMap((block) => {
@@ -205,13 +241,17 @@ Deno.serve(async (req) => {
       if (measureIds.length) {
         const { data: defs, error: measureError } = await admin
           .from('outcome_measure_defs')
-          .select('id, schema')
+          .select('id, schema, payload_format, sealed_payload')
           .in('id', measureIds)
           .eq('owner_id', form.owner_id)
         if (measureError) throw new Error(measureError.message)
-        for (const def of defs || []) measures[def.id] = def.schema
+        for (const def of defs || []) {
+          measures[def.id] = def.payload_format === 'envelope'
+            ? asObject(await openJson(key, asObject(def.sealed_payload))).schema
+            : def.schema
+        }
       }
-      const sealed = await sealJson(await dekFor(admin, org.organizationId), {
+      const sealed = await sealJson(key, {
         v: 0,
         schema,
         measures,
@@ -304,11 +344,64 @@ Deno.serve(async (req) => {
         }
       }
       const sealed = await sealJson(key, plain)
+      const patch = clientPatch(plain)
+      const creating = !row.client_id && Boolean(definition?.place_on_screener)
+      let sealedIdentity: Record<string, string | number> | null = null
+      let sealedPseudonym: Record<string, string | number> | null = null
+      let sealedEpisode: Record<string, string | number> | null = null
+      if (creating || (row.client_id && Object.keys(patch).length)) {
+        let current: Record<string, unknown> = {}
+        if (row.client_id) {
+          const { data: identity, error: identityError } = await admin
+            .from('client_identities')
+            .select('encrypted_payload, payload_format')
+            .eq('client_id', row.client_id)
+            .maybeSingle()
+          if (identityError) throw new Error(identityError.message)
+          if (identity) {
+            current = identity.payload_format === 'envelope'
+              ? asObject(await openJson(key, asObject(identity.encrypted_payload)))
+              : asObject(identity.encrypted_payload)
+          }
+        }
+        const firstName = String(patch.first_name || current.first_name || (creating ? 'New' : ''))
+        const surname = String(patch.surname || current.surname || (creating ? 'referral' : ''))
+        sealedIdentity = await sealJson(key, {
+          ...current,
+          ...patch,
+          v: 0,
+          first_name: firstName,
+          surname,
+        })
+        if (creating || patch.first_name || patch.surname) {
+          let pseudo: Record<string, unknown> = {}
+          if (row.client_id) {
+            const { data: client, error: clientError } = await admin
+              .from('clients')
+              .select('encrypted_pseudonym, payload_format')
+              .eq('id', row.client_id)
+              .maybeSingle()
+            if (clientError) throw new Error(clientError.message)
+            pseudo = client?.payload_format === 'envelope'
+              ? asObject(await openJson(key, asObject(client.encrypted_pseudonym)))
+              : asObject(client?.encrypted_pseudonym)
+          }
+          sealedPseudonym = await sealJson(key, {
+            ...pseudo,
+            v: 0,
+            label: `${firstName} ${surname.charAt(0)}.`.trim(),
+          })
+        }
+        if (creating) sealedEpisode = await sealJson(key, { v: 0 })
+      }
       const { data, error } = await admin.rpc('form_link_commit_sealed', {
         token: body.token,
         plain_payload: plain,
         sealed_payload: sealed,
         outcome_envelopes: envelopes,
+        sealed_identity: sealedIdentity,
+        sealed_pseudonym: sealedPseudonym,
+        sealed_episode: sealedEpisode,
       })
       if (error) throw new Error(error.message)
       return jsonResponse(data || { status: 'submitted' })
@@ -322,7 +415,8 @@ Deno.serve(async (req) => {
     if (!user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
     const table = String(body.table || '')
-    if (!TABLES.has(table)) return jsonResponse({ error: 'That record cannot be sealed.' }, 400)
+    const spec = SPECS[table]
+    if (!spec) return jsonResponse({ error: 'That record cannot be sealed.' }, 400)
     const org = await ensureOrg(admin, user.id)
     assertClinical(org.role)
 
@@ -332,18 +426,19 @@ Deno.serve(async (req) => {
       if (ids.length > OPEN_LIMIT) return jsonResponse({ error: 'Open fewer records at once.' }, 400)
       const { data, error } = await supabase
         .from(table)
-        .select('id, payload_format, encrypted_payload')
-        .in('id', ids)
+        .select(`${spec.key}, ${spec.format}, ${spec.payload}`)
+        .in(spec.key, ids)
       if (error) throw new Error(error.message)
-      const key = (data || []).some((row) => row.payload_format === 'envelope')
+      const key = (data || []).some((row) => row[spec.format] === 'envelope')
         ? await dekFor(admin, org.organizationId)
         : null
       const records = []
       for (const row of data || []) {
-        const payload = row.payload_format === 'envelope' && key
-          ? await openJson(key, asObject(row.encrypted_payload))
-          : row.encrypted_payload
-        records.push({ id: row.id, payload })
+        const stored = row[spec.payload]
+        const payload = row[spec.format] === 'envelope' && key
+          ? await openJson(key, asObject(stored))
+          : stored
+        records.push({ id: row[spec.key], payload })
       }
       return jsonResponse({ records })
     }
@@ -357,26 +452,28 @@ Deno.serve(async (req) => {
 
     if (action === 'seal') {
       if (!isUuid(body.id)) return jsonResponse({ error: 'That record could not be sealed.' }, 400)
+      const patch: Record<string, unknown> = {
+        [spec.payload]: envelope,
+        [spec.format]: 'envelope',
+        ...spec.clear,
+      }
+      if (spec.org) patch.organization_id = org.organizationId
       const { data, error } = await supabase
         .from(table)
-        .update({
-          encrypted_payload: envelope,
-          payload_format: 'envelope',
-          organization_id: org.organizationId,
-        })
-        .eq('id', body.id)
-        .select('id')
+        .update(patch)
+        .eq(spec.key, body.id)
+        .select(spec.key)
         .maybeSingle()
       if (error) throw new Error(error.message)
       if (!data) return jsonResponse({ error: 'That record could not be sealed.' }, 404)
-      return jsonResponse({ id: data.id, payload_format: 'envelope' })
+      return jsonResponse({ id: data[spec.key], payload_format: 'envelope' })
     }
 
     if (action === 'create') {
-      const row = pickedRow(table, asObject(body.row), user.id, org.organizationId, envelope)
-      const { data, error } = await supabase.from(table).insert(row).select('id').single()
+      const row = pickedRow(spec, asObject(body.row), user.id, org.organizationId, envelope)
+      const { data, error } = await supabase.from(table).insert(row).select(spec.key).single()
       if (error || !data) throw new Error(error?.message || 'That record could not be sealed.')
-      return jsonResponse({ id: data.id, payload_format: 'envelope' })
+      return jsonResponse({ id: data[spec.key], payload_format: 'envelope' })
     }
 
     return jsonResponse({ error: 'Unknown action' }, 400)

@@ -1,6 +1,8 @@
 import { getSupabase, isSupabaseConfigured } from './client'
 import { writeAuditEvent } from './audit'
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import type { Json } from './database.types'
+import type { ClinicalProfile } from '../clinicalProfile'
 import { db } from '../data/collections'
 import type { StoreRecord } from '../types/collections'
 import { filterClientsForUser, type Client } from '../permissions'
@@ -19,6 +21,12 @@ type IdentityPayload = {
   email?: string
 }
 
+type PseudonymPayload = {
+  v: 0
+  label: string
+  concession_label?: string
+}
+
 export type AppClientRecord = {
   id: string
   user_id: string
@@ -33,6 +41,7 @@ export type AppClientRecord = {
   medication: string
   gender: string
   email: string
+  clinical_profile?: ClinicalProfile
   concession_kind: string
   concession_percent: number | null
   concession_pence: number | null
@@ -76,6 +85,11 @@ function parseIdentity(raw: Json | null | undefined): IdentityPayload {
   }
 }
 
+function one<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] || null
+  return value || null
+}
+
 function toAppClient(row: {
   id: string
   owner_id: string
@@ -88,10 +102,8 @@ function toAppClient(row: {
   concession_pence?: number | null
   concession_label?: string | null
   client_identities?: { encrypted_payload: Json } | { encrypted_payload: Json }[] | null
-}): AppClientRecord {
-  const identityRow = Array.isArray(row.client_identities)
-    ? row.client_identities[0]
-    : row.client_identities
+}, extras?: { concessionLabel?: string; clinicalProfile?: ClinicalProfile }): AppClientRecord {
+  const identityRow = one(row.client_identities)
   const identity = parseIdentity(identityRow?.encrypted_payload)
   const realName = `${identity.first_name} ${identity.surname}`.trim()
   return {
@@ -108,10 +120,11 @@ function toAppClient(row: {
     medication: identity.medication || '',
     gender: identity.gender || '',
     email: identity.email || '',
+    clinical_profile: extras?.clinicalProfile,
     concession_kind: row.concession_kind || 'none',
     concession_percent: row.concession_percent ?? null,
     concession_pence: row.concession_pence ?? null,
-    concession_label: row.concession_label || '',
+    concession_label: extras?.concessionLabel ?? row.concession_label ?? '',
     is_active: row.status === 'active',
     on_screener: row.status === 'screener',
     on_waitlist: row.status === 'waitlist',
@@ -135,11 +148,50 @@ export async function listClientsFromSupabase(): Promise<AppClientRecord[]> {
 
   const { data, error } = await supabase
     .from('clients')
-    .select('id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, created_at, updated_at, client_identities(encrypted_payload)')
+    .select('id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, payload_format, encrypted_pseudonym, created_at, updated_at, client_identities(encrypted_payload, payload_format), client_clinical_profiles(encrypted_payload, payload_format)')
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  return (data || []).map((row) => toAppClient(row as Parameters<typeof toAppClient>[0]))
+  const rows = data || []
+  const identityRows = rows.flatMap((row) => {
+    const identity = one(row.client_identities)
+    return identity ? [{ id: row.id, payload_format: identity.payload_format, encrypted_payload: identity.encrypted_payload }] : []
+  })
+  const profileRows = rows.flatMap((row) => {
+    const profile = one(row.client_clinical_profiles)
+    return profile ? [{ id: row.id, payload_format: profile.payload_format, encrypted_payload: profile.encrypted_payload }] : []
+  })
+  const [openedClients, openedIdentities, openedProfiles] = await Promise.all([
+    withOpenedPayloads('clients', rows.map((row) => ({
+      id: row.id,
+      payload_format: row.payload_format,
+      encrypted_payload: row.encrypted_pseudonym ?? {},
+    }))),
+    withOpenedPayloads('client_identities', identityRows),
+    withOpenedPayloads('client_clinical_profiles', profileRows),
+  ])
+  const identityByClient = new Map(openedIdentities.map((row) => [row.id, row.encrypted_payload]))
+  const profileByClient = new Map(openedProfiles.map((row) => [row.id, row.encrypted_payload]))
+  const pseudoByClient = new Map(openedClients.map((row) => [row.id, row]))
+  return rows.map((row) => {
+    const pseudo = pseudoByClient.get(row.id)
+    const pseudoBody = pseudo && typeof pseudo.encrypted_payload === 'object' && pseudo.encrypted_payload
+      ? pseudo.encrypted_payload as Record<string, unknown>
+      : {}
+    const profileBody = profileByClient.get(row.id)
+    const clinicalProfile = profileBody && typeof profileBody === 'object' && !Array.isArray(profileBody)
+      ? profileBody as ClinicalProfile
+      : undefined
+    return toAppClient({
+      ...row,
+      client_identities: { encrypted_payload: identityByClient.get(row.id) || {} },
+    }, {
+      concessionLabel: pseudo?.payload_format === 'envelope'
+        ? String(pseudoBody.concession_label || '')
+        : row.concession_label || '',
+      clinicalProfile,
+    })
+  })
 }
 
 export async function fetchClientsForUser(
@@ -157,7 +209,7 @@ export async function fetchClientsForUser(
 
 export async function upsertClientRemote(
   input: ClientWriteInput,
-  userId: string,
+  _userId: string,
 ): Promise<AppClientRecord> {
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
@@ -175,34 +227,27 @@ export async function upsertClientRemote(
     gender: input.gender?.trim() || '',
     email: input.email?.trim() || '',
   }
-  const organizationId = input.workplace_id || null
-  const pseudonym = {
-    v: 0,
-    label: `${firstName} ${surname.charAt(0)}.`.trim(),
-  }
+  const clientColumns = 'id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, created_at, updated_at'
 
   if (input.id) {
+    const keptLabel = await concessionWords(input.id)
+    const pseudonym = pseudonymFor(firstName, surname, keptLabel)
+    await sealClinicalRecord('clients', input.id, pseudonym)
+    const { data: existingIdentity, error: existingError } = await supabase
+      .from('client_identities')
+      .select('client_id')
+      .eq('client_id', input.id)
+      .maybeSingle()
+    if (existingError) throw existingError
+    if (existingIdentity) await sealClinicalRecord('client_identities', input.id, identity)
+    else await createClinicalRecord('client_identities', { client_id: input.id }, identity)
+
     const { data: clientRow, error: clientError } = await supabase
       .from('clients')
-      .update({
-        organization_id: organizationId,
-        status: 'active',
-        encrypted_pseudonym: pseudonym as unknown as Json,
-      })
+      .select(clientColumns)
       .eq('id', input.id)
-      .select('id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, created_at, updated_at')
       .single()
     if (clientError) throw clientError
-
-    const { error: identityError } = await supabase
-      .from('client_identities')
-      .upsert({
-        client_id: input.id,
-        owner_id: userId,
-        organization_id: organizationId,
-        encrypted_payload: identity as unknown as Json,
-      })
-    if (identityError) throw identityError
 
     await writeAuditEvent({
       action: 'client.updated',
@@ -214,35 +259,26 @@ export async function upsertClientRemote(
     const mapped = toAppClient({
       ...clientRow,
       client_identities: { encrypted_payload: identity as unknown as Json },
-    })
+    }, { concessionLabel: keptLabel })
     hydrateLocal([mapped])
     return mapped
   }
 
+  const pseudonym = pseudonymFor(firstName, surname, '')
+  const created = await createClinicalRecord('clients', { status: 'active' }, pseudonym)
+  try {
+    await createClinicalRecord('client_identities', { client_id: created.id }, identity)
+  } catch (err) {
+    await supabase.from('clients').delete().eq('id', created.id)
+    throw err
+  }
+
   const { data: clientRow, error: clientError } = await supabase
     .from('clients')
-    .insert({
-      owner_id: userId,
-      organization_id: organizationId,
-      status: 'active',
-      encrypted_pseudonym: pseudonym as unknown as Json,
-    })
-    .select('id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, created_at, updated_at')
+    .select(clientColumns)
+    .eq('id', created.id)
     .single()
   if (clientError) throw clientError
-
-  const { error: identityError } = await supabase
-    .from('client_identities')
-    .insert({
-      client_id: clientRow.id,
-      owner_id: userId,
-      organization_id: organizationId,
-      encrypted_payload: identity as unknown as Json,
-    })
-  if (identityError) {
-    await supabase.from('clients').delete().eq('id', clientRow.id)
-    throw identityError
-  }
 
   await writeAuditEvent({
     action: 'client.created',
@@ -254,9 +290,37 @@ export async function upsertClientRemote(
   const mapped = toAppClient({
     ...clientRow,
     client_identities: { encrypted_payload: identity as unknown as Json },
-  })
+  }, { concessionLabel: '' })
   hydrateLocal([mapped])
   return mapped
+}
+
+function pseudonymFor(firstName: string, surname: string, concessionLabel: string): PseudonymPayload {
+  return {
+    v: 0,
+    label: `${firstName} ${surname.charAt(0)}.`.trim(),
+    concession_label: concessionLabel,
+  }
+}
+
+async function concessionWords(clientId: string): Promise<string> {
+  const supabase = getSupabase()
+  if (!supabase) return ''
+  const { data, error } = await supabase
+    .from('clients')
+    .select('payload_format, encrypted_pseudonym, concession_label')
+    .eq('id', clientId)
+    .maybeSingle()
+  if (error || !data) return ''
+  if (data.payload_format !== 'envelope') return data.concession_label || ''
+  const [opened] = await withOpenedPayloads('clients', [{
+    id: clientId,
+    payload_format: data.payload_format,
+    encrypted_payload: data.encrypted_pseudonym ?? {},
+  }])
+  const body = opened?.encrypted_payload
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return ''
+  return String((body as Record<string, unknown>).concession_label || '')
 }
 
 export async function patchClientIdentity(
@@ -277,12 +341,19 @@ export async function patchClientIdentity(
 
   const { data: identityRow, error: identityError } = await supabase
     .from('client_identities')
-    .select('encrypted_payload, organization_id')
+    .select('encrypted_payload, payload_format, organization_id')
     .eq('client_id', clientId)
     .maybeSingle()
   if (identityError) throw identityError
 
-  const current = parseIdentity(identityRow?.encrypted_payload)
+  const [openedIdentity] = identityRow
+    ? await withOpenedPayloads('client_identities', [{
+      id: clientId,
+      payload_format: identityRow.payload_format,
+      encrypted_payload: identityRow.encrypted_payload,
+    }])
+    : []
+  const current = parseIdentity(openedIdentity?.encrypted_payload ?? identityRow?.encrypted_payload)
   const identity: IdentityPayload = {
     ...current,
     v: 0,
@@ -292,15 +363,8 @@ export async function patchClientIdentity(
     medication: patch.medication !== undefined ? patch.medication.trim() : (current.medication || ''),
   }
 
-  const { error: writeError } = await supabase
-    .from('client_identities')
-    .upsert({
-      client_id: clientId,
-      owner_id: clientRow.owner_id || user.id,
-      organization_id: identityRow?.organization_id ?? clientRow.organization_id,
-      encrypted_payload: identity as unknown as Json,
-    })
-  if (writeError) throw writeError
+  if (identityRow) await sealClinicalRecord('client_identities', clientId, identity)
+  else await createClinicalRecord('client_identities', { client_id: clientId }, identity)
 
   await writeAuditEvent({
     action: 'client.updated',
@@ -335,13 +399,32 @@ export async function saveClientConcession(clientId: string, concession: ClientC
     amountPence: kind === 'amount' ? amount : null,
     label: kind === 'none' ? '' : concession.label.trim(),
   }
+  const { data: current, error: readError } = await supabase
+    .from('clients')
+    .select('payload_format, encrypted_pseudonym')
+    .eq('id', clientId)
+    .single()
+  if (readError) throw readError
+  const [opened] = await withOpenedPayloads('clients', [{
+    id: clientId,
+    payload_format: current.payload_format,
+    encrypted_payload: current.encrypted_pseudonym ?? {},
+  }])
+  const body = opened?.encrypted_payload && typeof opened.encrypted_payload === 'object' && !Array.isArray(opened.encrypted_payload)
+    ? opened.encrypted_payload as Record<string, unknown>
+    : {}
+  await sealClinicalRecord('clients', clientId, {
+    ...body,
+    v: 0,
+    label: String(body.label || ''),
+    concession_label: saved.label,
+  })
   const { error } = await supabase
     .from('clients')
     .update({
       concession_kind: saved.kind,
       concession_percent: saved.percent,
       concession_pence: saved.amountPence,
-      concession_label: saved.label || null,
     })
     .eq('id', clientId)
   if (error) throw error
@@ -356,6 +439,25 @@ export async function saveClientConcession(clientId: string, concession: ClientC
     } as StoreRecord
   }
   return saved
+}
+
+export async function saveClinicalProfile(clientId: string, profile: ClinicalProfile): Promise<ClinicalProfile> {
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const payload = { v: 0, ...profile }
+  const { data: existing, error } = await supabase
+    .from('client_clinical_profiles')
+    .select('client_id')
+    .eq('client_id', clientId)
+    .maybeSingle()
+  if (error) throw error
+  if (existing) await sealClinicalRecord('client_clinical_profiles', clientId, payload)
+  else await createClinicalRecord('client_clinical_profiles', { client_id: clientId }, payload)
+  const idx = db.clients.findIndex((row) => row.id === clientId)
+  if (idx !== -1) {
+    db.clients[idx] = { ...db.clients[idx], clinical_profile: profile } as StoreRecord
+  }
+  return profile
 }
 
 export async function promoteWaitlistClient(clientId: string): Promise<void> {

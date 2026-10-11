@@ -1,5 +1,5 @@
+import { createClinicalRecord } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
-import type { Json } from './database.types'
 import {
   activeLocalEpisode,
   deleteLocalEpisode,
@@ -111,29 +111,32 @@ export async function openEpisode(input: {
   ) + 1
   const startDate = input.startDate || new Date().toISOString().slice(0, 10)
 
-  const { data, error } = await supabase
-    .from('episodes')
-    .insert({
-      owner_id: input.ownerId,
-      organization_id: input.organizationId || null,
+  let createdId = ''
+  try {
+    const created = await createClinicalRecord('episodes', {
       client_id: input.clientId,
       episode_number: episodeNumber,
       status: 'active',
       referral_date: startDate,
       start_date: startDate,
       end_date: null,
-      encrypted_payload: { v: 0 } as Json,
-    })
-    .select(EPISODE_COLUMNS)
-    .single()
-
-  if (error) {
-    if (error.code === '23505') {
+    }, { v: 0 })
+    createdId = created.id
+  } catch (err) {
+    const message = err instanceof Error ? err.message : ''
+    if (message.includes('duplicate') || message.includes('episodes_one_active')) {
       const raced = await findActiveEpisode(input.clientId)
       if (raced) return raced
     }
-    throw error
+    throw err
   }
+
+  const { data, error } = await supabase
+    .from('episodes')
+    .select(EPISODE_COLUMNS)
+    .eq('id', createdId)
+    .single()
+  if (error) throw error
 
   const mapped = toAppEpisode(data as EpisodeRow)
   rememberLocalEpisode(mapped)

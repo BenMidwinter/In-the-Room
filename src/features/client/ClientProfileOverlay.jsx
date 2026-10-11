@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import DiagnosisPicker from '../../components/DiagnosisPicker'
 import { updateClientClinicalDetails, updateClientClinicalProfile } from '../../lib/store'
 import { isSupabaseConfigured } from '../../lib/supabase/client'
-import { patchClientIdentity } from '../../lib/supabase/clientsRepo'
+import { patchClientIdentity, saveClinicalProfile } from '../../lib/supabase/clientsRepo'
 import { useToast } from '../../components/ui'
 import { joinDiagnosisList, parseDiagnosisList } from '../../lib/diagnosisList'
 
@@ -48,7 +48,10 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
       diagnosis: joinDiagnosisList(selectedDiagnoses),
     }
     try {
-      if (isSupabaseConfigured()) await patchClientIdentity(client.id, details)
+      if (isSupabaseConfigured()) {
+        await patchClientIdentity(client.id, details)
+        await saveClinicalProfile(client.id, profile)
+      }
       updateClientClinicalDetails(client.id, details)
       const updated = updateClientClinicalProfile(client.id, profile)
       onSaved?.(updated)

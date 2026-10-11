@@ -1,5 +1,6 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
-import { userClient } from '../_shared/supabaseAdmin.ts'
+import { organizationIdFor, readEnvelope } from '../_shared/practiceKey.ts'
+import { adminClient, userClient } from '../_shared/supabaseAdmin.ts'
 
 const BATCH_LIMIT = 100
 
@@ -13,6 +14,9 @@ type InvoiceRow = {
   total_pence: number
   due_on: string | null
   payment_details: string
+  payload_format?: string | null
+  sealed_payload?: unknown
+  organization_id?: string | null
 }
 
 Deno.serve(async (req) => {
@@ -39,16 +43,44 @@ Deno.serve(async (req) => {
 
     const { data, error } = await supabase
       .from('invoices')
-      .select('id, number, status, bill_to_name, bill_to_email, for_name, total_pence, due_on, payment_details')
+      .select('id, number, status, bill_to_name, bill_to_email, for_name, total_pence, due_on, payment_details, payload_format, sealed_payload')
       .in('id', invoiceIds)
     if (error) return jsonResponse({ error: error.message }, 400)
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('invoice_account_name, invoice_sort_code, invoice_account_number, invoice_payment_note')
+      .select('invoice_account_name, invoice_sort_code, invoice_account_number, invoice_payment_note, sealed_bank, bank_format')
       .eq('id', user.id)
       .maybeSingle()
-    const paymentText = paymentInstructions(profile)
+    const admin = adminClient()
+    const needsKey = (data || []).some((row) => row.payload_format === 'envelope') || profile?.bank_format === 'envelope'
+    const organizationId = needsKey ? await organizationIdFor(admin, user.id) : ''
+    const invoices = []
+    for (const row of (data || []) as InvoiceRow[]) {
+      if (row.payload_format !== 'envelope') {
+        invoices.push(row)
+        continue
+      }
+      const opened = await readEnvelope(admin, organizationId, row.sealed_payload)
+      invoices.push({
+        ...row,
+        bill_to_name: String(opened.bill_to_name || ''),
+        bill_to_email: String(opened.bill_to_email || ''),
+        for_name: String(opened.for_name || ''),
+        payment_details: String(opened.payment_details || ''),
+      })
+    }
+    let paymentSource = profile
+    if (profile?.bank_format === 'envelope') {
+      const bank = await readEnvelope(admin, organizationId, profile.sealed_bank)
+      paymentSource = {
+        invoice_account_name: String(bank.invoice_account_name || ''),
+        invoice_sort_code: String(bank.invoice_sort_code || ''),
+        invoice_account_number: String(bank.invoice_account_number || ''),
+        invoice_payment_note: String(bank.invoice_payment_note || ''),
+      }
+    }
+    const paymentText = paymentInstructions(paymentSource)
     if (!paymentText) {
       return jsonResponse({ error: 'Add payment details in Account settings before you send these.' }, 400)
     }
@@ -56,7 +88,7 @@ Deno.serve(async (req) => {
     const note = String(body.customNote || '').trim().slice(0, 2000)
     const ready: InvoiceRow[] = []
     const failed: Array<{ id: string; reason: string }> = []
-    for (const invoice of (data || []) as InvoiceRow[]) {
+    for (const invoice of invoices) {
       if (invoice.status !== 'draft') {
         failed.push({ id: invoice.id, reason: 'This invoice is not a draft.' })
         continue

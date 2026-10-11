@@ -1,3 +1,4 @@
+import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 
@@ -20,6 +21,7 @@ type TemplateRow = {
   name: string
   is_active: boolean
   encrypted_payload: Json | null
+  payload_format?: string | null
   updated_at: string
 }
 
@@ -32,11 +34,17 @@ function contentFromPayload(payload: Json | null | undefined): string {
 }
 
 function toTemplate(row: TemplateRow): AppTemplate {
+  const body = row.encrypted_payload && typeof row.encrypted_payload === 'object' && !Array.isArray(row.encrypted_payload)
+    ? row.encrypted_payload as { name?: unknown; content?: unknown }
+    : {}
+  const sealed = row.payload_format === 'envelope'
   return {
     id: row.id,
     kind: row.kind as TemplateKind,
-    name: row.name,
-    content: contentFromPayload(row.encrypted_payload),
+    name: sealed ? String(body.name || 'Template') : row.name,
+    content: sealed
+      ? (typeof body.content === 'string' && body.content.trim() ? body.content : '<p></p>')
+      : contentFromPayload(row.encrypted_payload),
     is_active: row.is_active !== false,
     updated_at: row.updated_at,
   }
@@ -54,12 +62,12 @@ export async function listTemplates(kind: TemplateKind): Promise<AppTemplate[]> 
   if (!supabase) return listLocal(kind)
   const { data, error } = await supabase
     .from('templates')
-    .select('id, kind, name, is_active, encrypted_payload, updated_at')
+    .select('id, kind, name, is_active, encrypted_payload, payload_format, updated_at')
     .eq('kind', kind)
     .eq('is_active', true)
-    .order('name', { ascending: true })
   if (error) throw error
-  return (data || []).map((row) => toTemplate(row as TemplateRow))
+  const rows = await withOpenedPayloads('templates', (data || []) as TemplateRow[])
+  return rows.map((row) => toTemplate(row)).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function saveTemplate(input: {
@@ -98,31 +106,29 @@ export async function saveTemplate(input: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Sign in required')
 
-  const encrypted_payload = { v: 0, content } as unknown as Json
+  const encrypted_payload = { v: 0, name, content } as unknown as Json
   if (existingId) {
+    await sealClinicalRecord('templates', existingId, encrypted_payload)
     const { data, error } = await supabase
       .from('templates')
-      .update({ name, encrypted_payload, is_active: true })
+      .select('id, kind, name, is_active, encrypted_payload, payload_format, updated_at')
       .eq('id', existingId)
-      .select('id, kind, name, is_active, encrypted_payload, updated_at')
       .single()
     if (error) throw error
-    return toTemplate(data as TemplateRow)
+    return toTemplate({ ...(data as TemplateRow), encrypted_payload, payload_format: 'envelope' })
   }
 
+  const created = await createClinicalRecord('templates', {
+    kind: input.kind,
+    is_active: true,
+  }, encrypted_payload)
   const { data, error } = await supabase
     .from('templates')
-    .insert({
-      owner_id: user.id,
-      kind: input.kind,
-      name,
-      is_active: true,
-      encrypted_payload,
-    })
-    .select('id, kind, name, is_active, encrypted_payload, updated_at')
+    .select('id, kind, name, is_active, encrypted_payload, payload_format, updated_at')
+    .eq('id', created.id)
     .single()
   if (error) throw error
-  return toTemplate(data as TemplateRow)
+  return toTemplate({ ...(data as TemplateRow), encrypted_payload, payload_format: 'envelope' })
 }
 
 export async function deleteTemplate(id: string): Promise<void> {
