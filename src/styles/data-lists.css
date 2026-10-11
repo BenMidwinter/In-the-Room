@@ -26,7 +26,7 @@
 
 .record-module__title {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: var(--text-section);
   font-weight: 700;
   color: var(--col-accent);
   line-height: 1.25;
@@ -34,7 +34,7 @@
 
 .record-module__subtitle {
   margin: 0.35rem 0 0;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
   line-height: 1.5;
   max-width: 36rem;
@@ -86,7 +86,7 @@
   border-collapse: separate;
   border-spacing: 0;
   font-family: var(--font-body);
-  font-size: 0.92rem;
+  font-size: var(--text-body);
   line-height: 1.4;
 }
 
@@ -126,7 +126,7 @@
 
 .record-table__add {
   padding: 0.35rem 0.8rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   white-space: nowrap;
 }
 
@@ -315,7 +315,7 @@
   padding: 0.4rem 1rem 0.5rem;
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-canvas);
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   color: var(--text-tertiary);
   position: sticky;
   left: 0;
@@ -342,7 +342,7 @@
 
 .record-table__popover-input {
   width: 100%;
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
 }
 
 .record-table__choices {
@@ -364,7 +364,7 @@
   border-radius: 4px;
   background: transparent;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   text-align: left;
   color: var(--text-primary);
   cursor: pointer;
@@ -452,7 +452,7 @@
 
 .appointment-editor .form-group label {
   margin-bottom: 0.25rem;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
 }
 
 .appointment-editor .room-schedule-times {

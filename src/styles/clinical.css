@@ -19,7 +19,7 @@
   padding: 0 0 0 0.75rem;
   border-bottom: none;
   border-left: 3px solid var(--col-primary);
-  font-size: 1rem;
+  font-size: var(--text-card);
   font-weight: 700;
   color: var(--col-accent);
   line-height: 1.3;
@@ -81,7 +81,7 @@
 .workplace-context-picker__field label {
   display: block;
   margin-bottom: 0.35rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--col-accent);
 }
@@ -175,11 +175,11 @@
 
 .placeholder { text-align: center; padding: 3rem 2rem; color: var(--txt-muted); }
 .placeholder__icon { font-size: 2.5rem; margin-bottom: 1rem; opacity: 0.5; }
-.placeholder__title { font-size: 1.1rem; font-weight: 600; color: var(--col-accent); margin-bottom: 0.5rem; }
+.placeholder__title { font-size: var(--text-section); font-weight: 600; color: var(--col-accent); margin-bottom: 0.5rem; }
 
 button, .btn {
   font-family: var(--font-body);
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   cursor: pointer;
   border-radius: var(--radius-md);
@@ -190,7 +190,7 @@ button, .btn {
   color: var(--txt-inverse);
   border: 1px solid var(--col-primary-dark);
   padding: 0.5rem 1rem;
-  font-size: 0.9375rem;
+  font-size: var(--text-ui);
 }
 
 .primary:hover, .btn-primary:hover {
@@ -206,7 +206,7 @@ button, .btn {
   color: #fff;
   border: 1px solid #8f1d14;
   padding: 0.5rem 1rem;
-  font-size: 0.9375rem;
+  font-size: var(--text-ui);
 }
 
 .danger:hover, .btn-danger:hover {
@@ -222,7 +222,7 @@ button, .btn {
   color: var(--col-accent);
   border: 1px solid var(--border-color);
   padding: 0.5rem 1rem;
-  font-size: 0.9375rem;
+  font-size: var(--text-ui);
   text-decoration: none;
   cursor: pointer;
 }
@@ -237,7 +237,7 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 label {
   display: block;
-  font-size: 0.8rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--col-accent);
   margin-bottom: 0.35rem;
@@ -265,7 +265,7 @@ textarea.paper-input {
   height: 40px;
   padding: 8px 12px;
   font-family: var(--font-body);
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background-color: var(--bg-surface);
@@ -318,13 +318,13 @@ select.paper-input {
   min-width: 560px;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
 }
 
 .data-table thead tr {
   border-bottom: 2px solid var(--border-strong);
   color: var(--txt-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -346,13 +346,13 @@ select.paper-input {
 .data-table tbody tr.hover-row:hover { background: var(--col-primary-light); }
 .data-table tbody tr.inactive { opacity: 0.65; }
 
-.empty-state { padding: 2.5rem 1rem; text-align: center; color: var(--txt-muted); font-size: 0.9375rem; }
+.empty-state { padding: 2.5rem 1rem; text-align: center; color: var(--txt-muted); font-size: var(--text-body); }
 
 .badge {
   display: inline-block;
   padding: 0.2rem 0.55rem;
   border-radius: var(--radius-sm);
-  font-size: 0.8rem;
+  font-size: var(--text-ui);
   font-weight: 600;
 }
 
@@ -372,7 +372,7 @@ a.badge {
   border: none;
   border-bottom: 2px solid transparent;
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
   cursor: pointer;
   margin-bottom: -1px;
@@ -381,7 +381,7 @@ a.badge {
 .tab--active { color: var(--col-primary-dark); border-bottom-color: var(--col-primary); }
 
 .text-muted { color: var(--txt-muted); }
-.text-small { font-size: 0.85rem; }
+.text-small { font-size: var(--text-ui); }
 .mb-1 { margin-bottom: var(--section-gap); }
 .mt-1 { margin-top: 1.25rem; }
 .grid-2 {
@@ -439,7 +439,7 @@ a.badge {
 }
 
 .timeline__summary {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   margin-bottom: 0.25rem;
 }
 
@@ -525,7 +525,7 @@ a.badge {
   background: transparent;
   cursor: pointer;
   font-family: var(--font-body);
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .side-panel__item:hover { border-color: var(--border-color); background: var(--bg-surface); }
@@ -731,7 +731,7 @@ a.badge {
 }
 
 .doc-meta-fields__title-input {
-  font-size: 1.05rem;
+  font-size: var(--text-card);
   font-weight: 600;
 }
 
@@ -812,7 +812,7 @@ a.badge {
 
 .client-details-modal__header h2 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--text-section);
 }
 
 /* --- Episode detail --- */
@@ -854,7 +854,7 @@ a.badge {
 }
 
 .episode-detail__grid dt {
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -893,14 +893,14 @@ a.badge {
 
 .course-page__header h2 {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--text-section);
 }
 
 .course-page__header p {
   margin: 0.35rem 0 0;
   max-width: 36rem;
   color: var(--txt-muted);
-  font-size: 0.9rem;
+  font-size: var(--text-body);
 }
 
 .course-page__actions,
@@ -927,7 +927,7 @@ a.badge {
 .course-episode-actions .secondary,
 .course-episode-actions .danger {
   padding: 0.28rem 0.65rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .record-table__col--actions {
@@ -962,7 +962,7 @@ a.badge {
   background: transparent;
   padding: 0.4rem 0;
   font-family: var(--font-head);
-  font-size: 1.05rem;
+  font-size: var(--text-card);
   font-weight: 560;
   letter-spacing: 0;
   text-transform: none;
@@ -973,7 +973,7 @@ a.badge {
 .course-accordion__mark {
   width: 0.85rem;
   font-family: var(--font-body);
-  font-size: 0.8rem;
+  font-size: var(--text-ui);
   line-height: 1;
   color: var(--txt-muted);
 }
@@ -1079,7 +1079,7 @@ a.badge {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 0.35rem 0.75rem;
-  font-size: 0.95rem;
+  font-size: var(--text-body);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -1165,7 +1165,7 @@ a.badge {
 }
 
 .episode-report-list button span:last-child {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--txt-muted);
 }
@@ -1181,7 +1181,7 @@ a.badge {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1215,7 +1215,7 @@ a.badge {
 }
 
 .episode-report__editor > span {
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -1320,13 +1320,13 @@ a.badge {
 
 .client-shell__identity h1 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: var(--text-page);
   line-height: 1.2;
 }
 
 .client-shell__subtitle {
   margin: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
 }
 
@@ -1402,7 +1402,7 @@ a.badge {
 
 .client-details-bar__value {
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   color: var(--col-accent);
 }
 
@@ -1445,7 +1445,7 @@ a.badge {
   display: inline-flex;
   align-items: center;
   padding: 0.5rem 0.8rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--txt-muted);
   text-decoration: none;
@@ -1471,7 +1471,7 @@ a.badge {
   align-items: center;
   gap: 0.35rem;
   margin: 0 0 0.85rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .practice-crumbs button {
@@ -1501,7 +1501,7 @@ a.badge {
 }
 
 .practice-docs__actions button {
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   padding: 0.2rem 0.5rem;
 }
 
@@ -1580,7 +1580,7 @@ a.badge {
 
 .client-panel__header h2 {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-section);
   color: var(--col-accent);
 }
 
@@ -1672,7 +1672,7 @@ a.badge {
 
   .client-nav-bar__link {
     padding: 0.5rem 0.7rem;
-    font-size: 0.8125rem;
+    font-size: var(--text-meta);
   }
 
   .client-layout__main {
@@ -1736,7 +1736,7 @@ a.badge {
 
 .agenda-day__title {
   margin: 0;
-  font-size: 1.15rem;
+  font-size: var(--text-section);
   font-weight: 700;
   color: var(--col-accent);
 }
@@ -1744,7 +1744,7 @@ a.badge {
 .agenda-day__empty {
   padding: 1.25rem 1.15rem;
   color: var(--txt-muted);
-  font-size: 1rem;
+  font-size: var(--text-body);
 }
 
 .agenda-day__events {
@@ -1783,7 +1783,7 @@ button.agenda-event {
 
 .agenda-event__time {
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: var(--text-card);
   color: var(--col-primary-dark);
   font-variant-numeric: tabular-nums;
 }
@@ -1801,18 +1801,18 @@ button.agenda-event {
 }
 
 .agenda-event__meta {
-  font-size: 0.95rem;
+  font-size: var(--text-body);
   color: var(--txt-muted);
 }
 
 .agenda-event__badge {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .agenda-later-group__date {
   margin: 0;
   padding: 0.65rem 1.15rem 0.35rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1880,7 +1880,7 @@ button.agenda-event {
 }
 
 .appointment-list__datetime {
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
 }
 
@@ -1916,7 +1916,7 @@ button.agenda-event {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
 }
 
@@ -1946,7 +1946,7 @@ button.agenda-event {
   flex-direction: column;
   gap: 0.2rem;
   min-width: 8rem;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
 }
 
@@ -1979,7 +1979,7 @@ button.agenda-event {
   border: 1px solid var(--border-color);
   background: var(--bg-surface);
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--col-accent);
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s, color 0.12s;
@@ -2334,7 +2334,7 @@ button.agenda-event {
   max-width: 100%;
   padding: 0.12rem 0.55rem;
   border-radius: 999px;
-  font-size: 0.82rem;
+  font-size: var(--text-ui);
   font-weight: 650;
   line-height: 1.35;
   white-space: nowrap;
@@ -2368,7 +2368,7 @@ button.agenda-event {
   gap: 0.45rem;
   margin-left: 0.25rem;
   color: var(--txt-body);
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
   cursor: pointer;
 }
 
@@ -2412,7 +2412,7 @@ button.agenda-event {
 .form-designer__hint {
   margin: 0.4rem 0 0;
   color: var(--txt-muted);
-  font-size: 0.88rem;
+  font-size: var(--text-ui);
   line-height: 1.4;
 }
 
@@ -2572,7 +2572,7 @@ button.agenda-event {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
 }
 
 .form-share {
@@ -2672,7 +2672,7 @@ button.agenda-event {
 .form-designer__bar h1 {
   margin: 0;
   flex: 1 1 12rem;
-  font-size: 1.35rem;
+  font-size: var(--text-page);
 }
 
 .form-designer__layout {
@@ -2710,7 +2710,7 @@ button.agenda-event {
 
 .form-designer__palette-title {
   margin: 0.85rem 0 0.2rem;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;

@@ -52,7 +52,7 @@
   background: var(--bg-surface);
   color: var(--txt-primary);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   cursor: pointer;
 }
@@ -115,7 +115,7 @@
 
 .invoice-parties__name {
   margin: 0.2rem 0 0;
-  font-size: 1.05rem;
+  font-size: var(--text-card);
   font-weight: 700;
 }
 
@@ -200,7 +200,7 @@
 .invoice-totals__note {
   display: block;
   margin-top: 0.2rem;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 500;
   color: var(--txt-muted);
 }
@@ -268,7 +268,7 @@
 
 .invoice-sheet__pay h3 {
   margin: 0 0 0.35rem;
-  font-size: 0.85rem;
+  font-size: var(--text-card);
 }
 
 .invoice-sheet__pay p {
@@ -327,7 +327,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 700;
 }
 

@@ -15,7 +15,7 @@
 
 .settings-tabs__link,
 .settings-subtabs__link {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--txt-muted);
   text-decoration: none;
@@ -50,7 +50,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  font-size: 0.8rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--col-accent);
   text-transform: uppercase;
@@ -59,7 +59,7 @@
 
 .settings-form__hint {
   margin: 0.15rem 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
@@ -71,7 +71,7 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.95rem;
+  font-size: var(--text-body);
   font-weight: 500;
   letter-spacing: normal;
   text-transform: none;
@@ -98,7 +98,7 @@
 .payment-lock__row {
   display: grid;
   gap: 0.3rem;
-  font-size: 0.8rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--col-accent);
   text-transform: uppercase;
@@ -183,7 +183,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--txt-body);
   text-transform: none;
@@ -210,7 +210,7 @@
   background: var(--bg-muted);
   border: 1px solid var(--border-light);
   word-break: break-all;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .registration-list {
@@ -270,7 +270,7 @@
 .settings-google-row__meta {
   margin: 0.2rem 0 0;
   color: var(--txt-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
 }
 
 .settings-google-row__actions {

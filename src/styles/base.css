@@ -9,12 +9,12 @@ body {
   color: var(--txt-body);
   background-color: var(--bg-page);
   line-height: 1.55;
-  font-size: 16px;
+  font-size: var(--text-body);
 }
 
-h1 { font-size: 1.6rem; font-weight: 600; }
-h2 { font-size: 1.2rem; }
-h3 { font-size: 1.05rem; }
+h1 { font-size: var(--text-page); font-weight: 600; }
+h2 { font-size: var(--text-section); }
+h3 { font-size: var(--text-card); }
 
 h1, h2, h3, h4 {
   font-family: var(--font-head);
@@ -108,7 +108,7 @@ a:hover { text-decoration: underline; }
 
 .top-nav__link {
   padding: 0.4rem 0.55rem;
-  font-size: 1.0625rem;
+  font-size: var(--text-body);
   font-weight: 500;
   color: var(--txt-muted);
   text-decoration: none;
@@ -201,7 +201,7 @@ a:hover { text-decoration: underline; }
   background: transparent;
   border-radius: var(--radius-sm);
   font-family: var(--font-body);
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--col-accent);
   cursor: pointer;
@@ -325,7 +325,7 @@ a:hover { text-decoration: underline; }
 .page-header__title {
   margin: 0;
   font-family: var(--font-head);
-  font-size: 1.7rem;
+  font-size: var(--text-page);
   font-weight: 600;
   font-variation-settings: var(--font-head-variation);
   font-optical-sizing: auto;
@@ -334,7 +334,7 @@ a:hover { text-decoration: underline; }
 }
 
 .page-header--with-toolbar .page-header__title {
-  font-size: 1.4rem;
+  font-size: var(--text-page);
 }
 
 .help-tip {
@@ -373,7 +373,7 @@ a:hover { text-decoration: underline; }
   background: var(--bg-surface);
   box-shadow: 0 10px 28px rgb(0 0 0 / 12%);
   color: var(--txt-primary);
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
   font-weight: 500;
   line-height: 1.45;
 }
@@ -433,7 +433,7 @@ a:hover { text-decoration: underline; }
 .page-header__filter .paper-input {
   min-height: 2.25rem;
   padding: 0.35rem 0.55rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   min-width: 7.5rem;
 }
 
@@ -499,7 +499,7 @@ a:hover { text-decoration: underline; }
 
 .app-toast__message {
   flex: 1;
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
 }
 
 .app-toast--saved .app-toast__message {

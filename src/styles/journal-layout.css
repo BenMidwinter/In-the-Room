@@ -30,7 +30,7 @@
 
 .journal__feed-title {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -38,7 +38,7 @@
 }
 
 .journal__feed-new {
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   padding: 0.25rem 0.5rem;
 }
 
@@ -61,7 +61,7 @@
   cursor: pointer;
   text-align: left;
   font-family: var(--font-body);
-  font-size: 15px;
+  font-size: var(--text-body);
   line-height: 1.55;
 }
 
@@ -75,7 +75,7 @@
 }
 
 .journal__feed-date {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   color: var(--col-accent);
   font-variant-numeric: tabular-nums;
@@ -166,14 +166,14 @@
 }
 
 .journal__feed-preview {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
   line-height: 1.55;
 }
 
 .journal__feed-empty {
   padding: 1rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
 }
 
@@ -182,7 +182,7 @@
   flex-direction: column;
   min-width: 0;
   padding: 1rem 0 0 1.25rem;
-  font-size: 15px;
+  font-size: var(--text-body);
   line-height: 1.55;
 }
 
@@ -209,7 +209,7 @@
 }
 
 .journal__meta-field label {
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -318,7 +318,7 @@
 .room-sticky-bar__meta {
   flex: 1 1 auto;
   min-width: 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
 }
 
@@ -459,7 +459,7 @@
 
 .room-accessory-pane__title {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-card);
   font-weight: 700;
   color: var(--col-accent);
   line-height: 1.25;
@@ -467,7 +467,7 @@
 
 .room-accessory-pane__subtitle {
   margin: 0.2rem 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
 }
 
@@ -513,7 +513,7 @@
   height: 2.25rem;
   flex-shrink: 0;
   color: var(--col-primary-dark);
-  font-size: 1rem;
+  font-size: var(--text-body);
   line-height: 1;
 }
 
@@ -533,14 +533,14 @@
 }
 
 .room-stacked-row__value {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--col-accent);
   word-break: break-word;
 }
 
 .room-stacked-row__meta {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
   line-height: 1.45;
 }
@@ -594,13 +594,13 @@
   padding: var(--layout-space-sm) var(--layout-space-md);
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   line-height: 1.45;
 }
 
 .room-context-banner__title {
   margin: 0 0 0.25rem;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -648,7 +648,7 @@
   padding: var(--layout-space-sm) var(--layout-space-md);
   background: var(--bg-zone-muted);
   border-left: 3px solid var(--col-secondary, #ee4e14);
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--col-accent);
 }
@@ -782,7 +782,7 @@
   text-decoration: none;
   text-transform: none;
   letter-spacing: 0;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
 }
 
 .appointment-card__attendance {
@@ -864,13 +864,13 @@ a.room-event-drawer__note-action:hover {
 }
 
 .booking-kind-menu__label {
-  font-size: 0.95rem;
+  font-size: var(--text-body);
   font-weight: 700;
   color: var(--txt-primary);
 }
 
 .booking-kind-menu__detail {
-  font-size: 0.78rem;
+  font-size: var(--text-meta);
   line-height: 1.35;
   color: var(--txt-muted);
 }
@@ -902,11 +902,11 @@ a.room-event-drawer__note-action:hover {
 
 .room-stacked-list--compact .room-stacked-row__icon {
   width: 1.35rem;
-  font-size: 0.85rem;
+  font-size: var(--text-ui);
 }
 
 .room-stacked-list--compact .room-stacked-row__value {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .room-stacked-list--compact .room-stacked-row__meta {
@@ -933,7 +933,7 @@ a.room-event-drawer__note-action:hover {
 .room-attendance-row__select {
   min-height: 2rem;
   padding: 0.3rem 0.5rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .room-recurring-inline {
@@ -947,7 +947,7 @@ a.room-event-drawer__note-action:hover {
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   cursor: pointer;
 }
@@ -1017,7 +1017,7 @@ a.room-event-drawer__note-action:hover {
 }
 
 .room-group-accordion__name {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--col-accent);
 }

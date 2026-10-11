@@ -45,19 +45,19 @@
 
 .home-panel__title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--text-card);
   font-weight: 700;
   color: var(--col-accent);
 }
 
 .home-panel__subtitle {
   margin: 0.25rem 0 0;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
 }
 
 .home-panel__link {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--col-primary-dark);
   text-decoration: none;
@@ -71,7 +71,7 @@
 .home-panel__empty {
   margin: 0;
   padding: 1rem 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
   color: var(--txt-muted);
 }
 
@@ -119,7 +119,7 @@
 .home-feed__date {
   grid-column: 1;
   grid-row: 1;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--col-primary-dark);
 }
@@ -127,14 +127,14 @@
 .home-feed__time {
   grid-column: 2;
   grid-row: 1;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
 }
 
 .home-feed__primary {
   grid-column: 3;
   grid-row: 1;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--col-accent);
 }
@@ -142,7 +142,7 @@
 .home-feed__meta {
   grid-column: 1 / -1;
   grid-row: 2;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
   line-height: 1.45;
 }
@@ -174,7 +174,7 @@
 
 .home-outcomes__label {
   display: block;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--txt-muted);
   margin-bottom: 0.35rem;
@@ -191,7 +191,7 @@
 .home-outcomes__hint {
   display: block;
   margin-top: 0.35rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
 }
 
@@ -212,7 +212,7 @@
 }
 
 .home-outcomes__bar-label {
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
   font-weight: 600;
   color: var(--col-accent);
 }
@@ -233,7 +233,7 @@
 }
 
 .home-outcomes__bar-pct {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--txt-muted);
   text-align: right;
@@ -246,7 +246,7 @@
 
 .reporting-placeholder__lead {
   margin: 0 0 1.25rem;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
   line-height: 1.55;
   color: var(--txt-muted);
   max-width: 42rem;
@@ -263,7 +263,7 @@
 
 .reporting-placeholder__list li {
   padding: 0.75rem 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
   color: var(--col-accent);
   border-bottom: 1px solid var(--border-light);
 }
@@ -346,7 +346,7 @@
 .home-stat-card__title {
   margin: 0 0 0.65rem;
   font-family: var(--font-head);
-  font-size: 1rem;
+  font-size: var(--text-card);
   font-weight: 600;
   font-variation-settings: var(--font-head-variation);
   color: var(--col-accent);
@@ -382,7 +382,7 @@ button.home-stat-card__link {
 
 .home-stat-card__primary {
   margin: 0 0 0.35rem;
-  font-size: 1.05rem;
+  font-size: var(--text-card);
   font-weight: 600;
   color: var(--col-accent);
   line-height: 1.3;
@@ -390,7 +390,7 @@ button.home-stat-card__link {
 
 .home-stat-card__meta {
   margin: 0.15rem 0 0;
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
   line-height: 1.4;
 }
@@ -409,7 +409,7 @@ button.home-stat-card__link {
 .home-upcoming-timeline .card__title {
   margin: 0;
   font-family: var(--font-head);
-  font-size: 1rem;
+  font-size: var(--text-card);
   font-weight: 600;
   font-variation-settings: var(--font-head-variation);
   color: var(--col-accent);
@@ -439,13 +439,13 @@ button.home-stat-card__link {
 }
 
 .home-upcoming-timeline__when {
-  font-size: 0.85rem;
+  font-size: var(--text-ui);
   font-weight: 700;
   color: var(--col-primary-dark);
 }
 
 .home-upcoming-timeline__time {
-  font-size: 0.85rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
 }
 
@@ -475,7 +475,7 @@ button.home-stat-card__link {
 .home-caseload__bar .card__title {
   margin: 0;
   font-family: var(--font-head);
-  font-size: 1rem;
+  font-size: var(--text-card);
   font-weight: 600;
   font-variation-settings: var(--font-head-variation);
   color: var(--col-accent);
@@ -579,7 +579,7 @@ button.home-stat-card__link {
 .section-card__title {
   margin: 0;
   font-family: var(--font-head);
-  font-size: 1.15rem;
+  font-size: var(--text-section);
   font-weight: 600;
   font-variation-settings: var(--font-head-variation);
   font-optical-sizing: auto;
@@ -605,7 +605,7 @@ button.home-stat-card__link {
   width: 1.75rem;
   height: 1.75rem;
   padding: 0;
-  font-size: 1rem;
+  font-size: var(--text-body);
   line-height: 1;
   color: var(--col-primary-dark);
   background: var(--bg-surface);
@@ -668,7 +668,7 @@ button.home-stat-card__link {
   background: var(--bg-surface);
   color: var(--txt-body);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   padding: 0.35rem 0.7rem;
   border-radius: var(--radius-sm);
@@ -690,7 +690,7 @@ button.home-stat-card__link {
 }
 
 .section-card__link {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--col-primary-dark);
   text-decoration: none;
@@ -731,7 +731,7 @@ button.home-stat-card__link {
 
 .section-card__panel-title {
   margin: 0 0 0.65rem;
-  font-size: 0.95rem;
+  font-size: var(--text-card);
   font-weight: 700;
   color: var(--col-accent);
 }
@@ -744,7 +744,7 @@ button.home-stat-card__link {
 .section-card__empty {
   margin: 0;
   padding: 0.5rem 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
   color: var(--txt-muted);
 }
 
@@ -773,7 +773,7 @@ button.home-stat-card__link {
 
 .section-card__footnote {
   margin: 0.75rem 0 0;
-  font-size: 0.8rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
   line-height: 1.4;
 }
@@ -862,7 +862,7 @@ button.home-stat-card__link {
   background: transparent;
   padding: 0.45rem 0.85rem;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--txt-muted);
   cursor: pointer;
@@ -898,20 +898,20 @@ button.home-stat-card__link {
 
 .finance-card__title {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-card);
   color: var(--col-accent);
 }
 
 .finance-card__meta {
   margin: 0.25rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
 }
 
 .finance-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
 }
 
 .finance-table th,
@@ -937,7 +937,7 @@ button.home-stat-card__link {
 
 .finance-page__footnote {
   margin: 0.75rem 0 0;
-  font-size: 0.85rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
 }
 
@@ -1007,7 +1007,7 @@ button.home-stat-card__link {
 .paper-input--compact {
   min-height: 2rem;
   padding: 0.25rem 0.45rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 @media (max-width: 600px) {
@@ -1072,7 +1072,7 @@ button.home-stat-card__link {
 
 .calendar-reschedule-banner p {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: var(--text-body);
 }
 
 .main-content:has(.page--calendar) {
@@ -1162,7 +1162,7 @@ button.home-stat-card__link {
   border-radius: 0;
   border: none;
   border-left: 3px solid var(--col-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
 }
 
 .identity-banner--open {
@@ -1220,7 +1220,7 @@ button.home-stat-card__link {
 
 .calendar-toolbar__btn {
   padding: 0.4rem 0.7rem;
-  font-size: 0.9375rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--txt-primary);
   background: var(--bg-page);
@@ -1256,7 +1256,7 @@ button.home-stat-card__link {
 
 .calendar-toolbar__period {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: var(--text-card);
   font-weight: 700;
   color: var(--txt-primary);
   white-space: nowrap;
@@ -1281,7 +1281,7 @@ button.home-stat-card__link {
 
 .calendar-toolbar__view {
   padding: 0.45rem 0.8rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 700;
   color: var(--txt-muted);
   background: transparent;
@@ -1307,7 +1307,7 @@ button.home-stat-card__link {
 }
 
 .calendar-toolbar__owner-label {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1334,7 +1334,7 @@ button.home-stat-card__link {
   padding: 0.2rem 0.55rem;
   border-radius: 999px;
   border: 1px solid transparent;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
 }
 
@@ -1352,7 +1352,7 @@ button.home-stat-card__link {
   padding: 0.35rem 0.45rem;
   margin-bottom: 0.25rem;
   border-radius: 0;
-  font-size: 1rem;
+  font-size: var(--text-body);
   line-height: 1.35;
   border: 1px solid transparent;
   box-shadow: var(--shadow-sm);
@@ -1375,7 +1375,7 @@ button.calendar-event {
 
 .calendar-event--compact {
   padding: 0.2rem 0.35rem;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
 }
 
 /* Duration-sized block (absolutely placed inside a day column). Height reflects
@@ -1394,7 +1394,7 @@ button.calendar-event {
 
 .calendar-event--block .calendar-event__time {
   display: block;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 700;
   opacity: 0.85;
   overflow: hidden;
@@ -1456,7 +1456,7 @@ button.calendar-event {
 
 .calendar-event__therapist {
   display: block;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   opacity: 0.8;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1465,7 +1465,7 @@ button.calendar-event {
 
 .calendar-event__info {
   display: block;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   line-height: 1.2;
   font-style: italic;
   overflow: hidden;
@@ -1482,7 +1482,7 @@ button.calendar-event {
 }
 
 .calendar-event--compact .calendar-event__info {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .calendar-event--cancelled .calendar-event__info {
@@ -1513,7 +1513,7 @@ button.calendar-event {
 .calendar-month__weekday {
   padding: 0.55rem 0.35rem;
   text-align: center;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1562,7 +1562,7 @@ button.calendar-event {
   justify-content: center;
   width: 1.95rem;
   height: 1.95rem;
-  font-size: 0.95rem;
+  font-size: var(--text-body);
   font-weight: 700;
   color: var(--txt-primary);
   border-radius: 999px;
@@ -1586,7 +1586,7 @@ button.calendar-event {
   align-items: center;
   gap: 0.25rem;
   min-width: 0;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--txt-body);
 }
 
@@ -1604,14 +1604,14 @@ button.calendar-event {
 }
 
 .calendar-month__more {
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
 }
 
 .calendar-month__footer {
   margin: 0;
   padding: 0.5rem 0.85rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
   border-top: 1px solid var(--border-color);
   flex-shrink: 0;
@@ -1703,7 +1703,7 @@ button.calendar-event {
 }
 
 .calendar-time-grid__weekday {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1711,7 +1711,7 @@ button.calendar-event {
 }
 
 .calendar-time-grid__date {
-  font-size: 1.2rem;
+  font-size: var(--text-section);
   font-weight: 700;
   color: var(--txt-primary);
 }
@@ -1738,7 +1738,7 @@ button.calendar-event {
   position: relative;
   top: -0.5rem;
   padding-right: 0.4rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   line-height: 1;
   color: var(--txt-muted);
@@ -1853,7 +1853,7 @@ button.calendar-event {
 
 .calendar-view-options__trigger {
   padding: 0.45rem 0.8rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 700;
   color: var(--txt-muted);
   background: transparent;
@@ -1890,7 +1890,7 @@ button.calendar-event {
 }
 
 .calendar-view-options__field label {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1930,7 +1930,7 @@ button.calendar-event {
   border: 1px solid var(--border-color);
   border-radius: 0.4rem;
   background: var(--bg-page);
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
 }
 
 .room-schedule-meet {
@@ -1938,7 +1938,7 @@ button.calendar-event {
   align-items: flex-start;
   gap: 0.55rem;
   margin: 0 0 0.85rem;
-  font-size: 0.92rem;
+  font-size: var(--text-body);
   cursor: pointer;
 }
 
@@ -1986,7 +1986,7 @@ button.calendar-event {
 
 .room-recurring-option__title {
   font-weight: 700;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
 }
 
 .room-recurring-preview {
@@ -1994,7 +1994,7 @@ button.calendar-event {
   padding: 0.55rem 0.65rem;
   background: var(--bg-page);
   border: 1px solid var(--border-light);
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .room-recurring-preview__label {
@@ -2041,13 +2041,13 @@ button.calendar-event {
 }
 
 .room-schedule-client__name {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--col-accent);
 }
 
 .room-schedule-client__meta {
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   color: var(--txt-muted);
 }
 
@@ -2065,7 +2065,7 @@ button.calendar-event {
   background: none;
   color: var(--col-primary, #2f5d50);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
@@ -2090,7 +2090,7 @@ button.calendar-event {
 
 .room-schedule-more__title {
   margin: 0 0 0.2rem;
-  font-size: 0.95rem;
+  font-size: var(--text-card);
 }
 
 .room-schedule-more__actions {
@@ -2143,14 +2143,14 @@ button.calendar-event {
 
 .calendar-day__title {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: var(--text-section);
   font-weight: 700;
   color: var(--txt-primary);
 }
 
 .calendar-day__count {
   margin: 0.2rem 0 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
   color: var(--txt-muted);
 }
 
@@ -2166,7 +2166,7 @@ button.calendar-event {
 }
 
 .calendar-day__empty {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
   font-style: italic;
   padding-top: 0.35rem;

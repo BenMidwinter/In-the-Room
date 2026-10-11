@@ -38,7 +38,15 @@
 :root,
 [data-theme='practice'] {
   /* Layout & typography */
-  --nav-width: 11.25rem;
+  --nav-width: 9.25rem;
+
+  /* App chrome. The note editor, public forms, and printed letterhead keep their own sizes. */
+  --text-page: 1.6rem;
+  --text-section: 1.15rem;
+  --text-card: 1rem;
+  --text-body: 1rem;
+  --text-ui: 0.875rem;
+  --text-meta: 0.8125rem;
   --nav-height: 0px;
   --space-inline: 1.5rem;
   --space-block: 1.25rem;

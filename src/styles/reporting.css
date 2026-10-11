@@ -37,7 +37,7 @@
 
 .reporting-filter-row__name,
 .reporting-filter-row__hint {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   color: var(--txt-primary);
 }
@@ -215,7 +215,7 @@
 .reporting-metric__detail {
   margin-top: auto;
   min-height: 1.15rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   line-height: 1.35;
   color: var(--txt-muted);
 }
@@ -261,7 +261,7 @@
   border-radius: var(--radius-md);
   background: var(--col-primary-dark);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 500;
   letter-spacing: 0;
   line-height: 1.4;

@@ -15,7 +15,7 @@ Service prices, including whether the price already includes VAT, live on each s
 
 Noted from the hosted site. These stay on the list while encryption is the next piece of work.
 
-- [ ] Standardise text size between pages.
+- [x] Standardise text size between pages.
 - [ ] Evaluate the calendar layout. The text is a bit squeezed.
 - [ ] Make back buttons return to the previous screen.
 - [x] Rename the product to Process&Note, and use the logos already chosen.

@@ -58,7 +58,7 @@
 .form-overlay__title {
   margin: 0;
   font-family: var(--font-head);
-  font-size: 1.4rem;
+  font-size: var(--text-page);
   font-weight: 600;
   font-variation-settings: var(--font-head-variation);
   font-optical-sizing: auto;
@@ -83,7 +83,7 @@
 
 .form-overlay__meta {
   margin: 0.35rem 0 0;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
 }
 
@@ -189,7 +189,7 @@
 
 .client-profile-overlay__title {
   margin: 0;
-  font-size: 1.45rem;
+  font-size: var(--text-page);
   font-weight: 700;
   color: var(--txt-primary);
   line-height: 1.25;
@@ -197,7 +197,7 @@
 
 .client-profile-overlay__meta {
   margin: 0.35rem 0 0;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   color: var(--txt-muted);
 }
 
@@ -217,7 +217,7 @@
 
 .client-profile-overlay__section-title {
   margin: 0 0 0.85rem;
-  font-size: 0.78rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -231,7 +231,7 @@
 .client-profile-overlay__section-lead {
   margin: -0.35rem 0 1.25rem;
   max-width: 42rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   line-height: 1.55;
   color: var(--txt-muted);
 }
@@ -267,7 +267,7 @@
 .client-profile-overlay__field label {
   display: block;
   margin-bottom: 0.45rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--txt-primary);
 }
@@ -280,7 +280,7 @@
   min-height: auto;
   padding: 0.75rem 0.85rem;
   line-height: 1.55;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
 }
 
 .client-profile-overlay__textarea--short {
@@ -393,7 +393,7 @@
 }
 
 .theme-toggle__option-label {
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--col-accent);
 }
@@ -997,7 +997,7 @@
 
 .audio-fragment__head {
   grid-column: 1 / -1;
-  font-size: 0.78rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1023,7 +1023,7 @@
 
 .audio-fragment__duration {
   align-self: center;
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--col-accent);
@@ -1097,7 +1097,7 @@
 
 .artwork-embed__caption {
   margin-top: 0.45rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-style: italic;
   color: var(--txt-muted);
   outline: none;
@@ -1254,7 +1254,7 @@
 }
 
 .theme-toggle__accordion-label {
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 700;
   color: var(--col-accent);
 }
@@ -1310,7 +1310,7 @@
 .profile-actions__link {
   display: inline-block;
   padding: 0.55rem 0.85rem;
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
   font-weight: 600;
   color: var(--txt-muted);
   text-decoration: none;
@@ -1366,7 +1366,7 @@
 }
 
 .profile-identity__photo-label {
-  font-size: 0.75rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--txt-muted);
 }
@@ -1463,7 +1463,7 @@
 
 .profile-availability__location-title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--text-card);
   color: var(--col-accent);
 }
 
@@ -1500,14 +1500,14 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   font-weight: 600;
   color: var(--txt-body);
 }
 
 .profile-availability__hours-sep {
   color: var(--txt-muted);
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
   text-align: center;
 }
 
@@ -1543,7 +1543,7 @@
 }
 
 .profile-availability__service-copy strong {
-  font-size: 0.875rem;
+  font-size: var(--text-ui);
 }
 
 .profile-hub__grid {
@@ -1599,7 +1599,7 @@
 .profile-identity__signature-upload-btn {
   display: inline-flex;
   padding: 0.35rem 0.7rem;
-  font-size: 0.8125rem;
+  font-size: var(--text-meta);
 }
 
 .profile-identity__signature-remove {
@@ -1665,7 +1665,7 @@
 
 .profile-panel__title {
   margin: 0 0 1rem;
-  font-size: 1rem;
+  font-size: var(--text-card);
 }
 
 .profile-panel__hint {
