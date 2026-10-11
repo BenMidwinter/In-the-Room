@@ -11,14 +11,22 @@ Living plan. The clinical workspace (caseload, calendar, notes, services, forms,
 
 Service prices, including whether the price already includes VAT, live on each service.
 
+## Interface tweaks
+
+Noted from the hosted site. These stay on the list while encryption is the next piece of work.
+
+- [ ] Standardise text size between pages.
+- [ ] Evaluate the calendar layout. The text is a bit squeezed.
+- [ ] Make back buttons return to the previous screen.
+
 ## 2. Encryption and login — next
 
-Do this next, as one patch, tied into the login process.
+Encryption wiring is the next piece of work. Practice membership follows once a new encrypted note can be opened beside an existing plain note. MFA enrolment follows that, and the second-factor lock stays off until the phone code works.
 
 - [ ] Envelope encryption for clinical records: notes, letters, reports, form answers, and outcome totals. One organisation per signup, with roles owner, practitioner, and practice manager. The practice manager can read appointments, attendance, and invoice totals, and is kept out of note, report, letter, and form bodies. Operational columns stay readable: appointment times, attendance, note status, invoice amounts, and service prices.
-- [ ] Data processing agreement and mandatory MFA. A clinical payload is readable only after the second factor. Turn that check on at the same time as MFA enrolment.
-
-Delete the current rows before trialling this. They are fake test data. The trial starts from new fake clients. Those existing rows are removed rather than encrypted in place.
+- [ ] Keep the current dummy rows. New clinical writes use the envelope. Existing rows stay plain, so the two can be compared on one client. Wipe every test row in one go only when a stable beta is ready.
+- [ ] After that comparison, invite a practitioner and a practice manager.
+- [ ] Data processing agreement and mandatory MFA. A clinical payload is readable only after the second factor. Turn that check on at the same time as MFA enrolment, once the code from the phone has been confirmed.
 
 ## 3. Data management
 
