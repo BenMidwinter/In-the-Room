@@ -1303,6 +1303,10 @@ export type Database = {
           bank_format: string
           sealed_bank: Json | null
           bio: string | null
+          dpa_accepted: boolean
+          dpa_accepted_at: string | null
+          dpa_accepted_ip: string | null
+          dpa_version: string | null
           cancel_early_fee: string
           cancel_late_fee: string
           cancel_notice_hours: number
@@ -1340,6 +1344,10 @@ export type Database = {
           bank_format?: string
           sealed_bank?: Json | null
           bio?: string | null
+          dpa_accepted?: boolean
+          dpa_accepted_at?: string | null
+          dpa_accepted_ip?: string | null
+          dpa_version?: string | null
           cancel_early_fee?: string
           cancel_late_fee?: string
           cancel_notice_hours?: number
@@ -1377,6 +1385,10 @@ export type Database = {
           bank_format?: string
           sealed_bank?: Json | null
           bio?: string | null
+          dpa_accepted?: boolean
+          dpa_accepted_at?: string | null
+          dpa_accepted_ip?: string | null
+          dpa_version?: string | null
           cancel_early_fee?: string
           cancel_late_fee?: string
           cancel_notice_hours?: number

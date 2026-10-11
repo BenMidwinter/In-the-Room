@@ -3,6 +3,7 @@ import { useAppClients } from './lib/queries'
 
 import AppLayout from './components/AppLayout'
 import AuthPage from './features/auth/AuthPage'
+import DpaPage from './features/legal/DpaPage'
 import FormFillPage from './features/forms/FormFillPage'
 import FormDocumentPage from './features/forms/FormDocumentPage'
 import FormStartPage from './features/forms/FormStartPage'
@@ -48,6 +49,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<AuthPage />} />
+      <Route path="/legal/dpa" element={<DpaPage />} />
       <Route path="/f/:token" element={<FormFillPage />} />
       <Route path="/r/:formId" element={<FormStartPage />} />
       <Route path="/" element={<Navigate to="/home" replace />} />

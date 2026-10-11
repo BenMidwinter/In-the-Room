@@ -27,7 +27,7 @@ Encryption wiring is the next piece of work. Organisation id is the owner of the
 
 - [ ] Envelope encryption for client text and editor text, on top of notes, letters, reports, form answers, and outcome totals. Client names, contacts, clinical profiles, appointment notes, waitlist text, tags, and invoice addressees are included. Journal, working documents, practice documents, templates, form wording, questionnaires, and CPD or supervision notes are included. Bank details are included. The clinician’s name, email, phone, bio, registration, and letterhead stay readable so an account can be supported. Operational columns stay readable: appointment times, attendance, note status, invoice amounts, and service prices.
 - [ ] Keep the current dummy rows. New writes use the envelope. Existing rows stay plain, so the two can be compared. Wipe every test row in one go only when a stable beta is ready.
-- [ ] Data processing agreement. The second-factor lock stays off until MFA is enrolled as a final step.
+- [x] Data processing agreement, version 1.0. Accepted at signup, or on the next sign-in for an account that does not have one yet. The second-factor lock stays off until MFA is enrolled as a final step.
 
 ## 3. Data management
 
@@ -48,28 +48,13 @@ This follows the encryption and login patch, because the export has to decrypt n
 
 ### Account Security, Legal Compliance (DPA), & Caseload Portability
 
-- [ ] **UK GDPR Article 28 Data Processing Agreement (DPA) Framework**
-  - Draft an in-app click-through DPA integrated directly into user registration/checkout terms.
-  - Define clear legal roles: Subscribing Clinician = **Data Controller**; Platform Entity = **Data Processor**.
-  - Document and maintain a public **Sub-Processor Register** with regional pin guarantees (`eu-west-2` London):
-    - Database & Auth: Supabase (AWS London)
-    - Document Cold Storage: AWS S3 (London)
-    - Web Application CDN/Hosting: Vercel / Cloudflare
-    - Subscription Billing: Stripe Payments UK Ltd
-    - Transactional Email: Resend / Postmark
-  - Add explicit commitments to the terms:
-    - 48-hour data breach notification window to Controllers.
-    - Statutory data processing instructions strictly limited to app functionality.
-    - Explicit DPA consent timestamp tracking stored in database:
-      ```sql
-      create table public.dpa_consents (
-        id uuid primary key default gen_random_uuid(),
-        user_id uuid references auth.users(id) on delete cascade not null,
-        dpa_version text not null,
-        ip_address inet,
-        consented_at timestamptz default timezone('utc'::text, now()) not null
-      );
-      ```
+- [x] **UK GDPR Article 28 Data Processing Agreement, version 1.0**
+  - Public agreement at `/legal/dpa`. Signup cannot finish until it is accepted. An existing account signs off once after login.
+  - The registering practitioner or clinic is the Data Controller. Process&Note is the Data Processor.
+  - Version 1.0 names two sub-processors, both in `eu-west-2` (London) only: Supabase (database, authentication, and file storage) and AWS (KMS, secrets, and cryptographic processing).
+  - The agreement includes the 48-hour breach notice, deletion and cryptographic erasure, and the laws of England and Wales.
+  - Acceptance is stored on the profile: `dpa_accepted`, a server-stamped `dpa_accepted_at`, and `dpa_version` `1.0`. `dpa_accepted_ip` is present and left empty.
+- [ ] Wider sub-processor register for services that are not in version 1.0 yet: document storage, hosting, billing, and transactional email.
 
 - [ ] **Hardened Authentication & Session Lifecycle (Supabase Auth)**
   - **Mandatory TOTP MFA Enrollment:**
