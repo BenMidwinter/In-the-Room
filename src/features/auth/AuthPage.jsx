@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { brandLogoUrl, PRODUCT_NAME } from '../../lib/brand'
+import DpaConsent from '../legal/DpaConsent'
 
 export default function AuthPage() {
   const {
@@ -26,6 +27,7 @@ export default function AuthPage() {
   const [error, setError] = useState(null)
   const [info, setInfo] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [dpaAccepted, setDpaAccepted] = useState(false)
 
   if (!loading && user && !recovery) {
     return <Navigate to={next} replace />
@@ -37,9 +39,15 @@ export default function AuthPage() {
     setError(null)
     setInfo(null)
 
+    if (mode === 'signup' && !dpaAccepted) {
+      setBusy(false)
+      setError('Accept the Data Processing Agreement to create an account.')
+      return
+    }
+
     const result = mode === 'signin'
       ? await signIn(email.trim(), password)
-      : await signUp(email.trim(), password, fullName)
+      : await signUp(email.trim(), password, { fullName, dpaAccepted })
 
     setBusy(false)
 
@@ -106,7 +114,7 @@ export default function AuthPage() {
 
   return (
     <div className="auth-page">
-      <div className="auth-page__card">
+      <div className={`auth-page__card${mode === 'signup' && !recovery ? ' auth-page__card--wide' : ''}`}>
         <img className="auth-page__logo" src={brandLogoUrl} alt={PRODUCT_NAME} />
         <h1 className="auth-page__title">{title}</h1>
 
@@ -187,10 +195,18 @@ export default function AuthPage() {
             />
           </label>
 
+          {mode === 'signup' && (
+            <DpaConsent checked={dpaAccepted} onChange={setDpaAccepted} />
+          )}
+
           {error && <p className="auth-page__alert" role="alert">{error}</p>}
           {info && <p className="auth-page__info">{info}</p>}
 
-          <button type="submit" className="btn btn-primary auth-page__submit" disabled={busy || !configured || loading}>
+          <button
+            type="submit"
+            className="btn btn-primary auth-page__submit"
+            disabled={busy || !configured || loading || (mode === 'signup' && !dpaAccepted)}
+          >
             {busy ? 'Please wait…' : mode === 'signin' ? 'Sign in' : 'Create account'}
           </button>
           {mode === 'signin' && (

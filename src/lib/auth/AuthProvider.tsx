@@ -10,6 +10,7 @@ import {
 import type { Session, User } from '@supabase/supabase-js'
 import { getSupabase, isSupabaseConfigured } from '../supabase/client'
 import type { Tables } from '../supabase/database.types'
+import { DPA_VERSION } from '../dpa'
 
 export type ProfileRow = Tables<'profiles'>
 
@@ -20,12 +21,18 @@ type AuthContextValue = {
   user: User | null
   profile: ProfileRow | null
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
-  signUp: (email: string, password: string, fullName?: string) => Promise<{ error: string | null }>
+  signUp: (
+    email: string,
+    password: string,
+    details: { fullName?: string, dpaAccepted: boolean },
+  ) => Promise<{ error: string | null }>
+  acceptDpa: () => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<{ error: string | null }>
   completePasswordReset: (password: string) => Promise<{ error: string | null }>
   recovery: boolean
   refreshProfile: () => Promise<void>
+  profileReady: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -56,17 +63,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const configured = isSupabaseConfigured()
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<Session | null>(null)
-  const [profile, setProfile] = useState<ProfileRow | null>(null)
   const [recovery, setRecovery] = useState(recoveryLinkOpen)
+  const userId = session?.user?.id ?? null
+  const [profileRecord, setProfileRecord] = useState<{
+    userId: string | null
+    ready: boolean
+    profile: ProfileRow | null
+  }>({ userId: null, ready: true, profile: null })
+
+  if (profileRecord.userId !== userId) {
+    setProfileRecord({ userId, ready: !userId, profile: null })
+  }
+
+  const profile = profileRecord.userId === userId ? profileRecord.profile : null
+  const profileReady = profileRecord.userId === userId && profileRecord.ready
 
   const refreshProfile = useCallback(async () => {
-    const userId = session?.user?.id
-    if (!userId) {
-      setProfile(null)
-      return
-    }
-    setProfile(await fetchProfile(userId))
-  }, [session?.user?.id])
+    if (!userId) return
+    const next = await fetchProfile(userId)
+    setProfileRecord({ userId, ready: true, profile: next })
+  }, [userId])
 
   useEffect(() => {
     const supabase = getSupabase()
@@ -97,16 +113,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!session?.user?.id) {
-      setProfile(null)
-      return
-    }
+    if (!userId) return
     let cancelled = false
-    fetchProfile(session.user.id).then((row) => {
-      if (!cancelled) setProfile(row)
+    fetchProfile(userId).then((row) => {
+      if (!cancelled) setProfileRecord({ userId, ready: true, profile: row })
     })
     return () => { cancelled = true }
-  }, [session?.user?.id])
+  }, [userId])
 
   const signIn = useCallback(async (email: string, password: string) => {
     const supabase = getSupabase()
@@ -115,24 +128,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null }
   }, [])
 
-  const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
+  const signUp = useCallback(async (
+    email: string,
+    password: string,
+    details: { fullName?: string, dpaAccepted: boolean },
+  ) => {
     const supabase = getSupabase()
     if (!supabase) return { error: 'Supabase is not configured' }
+    if (!details.dpaAccepted) {
+      return { error: 'Accept the Data Processing Agreement to create an account.' }
+    }
+    // Copied once into profiles by handle_new_user. Not used for authorisation after that.
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: { full_name: fullName?.trim() || undefined },
+        data: {
+          full_name: details.fullName?.trim() || undefined,
+          dpa_accepted: true,
+          dpa_version: DPA_VERSION,
+        },
       },
     })
     return { error: error?.message ?? null }
   }, [])
 
+  const acceptDpa = useCallback(async () => {
+    const supabase = getSupabase()
+    if (!supabase || !userId) return { error: 'Supabase is not configured' }
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ dpa_accepted: true })
+      .eq('id', userId)
+      .select('dpa_accepted')
+      .maybeSingle()
+    if (error) return { error: error.message }
+    if (!data?.dpa_accepted) return { error: 'The agreement was not recorded. Try again.' }
+    setProfileRecord({ userId, ready: true, profile: await fetchProfile(userId) })
+    return { error: null }
+  }, [userId])
+
   const signOut = useCallback(async () => {
     const supabase = getSupabase()
     if (!supabase) return
     await supabase.auth.signOut()
-    setProfile(null)
+    setProfileRecord({ userId: null, ready: true, profile: null })
     setRecovery(false)
   }, [])
 
@@ -162,11 +202,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     signIn,
     signUp,
+    acceptDpa,
     signOut,
     requestPasswordReset,
     completePasswordReset,
     recovery,
     refreshProfile,
+    profileReady,
   }), [
     configured,
     loading,
@@ -174,11 +216,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     signIn,
     signUp,
+    acceptDpa,
     signOut,
     requestPasswordReset,
     completePasswordReset,
     recovery,
     refreshProfile,
+    profileReady,
   ])
 
   return (
