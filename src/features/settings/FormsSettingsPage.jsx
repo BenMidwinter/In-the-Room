@@ -240,6 +240,7 @@ export default function FormsSettingsPage() {
         description="Name the questionnaire, such as YP-CORE or CGAS. Save a draft while you design it, and publish it when it is ready to use."
       >
         <RecordTable
+          remember="questionnaires"
           headerAction={(
             <button
               type="button"
@@ -268,6 +269,7 @@ export default function FormsSettingsPage() {
         description="A form you send is added on a course. A shared form can be copied as a link or an embed. Open the form and use the settings wheel for the screener, auto fill, and email."
       >
         <RecordTable
+          remember="forms"
           headerAction={(
             <button
               type="button"

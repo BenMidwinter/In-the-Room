@@ -215,6 +215,7 @@ export default function WorkingDocumentsPanel() {
     >
       {!editing && (
         <RecordTable
+          remember={`working-documents-${clientId}`}
           columns={DOC_COLUMNS}
           rows={rows}
           defaultSort={{ key: 'updated', direction: 'desc' }}

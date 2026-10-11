@@ -79,6 +79,7 @@ function TagList({ kind, title, description }) {
       description={description}
     >
       <RecordTable
+        remember={`tags-${kind}`}
         headerAction={(
           <button type="button" className="secondary record-table__add" onClick={() => setOpen(true)}>
             Add

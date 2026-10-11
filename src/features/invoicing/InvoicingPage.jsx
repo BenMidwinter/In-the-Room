@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { readPref, useBrowserPref, writePref } from '../../lib/browserStore'
+import { useGoBack } from '../../lib/useGoBack'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
 import SectionNav from '../../components/SectionNav'
@@ -83,7 +85,24 @@ export default function InvoicingPage() {
   const saveAppointment = useSaveAppointmentMutation()
   const [params, setParams] = useSearchParams()
   const openId = params.get('invoice')
-  const tab = params.get('tab') === 'unbilled' ? 'unbilled' : 'invoices'
+  const explicitTab = params.get('tab')
+  const [storedTab, setStoredTab] = useBrowserPref('invoicing.tab', 'invoices')
+  const tab = explicitTab === 'unbilled' || explicitTab === 'invoices'
+    ? explicitTab
+    : (storedTab === 'unbilled' ? 'unbilled' : 'invoices')
+  const goBack = useGoBack(() => {
+    setParams((current) => {
+      const next = new URLSearchParams(current)
+      next.delete('invoice')
+      return next
+    })
+  })
+
+  useEffect(() => {
+    if ((explicitTab === 'unbilled' || explicitTab === 'invoices') && readPref('invoicing.tab') !== explicitTab) {
+      writePref('invoicing.tab', explicitTab)
+    }
+  }, [explicitTab])
   const today = todayYmd()
   const [creatingId, setCreatingId] = useState('')
   const [selected, setSelected] = useState({})
@@ -276,9 +295,11 @@ export default function InvoicingPage() {
     .sort((a, b) => String(a.real_name || '').localeCompare(String(b.real_name || '')))
 
   function setTab(nextTab) {
+    const chosen = nextTab === 'unbilled' ? 'unbilled' : 'invoices'
+    setStoredTab(chosen)
     const next = new URLSearchParams(params)
     next.delete('invoice')
-    if (nextTab === 'unbilled') next.set('tab', 'unbilled')
+    if (chosen === 'unbilled') next.set('tab', 'unbilled')
     else next.delete('tab')
     setParams(next)
   }
@@ -546,7 +567,7 @@ export default function InvoicingPage() {
       <div className="page page--invoicing">
         <PageHeader title="Invoicing" />
         {invoicesQuery.isLoading ? <p className="text-muted">Loading invoice…</p> : (
-          <button type="button" className="secondary" onClick={() => showInvoice(null)}>← Invoices</button>
+          <button type="button" className="secondary" onClick={goBack}>← Invoices</button>
         )}
       </div>
     )
@@ -561,7 +582,7 @@ export default function InvoicingPage() {
           letterhead={letterhead}
           paymentText={open.status === 'draft' ? paymentInstructions(paymentQuery.data || EMPTY_PAYMENT) : open.paymentDetails}
           items={items}
-          onBack={() => showInvoice(null)}
+          onBack={goBack}
           onStatus={onStatus}
           onDelete={onDelete}
           onSaveRecipient={onSaveRecipient}
@@ -607,6 +628,7 @@ export default function InvoicingPage() {
       {tab === 'invoices' ? (
         <section className="invoicing-panel">
           <RecordTable
+            remember="invoices"
             columns={INVOICE_COLUMNS}
             rows={invoiceRows}
             countNoun="invoices"
@@ -636,6 +658,7 @@ export default function InvoicingPage() {
             </div>
           )}
           <RecordTable
+            remember="unbilled"
             columns={UNBILLED_COLUMNS}
             rows={unbilledRows}
             countNoun="sessions"

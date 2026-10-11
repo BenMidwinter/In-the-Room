@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useGoBack } from '../../lib/useGoBack'
 import { useClientSession } from '../../lib/useClientSession'
 import {
   WorkspaceLayout,
@@ -171,8 +172,8 @@ function ProgressNotesPageContent() {
   const appointmentParam = searchParams.get('appointment')
   const noteParam = searchParams.get('note')
   const navigate = useNavigate()
-  const location = useLocation()
   const { client, session, refreshClients } = useClientSession()
+  const goBack = useGoBack(client?.id ? `/clients/${client.id}/notes-history` : '/home')
   const toast = useToast()
   const confirm = useConfirm()
   const chooseLetterhead = useChoose()
@@ -508,14 +509,6 @@ function ProgressNotesPageContent() {
     setTemplateId(template.id)
     setContent(template.content || '<p></p>')
     setEditorVersion((value) => value + 1)
-  }
-
-  const goBack = () => {
-    if (location.key !== 'default') {
-      navigate(-1)
-      return
-    }
-    navigate(`/clients/${client.id}/notes-history`)
   }
 
   const startHistoryResize = (event) => {

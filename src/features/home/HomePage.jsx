@@ -302,6 +302,7 @@ export default function HomePage() {
                 </div>
               </div>
               <RecordTable
+                remember="home-cases"
                 columns={CASELOAD_COLUMNS}
                 rows={caseloadRows}
                 defaultSort={{ key: 'next', direction: 'asc' }}

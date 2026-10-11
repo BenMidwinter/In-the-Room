@@ -147,6 +147,7 @@ export default function ContactsPanel() {
         </form>
       )}
       <RecordTable
+        remember={`contacts-${clientId}`}
         columns={[
           { key: 'name', label: 'Name', filter: 'text' },
           { key: 'role', label: 'Relationship', filter: 'choice' },

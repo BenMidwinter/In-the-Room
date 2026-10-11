@@ -11,8 +11,10 @@ import '@fontsource/atkinson-hyperlegible/latin-400-italic.css'
 import '@fontsource/atkinson-hyperlegible/latin-700-italic.css'
 import './index.css'
 import { initTheme } from './lib/themeEngine'
+import { hydrateBrowserStore } from './lib/browserStore'
 
 initTheme()
+hydrateBrowserStore()
 
 // In-memory store never goes stale on its own — data changes only via mutations,
 // which invalidate the relevant keys. Refetch-on-focus would be pure noise here.

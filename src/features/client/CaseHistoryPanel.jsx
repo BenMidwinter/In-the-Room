@@ -191,6 +191,7 @@ function EpisodeAppointments({ episode, clientId, episodes, open, onToggle }) {
       )}
     >
       <RecordTable
+        remember={`course-appointments-${clientId}`}
         columns={columns}
         rows={rows}
         scroll
@@ -379,6 +380,7 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
       )}
     >
       <RecordTable
+        remember={`course-reports-${clientId}`}
         columns={REPORT_COLUMNS}
         rows={rows}
         countNoun="reports"
@@ -563,6 +565,7 @@ export default function CaseHistoryPanel() {
       {episodes.length > 0 && (
         <div className="course-page__episodes">
           <RecordTable
+            remember={`courses-${clientId}`}
             columns={EPISODE_COLUMNS}
             rows={episodes.map((episode) => {
               const status = STATUS_LABELS[episode.status] || episode.status

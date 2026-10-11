@@ -1,4 +1,5 @@
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { useGoBack } from '../../lib/useGoBack'
 import { useQuery } from '@tanstack/react-query'
 import LetterheadPreview from '../client/LetterheadPreview'
 import { useToast } from '../../components/ui'
@@ -11,6 +12,7 @@ import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
 
 export default function FormDocumentPage() {
   const { clientId = '', submissionId = '' } = useParams()
+  const goBack = useGoBack(clientId ? `/clients/${clientId}` : '/screener')
   const toast = useToast()
   const { user } = useAuth()
   const documentQuery = useQuery({
@@ -58,7 +60,7 @@ export default function FormDocumentPage() {
   return (
     <div className="page form-document">
       <div className="form-document__bar">
-        <Link className="secondary" to={clientId ? `/clients/${clientId}` : '/screener'}>Back</Link>
+        <button type="button" className="secondary" onClick={goBack}>Back</button>
         <button type="button" className="primary" onClick={download}>Download PDF</button>
       </div>
       <article className="form-document__sheet">

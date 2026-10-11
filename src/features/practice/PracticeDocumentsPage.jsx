@@ -297,6 +297,7 @@ export default function PracticeDocumentsPage() {
       )}
       {!editing && !error && (
         <RecordTable
+          remember="practice-documents"
           columns={COLUMNS}
           rows={rows}
           countNoun="items"

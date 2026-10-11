@@ -165,6 +165,7 @@ export default function TemplatesSettingsPage({ kind, title }) {
         )}
         {error && <p className="auth-page__alert">{error.message}</p>}
         <RecordTable
+          remember={`templates-${kind}`}
           columns={[
             { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
             { key: 'updated', label: 'Updated', sort: 'date' },

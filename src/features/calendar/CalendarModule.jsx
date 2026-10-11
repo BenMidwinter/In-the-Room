@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react'
+import { useBrowserPref, writePref, readPref } from '../../lib/browserStore'
 import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
@@ -33,7 +34,7 @@ import {
 import { appointmentOtherInfo, appointmentSchedule } from '../../lib/appointmentUtils'
 import {
   getCalendarViewPreferences,
-  saveCalendarViewPreferences,
+  normalizeCalendarViewPreferences,
   syncCalendarPrefsFromAvailability,
   CALENDAR_START_HOUR_OPTIONS,
   CALENDAR_END_HOUR_OPTIONS,
@@ -72,7 +73,11 @@ const VIEW_MODES = [
 
 function readViewMode(params) {
   const value = params.get('view')
-  return VIEW_MODES.some((mode) => mode.id === value) ? value : 'week'
+  return VIEW_MODES.some((mode) => mode.id === value) ? value : null
+}
+
+function knownView(value, fallback = 'week') {
+  return VIEW_MODES.some((mode) => mode.id === value) ? value : fallback
 }
 
 function pad2(n) {
@@ -777,23 +782,39 @@ export default function CalendarModule({ persona }) {
   const { session } = useAppSession()
   const overlay = useAppointmentOverlay()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [viewMode, setViewModeState] = useState(() => readViewMode(searchParams))
+  const explicitView = readViewMode(searchParams)
+  const [storedView, setStoredView] = useBrowserPref('calendar.view', 'week')
+  const viewMode = explicitView || knownView(storedView)
   const [activeDate, setActiveDate] = useState(DEMO_TODAY)
   const [selectedId, setSelectedId] = useState(null)
   const { data: appointments = [] } = useAllAppointmentsQuery()
-  const [viewPrefs, setViewPrefs] = useState(() => getCalendarViewPreferences())
+  const [storedHours, setStoredHours] = useBrowserPref('calendar.hours', null)
+  const viewPrefs = storedHours
+    ? normalizeCalendarViewPreferences(storedHours)
+    : getCalendarViewPreferences()
+  const setViewPrefs = useCallback((next) => {
+    const current = storedHours
+      ? normalizeCalendarViewPreferences(storedHours)
+      : getCalendarViewPreferences()
+    const resolved = typeof next === 'function' ? next(current) : next
+    setStoredHours(normalizeCalendarViewPreferences(resolved))
+  }, [storedHours, setStoredHours])
   const [viewOptionsOpen, setViewOptionsOpen] = useState(false)
   const [rescheduleTarget, setRescheduleTarget] = useState(null)
 
+  useEffect(() => {
+    if (explicitView && readPref('calendar.view') !== explicitView) writePref('calendar.view', explicitView)
+  }, [explicitView])
+
   const setViewMode = useCallback((next) => {
-    setViewModeState(next)
+    setStoredView(next)
     setSearchParams((prev) => {
       const params = new URLSearchParams(prev)
       if (next === 'week') params.delete('view')
       else params.set('view', next)
       return params
     }, { replace: true })
-  }, [setSearchParams])
+  }, [setSearchParams, setStoredView])
 
   const [availabilitySettings, setAvailabilitySettings] = useState(() => (
     getClinicianWorkplaceSettings(session.user.id)
@@ -884,7 +905,7 @@ export default function CalendarModule({ persona }) {
   useEffect(() => {
     const bounds = getAvailabilityBounds(weeklyHours)
     if (!bounds) return
-    setViewPrefs(syncCalendarPrefsFromAvailability(bounds))
+    syncCalendarPrefsFromAvailability(bounds)
   }, [weeklyHours])
 
   const ownerOptions = useMemo(
@@ -1025,7 +1046,7 @@ export default function CalendarModule({ persona }) {
   }, [rescheduleTarget])
 
   const handleViewPrefsChange = (patch) => {
-    setViewPrefs(prev => saveCalendarViewPreferences({ ...prev, ...patch }))
+    setViewPrefs((prev) => ({ ...prev, ...patch }))
   }
 
   const handleEditAppointment = (appt) => {

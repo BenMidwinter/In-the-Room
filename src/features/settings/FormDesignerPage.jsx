@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useGoBack } from '../../lib/useGoBack'
 import { useQuery } from '@tanstack/react-query'
 import FormOverlay from '../../components/FormOverlay'
 import { useConfirm, useToast } from '../../components/ui'
@@ -227,6 +228,7 @@ function FormSettings({ draft, onChange, onClose }) {
 
 function FormDesigner({ draft, onChange, measures, userId }) {
   const navigate = useNavigate()
+  const goBack = useGoBack('/settings/forms')
   const toast = useToast()
   const confirm = useConfirm()
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -332,7 +334,7 @@ function FormDesigner({ draft, onChange, measures, userId }) {
   return (
     <div className="form-designer">
       <div className="form-designer__bar">
-        <button type="button" className="secondary" onClick={() => navigate('/settings/forms')}>Back</button>
+        <button type="button" className="secondary" onClick={goBack}>Back</button>
         <h1>{draft.name.trim() || 'New form'}</h1>
         <span className={`badge ${published ? 'badge-green' : 'badge-grey'}`}>
           {published ? 'Published' : 'Draft'}

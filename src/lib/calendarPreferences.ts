@@ -1,4 +1,5 @@
-/** Persisted calendar view preferences (localStorage). */
+/** Persisted calendar hours. The browser store is the copy that lasts. */
+import { readPref, writePref } from './browserStore'
 
 export const DEFAULT_CALENDAR_START_HOUR = 8
 export const DEFAULT_CALENDAR_END_HOUR = 17
@@ -40,7 +41,6 @@ export const CALENDAR_END_HOUR_OPTIONS = [
 const START_KEY = 'in-the-room-calendar-start-hour'
 const END_KEY = 'in-the-room-calendar-end-hour'
 const INTERVAL_KEY = 'in-the-room-calendar-interval'
-const AVAIL_SYNC_KEY = 'in-the-room-calendar-avail-sync'
 
 const ALLOWED_START_HOURS = CALENDAR_START_HOUR_OPTIONS.map(o => o.value)
 const ALLOWED_END_HOURS = CALENDAR_END_HOUR_OPTIONS.map(o => o.value)
@@ -117,42 +117,27 @@ export function getDefaultCalendarViewPreferences() {
   })
 }
 
-export function getCalendarViewPreferences() {
+function legacyCalendarHours() {
   try {
-    const raw = {
-      startHour: localStorage.getItem(START_KEY),
-      endHour: localStorage.getItem(END_KEY),
-      intervalMinutes: localStorage.getItem(INTERVAL_KEY),
-    }
-    // Migrate legacy default interval (15) to 30 when the user never customized it.
-    if (raw.intervalMinutes === null) {
-      raw.intervalMinutes = String(DEFAULT_CALENDAR_INTERVAL)
-    }
-    const normalized = normalizeCalendarViewPreferences(raw)
-
-    if (
-      String(normalized.startHour) !== raw.startHour
-      || String(normalized.endHour) !== raw.endHour
-      || String(normalized.intervalMinutes) !== raw.intervalMinutes
-    ) {
-      saveCalendarViewPreferences(normalized)
-    }
-
-    return normalized
+    const startHour = localStorage.getItem(START_KEY)
+    const endHour = localStorage.getItem(END_KEY)
+    const intervalMinutes = localStorage.getItem(INTERVAL_KEY)
+    if (startHour == null && endHour == null && intervalMinutes == null) return null
+    return { startHour, endHour, intervalMinutes: intervalMinutes ?? String(DEFAULT_CALENDAR_INTERVAL) }
   } catch {
-    return getDefaultCalendarViewPreferences()
+    return null
   }
+}
+
+export function getCalendarViewPreferences() {
+  const stored = readPref('calendar.hours') || legacyCalendarHours()
+  if (!stored) return getDefaultCalendarViewPreferences()
+  return normalizeCalendarViewPreferences(stored)
 }
 
 export function saveCalendarViewPreferences(next) {
   const normalized = normalizeCalendarViewPreferences(next)
-  try {
-    localStorage.setItem(START_KEY, String(normalized.startHour))
-    localStorage.setItem(END_KEY, String(normalized.endHour))
-    localStorage.setItem(INTERVAL_KEY, String(normalized.intervalMinutes))
-  } catch {
-    /* ignore */
-  }
+  writePref('calendar.hours', normalized)
   return normalized
 }
 
@@ -160,13 +145,9 @@ export function saveCalendarViewPreferences(next) {
 export function syncCalendarPrefsFromAvailability(bounds, { force = false } = {}) {
   if (!bounds) return getCalendarViewPreferences()
   const fingerprint = `${bounds.startHour}-${bounds.endHour}`
-  try {
-    const previous = localStorage.getItem(AVAIL_SYNC_KEY)
-    if (!force && previous === fingerprint) return getCalendarViewPreferences()
-    localStorage.setItem(AVAIL_SYNC_KEY, fingerprint)
-  } catch {
-    /* ignore */
-  }
+  const previous = readPref('calendar.availSync')
+  if (!force && previous === fingerprint) return getCalendarViewPreferences()
+  writePref('calendar.availSync', fingerprint)
   const current = getCalendarViewPreferences()
   return saveCalendarViewPreferences({
     startHour: nearestAllowed(bounds.startHour, ALLOWED_START_HOURS, DEFAULT_CALENDAR_START_HOUR),

@@ -52,6 +52,7 @@ export default function ClientSupportActivities() {
       })}
     >
       <RecordTable
+        remember={`support-${clientId}`}
         columns={SUPPORT_COLUMNS}
         rows={rows}
         countNoun="activities"

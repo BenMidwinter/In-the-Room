@@ -67,6 +67,7 @@ export default function AllClients() {
       />
 
       <RecordTable
+        remember="clients"
         columns={CLIENT_COLUMNS}
         rows={rows}
         countNoun="clients"

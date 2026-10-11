@@ -179,6 +179,7 @@ export function EpisodeForms({ episode, clientId, userId, organizationId, open, 
         </div>
       )}
       <RecordTable
+        remember={`course-forms-${clientId}`}
         columns={[
           { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
           { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
@@ -302,6 +303,7 @@ export function EpisodeOutcomes({ episode, clientId, userId, organizationId, ope
       )}
     >
       <RecordTable
+        remember={`course-scores-${clientId}`}
         columns={[
           { key: 'date', label: 'Date', sort: 'date' },
           { key: 'name', label: 'Questionnaire', filter: 'text', sort: 'text' },

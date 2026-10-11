@@ -100,6 +100,7 @@ export default function ClientAppointmentsIndex() {
         })}
       >
         <RecordTable
+          remember={`appointments-${clientId}`}
           columns={APPT_COLUMNS}
           rows={rows}
           countNoun="appointments"

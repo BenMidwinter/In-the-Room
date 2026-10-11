@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useBrowserPref } from '../lib/browserStore'
 import {
   choiceOptions,
   columnFilterKind,
@@ -7,6 +8,26 @@ import {
   filterRows,
   sortRows,
 } from './recordTableQuery'
+
+function initialSort(defaultSort) {
+  return defaultSort?.key
+    ? { key: defaultSort.key, direction: defaultSort.direction === 'asc' ? 'asc' : 'desc' }
+    : null
+}
+
+function cleanFilters(value) {
+  if (!value || typeof value !== 'object') return {}
+  const filters = {}
+  for (const [key, entry] of Object.entries(value)) {
+    if (typeof entry === 'string') filters[key] = entry
+  }
+  return filters
+}
+
+function cleanSort(value, fallback) {
+  if (!value?.key) return fallback
+  return { key: String(value.key), direction: value.direction === 'asc' ? 'asc' : 'desc' }
+}
 
 function SortMark({ direction }) {
   return (
@@ -173,11 +194,41 @@ export default function RecordTable({
   scroll = false,
   headerAction = null,
   selection = null,
+  /** When set, this table's filters and sorting are kept in the browser. */
+  remember = '',
 }) {
-  const [filters, setFilters] = useState({})
-  const [sort, setSort] = useState(() => (
-    defaultSort?.key ? { key: defaultSort.key, direction: defaultSort.direction === 'asc' ? 'asc' : 'desc' } : null
-  ))
+  const fallbackSort = initialSort(defaultSort)
+  const [stored, setStored] = useBrowserPref(remember ? `table.${remember}` : '', null)
+  const [localFilters, setLocalFilters] = useState({})
+  const [localSort, setLocalSort] = useState(fallbackSort)
+  const filters = remember ? cleanFilters(stored?.filters) : localFilters
+  const sort = remember ? cleanSort(stored?.sort, fallbackSort) : localSort
+  const setFilters = (action) => {
+    if (!remember) {
+      setLocalFilters(action)
+      return
+    }
+    setStored((current) => {
+      const currentFilters = cleanFilters(current?.filters)
+      return {
+        filters: typeof action === 'function' ? action(currentFilters) : action,
+        sort: cleanSort(current?.sort, fallbackSort),
+      }
+    })
+  }
+  const setSort = (action) => {
+    if (!remember) {
+      setLocalSort(action)
+      return
+    }
+    setStored((current) => {
+      const currentSort = cleanSort(current?.sort, fallbackSort)
+      return {
+        filters: cleanFilters(current?.filters),
+        sort: typeof action === 'function' ? action(currentSort) : action,
+      }
+    })
+  }
   const [openFilter, setOpenFilter] = useState(null)
   const filterButtonRefs = useRef({})
 

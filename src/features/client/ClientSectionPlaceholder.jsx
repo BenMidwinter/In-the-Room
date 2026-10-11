@@ -27,6 +27,7 @@ export default function ClientSectionPlaceholder({
       onNew={() => toast.info(`${newLabel || title} creation will connect to the backend.`)}
     >
       <RecordTable
+        remember={`placeholder-${title}`}
         columns={defaultColumns}
         rows={[]}
         emptyMessage={`No ${title.toLowerCase()} yet.`}

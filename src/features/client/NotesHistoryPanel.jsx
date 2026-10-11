@@ -77,6 +77,7 @@ export default function NotesHistoryPanel() {
       title="Process Notes"
     >
       <RecordTable
+        remember={`notes-${clientId}`}
         columns={NOTE_COLUMNS}
         rows={rows}
         countNoun="notes"

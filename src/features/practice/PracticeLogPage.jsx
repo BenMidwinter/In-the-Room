@@ -268,6 +268,7 @@ export default function PracticeLogPage({ kind }) {
       {error && <p className="text-muted">{error.message || 'Could not load this log.'}</p>}
       {!error && (
         <RecordTable
+          remember={`practice-${kind}`}
           columns={columns}
           rows={rows}
           countNoun={copy.noun}

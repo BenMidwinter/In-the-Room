@@ -304,6 +304,7 @@ export default function LettersPanel() {
     >
       {!editing && (
         <RecordTable
+          remember={`letters-${clientId}`}
           columns={LETTER_COLUMNS}
           rows={rows}
           countNoun="letters"

@@ -17,8 +17,9 @@ Noted from the hosted site. These stay on the list while encryption is the next 
 
 - [x] Standardise text size between pages.
 - [ ] Evaluate the calendar layout. The text is a bit squeezed.
-- [ ] Make back buttons return to the previous screen.
+- [x] Make back buttons return to the previous screen.
 - [x] Rename the product to Process&Note, and use the logos already chosen.
+- [x] **Browser memory.** IndexedDB on this device keeps the calendar view, report filters, and each table’s filters and sorting. Further preferences can be added to the same store.
 
 ## 2. Encryption and login — next
 

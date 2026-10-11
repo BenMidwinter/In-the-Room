@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useBrowserPref } from '../../lib/browserStore'
 import { useQuery } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
 import SectionNav from '../../components/SectionNav'
@@ -52,25 +53,66 @@ const NOTE_LABEL = { complete: 'Signed off', draft: 'Draft', missing: 'Missing' 
 const EMPTY_LIST = []
 const OPEN_RANGE = { from: '0001-01-01', to: '9999-12-31' }
 
+function blankReport(today) {
+  const range = rollingWeekRange(today)
+  return {
+    section: 'overview',
+    applied: { datesOn: false, range, serviceId: '', tagId: '' },
+    draft: { datesOn: false, range, serviceId: '', tagId: '', serviceOn: false, tagOn: false },
+  }
+}
+
+function cleanRange(range, fallback) {
+  if (range && typeof range.from === 'string' && typeof range.to === 'string') {
+    return { from: range.from, to: range.to }
+  }
+  return fallback
+}
+
+function cleanReport(value, today) {
+  const blank = blankReport(today)
+  if (!value || typeof value !== 'object') return blank
+  const known = new Set(SECTIONS.map((item) => item.id))
+  return {
+    section: known.has(value.section) ? value.section : blank.section,
+    applied: {
+      ...blank.applied,
+      ...(value.applied || {}),
+      range: cleanRange(value.applied?.range, blank.applied.range),
+    },
+    draft: {
+      ...blank.draft,
+      ...(value.draft || {}),
+      range: cleanRange(value.draft?.range, blank.draft.range),
+    },
+  }
+}
+
 export default function ReportingPage() {
   const { session } = useAppSession()
   const userId = session?.user?.id
   const today = todayYmd()
-  const [section, setSection] = useState('overview')
-  const [applied, setApplied] = useState(() => ({
-    datesOn: false,
-    range: rollingWeekRange(todayYmd()),
-    serviceId: '',
-    tagId: '',
-  }))
-  const [draft, setDraft] = useState(() => ({
-    datesOn: false,
-    range: rollingWeekRange(todayYmd()),
-    serviceId: '',
-    tagId: '',
-    serviceOn: false,
-    tagOn: false,
-  }))
+  const [storedReport, setStoredReport] = useBrowserPref('reporting.view', null)
+  const report = useMemo(() => cleanReport(storedReport, today), [storedReport, today])
+  const { section, applied, draft } = report
+  const updateReport = (patch) => {
+    setStoredReport((current) => {
+      const base = cleanReport(current, today)
+      return { ...base, ...patch }
+    })
+  }
+  const setDraft = (next) => {
+    setStoredReport((current) => {
+      const base = cleanReport(current, today)
+      return { ...base, draft: typeof next === 'function' ? next(base.draft) : next }
+    })
+  }
+  const setApplied = (next) => {
+    setStoredReport((current) => {
+      const base = cleanReport(current, today)
+      return { ...base, applied: typeof next === 'function' ? next(base.applied) : next }
+    })
+  }
   const range = applied.datesOn ? applied.range : OPEN_RANGE
   const serviceId = applied.serviceId
   const tagId = applied.tagId
@@ -217,9 +259,11 @@ export default function ReportingPage() {
   }, [mapped, range, applied.datesOn, applied.range, diarySpan, availabilityQuery.data])
 
   const changeSection = (next) => {
-    setSection(next)
-    setDraft((current) => ({ ...current, tagOn: false, tagId: '' }))
-    setApplied((current) => ({ ...current, tagId: '' }))
+    updateReport({
+      section: next,
+      draft: { ...draft, tagOn: false, tagId: '' },
+      applied: { ...applied, tagId: '' },
+    })
   }
 
   return (
@@ -306,20 +350,6 @@ export default function ReportingPage() {
   )
 }
 
-const SAVED_FILTERS_KEY = 'reporting-saved-filters'
-
-function readSavedFilters(userId) {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(`${SAVED_FILTERS_KEY}:${userId || 'local'}`) || '[]')
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function writeSavedFilters(userId, rows) {
-  localStorage.setItem(`${SAVED_FILTERS_KEY}:${userId || 'local'}`, JSON.stringify(rows))
-}
 
 function presetRange(preset, today) {
   if (preset === 'week') return rollingWeekRange(today)
@@ -332,7 +362,8 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
   const rootRef = useRef(null)
   const [menu, setMenu] = useState(null)
   const [query, setQuery] = useState('')
-  const [saved, setSaved] = useState([])
+  const [savedStored, setSaved] = useBrowserPref(`reporting.saved.${userId || 'local'}`, [])
+  const saved = Array.isArray(savedStored) ? savedStored : []
 
   useEffect(() => {
     if (!menu) return undefined
@@ -370,7 +401,6 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
     || pendingTag !== applied.tagId
 
   const openMenu = (next) => {
-    setSaved(readSavedFilters(userId))
     setMenu((current) => (current === next ? null : next))
     setQuery('')
   }
@@ -398,19 +428,20 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
     const name = await prompt({ title: 'Save filters', label: 'Name these filters', confirmLabel: 'Save' })
     const trimmed = String(name || '').trim()
     if (!trimmed) return
-    const next = readSavedFilters(userId).filter((item) => item.name !== trimmed)
-    next.push({
-      id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now()),
-      name: trimmed,
-      datesOn: draft.datesOn,
-      range: draft.range,
-      serviceOn: draft.serviceOn,
-      serviceId: draft.serviceId,
-      tagOn: draft.tagOn,
-      tagId: draft.tagId,
+    setSaved((current) => {
+      const next = (Array.isArray(current) ? current : []).filter((item) => item.name !== trimmed)
+      next.push({
+        id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : String(Date.now()),
+        name: trimmed,
+        datesOn: draft.datesOn,
+        range: draft.range,
+        serviceOn: draft.serviceOn,
+        serviceId: draft.serviceId,
+        tagOn: draft.tagOn,
+        tagId: draft.tagId,
+      })
+      return next
     })
-    writeSavedFilters(userId, next)
-    setSaved(next)
     setMenu(null)
   }
 
@@ -427,9 +458,7 @@ function ReportingFilterBar({ today, section, draft, applied, services, tagOptio
   }
 
   const removeSaved = (id) => {
-    const next = readSavedFilters(userId).filter((item) => item.id !== id)
-    writeSavedFilters(userId, next)
-    setSaved(next)
+    setSaved((current) => (Array.isArray(current) ? current : []).filter((item) => item.id !== id))
   }
 
   return (
@@ -633,6 +662,7 @@ function Overview({ summary, efficiency }) {
         />
       </div>
       <RecordTable
+        remember="report-overview"
         columns={[
           { key: 'service', label: 'Service', filter: 'choice', sort: 'text' },
           { key: 'hours', label: 'Hours', sort: 'number' },
@@ -694,6 +724,7 @@ function AppointmentsSection({ summary }) {
         />
       </div>
       <RecordTable
+        remember="report-appointments"
         columns={[
           { key: 'date', label: 'Date', sort: 'text' },
           { key: 'client', label: 'Client', filter: 'text' },
@@ -768,6 +799,7 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, service
         <Stat label="Courses discharged" value={discharged.length} />
       </div>
       <RecordTable
+        remember="report-clients"
         columns={[
           { key: 'name', label: 'Client', filter: 'text' },
           { key: 'sessions', label: 'Sessions', sort: 'number' },
@@ -822,6 +854,7 @@ function WaitlistSection({ people, tags, services, range, tagId, serviceId, toda
         <Stat label="Average days waiting" value={average == null ? '—' : average} help="People on the waitlist now, counted to today." />
       </div>
       <RecordTable
+        remember="report-waitlist"
         columns={[
           { key: 'name', label: 'Name', filter: 'text' },
           { key: 'days', label: 'Days waiting', sort: 'number' },
@@ -878,6 +911,7 @@ function PracticeSection({ cpd, supervision, appointments, range, serviceId }) {
         />
       </div>
       <RecordTable
+        remember="report-practice"
         columns={[
           { key: 'date', label: 'Date', sort: 'date' },
           { key: 'kind', label: 'Type', filter: 'choice', sort: 'text' },
@@ -926,6 +960,7 @@ function FinanceSection({ summary, invoices, range }) {
         <Stat label="Sessions not yet invoiced" value={uninvoiced.length} />
       </div>
       <RecordTable
+        remember="report-finance"
         columns={[
           { key: 'date', label: 'Date', sort: 'text' },
           { key: 'client', label: 'Client', filter: 'text' },

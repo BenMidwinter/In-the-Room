@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useBrowserPref } from '../lib/browserStore'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import FormOverlay from './FormOverlay'
@@ -142,7 +143,8 @@ export default function ScreenerPage() {
   const confirm = useConfirm()
   const queryClient = useQueryClient()
   const { refreshClients } = useAppSession()
-  const [view, setView] = useState('screener')
+  const [storedView, setView] = useBrowserPref('screener.view', 'screener')
+  const view = storedView === 'waitlist' || storedView === 'rejected' ? storedView : 'screener'
   const [editor, setEditor] = useState(null)
   const board = useQuery({
     queryKey: ['screener-board'],
@@ -274,6 +276,7 @@ export default function ScreenerPage() {
         />
       </div>
       <RecordTable
+        remember={`screener-${view}`}
         key={view}
         columns={view === 'waitlist' ? waitlistColumns : view === 'rejected' ? rejectedColumns : screenerColumns}
         rows={rows}

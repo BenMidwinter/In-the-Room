@@ -300,6 +300,7 @@ export default function ServicesSettingsPage() {
         )}
 
         <RecordTable
+          remember="services"
           columns={SERVICE_COLUMNS}
           rows={serviceRows}
           countNoun="services"
