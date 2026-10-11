@@ -1,4 +1,3 @@
-import { upsertClientRemote } from './clientsRepo'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase } from './client'
 import type { Json } from './database.types'
@@ -285,27 +284,32 @@ export async function saveWaitlistPlacement(input: {
   }
 }
 
-export async function addClientToWaitlist(input: {
-  userId: string
-  firstName: string
-  surname: string
-  dob: string
-  email: string
+export async function moveClientToWaitlist(input: {
+  clientId: string
   preferredTimes: string
   information: string
   serviceId: string | null
   tagIds: string[]
 }): Promise<void> {
-  const created = await upsertClientRemote({
-    first_name: input.firstName,
-    surname: input.surname,
-    dob: input.dob,
-    email: input.email,
-    status: 'waitlist',
-  }, input.userId)
+  const supabase = supabaseOrThrow()
+  const { data: current, error: readError } = await supabase
+    .from('clients')
+    .select('status')
+    .eq('id', input.clientId)
+    .maybeSingle()
+  if (readError) throw readError
+  if (!current || (current.status !== 'active' && current.status !== 'inactive')) {
+    throw new Error('Choose a client from your list.')
+  }
+  const { error } = await supabase
+    .from('clients')
+    .update({ status: 'waitlist' })
+    .eq('id', input.clientId)
+    .eq('status', current.status)
+  if (error) throw error
   try {
     await saveWaitlistPlacement({
-      clientId: created.id,
+      clientId: input.clientId,
       preferredTimes: input.preferredTimes,
       information: input.information,
       serviceId: input.serviceId,
@@ -313,11 +317,11 @@ export async function addClientToWaitlist(input: {
       accept: false,
     })
   } catch (err) {
-    try {
-      await supabaseOrThrow().from('clients').delete().eq('id', created.id)
-    } catch {
-      // Show the reason the waitlist record failed.
-    }
+    await supabase
+      .from('clients')
+      .update({ status: current.status })
+      .eq('id', input.clientId)
+      .eq('status', 'waitlist')
     throw err
   }
 }

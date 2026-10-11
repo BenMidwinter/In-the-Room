@@ -65,7 +65,6 @@ export type ClientWriteInput = {
   gender?: string
   email?: string
   workplace_id?: string | null
-  status?: 'active' | 'waitlist'
 }
 
 function parseIdentity(raw: Json | null | undefined): IdentityPayload {
@@ -266,9 +265,7 @@ export async function upsertClientRemote(
   }
 
   const pseudonym = pseudonymFor(firstName, surname, '')
-  const created = await createClinicalRecord('clients', {
-    status: input.status === 'waitlist' ? 'waitlist' : 'active',
-  }, pseudonym)
+  const created = await createClinicalRecord('clients', { status: 'active' }, pseudonym)
   try {
     await createClinicalRecord('client_identities', { client_id: created.id }, identity)
   } catch (err) {

@@ -10,12 +10,13 @@ import RecordTable from './RecordTable'
 import RowMenu from '../features/forms/RowMenu'
 import { useConfirm, useToast } from './ui'
 import { useAppSession } from '../lib/AppSessionContext'
+import { useAppClients } from '../lib/queries'
 import { formatDisplayDate } from '../lib/dateArchitecture'
 import { listServices } from '../lib/supabase/servicesRepo'
 import {
-  addClientToWaitlist,
   listScreenerBoard,
   listTags,
+  moveClientToWaitlist,
   rejectScreenerClient,
   saveWaitlistPlacement,
 } from '../lib/supabase/screenerRepo'
@@ -126,18 +127,23 @@ function PlacementEditor({ person, mode, services, tags, onClose, onSaved }) {
   )
 }
 
-function WaitlistAddForm({ services, tags, userId, onClose, onSaved }) {
+function WaitlistAddForm({ clients, services, tags, onClose, onSaved }) {
   const toast = useToast()
-  const [firstName, setFirstName] = useState('')
-  const [surname, setSurname] = useState('')
-  const [dob, setDob] = useState('')
-  const [email, setEmail] = useState('')
+  const [clientId, setClientId] = useState('')
   const [preferredTimes, setPreferredTimes] = useState('')
   const [information, setInformation] = useState('')
   const [serviceId, setServiceId] = useState('')
   const [tagIds, setTagIds] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const choices = clients
+    .filter((client) => client.status === 'active' || client.status === 'inactive')
+    .map((client) => ({
+      id: client.id,
+      name: client.real_name || `${client.first_name || ''} ${client.surname || ''}`.trim() || 'Client',
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name))
+  const chosen = choices.find((client) => client.id === clientId)
 
   const toggleTag = (id) => {
     setTagIds((current) => (
@@ -147,29 +153,21 @@ function WaitlistAddForm({ services, tags, userId, onClose, onSaved }) {
 
   const save = async (event) => {
     event.preventDefault()
-    if (!firstName.trim() || !surname.trim() || !dob) {
-      setError('Enter a first name, a surname, and a date of birth.')
-      return
-    }
-    if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Enter an email address.')
+    if (!chosen) {
+      setError('Choose a client from your list.')
       return
     }
     setSaving(true)
     setError(null)
     try {
-      await addClientToWaitlist({
-        userId,
-        firstName,
-        surname,
-        dob,
-        email,
+      await moveClientToWaitlist({
+        clientId: chosen.id,
         preferredTimes,
         information,
         serviceId: services.some((service) => service.id === serviceId) ? serviceId : null,
         tagIds,
       })
-      toast.saved(`${firstName.trim()} ${surname.trim()} is on the waitlist.`)
+      toast.saved(`${chosen.name} is on the waitlist.`)
       onSaved()
     } catch (err) {
       toast.error(err.message || 'Could not add this client')
@@ -186,8 +184,8 @@ function WaitlistAddForm({ services, tags, userId, onClose, onSaved }) {
       onClose={onClose}
       footer={(
         <div className="form-actions">
-          <button type="submit" form="waitlist-add-client" className="primary" disabled={saving}>
-            {saving ? 'Adding…' : 'Add client'}
+          <button type="submit" form="waitlist-add-client" className="primary" disabled={saving || !choices.length}>
+            {saving ? 'Adding…' : 'Add to waitlist'}
           </button>
           <button type="button" className="secondary" onClick={onClose}>Cancel</button>
         </div>
@@ -195,49 +193,24 @@ function WaitlistAddForm({ services, tags, userId, onClose, onSaved }) {
     >
       <form id="waitlist-add-client" onSubmit={save}>
         {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="form-grid">
-          <div className="form-group">
-            <label htmlFor="waitlist-add-first">First name</label>
-            <input
-              id="waitlist-add-first"
-              className="paper-input"
-              value={firstName}
-              onChange={(event) => setFirstName(event.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="waitlist-add-surname">Surname</label>
-            <input
-              id="waitlist-add-surname"
-              className="paper-input"
-              value={surname}
-              onChange={(event) => setSurname(event.target.value)}
-              required
-            />
-          </div>
-        </div>
         <div className="form-group">
-          <label htmlFor="waitlist-add-dob">Date of birth</label>
-          <input
-            id="waitlist-add-dob"
-            type="date"
-            className="paper-input"
-            value={dob}
-            onChange={(event) => setDob(event.target.value)}
-            required
-          />
-        </div>
-        <div className="form-group">
-          <label htmlFor="waitlist-add-email">Email</label>
-          <input
-            id="waitlist-add-email"
-            type="email"
-            className="paper-input"
-            value={email}
-            placeholder="Where invoices go, unless a contact is flagged"
-            onChange={(event) => setEmail(event.target.value)}
-          />
+          <label htmlFor="waitlist-add-client-id">Client</label>
+          {choices.length ? (
+            <select
+              id="waitlist-add-client-id"
+              className="paper-input"
+              value={choices.some((client) => client.id === clientId) ? clientId : ''}
+              onChange={(event) => setClientId(event.target.value)}
+              required
+            >
+              <option value="">Choose a client</option>
+              {choices.map((client) => (
+                <option key={client.id} value={client.id}>{client.name}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-muted">No other clients to add. People already on the waitlist stay listed here.</p>
+          )}
         </div>
         <div className="form-group">
           <label htmlFor="waitlist-add-times">Preferred times</label>
@@ -311,7 +284,8 @@ export default function ScreenerPage() {
   const toast = useToast()
   const confirm = useConfirm()
   const queryClient = useQueryClient()
-  const { refreshClients, session } = useAppSession()
+  const { refreshClients } = useAppSession()
+  const { clients } = useAppClients()
   const [storedView, setView] = useBrowserPref('screener.view', 'screener')
   const view = storedView === 'waitlist' || storedView === 'rejected' ? storedView : 'screener'
   const [editor, setEditor] = useState(null)
@@ -431,7 +405,7 @@ export default function ScreenerPage() {
         <PageHeader
           title="Screener"
           help={view === 'waitlist'
-            ? 'People you have accepted, waiting for a session.'
+            ? 'People waiting for a session. Add someone already on your client list, or accept them from the screener.'
             : view === 'rejected'
               ? 'People who were referred and not taken onto the waitlist.'
               : 'People who sent a form that places them here, waiting to be screened.'}
@@ -460,7 +434,7 @@ export default function ScreenerPage() {
         emptyMessage={board.isPending
           ? 'Loading…'
           : view === 'waitlist'
-            ? 'Nobody is on the waitlist yet. Add a client, or accept someone from the screener.'
+            ? 'Nobody is on the waitlist yet. Add a client from your list, or accept someone from the screener.'
             : view === 'rejected'
               ? 'Nobody has been rejected.'
               : 'Nobody is waiting to be screened. Publish a form and choose “Place the person on the screener”.'}
@@ -468,9 +442,9 @@ export default function ScreenerPage() {
       {board.error && <p className="form-error" role="alert">{board.error.message}</p>}
       {adding && (
         <WaitlistAddForm
+          clients={clients}
           services={appointmentTypes}
           tags={tags.data || []}
-          userId={session.user.id}
           onClose={() => setAdding(false)}
           onSaved={() => {
             setAdding(false)

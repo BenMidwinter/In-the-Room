@@ -34,11 +34,11 @@ Encryption wiring is the next piece of work. Organisation id is the owner of the
 - [ ] Private document storage in a London S3 bucket, linked to AWS, with short-lived upload and download links.
 - [ ] **Export by email.** One client, or the whole practice, as a `.zip` of the individual files. The clinician chooses what is included. The server builds the file and emails a one-time link to the account address. The browser session never receives the file.
 
-The export uses the private London store for the zip, and the same mail provider as invoice email for the link. Clinical text is decrypted on the server for the person who asked, then placed in the zip. See the export plan below.
+The export uses the private London store for the zip, and the same mail provider as invoice email for the link. Supabase Auth email only sends sign-in messages, so it cannot carry this link. Clinical text is decrypted on the server for the person who asked, then placed in the zip. See the export plan below.
 
 ## Later, not the next piece of work
 
-- [x] **Add clients to the waitlist manually.** On the waitlist, Add client records someone without a public form.
+- [x] **Add clients to the waitlist manually.** On the waitlist, Add client moves someone who is already a client onto the waitlist.
 - [ ] **Groups.** Record who attended a group session, with a note and a fee for each person, and invoice those people from that session. On the list, and not a priority.
 - [ ] **Mandatory MFA, as a final step.** Enrol a phone code, then turn on the second-factor lock so a clinical payload is readable only after that code. Leave it until the rest of the product is in place.
 
