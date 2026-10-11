@@ -77,8 +77,29 @@
   font-size: 0.875rem;
 }
 
+.auth-page__forgot {
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--col-primary-dark);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.auth-page__forgot:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .auth-page__switch {
-  margin: 1.25rem 0 0;
+  margin: 1.1rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--border-light);
   font-size: 0.875rem;
   color: var(--txt-muted);
 }
