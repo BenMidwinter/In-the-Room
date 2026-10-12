@@ -20,6 +20,9 @@ Noted from the hosted site. These stay on the list while encryption is the next 
 - [x] Make back buttons return to the previous screen.
 - [x] Rename the product to Process&Note, and use the logos already chosen.
 - [x] **Browser memory.** IndexedDB on this device keeps the calendar view, report filters, and each table’s filters and sorting. Further preferences can be added to the same store.
+- [ ] **Mobile notes editor.** On a phone, the rich text editor opens inside the desktop page padding, so the writing surface is a small box. Make it behave like a notes app: the editor should use the screen, with the surrounding chrome out of the way.
+- [ ] **Mobile calendar times.** In the phone calendar, appointment blocks overlap the time labels down the left. Keep those times readable, and keep the events in the grid beside them.
+- [ ] **Archive and delete on document tables.** A clinician needs to archive a document so it leaves the working list and stays recoverable. Follow All Invoices: the row action is a button in the last column (Open, on the right of each invoice). Put a Delete button in that same place on pretty much every document-based table: notes, letters, working documents, reports, practice documents, and the other document lists. Archive is the non-destructive action. Delete is the row button.
 
 ## 2. Encryption and login — next
 
