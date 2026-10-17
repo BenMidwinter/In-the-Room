@@ -4,7 +4,8 @@ import { useAuth } from '../../lib/auth/AuthProvider'
 import DpaConsent from './DpaConsent'
 
 export default function DpaSignOff() {
-  const { acceptDpa, signOut } = useAuth()
+  const { acceptDpa, signOut, profile } = useAuth()
+  const renewing = Boolean(profile?.dpa_accepted)
   const [accepted, setAccepted] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -28,7 +29,9 @@ export default function DpaSignOff() {
         <img className="auth-page__logo" src={brandLogoUrl} alt={PRODUCT_NAME} />
         <h1 className="auth-page__title">Data Processing Agreement</h1>
         <p className="auth-page__lead">
-          Accept the agreement to continue. It takes effect on this sign-off.
+          {renewing
+            ? 'The agreement is now version 1.1. Your earlier acceptance stays on record. Accept this version to continue.'
+            : 'Accept the agreement to continue. It takes effect on this sign-off.'}
         </p>
         <form className="auth-page__form" onSubmit={onSubmit}>
           <DpaConsent checked={accepted} onChange={setAccepted} id="dpa-signoff" />

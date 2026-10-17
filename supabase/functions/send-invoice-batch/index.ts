@@ -1,5 +1,6 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 import { organizationIdFor, readEnvelope } from '../_shared/practiceKey.ts'
+import { resendSettings, sendResendBatch } from '../_shared/resend.ts'
 import { adminClient, userClient } from '../_shared/supabaseAdmin.ts'
 
 const BATCH_LIMIT = 100
@@ -29,11 +30,9 @@ Deno.serve(async (req) => {
     if (!user) return jsonResponse({ error: 'Unauthorized' }, 401)
 
     const body = await req.json().catch(() => ({}))
-    const key = Deno.env.get('RESEND_API_KEY') || ''
-    const from = Deno.env.get('RESEND_FROM_EMAIL') || ''
-    const connected = Boolean(key && from)
-    if (body.action === 'probe') return jsonResponse({ email: connected })
-    if (!connected) return jsonResponse({ email: false, error: 'Email is not connected yet.' }, 400)
+    const mail = resendSettings()
+    if (body.action === 'probe') return jsonResponse({ email: mail.ready })
+    if (!mail.ready) return jsonResponse({ email: false, error: 'Email is not connected yet.' }, 400)
 
     const invoiceIds = Array.isArray(body.invoiceIds) ? body.invoiceIds.filter((id) => typeof id === 'string') : []
     if (!invoiceIds.length) return jsonResponse({ error: 'Choose at least one invoice.' }, 400)
@@ -111,7 +110,7 @@ Deno.serve(async (req) => {
         subject: string
         html: string
       } = {
-        from,
+        from: mail.from,
         to: emailList(invoice.bill_to_email),
         subject: `Invoice ${invoice.number}`,
         html: invoiceHtml(invoice, note, paymentText),
@@ -119,24 +118,17 @@ Deno.serve(async (req) => {
       if (user.email) message.reply_to = user.email
       return message
     })
-    const res = await fetch('https://api.resend.com/emails/batch', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        'Idempotency-Key': batchId,
-      },
-      body: JSON.stringify(messages),
-    })
-    const payload = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      const reason = String(payload?.message || payload?.error || 'Email provider rejected this batch.')
+    let sentBatch: { id: string }
+    try {
+      sentBatch = await sendResendBatch(messages, batchId)
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'Email provider rejected this batch.'
       for (const invoice of ready) failed.push({ id: invoice.id, reason })
       return jsonResponse({ email: true, batchId, sent: [], failed })
     }
     return jsonResponse({
       email: true,
-      batchId: String(payload?.id || batchId),
+      batchId: sentBatch.id,
       sent: ready.map((invoice) => ({ id: invoice.id })),
       failed,
     })

@@ -39,6 +39,15 @@
   min-width: 0;
 }
 
+.export-status {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
 .settings-form {
   display: flex;
   flex-direction: column;

@@ -10,7 +10,7 @@ import {
 import type { Session, User } from '@supabase/supabase-js'
 import { getSupabase, isSupabaseConfigured } from '../supabase/client'
 import type { Tables } from '../supabase/database.types'
-import { DPA_VERSION } from '../dpa'
+import { DPA_VERSION, hasCurrentDpa } from '../dpa'
 
 export type ProfileRow = Tables<'profiles'>
 
@@ -33,6 +33,7 @@ type AuthContextValue = {
   recovery: boolean
   refreshProfile: () => Promise<void>
   profileReady: boolean
+  dpaCurrent: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -59,6 +60,20 @@ async function fetchProfile(userId: string): Promise<ProfileRow | null> {
   return data
 }
 
+async function fetchDpaVersions(userId: string): Promise<string[]> {
+  const supabase = getSupabase()
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('profile_dpa_acceptances')
+    .select('dpa_version')
+    .eq('profile_id', userId)
+  if (error) {
+    console.warn('[auth] dpa load', error.message)
+    return []
+  }
+  return (data || []).map((row) => row.dpa_version)
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const configured = isSupabaseConfigured()
   const [loading, setLoading] = useState(true)
@@ -69,19 +84,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     userId: string | null
     ready: boolean
     profile: ProfileRow | null
-  }>({ userId: null, ready: true, profile: null })
+    dpaVersions: string[]
+  }>({ userId: null, ready: true, profile: null, dpaVersions: [] })
 
   if (profileRecord.userId !== userId) {
-    setProfileRecord({ userId, ready: !userId, profile: null })
+    setProfileRecord({ userId, ready: !userId, profile: null, dpaVersions: [] })
   }
 
   const profile = profileRecord.userId === userId ? profileRecord.profile : null
   const profileReady = profileRecord.userId === userId && profileRecord.ready
+  const dpaVersions = profileRecord.userId === userId ? profileRecord.dpaVersions : []
+  const dpaCurrent = hasCurrentDpa(
+    profile,
+    dpaVersions.map((dpa_version) => ({ dpa_version })),
+  )
 
   const refreshProfile = useCallback(async () => {
     if (!userId) return
-    const next = await fetchProfile(userId)
-    setProfileRecord({ userId, ready: true, profile: next })
+    const [next, versions] = await Promise.all([
+      fetchProfile(userId),
+      fetchDpaVersions(userId),
+    ])
+    setProfileRecord({ userId, ready: true, profile: next, dpaVersions: versions })
   }, [userId])
 
   useEffect(() => {
@@ -115,8 +139,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) return
     let cancelled = false
-    fetchProfile(userId).then((row) => {
-      if (!cancelled) setProfileRecord({ userId, ready: true, profile: row })
+    Promise.all([fetchProfile(userId), fetchDpaVersions(userId)]).then(([row, versions]) => {
+      if (!cancelled) setProfileRecord({ userId, ready: true, profile: row, dpaVersions: versions })
     })
     return () => { cancelled = true }
   }, [userId])
@@ -156,15 +180,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const acceptDpa = useCallback(async () => {
     const supabase = getSupabase()
     if (!supabase || !userId) return { error: 'Supabase is not configured' }
-    const { data, error } = await supabase
-      .from('profiles')
-      .update({ dpa_accepted: true })
-      .eq('id', userId)
-      .select('dpa_accepted')
-      .maybeSingle()
+    const { error } = await supabase.rpc('accept_dpa')
     if (error) return { error: error.message }
-    if (!data?.dpa_accepted) return { error: 'The agreement was not recorded. Try again.' }
-    setProfileRecord({ userId, ready: true, profile: await fetchProfile(userId) })
+    const [next, versions] = await Promise.all([
+      fetchProfile(userId),
+      fetchDpaVersions(userId),
+    ])
+    if (!hasCurrentDpa(next, versions.map((dpa_version) => ({ dpa_version })))) {
+      return { error: 'The agreement was not recorded. Try again.' }
+    }
+    setProfileRecord({ userId, ready: true, profile: next, dpaVersions: versions })
     return { error: null }
   }, [userId])
 
@@ -172,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const supabase = getSupabase()
     if (!supabase) return
     await supabase.auth.signOut()
-    setProfileRecord({ userId: null, ready: true, profile: null })
+    setProfileRecord({ userId: null, ready: true, profile: null, dpaVersions: [] })
     setRecovery(false)
   }, [])
 
@@ -209,6 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     recovery,
     refreshProfile,
     profileReady,
+    dpaCurrent,
   }), [
     configured,
     loading,
@@ -223,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     recovery,
     refreshProfile,
     profileReady,
+    dpaCurrent,
   ])
 
   return (

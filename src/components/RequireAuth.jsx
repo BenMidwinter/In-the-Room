@@ -4,7 +4,7 @@ import { brandLogoUrl, PRODUCT_NAME } from '../lib/brand'
 import DpaSignOff from '../features/legal/DpaSignOff'
 
 export default function RequireAuth({ children }) {
-  const { configured, loading, user, profile, profileReady } = useAuth()
+  const { configured, loading, user, profileReady, dpaCurrent } = useAuth()
   const location = useLocation()
 
   if (!configured) {
@@ -48,7 +48,7 @@ export default function RequireAuth({ children }) {
     )
   }
 
-  if (!profile?.dpa_accepted) {
+  if (!dpaCurrent) {
     return <DpaSignOff />
   }
 

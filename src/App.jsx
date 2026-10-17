@@ -4,6 +4,9 @@ import { useAppClients } from './lib/queries'
 import AppLayout from './components/AppLayout'
 import AuthPage from './features/auth/AuthPage'
 import DpaPage from './features/legal/DpaPage'
+import PrivacyPage from './features/legal/PrivacyPage'
+import TermsPage from './features/legal/TermsPage'
+import ExportDownloadPage from './features/export/ExportDownloadPage'
 import FormFillPage from './features/forms/FormFillPage'
 import FormDocumentPage from './features/forms/FormDocumentPage'
 import FormStartPage from './features/forms/FormStartPage'
@@ -30,6 +33,7 @@ import AvailabilitySettingsPage from './features/settings/AvailabilitySettingsPa
 import ServicesSettingsPage from './features/settings/ServicesSettingsPage'
 import IntegrationsSettingsPage from './features/settings/IntegrationsSettingsPage'
 import LegalSettingsPage from './features/settings/LegalSettingsPage'
+import ExportSettingsPage from './features/settings/ExportSettingsPage'
 import { TwoFactorSettingsPage } from './features/settings/SettingsPlaceholders'
 import FormsSettingsPage from './features/settings/FormsSettingsPage'
 import TagsSettingsPage from './features/settings/TagsSettingsPage'
@@ -51,6 +55,9 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<AuthPage />} />
       <Route path="/legal/dpa" element={<DpaPage />} />
+      <Route path="/legal/privacy" element={<PrivacyPage />} />
+      <Route path="/legal/terms" element={<TermsPage />} />
+      <Route path="/export/:token" element={<ExportDownloadPage />} />
       <Route path="/f/:token" element={<FormFillPage />} />
       <Route path="/r/:formId" element={<FormStartPage />} />
       <Route path="/" element={<Navigate to="/home" replace />} />
@@ -145,6 +152,7 @@ export default function App() {
           <Route path="password" element={<Navigate to="/settings/account" replace />} />
           <Route path="2fa" element={<TwoFactorSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
+          <Route path="export" element={<ExportSettingsPage />} />
           <Route path="legal" element={<Navigate to="dpa" replace />} />
           <Route path="legal/:doc" element={<LegalSettingsPage />} />
         </Route>

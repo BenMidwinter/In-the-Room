@@ -655,6 +655,63 @@ export type Database = {
         }
         Relationships: []
       }
+      data_exports: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          date_from: string | null
+          date_to: string | null
+          downloaded_at: string | null
+          emailed_at: string | null
+          error_message: string | null
+          expires_at: string | null
+          id: string
+          include: Json
+          owner_id: string
+          ready_at: string | null
+          s3_key: string | null
+          scope: string
+          status: string
+          token_hash: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          date_from?: string | null
+          date_to?: string | null
+          downloaded_at?: string | null
+          emailed_at?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          include?: Json
+          owner_id: string
+          ready_at?: string | null
+          s3_key?: string | null
+          scope: string
+          status?: string
+          token_hash?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          date_from?: string | null
+          date_to?: string | null
+          downloaded_at?: string | null
+          emailed_at?: string | null
+          error_message?: string | null
+          expires_at?: string | null
+          id?: string
+          include?: Json
+          owner_id?: string
+          ready_at?: string | null
+          s3_key?: string | null
+          scope?: string
+          status?: string
+          token_hash?: string | null
+        }
+        Relationships: []
+      }
       episodes: {
         Row: {
           client_id: string
@@ -1527,6 +1584,38 @@ export type Database = {
           },
         ]
       }
+      profile_dpa_acceptances: {
+        Row: {
+          accepted_at: string
+          accepted_ip: unknown
+          dpa_version: string
+          id: string
+          profile_id: string
+        }
+        Insert: {
+          accepted_at: string
+          accepted_ip?: unknown
+          dpa_version: string
+          id?: string
+          profile_id: string
+        }
+        Update: {
+          accepted_at?: string
+          accepted_ip?: unknown
+          dpa_version?: string
+          id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_dpa_acceptances_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           bank_format: string
@@ -2344,6 +2433,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_dpa: { Args: never; Returns: undefined }
       current_uid: { Args: never; Returns: string }
       form_link_commit_sealed: {
         Args: {

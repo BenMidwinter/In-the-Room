@@ -1,26 +1,17 @@
 import { Navigate, useParams } from 'react-router-dom'
 import DpaDocument from '../legal/DpaDocument'
-import { SettingsSectionCard } from './SettingsPlaceholders'
+import PrivacyDocument from '../legal/PrivacyDocument'
+import TermsDocument from '../legal/TermsDocument'
 
 const DOCUMENTS = {
-  dpa: 'agreement',
-  privacy: 'Privacy policy',
-  terms: 'Terms and conditions',
+  dpa: DpaDocument,
+  privacy: PrivacyDocument,
+  terms: TermsDocument,
 }
 
 export default function LegalSettingsPage() {
   const { doc } = useParams()
-  if (!DOCUMENTS[doc]) return <Navigate to="/settings/legal/dpa" replace />
-
-  if (doc === 'dpa') {
-    return <DpaDocument embedded />
-  }
-
-  return (
-    <SettingsSectionCard blockId={`settings_legal_${doc}`} title={DOCUMENTS[doc]}>
-      <p className="text-muted" style={{ marginTop: 0 }}>
-        This document has not been added yet.
-      </p>
-    </SettingsSectionCard>
-  )
+  const Document = DOCUMENTS[doc]
+  if (!Document) return <Navigate to="/settings/legal/dpa" replace />
+  return <Document embedded />
 }

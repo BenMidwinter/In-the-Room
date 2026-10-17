@@ -7,6 +7,7 @@ import ClientNav from './ClientNav'
 import ClientDocumentsSubnav from './ClientDocumentsSubnav'
 import { ClientChromeProvider, useClientChrome } from './ClientChrome'
 import ClientClinicalAlerts from './ClientClinicalAlerts'
+import ExportDialog from '../export/ExportDialog'
 
 function PatientProfileFrame({ client: initialClient }) {
   const { editorOpen } = useClientChrome()
@@ -15,6 +16,7 @@ function PatientProfileFrame({ client: initialClient }) {
   const { session } = useAppSession()
   const { clients } = useAppClients()
   const [client, setClient] = useState(initialClient)
+  const [exportOpen, setExportOpen] = useState(false)
   const onDocuments = Boolean(matchPath(
     { path: '/clients/:clientId/documents', end: true },
     location.pathname,
@@ -60,6 +62,7 @@ function PatientProfileFrame({ client: initialClient }) {
         />
 
         <div className="client-shell__actions">
+          <button type="button" className="secondary" onClick={() => setExportOpen(true)}>Export</button>
           <button type="button" className="secondary" onClick={() => navigate('/home')}>Home</button>
         </div>
       </header>
@@ -69,6 +72,14 @@ function PatientProfileFrame({ client: initialClient }) {
       {!editorOpen && onDocuments && <ClientDocumentsSubnav />}
 
       {!editorOpen && <ClientClinicalAlerts clientId={client.id} />}
+
+      {exportOpen && (
+        <ExportDialog
+          scope="client"
+          clientId={client.id}
+          onClose={() => setExportOpen(false)}
+        />
+      )}
 
       <div className={`client-layout${editorOpen ? ' client-layout--writing' : ''}`}>
         <div className="client-layout__main">

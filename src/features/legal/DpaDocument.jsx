@@ -4,7 +4,7 @@ export default function DpaDocument({ embedded = false }) {
       <header className="legal-doc__header">
         <h1>Data Processing Agreement</h1>
         <p className="legal-doc__meta">Last Updated: October 2026</p>
-        <p className="legal-doc__meta">Document Version: 1.0</p>
+        <p className="legal-doc__meta">Document Version: 1.1</p>
         <p className="legal-doc__meta">Effective Date: Upon account creation or sign-off</p>
       </header>
 
@@ -56,18 +56,16 @@ export default function DpaDocument({ embedded = false }) {
         <strong>2.3. Customer Warranties:</strong> The Customer confirms that it has a lawful basis under Article 6 of the UK GDPR (and an applicable condition under Article 9 for Special Category Data) to upload and process client and clinical records within the Service.
       </p>
 
-      <h2>3. Strict UK Data Residency & Cryptographic Key Management</h2>
+      <h2>3. Data Location and Cryptographic Key Management</h2>
       <p>
-        <strong>3.1. Primary Database Storage:</strong> All Customer Personal Data (including session notes, client files, and metadata) shall be hosted and processed exclusively on database infrastructure located within the <strong><code>eu-west-2</code> (London)</strong> region of Supabase.
+        <strong>3.1. Database and authentication:</strong> Customer Personal Data held in the Service database, and the authentication records for the Customer’s account, shall be hosted on Supabase infrastructure in the <strong><code>eu-west-2</code> (London)</strong> region. Supabase is engaged for the relational database and authentication only, and not for file storage.
       </p>
       <p>
-        <strong>3.2. Key Storage and Cryptographic Isolation:</strong> All decryption keys, encryption keys, and cryptographic secret material managing access to Customer Personal Data shall reside exclusively in <strong>AWS Key Management Service (AWS KMS) / AWS Secrets Manager in the <code>eu-west-2</code> (London)</strong> region.
+        <strong>3.2. Keys and encrypted files:</strong> Decryption keys, encryption keys, and cryptographic secret material managing access to Customer Personal Data shall reside exclusively in <strong>AWS Key Management Service (AWS KMS) in the <code>eu-west-2</code> (London)</strong> region. Encrypted documents and export archives are stored in <strong>Amazon S3 in the <code>eu-west-2</code> (London)</strong> region.
       </p>
-      <p><strong>3.3. Zero Third-Country Data Transfers:</strong> The Provider guarantees that:</p>
-      <ul>
-        <li>Neither Customer Personal Data nor its associated decryption keys shall be transferred, mirrored, backed up, or replicated outside of the <code>eu-west-2</code> (London) geographic boundary.</li>
-        <li>No international data transfers (as defined under Chapter V of the UK GDPR) shall take place in relation to Customer Personal Data without the explicit, written, prior instruction of the Customer.</li>
-      </ul>
+      <p>
+        <strong>3.3. Other locations:</strong> Clinical records and their decryption keys are not transferred outside <code>eu-west-2</code> (London) in order to store them. The sub-processors named in section 5 may process the limited operational purposes listed there, in the locations listed there. Where that processing is outside the UK, it is covered by the UK adequacy regulations or the UK International Data Transfer Addendum and approved standard contractual clauses, as described in the Privacy Notice. The Customer’s request to send an invoice or an export link is a documented instruction to use the email sub-processor for that message only.
+      </p>
 
       <h2>4. Technical and Organisational Measures (Article 32)</h2>
       <p>4.1. The Provider implements and maintains robust technical and organisational security measures, including:</p>
@@ -94,14 +92,34 @@ export default function DpaDocument({ embedded = false }) {
           </thead>
           <tbody>
             <tr>
-              <td>Supabase Inc.</td>
-              <td>Primary relational database, authentication, and file storage</td>
+              <td>Supabase</td>
+              <td>Relational database and authentication</td>
               <td><code>eu-west-2</code> (London, UK) exclusively</td>
             </tr>
             <tr>
-              <td>Amazon Web Services (AWS EMEA SARL / AWS UK)</td>
-              <td>Key management (AWS KMS), secrets vault, and cryptographic processing</td>
+              <td>Amazon Web Services</td>
+              <td>Key management (AWS KMS) and cryptographic processing</td>
               <td><code>eu-west-2</code> (London, UK) exclusively</td>
+            </tr>
+            <tr>
+              <td>Amazon Web Services</td>
+              <td>Encrypted document and export storage (Amazon S3)</td>
+              <td><code>eu-west-2</code> (London, UK) exclusively</td>
+            </tr>
+            <tr>
+              <td>Vercel Inc.</td>
+              <td>Application deployment and frontend hosting</td>
+              <td>Global edge network / UK and EU, under the UK International Data Transfer Addendum and SCCs</td>
+            </tr>
+            <tr>
+              <td>Stripe Payments Europe, Ltd.</td>
+              <td>Payment gateway and subscription management</td>
+              <td>United Kingdom / Ireland, under UK adequacy regulations and approved SCCs</td>
+            </tr>
+            <tr>
+              <td>Resend</td>
+              <td>Transactional email (sign-in messages, invoices, and export links)</td>
+              <td>European Union (<code>eu-west-1</code>, Ireland), under UK adequacy regulations</td>
             </tr>
           </tbody>
         </table>
@@ -177,7 +195,7 @@ export default function DpaDocument({ embedded = false }) {
           </ul>
         </li>
         <li>
-          <strong>Geographical Boundary:</strong> Exclusively <strong>London, UK (<code>eu-west-2</code>)</strong> for both database storage and cryptographic key management.
+          <strong>Geographical Boundary:</strong> Clinical records, authentication data, encrypted files, and cryptographic keys are stored in <strong>London, UK (<code>eu-west-2</code>)</strong>. Hosting, subscription payments, and transactional email are processed by the sub-processors and in the locations named in section 5.
         </li>
       </ul>
     </article>
