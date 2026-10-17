@@ -177,20 +177,29 @@ export async function setPracticeLogStatus(kind: LogKind, userId: string, id: st
   }
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
-  const table = kind === 'cpd' ? 'cpd_entries' : 'supervision_entries'
-  const columns = kind === 'cpd' ? CPD_COLUMNS : SUPERVISION_COLUMNS
-  const columnsArchive = kind === 'cpd' ? CPD_COLUMNS_ARCHIVE : SUPERVISION_COLUMNS_ARCHIVE
-  const columnsBase = kind === 'cpd' ? CPD_COLUMNS_BASE : SUPERVISION_COLUMNS_BASE
+  if (kind === 'cpd') {
+    const currentRows = await selectWithOptionalStatus(
+      () => supabase.from('cpd_entries').select(CPD_COLUMNS).eq('id', id),
+      () => supabase.from('cpd_entries').select(CPD_COLUMNS_ARCHIVE).eq('id', id),
+      () => supabase.from('cpd_entries').select(CPD_COLUMNS_BASE).eq('id', id),
+    )
+    if (!currentRows[0]) throw new Error('Entry not found')
+    const current = currentRows[0] as unknown as LogRow
+    const patch = statusTimestamps(nextStatus, current)
+    await updateStatusColumns(() => supabase.from('cpd_entries').update(patch).eq('id', id))
+    const [opened] = await withOpenedPayloads('cpd_entries', [{ ...current, ...patch }])
+    return toLog(kind, opened)
+  }
   const currentRows = await selectWithOptionalStatus(
-    () => supabase.from(table).select(columns).eq('id', id),
-    () => supabase.from(table).select(columnsArchive).eq('id', id),
-    () => supabase.from(table).select(columnsBase).eq('id', id),
+    () => supabase.from('supervision_entries').select(SUPERVISION_COLUMNS).eq('id', id),
+    () => supabase.from('supervision_entries').select(SUPERVISION_COLUMNS_ARCHIVE).eq('id', id),
+    () => supabase.from('supervision_entries').select(SUPERVISION_COLUMNS_BASE).eq('id', id),
   )
   if (!currentRows[0]) throw new Error('Entry not found')
-  const current = currentRows[0] as LogRow
+  const current = currentRows[0] as unknown as LogRow
   const patch = statusTimestamps(nextStatus, current)
-  await updateStatusColumns(() => supabase.from(table).update(patch).eq('id', id))
-  const [opened] = await withOpenedPayloads(table, [{ ...current, ...patch }])
+  await updateStatusColumns(() => supabase.from('supervision_entries').update(patch).eq('id', id))
+  const [opened] = await withOpenedPayloads('supervision_entries', [{ ...current, ...patch }])
   return toLog(kind, opened)
 }
 

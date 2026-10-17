@@ -220,6 +220,7 @@ export default function RecordTable({
   const rawFilters = remember ? cleanFilters(stored?.filters) : localFilters
   const filters = withDefaultFilters(rawFilters, defaultFilters)
   const sort = remember ? cleanSort(stored?.sort, fallbackSort) : localSort
+  const filtersNotifyRef = useRef('')
   const setFilters = (action) => {
     if (!remember) {
       setLocalFilters(action)
@@ -262,7 +263,11 @@ export default function RecordTable({
   const openColumn = columns.find((col) => col.key === openFilter) || null
 
   useEffect(() => {
-    onFiltersChange?.(filters)
+    if (!onFiltersChange) return
+    const serialized = JSON.stringify(filters)
+    if (serialized === filtersNotifyRef.current) return
+    filtersNotifyRef.current = serialized
+    onFiltersChange(filters)
   }, [filters, onFiltersChange])
 
   const toggleSort = (column) => {
