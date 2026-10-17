@@ -1,6 +1,6 @@
 import { journalEntryFromRow, type AppJournalEntry } from '../journalEntry'
 import { parseOrThrow, journalEntryInputSchema } from '../schemas'
-import { getJournalEntries, saveJournalEntry } from '../store/journal'
+import { deleteJournalEntry, getJournalEntries, saveJournalEntry } from '../store/journal'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
@@ -114,4 +114,20 @@ export async function saveJournalEntryForUser(userId: string, input: {
     somatic_state: row.somatic_state,
     encrypted_payload,
   })
+}
+
+export async function deleteJournalEntryForUser(userId: string, entryId: string): Promise<void> {
+  if (!userId || !entryId || entryId === 'new') return
+  if (!isSupabaseConfigured()) {
+    deleteJournalEntry(userId, entryId)
+    return
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { error } = await supabase
+    .from('journal_entries')
+    .delete()
+    .eq('id', entryId)
+    .eq('author_id', userId)
+  if (error) throw error
 }

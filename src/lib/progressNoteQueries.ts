@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tansta
 import { listTemplates } from './supabase/templatesRepo'
 import {
   appendProgressNoteAddendumForUser,
+  deleteProgressNote,
   fetchProgressNote,
   fetchProgressNoteByAppointment,
   fetchProgressNotesForClient,
   listProgressNotesIndex,
   saveProgressNoteForUser,
+  setProgressNoteArchived,
   signOffProgressNoteForUser,
 } from './supabase/progressNotesRepo'
 
@@ -131,6 +133,34 @@ export function useSignOffProgressNoteMutation() {
       }
       if (saved.client_id) {
         queryClient.invalidateQueries({ queryKey: ['episodes', 'client', saved.client_id] })
+      }
+    },
+  })
+}
+
+export function useDeleteProgressNoteMutation(clientId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteProgressNote(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.progressNotes })
+      if (clientId) {
+        queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.client(clientId) })
+        queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.feed(clientId) })
+      }
+    },
+  })
+}
+
+export function useArchiveProgressNoteMutation(clientId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, archived }: { id: string; archived: boolean }) => setProgressNoteArchived(id, archived),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.progressNotes })
+      if (clientId) {
+        queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.client(clientId) })
+        queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.feed(clientId) })
       }
     },
   })

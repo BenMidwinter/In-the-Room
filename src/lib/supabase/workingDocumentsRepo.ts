@@ -6,7 +6,7 @@ import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 
-const COLUMNS = 'id, client_id, author_id, encrypted_payload, payload_format, created_at, updated_at'
+const COLUMNS = 'id, client_id, author_id, encrypted_payload, payload_format, created_at, updated_at, archived_at'
 
 type DocumentRow = {
   id: string
@@ -16,6 +16,7 @@ type DocumentRow = {
   payload_format?: string | null
   created_at: string
   updated_at: string
+  archived_at?: string | null
 }
 
 export type AppWorkingDocument = {
@@ -26,6 +27,7 @@ export type AppWorkingDocument = {
   content: string
   created_at: string
   updated_at: string
+  archived_at?: string | null
 }
 
 function isUuid(value: unknown): value is string {
@@ -45,6 +47,7 @@ function toDocument(row: DocumentRow): AppWorkingDocument {
     content: typeof body.content === 'string' && body.content.trim() ? body.content : '<p></p>',
     created_at: row.created_at,
     updated_at: row.updated_at,
+    archived_at: row.archived_at || null,
   }
 }
 
@@ -106,4 +109,41 @@ export async function saveWorkingDocumentForUser(payload: Record<string, unknown
   const { data, error } = await supabase.from('working_documents').select(COLUMNS).eq('id', created.id).single()
   if (error) throw error
   return remember(toDocument({ ...(data as DocumentRow), encrypted_payload: body as unknown as Json, payload_format: 'envelope' }))
+}
+
+export async function setWorkingDocumentArchived(id: string, archived: boolean): Promise<AppWorkingDocument> {
+  if (!id) throw new Error('Document not found')
+  const archivedAt = archived ? new Date().toISOString() : null
+  if (!isSupabaseConfigured() || !isUuid(id)) {
+    const idx = db.workingDocuments.findIndex((row) => row.id === id)
+    if (idx === -1) throw new Error('Document not found')
+    db.workingDocuments[idx] = { ...db.workingDocuments[idx], archived_at: archivedAt } as StoreRecord
+    return db.workingDocuments[idx] as unknown as AppWorkingDocument
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { data, error } = await supabase
+    .from('working_documents')
+    .update({ archived_at: archivedAt })
+    .eq('id', id)
+    .select(COLUMNS)
+    .single()
+  if (error) throw error
+  const [opened] = await withOpenedPayloads('working_documents', [data as DocumentRow])
+  return remember(toDocument(opened))
+}
+
+export async function deleteWorkingDocument(id: string): Promise<void> {
+  if (!id) return
+  if (!isSupabaseConfigured() || !isUuid(id)) {
+    const idx = db.workingDocuments.findIndex((row) => row.id === id)
+    if (idx !== -1) db.workingDocuments.splice(idx, 1)
+    return
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { error } = await supabase.from('working_documents').delete().eq('id', id)
+  if (error) throw error
+  const idx = db.workingDocuments.findIndex((row) => row.id === id)
+  if (idx !== -1) db.workingDocuments.splice(idx, 1)
 }

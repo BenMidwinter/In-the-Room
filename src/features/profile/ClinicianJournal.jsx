@@ -1,10 +1,17 @@
-import { useMemo, useState, useCallback } from 'react'
-import { useAppSession } from '../../lib/AppSessionContext'
-import SectionCard from '../../components/SectionCard'
+import { useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import RecordListLayout from '../../components/RecordListLayout'
+import RecordTable from '../../components/RecordTable'
 import RichTextEditor from '../../components/RichTextEditor'
-import { useToast } from '../../components/ui'
-import { useJournalEntriesQuery, useSaveJournalEntryMutation } from '../../lib/journalQueries'
+import { useConfirm, useToast } from '../../components/ui'
+import { useAppSession } from '../../lib/AppSessionContext'
 import { DEMO_TODAY } from '../../lib/dateArchitecture'
+import {
+  useDeleteJournalEntryMutation,
+  useJournalEntriesQuery,
+  useSaveJournalEntryMutation,
+} from '../../lib/journalQueries'
+import DocumentWorkspace from '../client/DocumentWorkspace'
 
 const SOMATIC_TAGS = ['Grounded', 'Activated', 'Fatigued', 'Open', 'Constricted', 'Settled']
 
@@ -13,9 +20,18 @@ function defaultJournalTime() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-function formatJournalTimestamp(date, time) {
-  if (!date) return ''
-  return time ? `${date} · ${time}` : date
+function formatJournalDate(date) {
+  if (!date) return '—'
+  return new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+function stripHtml(html) {
+  if (!html) return ''
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function sortJournalEntries(items) {
@@ -26,210 +42,202 @@ function sortJournalEntries(items) {
   })
 }
 
-function stripHtml(html) {
-  if (!html) return ''
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
-function draftFromEntry(entry) {
-  if (!entry) {
-    return {
-      date: DEMO_TODAY,
-      time: defaultJournalTime(),
-      somatic: 'Grounded',
-      body: '<p></p>',
-    }
-  }
-  return {
-    date: entry.date,
-    time: entry.time || '09:00',
-    somatic: entry.somatic_state || 'Grounded',
-    body: entry.body_text || '<p></p>',
-  }
-}
+const COLUMNS = [
+  { key: 'date', label: 'Date', sort: 'date' },
+  { key: 'time', label: 'Time', sort: 'text' },
+  { key: 'somatic', label: 'Somatic state', filter: 'choice', sort: 'text' },
+  { key: 'preview', label: 'Preview', filter: 'text' },
+]
 
 export default function ClinicianJournal() {
   const { session } = useAppSession()
   const userId = session?.user?.id ?? ''
   const toast = useToast()
+  const confirm = useConfirm()
+  const { setEditorOpen } = useOutletContext() || {}
   const { data: entries = [], isPending, error } = useJournalEntriesQuery(userId)
   const saveEntry = useSaveJournalEntryMutation(userId)
-
+  const removeEntry = useDeleteJournalEntryMutation(userId)
   const sortedEntries = useMemo(() => sortJournalEntries(entries), [entries])
-  const [selectedId, setSelectedId] = useState('new')
-  const [booted, setBooted] = useState(false)
-  const [feedOpen, setFeedOpen] = useState(false)
+
+  const [openId, setOpenId] = useState(null)
   const [draftDate, setDraftDate] = useState(DEMO_TODAY)
   const [draftTime, setDraftTime] = useState(defaultJournalTime)
   const [draftSomatic, setDraftSomatic] = useState('Grounded')
   const [draftBody, setDraftBody] = useState('<p></p>')
-
-  if (!booted && userId && !isPending) {
-    const first = sortedEntries[0] ?? null
-    const draft = draftFromEntry(first)
-    setBooted(true)
-    if (first) setSelectedId(first.id)
-    setDraftDate(draft.date)
-    setDraftTime(draft.time)
-    setDraftSomatic(draft.somatic)
-    setDraftBody(draft.body)
-  }
-
-  const selectedEntry = useMemo(
-    () => sortedEntries.find(e => e.id === selectedId) ?? null,
-    [sortedEntries, selectedId],
-  )
-
-  const loadEntry = useCallback((entry) => {
-    const draft = draftFromEntry(entry)
-    setSelectedId(entry?.id ?? 'new')
-    setDraftDate(draft.date)
-    setDraftTime(draft.time)
-    setDraftSomatic(draft.somatic)
-    setDraftBody(draft.body)
-    setFeedOpen(false)
-  }, [])
+  const [editorVersion, setEditorVersion] = useState(0)
 
   if (!session?.user) {
     return <p className="text-muted">Journal session unavailable. Return to Home and try again.</p>
   }
 
-  const handleNewEntry = () => {
-    loadEntry(null)
+  const close = () => {
+    setEditorOpen?.(false)
+    setOpenId(null)
+  }
+
+  const openNew = () => {
+    setOpenId('new')
+    setDraftDate(DEMO_TODAY)
+    setDraftTime(defaultJournalTime())
+    setDraftSomatic('Grounded')
+    setDraftBody('<p></p>')
+    setEditorVersion((value) => value + 1)
+    setEditorOpen?.(true)
+  }
+
+  const openExisting = (entry) => {
+    setOpenId(entry.id)
+    setDraftDate(entry.date)
+    setDraftTime(entry.time || '09:00')
+    setDraftSomatic(entry.somatic_state || 'Grounded')
+    setDraftBody(entry.body_text || '<p></p>')
+    setEditorVersion((value) => value + 1)
+    setEditorOpen?.(true)
   }
 
   const handleSave = async () => {
     try {
       const saved = await saveEntry.mutateAsync({
-        id: selectedId === 'new' ? undefined : selectedId,
+        id: openId === 'new' ? undefined : openId,
         date: draftDate,
         time: draftTime,
         somatic_state: draftSomatic,
         body_text: draftBody,
       })
-      setSelectedId(saved.id)
+      setOpenId(saved.id)
       toast.saved()
     } catch (err) {
       toast.error(err?.message || 'Could not save the journal entry.')
     }
   }
 
-  return (
-    <div className="section-card-stack profile-hub">
-      <SectionCard blockId="profile_journal">
-        <div className="journal journal--in-block">
-      <div className="journal__mobile-bar">
-        <button
-          type="button"
-          className="secondary journal__feed-toggle"
-          onClick={() => setFeedOpen(o => !o)}
-          aria-expanded={feedOpen}
-        >
-          {feedOpen ? 'Hide past entries' : 'Past entries'}
-        </button>
-        <button type="button" className="primary" onClick={handleNewEntry}>
-          New entry
-        </button>
-      </div>
+  const handleDelete = async () => {
+    if (!openId || openId === 'new') {
+      close()
+      return
+    }
+    const ok = await confirm({
+      title: 'Delete this entry?',
+      message: 'This removes it from your journal.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      await removeEntry.mutateAsync(openId)
+      close()
+      toast.saved('Entry deleted')
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete this entry')
+    }
+  }
 
-      <aside className={`journal__feed${feedOpen ? ' journal__feed--open' : ''}`}>
-        <div className="journal__feed-head">
-          <h2 className="journal__feed-title">Journal feed</h2>
-          <button type="button" className="secondary journal__feed-new" onClick={handleNewEntry}>
-            New entry
-          </button>
-        </div>
-        <ul className="journal__feed-list">
-          {!booted && (
-            <li className="journal__feed-empty">Loading journal…</li>
-          )}
-          {booted && sortedEntries.map(entry => (
-            <li key={entry.id}>
-              <button
-                type="button"
-                className={`journal__feed-item${selectedId === entry.id ? ' journal__feed-item--active' : ''}`}
-                onClick={() => loadEntry(entry)}
-              >
-                <span className="journal__feed-date">{formatJournalTimestamp(entry.date, entry.time)}</span>
-                <span className="journal__feed-tag" data-somatic={entry.somatic_state.toLowerCase()}>
-                  {entry.somatic_state}
-                </span>
-                <span className="journal__feed-preview">
-                  {stripHtml(entry.body_text).slice(0, 90) || 'Empty entry'}
-                </span>
-              </button>
-            </li>
-          ))}
-          {booted && error && (
-            <li className="journal__feed-empty">{error.message || 'Could not load journal entries.'}</li>
-          )}
-          {booted && !error && sortedEntries.length === 0 && (
-            <li className="journal__feed-empty">No journal entries yet.</li>
-          )}
-        </ul>
-      </aside>
+  const rows = sortedEntries.map((entry) => {
+    const preview = stripHtml(entry.body_text).slice(0, 90) || 'Empty entry'
+    return {
+      id: entry.id,
+      entry,
+      filterValues: {
+        somatic: entry.somatic_state || '',
+        preview,
+      },
+      sortValues: {
+        date: entry.date,
+        time: entry.time || '',
+        somatic: entry.somatic_state || '',
+        preview,
+      },
+      cells: {
+        date: formatJournalDate(entry.date),
+        time: entry.time || '—',
+        somatic: (
+          <span className="badge badge-grey" data-somatic={(entry.somatic_state || '').toLowerCase()}>
+            {entry.somatic_state || '—'}
+          </span>
+        ),
+        preview: <span className="record-table__primary">{preview}</span>,
+      },
+    }
+  })
 
-      <div className="journal__workspace">
-        <header className="journal__workspace-head">
-          <div className="journal__meta">
-            <div className="form-group journal__meta-field">
-              <label htmlFor="journal-date">Date</label>
+  if (openId) {
+    return (
+      <DocumentWorkspace
+        title="Journal entry"
+        onBack={close}
+        actions={(
+          <>
+            <button type="button" className="secondary" onClick={handleDelete} disabled={removeEntry.isPending}>
+              Delete
+            </button>
+            <button type="button" className="primary" onClick={handleSave} disabled={saveEntry.isPending}>
+              {saveEntry.isPending ? 'Saving…' : 'Save'}
+            </button>
+          </>
+        )}
+        meta={(
+          <>
+            <label className="progress-notes-page__meta-field">
+              <span className="progress-notes-page__meta-label">Date</span>
               <input
-                id="journal-date"
                 type="date"
-                className="paper-input"
+                className="progress-notes-page__meta-input"
                 value={draftDate}
-                onChange={e => setDraftDate(e.target.value)}
+                onChange={(event) => setDraftDate(event.target.value)}
               />
-            </div>
-            <div className="form-group journal__meta-field">
-              <label htmlFor="journal-time">Time</label>
+            </label>
+            <label className="progress-notes-page__meta-field">
+              <span className="progress-notes-page__meta-label">Time</span>
               <input
-                id="journal-time"
                 type="time"
-                className="paper-input"
+                className="progress-notes-page__meta-input"
                 value={draftTime}
-                onChange={e => setDraftTime(e.target.value)}
+                onChange={(event) => setDraftTime(event.target.value)}
               />
-            </div>
-            <div className="form-group journal__meta-field">
-              <label htmlFor="journal-somatic">Somatic state</label>
+            </label>
+            <label className="progress-notes-page__meta-field">
+              <span className="progress-notes-page__meta-label">Somatic state</span>
               <select
-                id="journal-somatic"
-                className="paper-input journal__somatic-select"
+                className="progress-notes-page__meta-input"
                 data-somatic={draftSomatic.toLowerCase()}
                 value={draftSomatic}
-                onChange={e => setDraftSomatic(e.target.value)}
+                onChange={(event) => setDraftSomatic(event.target.value)}
               >
-                {SOMATIC_TAGS.map(tag => (
+                {SOMATIC_TAGS.map((tag) => (
                   <option key={tag} value={tag}>{tag}</option>
                 ))}
               </select>
-            </div>
-          </div>
-          <button type="button" className="primary" onClick={handleSave} disabled={!booted || saveEntry.isPending}>
-            {saveEntry.isPending ? 'Saving…' : 'Save entry'}
-          </button>
-        </header>
-
-        <div className="journal__editor">
-          <RichTextEditor
-            key={selectedId}
-            content={draftBody}
-            onChange={setDraftBody}
-            mode="basic"
-            variant="default"
-          />
-        </div>
-
-        {selectedEntry && selectedId !== 'new' && (
-          <p className="journal__saved-note text-small text-muted">
-            Editing entry from {formatJournalTimestamp(selectedEntry.date, selectedEntry.time)} · {selectedEntry.somatic_state}
-          </p>
+            </label>
+          </>
         )}
-      </div>
-        </div>
-      </SectionCard>
-    </div>
+      >
+        <RichTextEditor
+          key={`${openId}-${editorVersion}`}
+          content={draftBody}
+          onChange={setDraftBody}
+          layout="immersive"
+          variant="a4"
+          mode="clinical"
+        />
+      </DocumentWorkspace>
+    )
+  }
+
+  return (
+    <RecordListLayout title="Journal" newLabel="entry" onNew={openNew}>
+      {error && <p className="text-muted">{error.message || 'Could not load journal entries.'}</p>}
+      {!error && (
+        <RecordTable
+          remember="practice-journal"
+          columns={COLUMNS}
+          rows={rows}
+          countNoun="entries"
+          defaultSort={{ key: 'date', direction: 'desc' }}
+          emptyMessage={isPending ? 'Loading…' : 'No journal entries yet.'}
+          onRowClick={(row) => openExisting(row.entry)}
+        />
+      )}
+    </RecordListLayout>
   )
 }

@@ -6,7 +6,7 @@ import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 
-const LETTER_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, author_id, letter_date, encrypted_payload, payload_format, created_at, updated_at'
+const LETTER_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, author_id, letter_date, encrypted_payload, payload_format, created_at, updated_at, archived_at'
 
 type LetterPayload = {
   v: 0
@@ -27,6 +27,7 @@ type LetterRow = {
   payload_format: string
   created_at: string
   updated_at: string
+  archived_at?: string | null
 }
 
 export type AppLetter = {
@@ -39,6 +40,7 @@ export type AppLetter = {
   letter_date: string
   created_at: string
   updated_at: string
+  archived_at?: string | null
 }
 
 function isUuid(value: unknown): value is string {
@@ -70,6 +72,7 @@ function toAppLetter(row: LetterRow): AppLetter {
     letter_date: row.letter_date || String(row.created_at).slice(0, 10),
     created_at: row.created_at,
     updated_at: row.updated_at,
+    archived_at: row.archived_at || null,
   }
 }
 
@@ -157,4 +160,41 @@ export async function saveLetterForUser(payload: Record<string, unknown>, userId
     encrypted_payload: body as unknown as Json,
     payload_format: 'envelope',
   }))
+}
+
+export async function setLetterArchived(id: string, archived: boolean): Promise<AppLetter> {
+  if (!id) throw new Error('Letter not found')
+  const archivedAt = archived ? new Date().toISOString() : null
+  if (!isSupabaseConfigured() || !isUuid(id)) {
+    const idx = db.letters.findIndex((row) => row.id === id)
+    if (idx === -1) throw new Error('Letter not found')
+    db.letters[idx] = { ...db.letters[idx], archived_at: archivedAt } as StoreRecord
+    return db.letters[idx] as unknown as AppLetter
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { data, error } = await supabase
+    .from('letters')
+    .update({ archived_at: archivedAt })
+    .eq('id', id)
+    .select(LETTER_COLUMNS)
+    .single()
+  if (error) throw error
+  const [opened] = await withOpenedPayloads('letters', [data as LetterRow])
+  return remember(toAppLetter(opened))
+}
+
+export async function deleteLetter(id: string): Promise<void> {
+  if (!id) return
+  if (!isSupabaseConfigured() || !isUuid(id)) {
+    const idx = db.letters.findIndex((row) => row.id === id)
+    if (idx !== -1) db.letters.splice(idx, 1)
+    return
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { error } = await supabase.from('letters').delete().eq('id', id)
+  if (error) throw error
+  const idx = db.letters.findIndex((row) => row.id === id)
+  if (idx !== -1) db.letters.splice(idx, 1)
 }

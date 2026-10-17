@@ -560,3 +560,43 @@ a:hover { text-decoration: underline; }
   color: var(--txt-body);
 }
 
+/* Phone: one flat surface instead of page + card + inner card borders. */
+@media (max-width: 640px) {
+  .page {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .page-mast {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .section-card {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .section-card__header,
+  .section-card__body,
+  .section-card__panel {
+    padding-left: var(--space-inline);
+    padding-right: var(--space-inline);
+  }
+
+  .section-card__panel {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .home-stat-card {
+    border: none;
+    box-shadow: none;
+    background: color-mix(in srgb, var(--bg-page) 70%, var(--bg-surface));
+  }
+}
+
+

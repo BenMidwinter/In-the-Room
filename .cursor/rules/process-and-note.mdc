@@ -1,0 +1,22 @@
+---
+description: Process&Note agent guardrails — UK English, KMS encryption, repo pattern, UI consistency
+alwaysApply: true
+---
+
+# Process&Note — Process and Note
+
+## UK English & copy
+- Use UK English spelling strictly (`colour`, `behaviour`, `normalised`, `organisation`, `catalogue`, `cancelled`, `programme`).
+- Never use em dashes in UI copy or code comments.
+
+## Server-side KMS envelope encryption (source of truth)
+- Clinical and identifying payloads are sealed and opened via `supabase/functions/clinical-record/index.ts` using `_shared/practiceKey.ts` (`dekFor`, `openJson`, `sealJson`) and AWS KMS (`_shared/awsKms.ts`) in `eu-west-2`.
+- Frontend data reads/writes must go through `src/lib/supabase/*Repo.ts` and `src/lib/supabase/clinicalEnvelope.ts` (`createClinicalRecord`, `sealClinicalRecord`, `withOpenedPayloads`).
+- Never build new features against legacy synchronous `src/lib/store/*` or `mockData.js`.
+- Write audit events to `public.audit_events` via `writeAuditEvent()` in `src/lib/supabase/audit.ts`.
+
+## UI consistency
+- Top-level pages use `<div className="page">` with `<div className="page-mast"><PageHeader /><SectionNav /></div>`.
+- Client tab lists and practice lists use `<RecordListLayout>` + `<RecordTable remember="..." />`.
+- Modals use `<FormOverlay>` (`src/components/FormOverlay.jsx`) or dialog hooks (`useConfirm`, `usePrompt`, `useChoose`). Never create bespoke modal overlays.
+- Full-page rich text editors must wrap in `<DocumentWorkspace>` and pass `layout="immersive"` to `<RichTextEditor>`.

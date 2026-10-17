@@ -38,3 +38,9 @@ export function saveJournalEntry(userId, payload) {
   db.journalEntries.push(created)
   return created
 }
+
+export function deleteJournalEntry(userId, entryId) {
+  const idx = db.journalEntries.findIndex((entry) => entry.id === entryId && entry.author_id === userId)
+  if (idx === -1) return
+  db.journalEntries.splice(idx, 1)
+}

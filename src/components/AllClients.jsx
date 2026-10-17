@@ -7,6 +7,7 @@ import RecordTable from './RecordTable'
 function caseloadStatus(client) {
   if (client.on_screener || client.status === 'screener') return 'Screener'
   if (client.on_waitlist || client.status === 'waitlist') return 'Waitlist'
+  if (client.status === 'closed') return 'Closed'
   if (client.status === 'rejected') return 'Rejected'
   if (client.is_active) return 'Active'
   return 'Discharged'
@@ -48,11 +49,13 @@ export default function AllClients() {
           ? <span className="badge badge-blue">Screener</span>
           : client.on_waitlist
             ? <span className="badge badge-grey">Waitlist</span>
-            : client.status === 'rejected'
-              ? <span className="badge badge-grey">Rejected</span>
-              : client.is_active
-                ? <span className="badge badge-green">Active</span>
-                : <span className="badge badge-grey">Discharged</span>,
+            : client.status === 'closed'
+              ? <span className="badge badge-grey">Closed</span>
+              : client.status === 'rejected'
+                ? <span className="badge badge-grey">Rejected</span>
+                : client.is_active
+                  ? <span className="badge badge-green">Active</span>
+                  : <span className="badge badge-grey">Discharged</span>,
       },
     }))
 

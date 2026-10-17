@@ -583,6 +583,20 @@ a.badge {
   min-height: 100%;
 }
 
+@media (max-width: 640px) {
+  .doc-editor--immersive .doc-editor__write {
+    padding-left: var(--space-inline);
+    padding-right: var(--space-inline);
+    max-width: none;
+    width: 100%;
+  }
+
+  .letterhead-preview {
+    padding: 1rem var(--space-inline) 0;
+  }
+}
+
+
 .doc-editor--immersive .doc-editor__prose,
 .doc-editor--immersive .ProseMirror {
   min-height: 12rem;

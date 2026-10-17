@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAppSession } from '../../lib/AppSessionContext'
+import { concessionFromClient, concessionPhrase } from '../../lib/sessionPrice'
 import { usePermissions } from '../../lib/usePermissions'
 import ClientProfileOverlay from './ClientProfileOverlay'
 
@@ -7,22 +8,26 @@ export default function ClientDetailsBar({ client, onClientUpdated, embedded = f
   const { refreshClients } = useAppSession()
   const perms = usePermissions(client)
   const [showEdit, setShowEdit] = useState(false)
+  const concession = concessionPhrase(concessionFromClient(client))
   const items = [
     { label: 'Gender', value: client.gender || '—' },
     { label: 'School / setting', value: client.school || '—' },
     { label: 'Diagnosis', value: client.diagnosis || '—' },
     { label: 'Medication', value: client.medication || '—' },
+    { label: 'Concession', value: concession || 'None' },
     {
       label: 'Status',
       value: client.on_screener
         ? 'Screener'
         : client.on_waitlist
           ? 'Waitlist'
-          : client.status === 'rejected'
-            ? 'Rejected'
-            : client.is_active
-              ? 'Active'
-              : 'Discharged',
+          : client.status === 'closed'
+            ? 'Closed'
+            : client.status === 'rejected'
+              ? 'Rejected'
+              : client.is_active
+                ? 'Active'
+                : 'Discharged',
     },
   ]
 

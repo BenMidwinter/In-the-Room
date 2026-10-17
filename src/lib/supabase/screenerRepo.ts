@@ -1,3 +1,4 @@
+import { writeAuditEvent } from './audit'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase } from './client'
 import type { Json } from './database.types'
@@ -39,7 +40,7 @@ export type ScreenerPerson = {
   name: string
   dob: string
   gender: string
-  status: 'screener' | 'waitlist' | 'rejected'
+  status: 'screener' | 'waitlist' | 'closed' | 'rejected'
   createdAt: string
   submissionId: string | null
   formName: string
@@ -120,7 +121,7 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
   const { data: clients, error } = await supabase
     .from('clients')
     .select('id, status, created_at, client_identities(encrypted_payload, payload_format)')
-    .in('status', ['screener', 'waitlist', 'rejected'])
+    .in('status', ['screener', 'waitlist', 'closed', 'rejected'])
     .order('created_at', { ascending: true })
   if (error) throw error
   const rows = clients || []
@@ -206,7 +207,13 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
       name,
       dob: String(identity.dob || ''),
       gender: String(identity.gender || ''),
-      status: row.status === 'waitlist' ? 'waitlist' : row.status === 'rejected' ? 'rejected' : 'screener',
+      status: row.status === 'waitlist'
+        ? 'waitlist'
+        : row.status === 'closed'
+          ? 'closed'
+          : row.status === 'rejected'
+            ? 'rejected'
+            : 'screener',
       createdAt: row.created_at,
       submissionId: form?.id || null,
       formName: form?.name || '',
@@ -334,4 +341,20 @@ export async function rejectScreenerClient(clientId: string): Promise<void> {
     .eq('id', clientId)
     .eq('status', 'screener')
   if (error) throw error
+}
+
+export async function closeWaitlistClient(clientId: string): Promise<void> {
+  const supabase = supabaseOrThrow()
+  const { error } = await supabase
+    .from('clients')
+    .update({ status: 'closed' })
+    .eq('id', clientId)
+    .eq('status', 'waitlist')
+  if (error) throw error
+  await writeAuditEvent({
+    action: 'client.waitlist_closed',
+    entityType: 'client',
+    entityId: clientId,
+    clientId,
+  })
 }

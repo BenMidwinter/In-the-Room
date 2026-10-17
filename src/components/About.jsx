@@ -30,7 +30,7 @@ export default function About() {
           <ul className="text-muted" style={{ paddingLeft: '1.25rem', lineHeight: 1.9 }}>
             <li>Freelance clinician workspace for clients, sessions, notes, and calendar</li>
             <li>Thin-page shells with encapsulated feature modules</li>
-            <li>Client-side encryption before any clinical data reaches Supabase</li>
+            <li>Server-side AWS KMS envelope encryption for clinical and identifying payloads</li>
             <li>Design brief lives in <code>docs/SYSTEM_ARCHITECTURE.md</code></li>
           </ul>
         </div>
@@ -40,9 +40,25 @@ export default function About() {
         <div className="card">
           <h3 className="card__title">Zero plaintext at rest</h3>
           <p className="text-muted" style={{ lineHeight: 1.8 }}>
-            Sensitive clinical text and identifiers are encrypted in the browser with WebCrypto
-            before network calls. The database only stores opaque ciphertext. See the project
-            security directives for envelope encryption, RLS, and key-handling rules.
+            Clinical and identifying payloads are sealed and opened by the
+            <code> clinical-record </code>
+            Edge Function (
+            <code>supabase/functions/clinical-record/index.ts</code>
+            ) using
+            <code> _shared/practiceKey.ts </code>
+            (
+            <code>dekFor</code>
+            ,
+            <code> openJson</code>
+            ,
+            <code> sealJson</code>
+            ) and AWS KMS (
+            <code>_shared/awsKms.ts</code>
+            ) in
+            <code> eu-west-2</code>
+            . Organisation keys live in
+            <code> organization_keys</code>
+            . The database stores opaque ciphertext only.
           </p>
         </div>
       )}
@@ -51,8 +67,13 @@ export default function About() {
         <div className="card">
           <h3 className="card__title">Modular structure</h3>
           <p className="text-muted" style={{ lineHeight: 1.8 }}>
-            Routes stay anemic. Business logic, editor state, and crypto binds live in
-            <code> src/features/</code> and <code>src/modules/</code> blocks, composed by thin page shells.
+            Routes stay anemic. Frontend reads and writes go through
+            <code> src/lib/supabase/*Repo.ts </code>
+            and
+            <code> clinicalEnvelope.ts</code>
+            . Business logic and editors live in
+            <code> src/features/</code>
+            , composed by thin page shells.
           </p>
         </div>
       )}

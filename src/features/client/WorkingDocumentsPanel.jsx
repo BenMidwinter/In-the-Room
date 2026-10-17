@@ -7,7 +7,12 @@ import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFie
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { useTemplatesQuery } from '../../lib/templateQueries'
 import { getProfile } from '../../lib/store'
-import { listWorkingDocuments, saveWorkingDocumentForUser } from '../../lib/supabase/workingDocumentsRepo'
+import {
+  deleteWorkingDocument,
+  listWorkingDocuments,
+  saveWorkingDocumentForUser,
+  setWorkingDocumentArchived,
+} from '../../lib/supabase/workingDocumentsRepo'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import { useToast, useConfirm } from '../../components/ui'
@@ -25,8 +30,10 @@ function todayISO() {
 
 const DOC_COLUMNS = [
   { key: 'title', label: 'Title', filter: 'text' },
+  { key: 'status', label: 'Status', filter: 'choice' },
   { key: 'created', label: 'Created', sort: 'date' },
   { key: 'updated', label: 'Last updated', sort: 'date' },
+  { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
 export default function WorkingDocumentsPanel() {
@@ -135,23 +142,81 @@ export default function WorkingDocumentsPanel() {
     })
   }
 
-  const rows = documents.map(doc => ({
-    id: doc.id,
-    doc,
-    filterValues: {
-      title: doc.title,
-    },
-    sortValues: {
-      title: doc.title,
-      created: doc.created_at || '',
-      updated: doc.updated_at || '',
-    },
-    cells: {
-      title: <span className="record-table__primary">{doc.title}</span>,
-      created: formatDocDate(doc.created_at),
-      updated: formatDocDate(doc.updated_at),
-    },
-  }))
+  const handleArchive = async (doc) => {
+    try {
+      await setWorkingDocumentArchived(doc.id, !doc.archived_at)
+      await refresh()
+      toast.saved(doc.archived_at ? 'Document restored' : 'Document archived')
+    } catch (err) {
+      toast.error(err?.message || 'Could not update this document')
+    }
+  }
+
+  const handleDelete = async (doc) => {
+    const ok = await confirm({
+      title: 'Delete this document?',
+      message: 'This permanently removes the working document.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      await deleteWorkingDocument(doc.id)
+      if (selectedId === doc.id) setSelectedId(null)
+      await refresh()
+      toast.saved('Document deleted')
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete this document')
+    }
+  }
+
+  const rows = documents.map(doc => {
+    const status = doc.archived_at ? 'Archived' : 'Active'
+    return {
+      id: doc.id,
+      doc,
+      filterValues: {
+        title: doc.title,
+        status,
+      },
+      sortValues: {
+        title: doc.title,
+        status,
+        created: doc.created_at || '',
+        updated: doc.updated_at || '',
+      },
+      cells: {
+        title: <span className="record-table__primary">{doc.title}</span>,
+        status: <span className={`badge ${doc.archived_at ? 'badge-grey' : 'badge-green'}`}>{status}</span>,
+        created: formatDocDate(doc.created_at),
+        updated: formatDocDate(doc.updated_at),
+        actions: (
+          <span className="practice-docs__actions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={(event) => {
+                event.stopPropagation()
+                handleArchive(doc)
+              }}
+            >
+              {doc.archived_at ? 'Restore' : 'Archive'}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={(event) => {
+                event.stopPropagation()
+                handleDelete(doc)
+              }}
+            >
+              Delete
+            </button>
+          </span>
+        ),
+      },
+    }
+  })
 
   const editing = selectedId != null
   const editorTitle = selectedId === 'new' ? 'New working document' : title || 'Working document'

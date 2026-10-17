@@ -3,7 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import RichTextEditor from '../../components/RichTextEditor'
 import { useClientSession } from '../../lib/useClientSession'
 import { getProfile } from '../../lib/store'
-import { listLettersForClient, saveLetterForUser } from '../../lib/supabase/lettersRepo'
+import {
+  deleteLetter,
+  listLettersForClient,
+  saveLetterForUser,
+  setLetterArchived,
+} from '../../lib/supabase/lettersRepo'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { useTemplatesQuery } from '../../lib/templateQueries'
@@ -30,8 +35,10 @@ function todayISO() {
 const LETTER_COLUMNS = [
   { key: 'title', label: 'Title', filter: 'text' },
   { key: 'recipient', label: 'Recipient', filter: 'text' },
+  { key: 'status', label: 'Status', filter: 'choice' },
   { key: 'date', label: 'Letter date', sort: 'date' },
   { key: 'updated', label: 'Updated', sort: 'date' },
+  { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
 export default function LettersPanel() {
@@ -156,6 +163,34 @@ export default function LettersPanel() {
     }
   }
 
+  const handleArchive = async (letter) => {
+    try {
+      await setLetterArchived(letter.id, !letter.archived_at)
+      await refresh()
+      toast.saved(letter.archived_at ? 'Letter restored' : 'Letter archived')
+    } catch (err) {
+      toast.error(err?.message || 'Could not update this letter')
+    }
+  }
+
+  const handleDelete = async (letter) => {
+    const ok = await confirm({
+      title: 'Delete this letter?',
+      message: 'This permanently removes the letter.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      await deleteLetter(letter.id)
+      if (selectedId === letter.id) setSelectedId(null)
+      await refresh()
+      toast.saved('Letter deleted')
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete this letter')
+    }
+  }
+
   const handleDownload = async () => {
     try {
       const letterhead = printLetterhead
@@ -182,27 +217,57 @@ export default function LettersPanel() {
     }
   }
 
-  const rows = letters.map(letter => ({
-    id: letter.id,
-    letter,
-    filterValues: {
-      title: letter.title,
-      recipient: letter.recipient || '',
-      date: formatDocDate(letter.letter_date),
-    },
-    sortValues: {
-      title: letter.title,
-      recipient: letter.recipient || '',
-      date: letter.letter_date || '',
-      updated: letter.updated_at || '',
-    },
-    cells: {
-      title: <span className="record-table__primary">{letter.title}</span>,
-      recipient: letter.recipient || <span className="record-table__cell-muted">—</span>,
-      date: formatDocDate(letter.letter_date),
-      updated: formatDocDate(letter.updated_at),
-    },
-  }))
+  const rows = letters.map(letter => {
+    const status = letter.archived_at ? 'Archived' : 'Active'
+    return {
+      id: letter.id,
+      letter,
+      filterValues: {
+        title: letter.title,
+        recipient: letter.recipient || '',
+        status,
+        date: formatDocDate(letter.letter_date),
+      },
+      sortValues: {
+        title: letter.title,
+        recipient: letter.recipient || '',
+        status,
+        date: letter.letter_date || '',
+        updated: letter.updated_at || '',
+      },
+      cells: {
+        title: <span className="record-table__primary">{letter.title}</span>,
+        recipient: letter.recipient || <span className="record-table__cell-muted">—</span>,
+        status: <span className={`badge ${letter.archived_at ? 'badge-grey' : 'badge-green'}`}>{status}</span>,
+        date: formatDocDate(letter.letter_date),
+        updated: formatDocDate(letter.updated_at),
+        actions: (
+          <span className="practice-docs__actions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={(event) => {
+                event.stopPropagation()
+                handleArchive(letter)
+              }}
+            >
+              {letter.archived_at ? 'Restore' : 'Archive'}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={(event) => {
+                event.stopPropagation()
+                handleDelete(letter)
+              }}
+            >
+              Delete
+            </button>
+          </span>
+        ),
+      },
+    }
+  })
 
   const editing = selectedId != null
   const editorTitle = selectedId === 'new' ? 'New letter' : title || 'Letter'
@@ -286,6 +351,7 @@ export default function LettersPanel() {
           key={`${selectedId}-${editorVersion}`}
           content={content}
           onChange={setContent}
+          layout="immersive"
           variant="a4"
           mode="clinical"
           mergeContext={mergeContext}

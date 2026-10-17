@@ -21,7 +21,7 @@ import { getAppointment } from '../store/scheduling'
 const NOTE_NEEDS_APPOINTMENT = 'A Process Note is saved against an appointment.'
 const NOTE_NEEDS_EPISODE = 'Add this appointment to an episode before saving the Process Note.'
 
-const NOTE_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, appointment_id, author_id, note_number, session_date, noted_at, status, signed_off_at, lock_until, template_id, encrypted_payload, payload_format, created_at, updated_at'
+const NOTE_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, appointment_id, author_id, note_number, session_date, noted_at, status, signed_off_at, lock_until, template_id, encrypted_payload, payload_format, created_at, updated_at, archived_at'
 
 type NoteAddendum = {
   id: string
@@ -59,6 +59,7 @@ type NoteRow = {
   payload_format: string
   created_at: string
   updated_at: string
+  archived_at?: string | null
 }
 
 async function materializeNotes(rows: NoteRow[]): Promise<NoteRow[]> {
@@ -128,6 +129,7 @@ function toAppNote(row: NoteRow) {
     lock_until: row.lock_until,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    archived_at: row.archived_at || null,
   })
 }
 
@@ -356,4 +358,41 @@ export async function signOffProgressNoteForUser(payload: Record<string, unknown
   if (error) throw error
   const [row] = await materializeNotes([data as NoteRow])
   return remember(toAppNote(row))
+}
+
+export async function setProgressNoteArchived(id: string, archived: boolean) {
+  if (!id) throw new Error('Note not found')
+  const archivedAt = archived ? new Date().toISOString() : null
+  if (!isSupabaseConfigured() || !isUuid(id)) {
+    const idx = db.progressNotes.findIndex((row) => row.id === id)
+    if (idx === -1) throw new Error('Note not found')
+    db.progressNotes[idx] = { ...db.progressNotes[idx], archived_at: archivedAt } as StoreRecord
+    return enrichProgressNoteLock(db.progressNotes[idx] as Record<string, unknown>)
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { data, error } = await supabase
+    .from('progress_notes')
+    .update({ archived_at: archivedAt })
+    .eq('id', id)
+    .select(NOTE_COLUMNS)
+    .single()
+  if (error) throw error
+  const [row] = await materializeNotes([data as NoteRow])
+  return remember(toAppNote(row))
+}
+
+export async function deleteProgressNote(id: string): Promise<void> {
+  if (!id) return
+  if (!isSupabaseConfigured() || !isUuid(id)) {
+    const idx = db.progressNotes.findIndex((row) => row.id === id)
+    if (idx !== -1) db.progressNotes.splice(idx, 1)
+    return
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { error } = await supabase.from('progress_notes').delete().eq('id', id)
+  if (error) throw error
+  const idx = db.progressNotes.findIndex((row) => row.id === id)
+  if (idx !== -1) db.progressNotes.splice(idx, 1)
 }

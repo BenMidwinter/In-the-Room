@@ -1391,3 +1391,28 @@ select.progress-notes-page__meta-input {
   margin: 0.7rem 0 0;
 }
 
+@media (max-width: 640px) {
+  .letterhead-preview {
+    padding: 1rem var(--space-inline) 0;
+  }
+
+  .doc-editor__write,
+  .progress-notes-page .doc-editor--immersive .doc-editor__write,
+  .clinical-doc-page .doc-editor--immersive .doc-editor__write {
+    padding-left: var(--space-inline);
+    padding-right: var(--space-inline);
+    max-width: none;
+    width: 100%;
+  }
+
+  .letterhead-preview__brand {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .letterhead-preview__practice {
+    text-align: left;
+  }
+}
+
+

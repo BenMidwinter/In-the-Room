@@ -13,6 +13,7 @@ export type AppReport = {
   report_date: string | null
   created_at: string
   updated_at: string
+  archived_at?: string | null
 }
 
 function asReport(row: StoreRecord): AppReport {
@@ -76,4 +77,17 @@ export function saveLocalReport(input: {
   }
   rememberLocalReport(created)
   return created
+}
+
+export function setLocalReportArchived(id: string, archivedAt: string | null): AppReport {
+  const idx = db.reports.findIndex((row) => row.id === id)
+  if (idx === -1) throw new Error('Report not found')
+  const next = { ...asReport(db.reports[idx]), archived_at: archivedAt }
+  db.reports[idx] = next as unknown as StoreRecord
+  return next
+}
+
+export function deleteLocalReport(id: string): void {
+  const idx = db.reports.findIndex((row) => row.id === id)
+  if (idx !== -1) db.reports.splice(idx, 1)
 }

@@ -1070,6 +1070,7 @@ export type Database = {
           author_id: string
           client_id: string
           created_at: string
+          archived_at: string | null
           encrypted_payload: Json
           payload_format: string
           episode_id: string | null
@@ -1084,6 +1085,7 @@ export type Database = {
           author_id: string
           client_id: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload: Json
           payload_format?: string
           episode_id?: string | null
@@ -1098,6 +1100,7 @@ export type Database = {
           author_id?: string
           client_id?: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload?: Json
           payload_format?: string
           episode_id?: string | null
@@ -1258,6 +1261,7 @@ export type Database = {
         Row: {
           payload_format: string
           created_at: string
+          archived_at: string | null
           encrypted_payload: Json | null
           id: string
           kind: string
@@ -1269,6 +1273,7 @@ export type Database = {
         Insert: {
           payload_format?: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload?: Json | null
           id?: string
           kind: string
@@ -1280,6 +1285,7 @@ export type Database = {
         Update: {
           payload_format?: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload?: Json | null
           id?: string
           kind?: string
@@ -1430,6 +1436,7 @@ export type Database = {
           author_id: string
           client_id: string
           created_at: string
+          archived_at: string | null
           encrypted_payload: Json
           payload_format: string
           episode_id: string
@@ -1450,6 +1457,7 @@ export type Database = {
           author_id: string
           client_id: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload: Json
           payload_format?: string
           episode_id: string
@@ -1470,6 +1478,7 @@ export type Database = {
           author_id?: string
           client_id?: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload?: Json
           payload_format?: string
           episode_id?: string
@@ -1643,6 +1652,7 @@ export type Database = {
           author_id: string
           client_id: string
           created_at: string
+          archived_at: string | null
           encrypted_payload: Json
           payload_format: string
           episode_id: string | null
@@ -1657,6 +1667,7 @@ export type Database = {
           author_id: string
           client_id: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload: Json
           payload_format?: string
           episode_id?: string | null
@@ -1671,6 +1682,7 @@ export type Database = {
           author_id?: string
           client_id?: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload?: Json
           payload_format?: string
           episode_id?: string | null
@@ -1935,6 +1947,7 @@ export type Database = {
           author_id: string
           client_id: string
           created_at: string
+          archived_at: string | null
           encrypted_payload: Json
           episode_id: string | null
           id: string
@@ -1948,6 +1961,7 @@ export type Database = {
           author_id: string
           client_id: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload: Json
           episode_id?: string | null
           id?: string
@@ -1961,6 +1975,7 @@ export type Database = {
           author_id?: string
           client_id?: string
           created_at?: string
+          archived_at?: string | null
           encrypted_payload?: Json
           episode_id?: string | null
           id?: string

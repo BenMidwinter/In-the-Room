@@ -11,7 +11,12 @@ import {
   useSetEpisodeAppointmentsMutation,
 } from '../../lib/episodeQueries'
 import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
-import { useEpisodeReportsQuery, useSaveReportMutation } from '../../lib/reportQueries'
+import {
+  useArchiveReportMutation,
+  useDeleteReportMutation,
+  useEpisodeReportsQuery,
+  useSaveReportMutation,
+} from '../../lib/reportQueries'
 import { attendanceLabel, formatSessionDateTime, isClientSessionAppointment } from '../../lib/appointmentUtils'
 import RecordTable from '../../components/RecordTable'
 import { useAppointmentOverlay } from '../appointments/AppointmentOverlay'
@@ -57,7 +62,9 @@ const APPOINTMENT_COLUMNS = [
 
 const REPORT_COLUMNS = [
   { key: 'title', label: 'Title', filter: 'text', sort: 'text' },
+  { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
   { key: 'date', label: 'Date', sort: 'date' },
+  { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
 function CourseAccordion({ title, open, onToggle, actions, children }) {
@@ -214,6 +221,8 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
   const { data: reportTemplates = [] } = useTemplatesQuery('report')
   const { data: reports = [], isPending } = useEpisodeReportsQuery(episode.id)
   const saveReport = useSaveReportMutation()
+  const removeReport = useDeleteReportMutation(episode.id, clientId)
+  const archiveReport = useArchiveReportMutation(episode.id, clientId)
   const [openId, setOpenId] = useState(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('<p></p>')
@@ -284,6 +293,32 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
     }
   }
 
+  const onArchive = async (report) => {
+    try {
+      await archiveReport.mutateAsync({ id: report.id, archived: !report.archived_at })
+      toast.saved(report.archived_at ? 'Report restored' : 'Report archived')
+    } catch (err) {
+      toast.error(err?.message || 'Could not update this report')
+    }
+  }
+
+  const onDelete = async (report) => {
+    const ok = await confirm({
+      title: 'Delete this report?',
+      message: 'This permanently removes the report from the course.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      await removeReport.mutateAsync(report.id)
+      if (openId === report.id) setOpenId(null)
+      toast.saved('Report deleted')
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete this report')
+    }
+  }
+
   const mergeContext = buildMergeContext({
     client,
     profile: clinicianProfile,
@@ -351,22 +386,52 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
     )
   }
 
-  const rows = reports.map((report) => ({
-    id: report.id,
-    report,
-    filterValues: {
-      title: report.title || 'Untitled report',
-      date: formatDate(report.report_date),
-    },
-    sortValues: {
-      title: report.title || '',
-      date: report.report_date || '',
-    },
-    cells: {
-      title: <span className="record-table__primary">{report.title || 'Untitled report'}</span>,
-      date: formatDate(report.report_date),
-    },
-  }))
+  const rows = reports.map((report) => {
+    const status = report.archived_at ? 'Archived' : 'Active'
+    return {
+      id: report.id,
+      report,
+      filterValues: {
+        title: report.title || 'Untitled report',
+        status,
+        date: formatDate(report.report_date),
+      },
+      sortValues: {
+        title: report.title || '',
+        status,
+        date: report.report_date || '',
+      },
+      cells: {
+        title: <span className="record-table__primary">{report.title || 'Untitled report'}</span>,
+        status: <span className={`badge ${report.archived_at ? 'badge-grey' : 'badge-green'}`}>{status}</span>,
+        date: formatDate(report.report_date),
+        actions: (
+          <span className="practice-docs__actions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={(event) => {
+                event.stopPropagation()
+                onArchive(report)
+              }}
+            >
+              {report.archived_at ? 'Restore' : 'Archive'}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              onClick={(event) => {
+                event.stopPropagation()
+                onDelete(report)
+              }}
+            >
+              Delete
+            </button>
+          </span>
+        ),
+      },
+    }
+  })
 
   return (
     <CourseAccordion

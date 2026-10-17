@@ -2,13 +2,15 @@ import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
 import {
+  deleteLocalReport,
   listLocalReports,
   rememberLocalReport,
   saveLocalReport,
+  setLocalReportArchived,
   type AppReport,
 } from '../store/reports'
 
-const REPORT_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, author_id, report_date, encrypted_payload, payload_format, created_at, updated_at'
+const REPORT_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, author_id, report_date, encrypted_payload, payload_format, created_at, updated_at, archived_at'
 
 type ReportRow = {
   id: string
@@ -22,6 +24,7 @@ type ReportRow = {
   payload_format: string
   created_at: string
   updated_at: string
+  archived_at?: string | null
 }
 
 function parseReport(raw: Json | null | undefined): { title: string; body: string } {
@@ -48,6 +51,7 @@ function toAppReport(row: ReportRow): AppReport {
     report_date: row.report_date,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    archived_at: row.archived_at || null,
   }
 }
 
@@ -147,4 +151,37 @@ export async function saveReportForUser(input: {
     encrypted_payload: payload as unknown as Json,
     payload_format: 'envelope',
   }))
+}
+
+export async function setReportArchived(id: string, archived: boolean): Promise<AppReport> {
+  if (!id) throw new Error('Report not found')
+  const archivedAt = archived ? new Date().toISOString() : null
+  if (!isSupabaseConfigured()) return setLocalReportArchived(id, archivedAt)
+  const supabase = getSupabase()
+  if (!supabase) return setLocalReportArchived(id, archivedAt)
+  const { data, error } = await supabase
+    .from('reports')
+    .update({ archived_at: archivedAt })
+    .eq('id', id)
+    .select(REPORT_COLUMNS)
+    .single()
+  if (error) throw error
+  const [opened] = await withOpenedPayloads('reports', [data as ReportRow])
+  return rememberLocalReport(toAppReport(opened))
+}
+
+export async function deleteReport(id: string): Promise<void> {
+  if (!id) return
+  if (!isSupabaseConfigured()) {
+    deleteLocalReport(id)
+    return
+  }
+  const supabase = getSupabase()
+  if (!supabase) {
+    deleteLocalReport(id)
+    return
+  }
+  const { error } = await supabase.from('reports').delete().eq('id', id)
+  if (error) throw error
+  deleteLocalReport(id)
 }

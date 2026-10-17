@@ -12,6 +12,7 @@ type PracticeRow = {
   payload_format?: string | null
   created_at: string
   updated_at: string
+  archived_at?: string | null
 }
 
 const localItems: PracticeItem[] = []
@@ -40,6 +41,7 @@ function toItem(row: PracticeRow): PracticeItem {
         : (contentFromPayload(row.encrypted_payload) || '<p></p>'),
     created_at: row.created_at,
     updated_at: row.updated_at,
+    archived_at: row.archived_at || null,
   }
 }
 
@@ -81,7 +83,7 @@ export async function listPracticeItems(): Promise<PracticeItem[]> {
   if (!supabase) return localItems.map((item) => ({ ...item }))
   const { data, error } = await supabase
     .from('practice_items')
-    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at')
+    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at, archived_at')
     .order('name', { ascending: true })
   if (error) throw error
   const rows = await withOpenedPayloads('practice_items', (data || []) as PracticeRow[])
@@ -226,4 +228,26 @@ export async function deletePracticeItem(id: string): Promise<void> {
   if (!supabase) throw new Error('Supabase is not configured')
   const { error } = await supabase.from('practice_items').delete().eq('id', id)
   if (error) throw error
+}
+
+export async function setPracticeItemArchived(id: string, archived: boolean): Promise<PracticeItem> {
+  if (!id || id === 'new') throw new Error('Document not found')
+  const archivedAt = archived ? new Date().toISOString() : null
+  if (!isSupabaseConfigured()) {
+    const idx = localItems.findIndex((item) => item.id === id)
+    if (idx === -1) throw new Error('Document not found')
+    localItems[idx] = { ...localItems[idx], archived_at: archivedAt }
+    return { ...localItems[idx] }
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { data, error } = await supabase
+    .from('practice_items')
+    .update({ archived_at: archivedAt })
+    .eq('id', id)
+    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at, archived_at')
+    .single()
+  if (error) throw error
+  const [opened] = await withOpenedPayloads('practice_items', [data as PracticeRow])
+  return toItem(opened)
 }

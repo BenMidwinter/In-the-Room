@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import SectionNav from '../../components/SectionNav'
 import LettersPanel from './LettersPanel'
 import WorkingDocumentsPanel from './WorkingDocumentsPanel'
 import { useClientChrome } from './ClientChrome'
@@ -11,29 +12,13 @@ export default function ClientDocumentsPage() {
   return (
     <div className="documents-page">
       {!editing && (
-        <>
-          <header className="course-page__header">
-            <div>
-              <h2>Documents</h2>
-            </div>
-          </header>
-          <div className="documents-page__tabs" role="tablist" aria-label="Document types">
-            <button
-              type="button"
-              className={tab === 'letters' ? 'primary' : 'secondary'}
-              onClick={() => setTab('letters')}
-            >
-              Letters
-            </button>
-            <button
-              type="button"
-              className={tab === 'working' ? 'primary' : 'secondary'}
-              onClick={() => setTab('working')}
-            >
-              Working documents
-            </button>
-          </div>
-        </>
+        <SectionNav
+          label="Document types"
+          items={[
+            { key: 'letters', label: 'Letters', active: tab === 'letters', onSelect: () => setTab('letters') },
+            { key: 'working', label: 'Working documents', active: tab === 'working', onSelect: () => setTab('working') },
+          ]}
+        />
       )}
       {tab === 'letters' ? <LettersPanel /> : <WorkingDocumentsPanel />}
     </div>

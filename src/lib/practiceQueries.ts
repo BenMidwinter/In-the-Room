@@ -5,6 +5,7 @@ import {
   listPracticeItems,
   renamePracticeItem,
   savePracticeDocument,
+  setPracticeItemArchived,
 } from './supabase/practiceItemsRepo'
 
 export const practiceQueryKeys = {
@@ -24,7 +25,8 @@ export function usePracticeItemMutation() {
     mutationFn: async (action: { type: 'create'; parentId?: string | null; kind: 'folder' | 'document'; name: string; content?: string }
       | { type: 'save'; id?: string | null; parentId?: string | null; name: string; content: string }
       | { type: 'rename'; id: string; name: string }
-      | { type: 'delete'; id: string }) => {
+      | { type: 'delete'; id: string }
+      | { type: 'archive'; id: string; archived: boolean }) => {
       if (action.type === 'create') {
         return createPracticeItem(action)
       }
@@ -33,6 +35,9 @@ export function usePracticeItemMutation() {
       }
       if (action.type === 'rename') {
         return renamePracticeItem(action.id, action.name)
+      }
+      if (action.type === 'archive') {
+        return setPracticeItemArchived(action.id, action.archived)
       }
       await deletePracticeItem(action.id)
       return null
