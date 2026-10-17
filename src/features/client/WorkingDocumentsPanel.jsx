@@ -36,9 +36,9 @@ const DOC_COLUMNS = [
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
-export default function WorkingDocumentsPanel() {
+export default function WorkingDocumentsPanel({ embedded = false }) {
   const { clientId, client, session } = useClientSession()
-  const { data: documents = [], refetch } = useQuery({
+  const { data: documents = [], refetch, isPending, error } = useQuery({
     queryKey: ['working-documents', clientId],
     queryFn: () => listWorkingDocuments(clientId),
   })
@@ -228,9 +228,23 @@ export default function WorkingDocumentsPanel() {
         clientName={client?.real_name}
         onBack={handleCancel}
         actions={(
-          <button type="button" className="primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save document'}
-          </button>
+          <>
+            {selectedId !== 'new' && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  const doc = documents.find((row) => row.id === selectedId)
+                  if (doc) handleDelete(doc)
+                }}
+              >
+                Delete
+              </button>
+            )}
+            <button type="button" className="primary" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save document'}
+            </button>
+          </>
         )}
         meta={(
           <>
@@ -274,18 +288,19 @@ export default function WorkingDocumentsPanel() {
 
   return (
     <RecordListLayout
-      title="Working documents"
+      title={embedded ? '' : 'Working documents'}
       newLabel="working document"
       onNew={handleNew}
     >
-      {!editing && (
+      {error && <p className="form-error" role="alert">{error.message || 'Could not load documents.'}</p>}
+      {!editing && !error && (
         <RecordTable
           remember={`working-documents-${clientId}`}
           columns={DOC_COLUMNS}
           rows={rows}
           defaultSort={{ key: 'updated', direction: 'desc' }}
           countNoun="documents"
-          emptyMessage="No working documents yet."
+          emptyMessage={isPending ? 'Loading documents…' : 'No working documents yet.'}
           onRowClick={(row) => selectDocument(row.doc)}
         />
       )}

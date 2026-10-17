@@ -14,12 +14,16 @@ export default function RecordListLayout({
   editor,
   className = '',
 }) {
+  const showTitle = Boolean(title)
+  const showHeader = showTitle || Boolean(subtitle) || Boolean(headerActions) || Boolean(newLabel && onNew)
+
   return (
     <div className={`flex min-w-0 flex-col gap-0 ${className}`.trim()}>
+      {showHeader && (
       <header className="mb-0 flex flex-wrap items-start justify-between gap-3 border-b border-line-light pb-4">
         <div className="flex min-w-0 items-center gap-1.5">
-          <h2 className="m-0 text-lg font-bold leading-tight text-accent">{title}</h2>
-          {subtitle ? <HelpTip text={subtitle} label={`About ${title}`} /> : null}
+          {showTitle ? <h2 className="m-0 text-lg font-bold leading-tight text-accent">{title}</h2> : <span />}
+          {subtitle ? <HelpTip text={subtitle} label={`About ${title || 'this list'}`} /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {headerActions}
@@ -30,6 +34,7 @@ export default function RecordListLayout({
           )}
         </div>
       </header>
+      )}
 
       {toolbar && (
         <div className="flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-line-light py-3.5">

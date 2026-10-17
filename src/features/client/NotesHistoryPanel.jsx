@@ -38,7 +38,7 @@ export default function NotesHistoryPanel() {
   const navigate = useNavigate()
   const toast = useToast()
   const confirm = useConfirm()
-  const { data: notes = [] } = useProgressNotesFeedQuery(clientId)
+  const { data: notes = [], isPending, error } = useProgressNotesFeedQuery(clientId)
   const { data: appointments = [] } = useClientAppointmentsQuery(clientId)
   const removeNote = useDeleteProgressNoteMutation(clientId)
   const archiveNote = useArchiveProgressNoteMutation(clientId)
@@ -146,15 +146,18 @@ export default function NotesHistoryPanel() {
     <RecordListLayout
       title="Process Notes"
     >
-      <RecordTable
-        remember={`notes-${clientId}`}
-        columns={NOTE_COLUMNS}
-        rows={rows}
-        countNoun="notes"
-        defaultSort={{ key: 'date', direction: 'desc' }}
-        emptyMessage="No Process Notes recorded yet."
-        onRowClick={openNote}
-      />
+      {error && <p className="form-error" role="alert">{error.message || 'Could not load Process Notes.'}</p>}
+      {!error && (
+        <RecordTable
+          remember={`notes-${clientId}`}
+          columns={NOTE_COLUMNS}
+          rows={rows}
+          countNoun="notes"
+          defaultSort={{ key: 'date', direction: 'desc' }}
+          emptyMessage={isPending ? 'Loading notes…' : 'No Process Notes recorded yet.'}
+          onRowClick={openNote}
+        />
+      )}
     </RecordListLayout>
   )
 }

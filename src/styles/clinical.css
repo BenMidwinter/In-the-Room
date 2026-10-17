@@ -1081,6 +1081,14 @@ a.badge {
   cursor: pointer;
 }
 
+.documents-page__mast {
+  margin: 0 0 0.75rem;
+}
+
+.documents-page__mast .client-nav-bar {
+  margin: 0;
+}
+
 .documents-page__tabs {
   display: flex;
   flex-wrap: wrap;

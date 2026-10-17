@@ -12,15 +12,19 @@ export default function ClientDocumentsPage() {
   return (
     <div className="documents-page">
       {!editing && (
-        <SectionNav
-          label="Document types"
-          items={[
-            { key: 'letters', label: 'Letters', active: tab === 'letters', onSelect: () => setTab('letters') },
-            { key: 'working', label: 'Working documents', active: tab === 'working', onSelect: () => setTab('working') },
-          ]}
-        />
+        <div className="documents-page__mast">
+          <SectionNav
+            label="Document types"
+            items={[
+              { key: 'letters', label: 'Letters', active: tab === 'letters', onSelect: () => setTab('letters') },
+              { key: 'working', label: 'Working documents', active: tab === 'working', onSelect: () => setTab('working') },
+            ]}
+          />
+        </div>
       )}
-      {tab === 'letters' ? <LettersPanel /> : <WorkingDocumentsPanel />}
+      {tab === 'letters'
+        ? <LettersPanel embedded />
+        : <WorkingDocumentsPanel embedded />}
     </div>
   )
 }

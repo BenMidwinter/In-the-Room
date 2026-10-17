@@ -41,9 +41,9 @@ const LETTER_COLUMNS = [
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
-export default function LettersPanel() {
+export default function LettersPanel({ embedded = false }) {
   const { clientId, session, client } = useClientSession()
-  const { data: letters = [], refetch } = useQuery({
+  const { data: letters = [], refetch, isPending, error } = useQuery({
     queryKey: ['letters', clientId],
     queryFn: () => listLettersForClient(clientId),
   })
@@ -281,6 +281,18 @@ export default function LettersPanel() {
         onBack={handleCancel}
         actions={(
           <>
+            {selectedId !== 'new' && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  const letter = letters.find((row) => row.id === selectedId)
+                  if (letter) handleDelete(letter)
+                }}
+              >
+                Delete
+              </button>
+            )}
             <button type="button" className="secondary" onClick={handleDownload}>Download</button>
             <button type="button" className="primary" onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save letter'}
@@ -364,18 +376,19 @@ export default function LettersPanel() {
 
   return (
     <RecordListLayout
-      title="Letters"
+      title={embedded ? '' : 'Letters'}
       newLabel="letter"
       onNew={handleNew}
     >
-      {!editing && (
+      {error && <p className="form-error" role="alert">{error.message || 'Could not load letters.'}</p>}
+      {!editing && !error && (
         <RecordTable
           remember={`letters-${clientId}`}
           columns={LETTER_COLUMNS}
           rows={rows}
           countNoun="letters"
           defaultSort={{ key: 'updated', direction: 'desc' }}
-          emptyMessage="No letters yet."
+          emptyMessage={isPending ? 'Loading letters…' : 'No letters yet.'}
           onRowClick={(row) => selectLetter(row.letter)}
         />
       )}

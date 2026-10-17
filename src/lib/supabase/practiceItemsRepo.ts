@@ -2,6 +2,10 @@ import { type PracticeItem, type PracticeKind } from '../practiceItems'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
+import { selectWithOptionalArchive, updateArchiveColumn } from './optionalArchive'
+
+const PRACTICE_COLUMNS_BASE = 'id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at'
+const PRACTICE_COLUMNS = `${PRACTICE_COLUMNS_BASE}, archived_at`
 
 type PracticeRow = {
   id: string
@@ -81,12 +85,11 @@ export async function listPracticeItems(): Promise<PracticeItem[]> {
   if (!isSupabaseConfigured()) return localItems.map((item) => ({ ...item }))
   const supabase = getSupabase()
   if (!supabase) return localItems.map((item) => ({ ...item }))
-  const { data, error } = await supabase
-    .from('practice_items')
-    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at, archived_at')
-    .order('name', { ascending: true })
-  if (error) throw error
-  const rows = await withOpenedPayloads('practice_items', (data || []) as PracticeRow[])
+  const data = await selectWithOptionalArchive(
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS).order('name', { ascending: true }),
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS_BASE).order('name', { ascending: true }),
+  )
+  const rows = await withOpenedPayloads('practice_items', data as PracticeRow[])
   return rows.map((row) => toItem(row)).sort((a, b) => a.name.localeCompare(b.name))
 }
 
@@ -241,13 +244,12 @@ export async function setPracticeItemArchived(id: string, archived: boolean): Pr
   }
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
-  const { data, error } = await supabase
-    .from('practice_items')
-    .update({ archived_at: archivedAt })
-    .eq('id', id)
-    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at, archived_at')
-    .single()
-  if (error) throw error
-  const [opened] = await withOpenedPayloads('practice_items', [data as PracticeRow])
+  await updateArchiveColumn(() => supabase.from('practice_items').update({ archived_at: archivedAt }).eq('id', id))
+  const rows = await selectWithOptionalArchive(
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS).eq('id', id),
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS_BASE).eq('id', id),
+  )
+  if (!rows[0]) throw new Error('Document not found')
+  const [opened] = await withOpenedPayloads('practice_items', [{ ...(rows[0] as PracticeRow), archived_at: archivedAt }])
   return toItem(opened)
 }

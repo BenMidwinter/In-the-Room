@@ -379,7 +379,7 @@ export default function PracticeDocumentsPage() {
         </nav>
       )}
       {error && (
-        <p className="text-muted">{error.message || 'Could not load documents.'}</p>
+        <p className="form-error" role="alert">{error.message || 'Could not load documents.'}</p>
       )}
       {!error && (
         <RecordTable

@@ -47,6 +47,7 @@ const COLUMNS = [
   { key: 'time', label: 'Time', sort: 'text' },
   { key: 'somatic', label: 'Somatic state', filter: 'choice', sort: 'text' },
   { key: 'preview', label: 'Preview', filter: 'text' },
+  { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
 export default function ClinicianJournal() {
@@ -112,8 +113,8 @@ export default function ClinicianJournal() {
     }
   }
 
-  const handleDelete = async () => {
-    if (!openId || openId === 'new') {
+  const handleDelete = async (entryId = openId) => {
+    if (!entryId || entryId === 'new') {
       close()
       return
     }
@@ -125,8 +126,8 @@ export default function ClinicianJournal() {
     })
     if (!ok) return
     try {
-      await removeEntry.mutateAsync(openId)
-      close()
+      await removeEntry.mutateAsync(entryId)
+      if (openId === entryId) close()
       toast.saved('Entry deleted')
     } catch (err) {
       toast.error(err?.message || 'Could not delete this entry')
@@ -157,6 +158,19 @@ export default function ClinicianJournal() {
           </span>
         ),
         preview: <span className="record-table__primary">{preview}</span>,
+        actions: (
+          <button
+            type="button"
+            className="secondary"
+            onClick={(event) => {
+              event.stopPropagation()
+              handleDelete(entry.id)
+            }}
+            disabled={removeEntry.isPending}
+          >
+            Delete
+          </button>
+        ),
       },
     }
   })
@@ -226,7 +240,7 @@ export default function ClinicianJournal() {
 
   return (
     <RecordListLayout title="Journal" newLabel="entry" onNew={openNew}>
-      {error && <p className="text-muted">{error.message || 'Could not load journal entries.'}</p>}
+      {error && <p className="form-error" role="alert">{error.message || 'Could not load journal entries.'}</p>}
       {!error && (
         <RecordTable
           remember="practice-journal"

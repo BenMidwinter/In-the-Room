@@ -5,8 +5,10 @@ import type { StoreRecord } from '../types/collections'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
+import { selectWithOptionalArchive, updateArchiveColumn } from './optionalArchive'
 
-const LETTER_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, author_id, letter_date, encrypted_payload, payload_format, created_at, updated_at, archived_at'
+const LETTER_COLUMNS_BASE = 'id, owner_id, organization_id, client_id, episode_id, author_id, letter_date, encrypted_payload, payload_format, created_at, updated_at'
+const LETTER_COLUMNS = `${LETTER_COLUMNS_BASE}, archived_at`
 
 type LetterPayload = {
   v: 0
@@ -94,13 +96,11 @@ export async function listLettersForClient(clientId: string): Promise<AppLetter[
   if (!clientId || !isSupabaseConfigured() || !isUuid(clientId)) return localLetters(clientId)
   const supabase = getSupabase()
   if (!supabase) return localLetters(clientId)
-  const { data, error } = await supabase
-    .from('letters')
-    .select(LETTER_COLUMNS)
-    .eq('client_id', clientId)
-    .order('updated_at', { ascending: false })
-  if (error) throw error
-  const rows = await withOpenedPayloads('letters', (data || []) as LetterRow[])
+  const data = await selectWithOptionalArchive(
+    () => supabase.from('letters').select(LETTER_COLUMNS).eq('client_id', clientId).order('updated_at', { ascending: false }),
+    () => supabase.from('letters').select(LETTER_COLUMNS_BASE).eq('client_id', clientId).order('updated_at', { ascending: false }),
+  )
+  const rows = await withOpenedPayloads('letters', data as LetterRow[])
   return rows.map((row) => remember(toAppLetter(row)))
 }
 
@@ -135,7 +135,7 @@ export async function saveLetterForUser(payload: Record<string, unknown>, userId
       .from('letters')
       .update({ letter_date: letterDate })
       .eq('id', existingId)
-      .select(LETTER_COLUMNS)
+      .select(LETTER_COLUMNS_BASE)
       .single()
     if (error) throw error
     return remember(toAppLetter({
@@ -151,7 +151,7 @@ export async function saveLetterForUser(payload: Record<string, unknown>, userId
   }, body)
   const { data, error } = await supabase
     .from('letters')
-    .select(LETTER_COLUMNS)
+    .select(LETTER_COLUMNS_BASE)
     .eq('id', created.id)
     .single()
   if (error) throw error
@@ -173,14 +173,13 @@ export async function setLetterArchived(id: string, archived: boolean): Promise<
   }
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
-  const { data, error } = await supabase
-    .from('letters')
-    .update({ archived_at: archivedAt })
-    .eq('id', id)
-    .select(LETTER_COLUMNS)
-    .single()
-  if (error) throw error
-  const [opened] = await withOpenedPayloads('letters', [data as LetterRow])
+  await updateArchiveColumn(() => supabase.from('letters').update({ archived_at: archivedAt }).eq('id', id))
+  const rows = await selectWithOptionalArchive(
+    () => supabase.from('letters').select(LETTER_COLUMNS).eq('id', id),
+    () => supabase.from('letters').select(LETTER_COLUMNS_BASE).eq('id', id),
+  )
+  if (!rows[0]) throw new Error('Letter not found')
+  const [opened] = await withOpenedPayloads('letters', [{ ...(rows[0] as LetterRow), archived_at: archivedAt }])
   return remember(toAppLetter(opened))
 }
 

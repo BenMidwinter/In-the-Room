@@ -147,17 +147,36 @@ export default function PracticeLogPage({ kind }) {
     }
   }
 
+  const removeFromList = async (entry) => {
+    const ok = await confirm({
+      title: 'Delete this entry?',
+      message: 'This removes it from your log.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      await removeEntry.mutateAsync(entry.id)
+      if (openId === entry.id) close()
+      toast.saved('Entry deleted')
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete this entry')
+    }
+  }
+
   const columns = kind === 'supervision'
     ? [
       { key: 'date', label: 'Date', sort: 'date' },
       { key: 'direction', label: 'Type', filter: 'choice', sort: 'text' },
       { key: 'label', label: 'With', filter: 'text', sort: 'text' },
       { key: 'hours', label: 'Hours', sort: 'number' },
+      { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
     ]
     : [
       { key: 'date', label: 'Date', sort: 'date' },
       { key: 'label', label: 'Activity', filter: 'text', sort: 'text' },
       { key: 'hours', label: 'Hours', sort: 'number' },
+      { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
     ]
 
   const rows = entries.map((entry) => {
@@ -181,6 +200,19 @@ export default function PracticeLogPage({ kind }) {
         direction: type,
         label: <span className="record-table__primary">{entry.label}</span>,
         hours: hoursLabel,
+        actions: (
+          <button
+            type="button"
+            className="secondary"
+            onClick={(event) => {
+              event.stopPropagation()
+              removeFromList(entry)
+            }}
+            disabled={removeEntry.isPending}
+          >
+            Delete
+          </button>
+        ),
       },
     }
   })
@@ -265,7 +297,7 @@ export default function PracticeLogPage({ kind }) {
 
   return (
     <RecordListLayout title={copy.title} newLabel={copy.newLabel} onNew={openNew}>
-      {error && <p className="text-muted">{error.message || 'Could not load this log.'}</p>}
+      {error && <p className="form-error" role="alert">{error.message || 'Could not load this log.'}</p>}
       {!error && (
         <RecordTable
           remember={`practice-${kind}`}

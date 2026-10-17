@@ -9,8 +9,10 @@ import {
   setLocalReportArchived,
   type AppReport,
 } from '../store/reports'
+import { selectWithOptionalArchive, updateArchiveColumn } from './optionalArchive'
 
-const REPORT_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, author_id, report_date, encrypted_payload, payload_format, created_at, updated_at, archived_at'
+const REPORT_COLUMNS_BASE = 'id, owner_id, organization_id, client_id, episode_id, author_id, report_date, encrypted_payload, payload_format, created_at, updated_at'
+const REPORT_COLUMNS = `${REPORT_COLUMNS_BASE}, archived_at`
 
 type ReportRow = {
   id: string
@@ -60,13 +62,11 @@ export async function listReportsForEpisode(episodeId: string): Promise<AppRepor
   if (!isSupabaseConfigured()) return listLocalReports(episodeId)
   const supabase = getSupabase()
   if (!supabase) return listLocalReports(episodeId)
-  const { data, error } = await supabase
-    .from('reports')
-    .select(REPORT_COLUMNS)
-    .eq('episode_id', episodeId)
-    .order('report_date', { ascending: false })
-  if (error) throw error
-  const rows = await withOpenedPayloads('reports', (data || []) as ReportRow[])
+  const data = await selectWithOptionalArchive(
+    () => supabase.from('reports').select(REPORT_COLUMNS).eq('episode_id', episodeId).order('report_date', { ascending: false }),
+    () => supabase.from('reports').select(REPORT_COLUMNS_BASE).eq('episode_id', episodeId).order('report_date', { ascending: false }),
+  )
+  const rows = await withOpenedPayloads('reports', data as ReportRow[])
   for (const row of rows) rememberLocalReport(toAppReport(row))
   return listLocalReports(episodeId)
 }
@@ -125,7 +125,7 @@ export async function saveReportForUser(input: {
         report_date: reportDate,
       })
       .eq('id', existingId)
-      .select(REPORT_COLUMNS)
+      .select(REPORT_COLUMNS_BASE)
       .single()
     if (error) throw error
     return rememberLocalReport(toAppReport({
@@ -142,7 +142,7 @@ export async function saveReportForUser(input: {
   }, payload)
   const { data, error } = await supabase
     .from('reports')
-    .select(REPORT_COLUMNS)
+    .select(REPORT_COLUMNS_BASE)
     .eq('id', created.id)
     .single()
   if (error) throw error
@@ -159,14 +159,13 @@ export async function setReportArchived(id: string, archived: boolean): Promise<
   if (!isSupabaseConfigured()) return setLocalReportArchived(id, archivedAt)
   const supabase = getSupabase()
   if (!supabase) return setLocalReportArchived(id, archivedAt)
-  const { data, error } = await supabase
-    .from('reports')
-    .update({ archived_at: archivedAt })
-    .eq('id', id)
-    .select(REPORT_COLUMNS)
-    .single()
-  if (error) throw error
-  const [opened] = await withOpenedPayloads('reports', [data as ReportRow])
+  await updateArchiveColumn(() => supabase.from('reports').update({ archived_at: archivedAt }).eq('id', id))
+  const rows = await selectWithOptionalArchive(
+    () => supabase.from('reports').select(REPORT_COLUMNS).eq('id', id),
+    () => supabase.from('reports').select(REPORT_COLUMNS_BASE).eq('id', id),
+  )
+  if (!rows[0]) throw new Error('Report not found')
+  const [opened] = await withOpenedPayloads('reports', [{ ...(rows[0] as ReportRow), archived_at: archivedAt }])
   return rememberLocalReport(toAppReport(opened))
 }
 

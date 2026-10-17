@@ -219,7 +219,7 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
   const confirm = useConfirm()
   const { profile: accountProfile } = useAuth()
   const { data: reportTemplates = [] } = useTemplatesQuery('report')
-  const { data: reports = [], isPending } = useEpisodeReportsQuery(episode.id)
+  const { data: reports = [], isPending, error: reportsError } = useEpisodeReportsQuery(episode.id)
   const saveReport = useSaveReportMutation()
   const removeReport = useDeleteReportMutation(episode.id, clientId)
   const archiveReport = useArchiveReportMutation(episode.id, clientId)
@@ -332,9 +332,24 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
         clientName={client?.real_name}
         onBack={() => setOpenId(null)}
         actions={(
-          <button type="button" className="primary" onClick={save} disabled={saveReport.isPending}>
-            {saveReport.isPending ? 'Saving…' : 'Save report'}
-          </button>
+          <>
+            {openId !== 'new' && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => {
+                  const report = reports.find((row) => row.id === openId)
+                  if (report) onDelete(report)
+                }}
+                disabled={removeReport.isPending}
+              >
+                Delete
+              </button>
+            )}
+            <button type="button" className="primary" onClick={save} disabled={saveReport.isPending}>
+              {saveReport.isPending ? 'Saving…' : 'Save report'}
+            </button>
+          </>
         )}
         meta={(
           <>
@@ -444,15 +459,20 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
         </button>
       )}
     >
-      <RecordTable
-        remember={`course-reports-${clientId}`}
-        columns={REPORT_COLUMNS}
-        rows={rows}
-        countNoun="reports"
-        defaultSort={{ key: 'date', direction: 'desc' }}
-        emptyMessage={isPending ? 'Loading reports…' : 'No reports on this course yet.'}
-        onRowClick={(row) => openReport(row.report)}
-      />
+      {reportsError && (
+        <p className="form-error" role="alert">{reportsError.message || 'Could not load reports.'}</p>
+      )}
+      {!reportsError && (
+        <RecordTable
+          remember={`course-reports-${clientId}`}
+          columns={REPORT_COLUMNS}
+          rows={rows}
+          countNoun="reports"
+          defaultSort={{ key: 'date', direction: 'desc' }}
+          emptyMessage={isPending ? 'Loading reports…' : 'No reports on this course yet.'}
+          onRowClick={(row) => openReport(row.report)}
+        />
+      )}
     </CourseAccordion>
   )
 }

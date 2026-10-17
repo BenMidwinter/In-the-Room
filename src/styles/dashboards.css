@@ -265,13 +265,6 @@
     min-height: 50vh;
   }
 
-  .page--home .home-dashboard,
-  .page--client .client-shell__header,
-  .page--client .client-layout {
-    padding-left: var(--space-inline);
-    padding-right: var(--space-inline);
-  }
-
   .home-dashboard .section-card,
   .page--home .section-card {
     border: none;

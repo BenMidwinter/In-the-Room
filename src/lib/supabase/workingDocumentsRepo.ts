@@ -5,8 +5,10 @@ import type { StoreRecord } from '../types/collections'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
+import { selectWithOptionalArchive, updateArchiveColumn } from './optionalArchive'
 
-const COLUMNS = 'id, client_id, author_id, encrypted_payload, payload_format, created_at, updated_at, archived_at'
+const COLUMNS_BASE = 'id, client_id, author_id, encrypted_payload, payload_format, created_at, updated_at'
+const COLUMNS = `${COLUMNS_BASE}, archived_at`
 
 type DocumentRow = {
   id: string
@@ -69,13 +71,11 @@ export async function listWorkingDocuments(clientId: string): Promise<AppWorking
   if (!clientId || !isSupabaseConfigured() || !isUuid(clientId)) return localDocuments(clientId)
   const supabase = getSupabase()
   if (!supabase) return localDocuments(clientId)
-  const { data, error } = await supabase
-    .from('working_documents')
-    .select(COLUMNS)
-    .eq('client_id', clientId)
-    .order('updated_at', { ascending: false })
-  if (error) throw error
-  const rows = await withOpenedPayloads('working_documents', (data || []) as DocumentRow[])
+  const data = await selectWithOptionalArchive(
+    () => supabase.from('working_documents').select(COLUMNS).eq('client_id', clientId).order('updated_at', { ascending: false }),
+    () => supabase.from('working_documents').select(COLUMNS_BASE).eq('client_id', clientId).order('updated_at', { ascending: false }),
+  )
+  const rows = await withOpenedPayloads('working_documents', data as DocumentRow[])
   return rows.map((row) => remember(toDocument(row)))
 }
 
@@ -99,14 +99,14 @@ export async function saveWorkingDocumentForUser(payload: Record<string, unknown
     await sealClinicalRecord('working_documents', existingId, body)
     const supabase = getSupabase()
     if (!supabase) throw new Error('Supabase is not configured')
-    const { data, error } = await supabase.from('working_documents').select(COLUMNS).eq('id', existingId).single()
+    const { data, error } = await supabase.from('working_documents').select(COLUMNS_BASE).eq('id', existingId).single()
     if (error) throw error
     return remember(toDocument({ ...(data as DocumentRow), encrypted_payload: body as unknown as Json, payload_format: 'envelope' }))
   }
   const created = await createClinicalRecord('working_documents', { client_id: clientId }, body)
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
-  const { data, error } = await supabase.from('working_documents').select(COLUMNS).eq('id', created.id).single()
+  const { data, error } = await supabase.from('working_documents').select(COLUMNS_BASE).eq('id', created.id).single()
   if (error) throw error
   return remember(toDocument({ ...(data as DocumentRow), encrypted_payload: body as unknown as Json, payload_format: 'envelope' }))
 }
@@ -122,14 +122,13 @@ export async function setWorkingDocumentArchived(id: string, archived: boolean):
   }
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
-  const { data, error } = await supabase
-    .from('working_documents')
-    .update({ archived_at: archivedAt })
-    .eq('id', id)
-    .select(COLUMNS)
-    .single()
-  if (error) throw error
-  const [opened] = await withOpenedPayloads('working_documents', [data as DocumentRow])
+  await updateArchiveColumn(() => supabase.from('working_documents').update({ archived_at: archivedAt }).eq('id', id))
+  const rows = await selectWithOptionalArchive(
+    () => supabase.from('working_documents').select(COLUMNS).eq('id', id),
+    () => supabase.from('working_documents').select(COLUMNS_BASE).eq('id', id),
+  )
+  if (!rows[0]) throw new Error('Document not found')
+  const [opened] = await withOpenedPayloads('working_documents', [{ ...(rows[0] as DocumentRow), archived_at: archivedAt }])
   return remember(toDocument(opened))
 }
 
