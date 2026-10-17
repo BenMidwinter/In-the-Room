@@ -1,10 +1,13 @@
 import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { brandLogoUrl, PRODUCT_NAME } from '../../lib/brand'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import TotpCodeInput from './TotpCodeInput'
 
 export default function MfaChallenge() {
   const { verifyTotp, signOut } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [attempt, setAttempt] = useState(0)
@@ -18,7 +21,9 @@ export default function MfaChallenge() {
     if (result.error) {
       setError(result.error)
       setAttempt((value) => value + 1)
+      return
     }
+    if (location.pathname === '/settings/2fa') navigate('/home', { replace: true })
   }
 
   return (

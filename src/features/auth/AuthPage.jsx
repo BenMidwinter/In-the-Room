@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { brandLogoUrl, PRODUCT_NAME } from '../../lib/brand'
+import { loginDestination } from '../../lib/auth/loginDestination'
 import DpaConsent from '../legal/DpaConsent'
 
 export default function AuthPage() {
@@ -17,7 +18,7 @@ export default function AuthPage() {
   } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const next = params.get('next') || '/home'
+  const next = loginDestination(params.get('next'))
 
   const [mode, setMode] = useState('signin')
   const [fullName, setFullName] = useState('')

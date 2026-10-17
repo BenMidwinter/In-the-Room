@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth/AuthProvider'
+import { loginDestination } from '../lib/auth/loginDestination'
 import { brandLogoUrl, PRODUCT_NAME } from '../lib/brand'
 import DpaSignOff from '../features/legal/DpaSignOff'
 import MfaChallenge from '../features/auth/MfaChallenge'
@@ -34,7 +35,7 @@ export default function RequireAuth({ children }) {
   }
 
   if (!user) {
-    const next = `${location.pathname}${location.search}`
+    const next = loginDestination(`${location.pathname}${location.search}`)
     return <Navigate to={`/login?next=${encodeURIComponent(next)}`} replace />
   }
 

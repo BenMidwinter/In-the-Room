@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Outlet, useLocation, useNavigate, matchPath } from 'react-router-dom'
+import { Outlet, useLocation, matchPath } from 'react-router-dom'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useAppClients } from '../../lib/queries'
 import ClientDetailsBar from './ClientDetailsBar'
@@ -11,7 +11,6 @@ import ExportDialog from '../export/ExportDialog'
 
 function PatientProfileFrame({ client: initialClient }) {
   const { editorOpen } = useClientChrome()
-  const navigate = useNavigate()
   const location = useLocation()
   const { session } = useAppSession()
   const { clients } = useAppClients()
@@ -63,7 +62,6 @@ function PatientProfileFrame({ client: initialClient }) {
 
         <div className="client-shell__actions">
           <button type="button" className="secondary" onClick={() => setExportOpen(true)}>Export</button>
-          <button type="button" className="secondary" onClick={() => navigate('/home')}>Home</button>
         </div>
       </header>
       )}

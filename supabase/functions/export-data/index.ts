@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
     const admin = adminClient()
 
     if (body.action === 'list') return jsonResponse({ exports: await listExports(admin, user.id) })
-    if (body.action === 'request') return await requestExport(admin, user, body)
+    if (body.action === 'request') return await requestExport(admin, user, body, exportSite(req))
     return jsonResponse({ error: 'That export action is not available.' }, 400)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Could not export these records.'
@@ -29,10 +29,33 @@ Deno.serve(async (req) => {
   }
 })
 
+const LIVE_SITE = 'https://processandnote.app'
+
+function exportSite(req: Request): string {
+  const fromOrigin = httpsAppSite(req.headers.get('Origin') || '')
+  if (fromOrigin) return fromOrigin
+  const fromSecret = httpsAppSite(secret('SITE_URL') || '')
+  if (fromSecret) return fromSecret
+  return LIVE_SITE
+}
+
+function httpsAppSite(value: string): string {
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase()
+    if (url.protocol !== 'https:') return ''
+    if (host === 'processandnote.app' || host === 'www.processandnote.app') return url.origin
+    return ''
+  } catch {
+    return ''
+  }
+}
+
 async function requestExport(
   admin: ReturnType<typeof adminClient>,
   user: { id: string; email?: string | null },
   body: Record<string, unknown>,
+  site: string,
 ) {
   const scope = body.scope === 'practice' ? 'practice' : body.scope === 'client' ? 'client' : ''
   if (!scope) return jsonResponse({ error: 'Choose a client export or a practice export.' }, 400)
@@ -74,6 +97,7 @@ async function requestExport(
     include,
     dateFrom: scope === 'practice' ? dateFrom : null,
     dateTo: scope === 'practice' ? dateTo : null,
+    site,
   })
   const runtime = (globalThis as { EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void } }).EdgeRuntime
   if (runtime?.waitUntil) runtime.waitUntil(work)
@@ -92,6 +116,7 @@ async function prepareExport(
     include: string[]
     dateFrom: string | null
     dateTo: string | null
+    site: string
   },
 ) {
   const key = `exports/${input.userId}/${input.id}.zip`
@@ -102,9 +127,7 @@ async function prepareExport(
     const tokenHash = await sha256Hex(token)
     const readyAt = new Date()
     const expiresAt = new Date(readyAt.getTime() + DAY_MS)
-    const site = (secret('SITE_URL') || '').replace(/\/$/, '')
-    if (!site) throw new Error('The export link is not configured.')
-    const link = `${site}/export/${token}`
+    const link = `${input.site}/export/${token}`
     await sendResendEmail({
       to: input.email,
       subject: 'Your Process&Note export is ready',
