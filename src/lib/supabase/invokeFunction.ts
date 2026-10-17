@@ -3,7 +3,7 @@ import { getSupabase } from './client'
 /** Invoke a Supabase Edge Function and surface the JSON error body when present. */
 export async function invokeFunction<T = unknown>(
   name: string,
-  options: { method?: string; body?: Record<string, unknown> } = {},
+  options: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: Record<string, unknown> } = {},
 ): Promise<T> {
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')

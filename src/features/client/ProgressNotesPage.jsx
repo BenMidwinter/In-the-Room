@@ -7,6 +7,7 @@ import {
   StickyContextBar,
 } from '../../components/LayoutComponents'
 import RichTextEditor from '../../components/RichTextEditor'
+import ArtworkAttachmentZone from './ArtworkAttachmentZone'
 import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import { useAuth } from '../../lib/auth/AuthProvider'
@@ -854,6 +855,12 @@ function ProgressNotesPageContent() {
               clinicianProfile={clinicianProfile}
             />
           </div>
+          <ArtworkAttachmentZone
+            clientId={client?.id}
+            attachments={artworkAttachments}
+            onChange={setArtworkAttachments}
+            disabled={!editorEditable}
+          />
           {addendums.length > 0 && (
             <div className="progress-note-addenda">
               {addendums.map((item) => (

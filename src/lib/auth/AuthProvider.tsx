@@ -34,6 +34,9 @@ type AuthContextValue = {
   refreshProfile: () => Promise<void>
   profileReady: boolean
   dpaCurrent: boolean
+  mfaReady: boolean
+  needsMfa: boolean
+  verifyTotp: (code: string) => Promise<{ error: string | null }>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -98,6 +101,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     dpaVersions.map((dpa_version) => ({ dpa_version })),
   )
+  const [mfaRecord, setMfaRecord] = useState<{
+    userId: string | null
+    ready: boolean
+    needsMfa: boolean
+  }>({ userId: null, ready: true, needsMfa: false })
+
+  if (mfaRecord.userId !== userId) {
+    setMfaRecord({ userId, ready: !userId, needsMfa: false })
+  }
+
+  const mfaReady = mfaRecord.userId === userId && mfaRecord.ready
+  const needsMfa = mfaRecord.userId === userId && mfaRecord.needsMfa
 
   const refreshProfile = useCallback(async () => {
     if (!userId) return
@@ -142,6 +157,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     Promise.all([fetchProfile(userId), fetchDpaVersions(userId)]).then(([row, versions]) => {
       if (!cancelled) setProfileRecord({ userId, ready: true, profile: row, dpaVersions: versions })
     })
+    return () => { cancelled = true }
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId) return
+    const supabase = getSupabase()
+    if (!supabase) {
+      setMfaRecord({ userId, ready: true, needsMfa: false })
+      return
+    }
+    let cancelled = false
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      .then(({ data, error }) => {
+        if (cancelled) return
+        const needs = !error && data?.nextLevel === 'aal2' && data.currentLevel !== 'aal2'
+        setMfaRecord({ userId, ready: true, needsMfa: Boolean(needs) })
+      })
+      .catch(() => {
+        if (!cancelled) setMfaRecord({ userId, ready: true, needsMfa: false })
+      })
     return () => { cancelled = true }
   }, [userId])
 
@@ -193,11 +228,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null }
   }, [userId])
 
+  const verifyTotp = useCallback(async (code: string) => {
+    const supabase = getSupabase()
+    if (!supabase || !userId) return { error: 'Supabase is not configured' }
+    const digits = code.replace(/\s/g, '')
+    if (!/^\d{6}$/.test(digits)) return { error: 'Enter the six-digit code from your authenticator app.' }
+    const { data: factors, error: listError } = await supabase.auth.mfa.listFactors()
+    if (listError) return { error: listError.message }
+    const factor = (factors?.totp || []).find((item) => item.status === 'verified')
+    if (!factor) return { error: 'No authenticator is enrolled for this account.' }
+    const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: factor.id, code: digits })
+    if (error) return { error: error.message }
+    setMfaRecord({ userId, ready: true, needsMfa: false })
+    return { error: null }
+  }, [userId])
+
   const signOut = useCallback(async () => {
     const supabase = getSupabase()
     if (!supabase) return
     await supabase.auth.signOut()
     setProfileRecord({ userId: null, ready: true, profile: null, dpaVersions: [] })
+    setMfaRecord({ userId: null, ready: true, needsMfa: false })
     setRecovery(false)
   }, [])
 
@@ -235,6 +286,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshProfile,
     profileReady,
     dpaCurrent,
+    mfaReady,
+    needsMfa,
+    verifyTotp,
   }), [
     configured,
     loading,
@@ -250,6 +304,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshProfile,
     profileReady,
     dpaCurrent,
+    mfaReady,
+    needsMfa,
+    verifyTotp,
   ])
 
   return (

@@ -36,3 +36,7 @@ create policy data_exports_select_own
   using (owner_id = auth.uid());
 
 revoke insert, update, delete on public.data_exports from anon, authenticated;
+grant select on public.data_exports to authenticated;
+grant all on public.data_exports to service_role;
+
+notify pgrst, 'reload schema';

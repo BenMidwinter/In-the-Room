@@ -5,7 +5,6 @@ import {
   normalizeWorkplaceSettings,
   mergeSettingsForLocations,
   buildClinicianLocations,
-  PRIVATE_PRACTICE_LOCATION_ID,
 } from '../clinicianAvailability'
 import { defaultBrandingFieldsForWorkplace } from '../workplaceBranding'
 import { normalizeServiceColor, serviceNameToSlug } from '../serviceColors'
@@ -80,10 +79,10 @@ export function getClinicianLocationsForUser(userId) {
         ? { workplace_id: workplace.id, name: workplace.name, role: m.role }
         : null
     })
-    .filter(Boolean)
+    .filter((entry): entry is { workplace_id: string; name: string; role: string } => entry !== null)
 
   const workplacesById = new Map(db.workplaces.map(w => [w.id, w]))
-  return buildClinicianLocations(memberships, workplacesById)
+  return buildClinicianLocations(memberships, workplacesById as Map<string, { name?: string }>)
 }
 
 export function updateClinicianWorkplaceSettings(userId, settings, locationIds) {

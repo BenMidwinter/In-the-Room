@@ -94,6 +94,36 @@
   margin-top: 0.75rem;
 }
 
+.totp-factors {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.totp-factors__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.totp-qr {
+  display: block;
+  width: 180px;
+  height: 180px;
+  margin: 0.75rem 0;
+  background: #fff;
+}
+
+.totp-secret {
+  margin: 0 0 0.75rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+  word-break: break-all;
+}
+
 .payment-lock__mask {
   display: grid;
   gap: 0.65rem;

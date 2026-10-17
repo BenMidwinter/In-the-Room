@@ -33,7 +33,7 @@ export function inDateRange(ymd: string, range: ReportRange): boolean {
 export function eachDate(range: ReportRange): string[] {
   const span = daysBetweenYmd(range.from, range.to)
   if (span < 0) return []
-  const dates = []
+  const dates: string[] = []
   for (let offset = 0; offset <= span; offset += 1) dates.push(addDaysYmd(range.from, offset))
   return dates
 }
@@ -190,7 +190,7 @@ export function summariseAppointments(
   policy: CancellationPolicy = DEFAULT_CANCELLATION_POLICY,
 ): PracticeSummary {
   const byService = new Map<string, { serviceId: string; name: string; minutes: number; sessions: number; earnedPence: number }>()
-  const rows = []
+  const rows: PracticeSummary['rows'] = []
   let deliveredMinutes = 0
   let attended = 0
   let dna = 0

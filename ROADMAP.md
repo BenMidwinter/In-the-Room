@@ -26,15 +26,15 @@ Noted from the hosted site. These stay on the list while encryption is the next 
 
 ## 2. Encryption and login — next
 
-Encryption wiring is the next piece of work. Organisation id is the owner of the clients, ready for a later workspace. The people using the app now are freelance clinicians, one account each. MFA stays off for now. Enrolment and the second-factor lock are a final step, after the rest of the product is in place.
+Encryption wiring is the next piece of work. Organisation id is the owner of the clients, ready for a later workspace. The people using the app now are freelance clinicians, one account each. TOTP enrolment is in Settings. A verified authenticator must be entered before clinical pages on that sign-in. Recovery codes and an API-level AAL2 lock are still later.
 
 - [ ] Envelope encryption for client text and editor text, on top of notes, letters, reports, form answers, and outcome totals. Client names, contacts, clinical profiles, appointment notes, waitlist text, tags, and invoice addressees are included. Journal, working documents, practice documents, templates, form wording, questionnaires, and CPD or supervision notes are included. Bank details are included. The clinician’s name, email, phone, bio, registration, and letterhead stay readable so an account can be supported. Operational columns stay readable: appointment times, attendance, note status, invoice amounts, and service prices.
 - [ ] Keep the current dummy rows. New writes use the envelope. Existing rows stay plain, so the two can be compared. Wipe every test row in one go only when a stable beta is ready.
-- [x] Data processing agreement, version 1.0. Accepted at signup, or on the next sign-in for an account that does not have one yet. The second-factor lock stays off until MFA is enrolled as a final step.
+- [x] Data processing agreement, version 1.1. Accepted at signup, or on the next sign-in for an account that does not have the current version yet. A verified authenticator, once enrolled, is asked for after that agreement.
 
 ## 3. Data management
 
-- [ ] Private document storage in a London S3 bucket, linked to AWS, with short-lived upload and download links.
+- [x] Private document storage in a London S3 bucket, linked to AWS, with short-lived upload and download links. Client file metadata is in `client_files`. The browser talks to S3 directly.
 - [ ] **Export by email.** One client, or the whole practice, as a `.zip` of the individual files. The clinician chooses what is included. The server builds the file and emails a one-time link to the account address. The browser session never receives the file.
 
 The export uses the private London store for the zip, and the same mail provider as invoice email for the link. Supabase Auth email only sends sign-in messages, so it cannot carry this link. Clinical text is decrypted on the server for the person who asked, then placed in the zip. See the export plan below.
@@ -43,7 +43,7 @@ The export uses the private London store for the zip, and the same mail provider
 
 - [x] **Add clients to the waitlist manually.** On the waitlist, Add client moves someone who is already a client onto the waitlist.
 - [ ] **Groups.** Record who attended a group session, with a note and a fee for each person, and invoice those people from that session. On the list, and not a priority.
-- [ ] **Mandatory MFA, as a final step.** Enrol a phone code, then turn on the second-factor lock so a clinical payload is readable only after that code. Leave it until the rest of the product is in place.
+- [ ] **Mandatory MFA, as a final step.** Settings can enrol a TOTP authenticator, and a verified factor must be entered before clinical pages on that sign-in. Still to do: recovery codes, an inactivity lock, and blocking clinical API routes unless the session is AAL2.
 
 ---
 
@@ -60,10 +60,13 @@ The export uses the private London store for the zip, and the same mail provider
 - [ ] Wider sub-processor register for services that are not in version 1.0 yet: document storage, hosting, billing, and transactional email.
 
 - [ ] **Hardened Authentication & Session Lifecycle (Supabase Auth)**
-  - **Mandatory TOTP MFA Enrollment:**
-    - Enforce Time-based One-Time Passwords (TOTP via Google Authenticator, 1Password, Apple Passwords) before allowing route access beyond `/onboarding/mfa`.
+  - **TOTP MFA enrolment (in place for an enrolled factor):**
+    - Settings → Two-factor authentication enrols a TOTP authenticator (Google Authenticator, 1Password, Apple Passwords) with `supabase.auth.mfa`. Removing one asks for the current password.
+    - `supabase/config.toml` has `[auth.mfa.totp]` `enroll_enabled` and `verify_enabled`.
+    - When `getAuthenticatorAssuranceLevel()` reports `nextLevel === 'aal2'` and `currentLevel !== 'aal2'`, clinical routes show a code screen before the rest of the app. An account with no verified factor is not blocked.
+  - **Still to do:**
     - Block access to all clinical API routes/tables if `auth.jwt() -> app_metadata -> aal != 'aal2'` (Supabase Authenticator Assurance Level 2).
-    - Provide secure recovery codes generated on enrollment (hashed with bcrypt before DB storage).
+    - Provide secure recovery codes generated on enrolment (hashed with bcrypt before DB storage).
   - **Session Management & Inactivity Lock:**
     - Configure JWT access token expiration to 15–30 minutes with secure HTTP-only refresh tokens.
     - Implement a client-side inactivity timer: Automatically mask the screen and lock the session after 15 minutes of idle time, requiring biometric/password re-auth to resume without terminating unsaved form state.
@@ -99,6 +102,8 @@ The export uses the private London store for the zip, and the same mail provider
 ## Later detail: Confidential document storage
 
 ### Low-Velocity Confidential Document Storage (AWS S3 + Supabase Architecture)
+
+The app side is in place. `client_files` stores metadata for the signed-in owner (`owner_id`), not a workspace. The `client-files` Edge Function returns a five-minute PUT URL and a 60-second GET URL in `eu-west-2`. The browser sends the file straight to S3. When `AWS_KMS_KEY_ID` is set, the upload is signed for SSE-KMS. Bucket lifecycle, public-access block, and object lock stay with the bucket itself.
 
 - [ ] **AWS S3 Bucket Setup (London `eu-west-2`)**
   - Create a private S3 bucket in `eu-west-2` (strictly enforcing UK data residency under UK GDPR/NHS DSPT).

@@ -2,9 +2,10 @@ import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth/AuthProvider'
 import { brandLogoUrl, PRODUCT_NAME } from '../lib/brand'
 import DpaSignOff from '../features/legal/DpaSignOff'
+import MfaChallenge from '../features/auth/MfaChallenge'
 
 export default function RequireAuth({ children }) {
-  const { configured, loading, user, profileReady, dpaCurrent } = useAuth()
+  const { configured, loading, user, profileReady, dpaCurrent, mfaReady, needsMfa } = useAuth()
   const location = useLocation()
 
   if (!configured) {
@@ -50,6 +51,21 @@ export default function RequireAuth({ children }) {
 
   if (!dpaCurrent) {
     return <DpaSignOff />
+  }
+
+  if (!mfaReady) {
+    return (
+      <div className="auth-page">
+        <div className="auth-page__card">
+          <img className="auth-page__logo" src={brandLogoUrl} alt={PRODUCT_NAME} />
+          <p className="auth-page__lead">Checking your session…</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (needsMfa) {
+    return <MfaChallenge />
   }
 
   return children

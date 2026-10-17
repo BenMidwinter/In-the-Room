@@ -32,11 +32,19 @@ function amzDate(now = new Date()): { amz: string; stamp: string } {
   return { amz, stamp: amz.slice(0, 8) }
 }
 
-export function exportBucket(): { bucket: string; region: string } {
-  const bucket = secret('EXPORT_S3_BUCKET') || secret('AWS_S3_BUCKET')
+function awsEncode(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`)
+}
+
+function bucketConfig(missing: string): { bucket: string; region: string } {
+  const bucket = secret('AWS_S3_BUCKET_NAME') || secret('EXPORT_S3_BUCKET') || secret('AWS_S3_BUCKET')
   const region = secret('EXPORT_S3_REGION') || secret('AWS_REGION') || 'eu-west-2'
-  if (!bucket) throw new Error('Export storage is not configured.')
+  if (!bucket) throw new Error(missing)
   return { bucket, region }
+}
+
+export function exportBucket(): { bucket: string; region: string } {
+  return bucketConfig('Export storage is not configured.')
 }
 
 async function signedS3(
@@ -97,10 +105,81 @@ export async function getExportObject(key: string): Promise<Uint8Array> {
   return new Uint8Array(await response.arrayBuffer())
 }
 
-export async function deleteExportObject(key: string): Promise<void> {
+export async function deleteStoredObject(key: string): Promise<void> {
   const response = await signedS3('DELETE', key)
   if (!response.ok && response.status !== 404) {
     console.error('S3 delete failed', response.status)
-    throw new Error('The export file could not be removed.')
+    throw new Error('The file could not be removed.')
+  }
+}
+
+export async function deleteExportObject(key: string): Promise<void> {
+  try {
+    await deleteStoredObject(key)
+  } catch (error) {
+    if (error instanceof Error && error.message === 'The file could not be removed.') {
+      throw new Error('The export file could not be removed.')
+    }
+    throw error
+  }
+}
+
+/** Short-lived browser URL. The binary never passes through this function. */
+export async function presignObject(input: {
+  method: 'PUT' | 'GET'
+  key: string
+  expiresSeconds: number
+  contentType?: string
+  responseContentDisposition?: string
+}): Promise<{ url: string; headers: Record<string, string> }> {
+  const accessKey = secret('AWS_ACCESS_KEY_ID')
+  const secretKey = secret('AWS_SECRET_ACCESS_KEY')
+  if (!accessKey || !secretKey) throw new Error('File storage is not configured.')
+  const { bucket, region } = bucketConfig('File storage is not configured.')
+  const host = `${bucket}.s3.${region}.amazonaws.com`
+  const path = `/${input.key.split('/').map(awsEncode).join('/')}`
+  const { amz, stamp } = amzDate()
+  const credentialScope = `${stamp}/${region}/s3/aws4_request`
+  const kmsKey = input.method === 'PUT' ? secret('AWS_KMS_KEY_ID') : ''
+  const signedHeaderMap: Record<string, string> = { host }
+  const browserHeaders: Record<string, string> = {}
+  if (input.method === 'PUT') {
+    const contentType = input.contentType || 'application/octet-stream'
+    signedHeaderMap['content-type'] = contentType
+    browserHeaders['content-type'] = contentType
+    if (kmsKey) {
+      signedHeaderMap['x-amz-server-side-encryption'] = 'aws:kms'
+      signedHeaderMap['x-amz-server-side-encryption-aws-kms-key-id'] = kmsKey
+      browserHeaders['x-amz-server-side-encryption'] = 'aws:kms'
+      browserHeaders['x-amz-server-side-encryption-aws-kms-key-id'] = kmsKey
+    }
+  }
+  const signedHeaderNames = Object.keys(signedHeaderMap).sort()
+  const canonicalHeaders = `${signedHeaderNames.map((name) => `${name}:${signedHeaderMap[name]}`).join('\n')}\n`
+  const signedHeaders = signedHeaderNames.join(';')
+  const query: Record<string, string> = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${accessKey}/${credentialScope}`,
+    'X-Amz-Date': amz,
+    'X-Amz-Expires': String(input.expiresSeconds),
+    'X-Amz-SignedHeaders': signedHeaders,
+  }
+  if (input.method === 'GET' && input.responseContentDisposition) {
+    query['response-content-disposition'] = input.responseContentDisposition
+  }
+  const canonicalQuery = Object.keys(query).sort()
+    .map((key) => `${awsEncode(key)}=${awsEncode(query[key])}`)
+    .join('&')
+  const canonical = [input.method, path, canonicalQuery, canonicalHeaders, signedHeaders, 'UNSIGNED-PAYLOAD'].join('\n')
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amz,
+    credentialScope,
+    await sha256Hex(new TextEncoder().encode(canonical)),
+  ].join('\n')
+  const signature = hex(new Uint8Array(await hmac(await signingKey(secretKey, stamp, region), stringToSign)))
+  return {
+    url: `https://${host}${path}?${canonicalQuery}&X-Amz-Signature=${awsEncode(signature)}`,
+    headers: browserHeaders,
   }
 }

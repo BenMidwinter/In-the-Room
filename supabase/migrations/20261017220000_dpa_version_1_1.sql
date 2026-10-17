@@ -29,6 +29,7 @@ create policy profile_dpa_acceptances_select_own
   for select to authenticated
   using (profile_id = auth.uid());
 
+grant select on public.profile_dpa_acceptances to authenticated;
 revoke insert, update, delete on public.profile_dpa_acceptances from anon, authenticated;
 
 -- New sign-ups stamp 1.1. An existing acceptance on the profile is left as it was.
@@ -116,3 +117,5 @@ $$;
 
 revoke all on function public.accept_dpa() from public, anon;
 grant execute on function public.accept_dpa() to authenticated;
+
+notify pgrst, 'reload schema';

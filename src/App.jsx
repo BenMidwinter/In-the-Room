@@ -20,12 +20,12 @@ import ClientPanelEmpty from './features/client/ClientPanelEmpty'
 import ProgressNotesPage from './features/client/ProgressNotesPage'
 import ProgressNotesRedirect from './features/client/ProgressNotesRedirect'
 import LettersPanel from './features/client/LettersPanel'
+import ClientFilesPanel from './features/client/ClientFilesPanel'
 import CaseHistoryPanel from './features/client/CaseHistoryPanel'
 import ClientDocumentsPage from './features/client/ClientDocumentsPage'
 import ClientAppointmentsIndex from './features/client/ClientAppointmentsIndex'
 import ClientSupportActivities from './features/client/ClientSupportActivities'
 import AppointmentEditor from './features/client/AppointmentEditor'
-import ClientSectionPlaceholder from './features/client/ClientSectionPlaceholder'
 import ContactsPanel from './features/client/ContactsPanel'
 import SettingsLayout from './features/settings/SettingsLayout'
 import AccountSettingsPage from './features/settings/AccountSettingsPage'
@@ -109,17 +109,7 @@ export default function App() {
           <Route path="notes-history" element={<NotesHistoryPanel />} />
           <Route path="case-history" element={<CaseHistoryPanel />} />
           <Route path="letters" element={<LettersPanel />} />
-          <Route path="files" element={
-            <ClientSectionPlaceholder
-              title="Files"
-              newLabel="file"
-              columns={[
-                { key: 'name', label: 'File name' },
-                { key: 'type', label: 'Type' },
-                { key: 'date', label: 'Uploaded' },
-              ]}
-            />
-          } />
+          <Route path="files" element={<ClientFilesPanel />} />
           <Route path="documents" element={<ClientDocumentsPage />} />
           <Route path="contacts" element={<ContactsPanel />} />
           <Route path="forms" element={<Navigate to="../case-history" replace />} />

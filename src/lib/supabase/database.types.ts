@@ -447,6 +447,50 @@ export type Database = {
           },
         ]
       }
+      client_files: {
+        Row: {
+          client_id: string
+          created_at: string
+          file_name: string
+          file_size_bytes: number
+          file_type: string
+          id: string
+          organization_id: string | null
+          owner_id: string
+          s3_key: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          file_name: string
+          file_size_bytes: number
+          file_type: string
+          id?: string
+          organization_id?: string | null
+          owner_id: string
+          s3_key: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          file_name?: string
+          file_size_bytes?: number
+          file_type?: string
+          id?: string
+          organization_id?: string | null
+          owner_id?: string
+          s3_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_files_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_identities: {
         Row: {
           client_id: string
