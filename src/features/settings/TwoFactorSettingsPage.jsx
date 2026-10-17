@@ -113,6 +113,7 @@ export default function TwoFactorSettingsPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       await confirmCurrentPassword(password)
+      // Password sign-in replaces the session with AAL1. Put the previous session back so unenroll still has AAL2.
       if (session?.access_token && session.refresh_token) {
         const { error: restoreError } = await supabase.auth.setSession({
           access_token: session.access_token,
