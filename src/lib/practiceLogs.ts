@@ -12,6 +12,7 @@ export type PracticeLog = {
   created_at: string
   updated_at: string
   archived_at?: string | null
+  trashed_at?: string | null
 }
 
 export type PracticeLogInput = {

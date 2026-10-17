@@ -1,19 +1,30 @@
 import { useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
+import BulkStatusBar from '../../components/BulkStatusBar'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import RichTextEditor from '../../components/RichTextEditor'
+import RowMenu from '../../components/RowMenu'
+import StatusBadge from '../../components/StatusBadge'
 import { useConfirm, useToast } from '../../components/ui'
-import { filterByArchiveScope } from '../../lib/archiveScope'
+import { useRowSelection } from '../../hooks/useRowSelection'
 import { useAuth } from '../../lib/auth/AuthProvider'
+import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import { hoursFromMinutes } from '../../lib/practiceLogs'
 import {
-  useArchivePracticeLogMutation,
+  STATUS_COLUMN,
+  STATUS_DEFAULT_FILTERS,
+  bulkActionsForStatus,
+  recordStatusOf,
+  statusLabelOf,
+  statusMenuItems,
+} from '../../lib/recordStatus'
+import {
   useDeletePracticeLogMutation,
   usePracticeLogsQuery,
   useSavePracticeLogMutation,
+  useSetPracticeLogStatusMutation,
 } from '../../lib/practiceLogQueries'
 import { getProfile } from '../../lib/store'
 import DocumentWorkspace from '../client/DocumentWorkspace'
@@ -26,7 +37,6 @@ const COPY = {
     labelName: 'Activity',
     placeholder: 'e.g. Trauma conference',
     empty: 'No CPD logged yet.',
-    emptyArchived: 'No archived CPD entries.',
   },
   supervision: {
     title: 'Supervision log',
@@ -35,7 +45,6 @@ const COPY = {
     labelName: 'With',
     placeholder: 'e.g. Peer group',
     empty: 'No supervision logged yet.',
-    emptyArchived: 'No archived supervision entries.',
   },
 }
 
@@ -69,8 +78,9 @@ export default function PracticeLogPage({ kind }) {
   const { data: entries = [], isPending, error } = usePracticeLogsQuery(kind, userId)
   const saveEntry = useSavePracticeLogMutation(kind, userId)
   const removeEntry = useDeletePracticeLogMutation(kind, userId)
-  const archiveEntry = useArchivePracticeLogMutation(kind, userId)
-  const [archiveScope, setArchiveScope] = useState('active')
+  const setLogStatus = useSetPracticeLogStatusMutation(kind, userId)
+  const [statusFilter, setStatusFilter] = useState('Active')
+  const { selectedIds, selection, clear: clearSelection, count: selectedCount } = useRowSelection()
   const [openId, setOpenId] = useState(null)
   const [occurredOn, setOccurredOn] = useState(() => new Date().toISOString().slice(0, 10))
   const [hours, setHours] = useState('1')
@@ -78,11 +88,6 @@ export default function PracticeLogPage({ kind }) {
   const [direction, setDirection] = useState('received')
   const [content, setContent] = useState('<p></p>')
   const [editorVersion, setEditorVersion] = useState(0)
-
-  const visibleEntries = useMemo(
-    () => filterByArchiveScope(entries, archiveScope),
-    [entries, archiveScope],
-  )
 
   const clinicianProfile = useMemo(
     () => clinicianProfileForEditor(accountProfile, user ? getProfile(user.id) : null),
@@ -138,36 +143,84 @@ export default function PracticeLogPage({ kind }) {
     }
   }
 
-  const remove = async (entryId = openId) => {
-    if (!entryId || entryId === 'new') {
-      close()
-      return
+  const moveStatus = async (entry, nextStatus, toastLabel) => {
+    try {
+      await setLogStatus.mutateAsync({ id: entry.id, status: nextStatus })
+      if (openId === entry.id && nextStatus !== 'active') close()
+      clearSelection()
+      toast.saved(toastLabel)
+    } catch (err) {
+      toast.error(err?.message || 'Could not update this entry')
     }
+  }
+
+  const permanentlyDelete = async (entryId) => {
     const ok = await confirm({
-      title: 'Delete this entry?',
-      message: 'This permanently removes it from your log.',
-      confirmLabel: 'Delete',
+      title: 'Permanently delete this entry?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Permanently delete',
       tone: 'danger',
     })
     if (!ok) return
     try {
       await removeEntry.mutateAsync(entryId)
       if (openId === entryId) close()
-      toast.saved('Entry deleted')
+      clearSelection()
+      toast.saved('Entry permanently deleted')
     } catch (err) {
       toast.error(err?.message || 'Could not delete this entry')
     }
   }
 
-  const handleArchive = async (entry) => {
+  const downloadOne = async (entry) => {
     try {
-      await archiveEntry.mutateAsync({ id: entry.id, archived: !entry.archived_at })
-      if (openId === entry.id && !entry.archived_at) close()
-      toast.saved(entry.archived_at ? 'Entry restored' : 'Entry archived')
+      const metaHtml = `<p>${formatDate(entry.occurred_on)} · ${formatHours(entry.minutes)} hours</p>`
+      const opened = await downloadRichDocumentPdf({
+        title: entry.label || copy.title,
+        bodyHtml: entry.content,
+        metaHtml,
+        mergeContext,
+      })
+      if (!opened) {
+        toast.error('Could not create the PDF. Please try again.')
+        return
+      }
+      toast.success('PDF downloaded.')
     } catch (err) {
-      toast.error(err?.message || 'Could not update this entry')
+      toast.error(err?.message || 'Could not prepare the PDF.')
     }
   }
+
+  const runBulk = async (action) => {
+    const targets = entries.filter((entry) => selectedIds.includes(entry.id))
+    if (!targets.length) return
+    for (const entry of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      await action(entry)
+    }
+  }
+
+  const bulk = bulkActionsForStatus(statusFilter, {
+    onArchive: () => runBulk((entry) => moveStatus(entry, 'archive', 'Entries archived')),
+    onRestore: () => runBulk((entry) => moveStatus(entry, 'active', 'Entries restored')),
+    onDelete: () => runBulk((entry) => moveStatus(entry, 'trash', 'Entries moved to trash')),
+    onRestoreToArchive: () => runBulk((entry) => moveStatus(entry, 'archive', 'Entries restored to archive')),
+    onPermanentDelete: async () => {
+      const ok = await confirm({
+        title: 'Permanently delete selected entries?',
+        message: 'This cannot be undone.',
+        confirmLabel: 'Permanently delete',
+        tone: 'danger',
+      })
+      if (!ok) return
+      await runBulk(async (entry) => {
+        await removeEntry.mutateAsync(entry.id)
+      })
+      clearSelection()
+      toast.saved('Entries permanently deleted')
+    },
+    onDownload: () => runBulk((entry) => downloadOne(entry)),
+  })
 
   const columns = kind === 'supervision'
     ? [
@@ -175,85 +228,66 @@ export default function PracticeLogPage({ kind }) {
       { key: 'direction', label: 'Type', filter: 'choice', sort: 'text' },
       { key: 'label', label: 'With', filter: 'text', sort: 'text' },
       { key: 'hours', label: 'Hours', sort: 'number' },
+      STATUS_COLUMN,
       { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
     ]
     : [
       { key: 'date', label: 'Date', sort: 'date' },
       { key: 'label', label: 'Activity', filter: 'text', sort: 'text' },
       { key: 'hours', label: 'Hours', sort: 'number' },
+      STATUS_COLUMN,
       { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
     ]
 
-  const rows = visibleEntries.map((entry) => {
+  const rows = entries.map((entry) => {
     const type = DIRECTION_LABELS[entry.direction] || ''
     const hoursLabel = formatHours(entry.minutes)
-    const archived = Boolean(entry.archived_at)
+    const status = recordStatusOf(entry)
+    const readOnly = status !== 'active'
     return {
       id: entry.id,
       entry,
       filterValues: {
         label: entry.label,
         direction: type,
+        status: statusLabelOf(entry),
       },
       sortValues: {
         date: entry.occurred_on,
         direction: type,
         label: entry.label,
         hours: entry.minutes,
+        status: statusLabelOf(entry),
       },
+      muted: readOnly,
       cells: {
         date: formatDate(entry.occurred_on),
         direction: type,
         label: <span className="record-table__primary">{entry.label}</span>,
         hours: hoursLabel,
+        status: <StatusBadge status={status} />,
         actions: (
-          <span className="practice-docs__actions">
-            {archived ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleArchive(entry)
-                  }}
-                  disabled={archiveEntry.isPending}
-                >
-                  Restore
-                </button>
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    remove(entry.id)
-                  }}
-                  disabled={removeEntry.isPending}
-                >
-                  Delete
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="secondary"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  handleArchive(entry)
-                }}
-                disabled={archiveEntry.isPending}
-              >
-                Archive
-              </button>
-            )}
-          </span>
+          <RowMenu
+            label={`Actions for ${entry.label}`}
+            items={statusMenuItems(status, {
+              onEdit: () => openExisting(entry),
+              onView: () => openExisting(entry),
+              onArchive: () => moveStatus(entry, 'archive', 'Entry archived'),
+              onRestore: () => moveStatus(entry, 'active', 'Entry restored'),
+              onDelete: () => moveStatus(entry, 'trash', 'Entry moved to trash'),
+              onRestoreToArchive: () => moveStatus(entry, 'archive', 'Entry restored to archive'),
+              onPermanentDelete: () => permanentlyDelete(entry.id),
+              onDownload: () => downloadOne(entry),
+            })}
+          />
         ),
       },
     }
   })
 
   const openEntry = entries.find((entry) => entry.id === openId)
-  const openArchived = Boolean(openEntry?.archived_at)
+  const openStatus = openEntry ? recordStatusOf(openEntry) : 'active'
+  const openReadOnly = openId !== 'new' && openStatus !== 'active'
 
   if (openId) {
     return (
@@ -262,19 +296,29 @@ export default function PracticeLogPage({ kind }) {
         onBack={close}
         actions={(
           <>
-            {openId !== 'new' && (
-              openArchived ? (
-                <>
-                  <button type="button" className="secondary" onClick={() => openEntry && handleArchive(openEntry)} disabled={archiveEntry.isPending || !openEntry}>Restore</button>
-                  <button type="button" className="danger" onClick={() => remove(openId)} disabled={removeEntry.isPending}>Delete</button>
-                </>
-              ) : (
-                <button type="button" className="secondary" onClick={() => openEntry && handleArchive(openEntry)} disabled={archiveEntry.isPending || !openEntry}>Archive</button>
-              )
+            {openId !== 'new' && openEntry && openStatus === 'archive' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openEntry, 'active', 'Entry restored')} disabled={setLogStatus.isPending}>Restore</button>
             )}
-            <button type="button" className="primary" onClick={save} disabled={saveEntry.isPending}>
-              {saveEntry.isPending ? 'Saving…' : 'Save'}
+            {openId !== 'new' && openEntry && openStatus === 'trash' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openEntry, 'archive', 'Entry restored to archive')} disabled={setLogStatus.isPending}>Restore to archive</button>
+            )}
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => downloadOne({
+                label: label.trim() || copy.title,
+                occurred_on: occurredOn,
+                minutes: Math.round(parseFloat(hours || '0') * 60),
+                content,
+              })}
+            >
+              Download
             </button>
+            {!openReadOnly && (
+              <button type="button" className="primary" onClick={save} disabled={saveEntry.isPending}>
+                {saveEntry.isPending ? 'Saving…' : 'Save'}
+              </button>
+            )}
           </>
         )}
         meta={(
@@ -286,6 +330,7 @@ export default function PracticeLogPage({ kind }) {
                 className="progress-notes-page__meta-input"
                 value={occurredOn}
                 onChange={(event) => setOccurredOn(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
             <label className="progress-notes-page__meta-field">
@@ -298,6 +343,7 @@ export default function PracticeLogPage({ kind }) {
                 className="progress-notes-page__meta-input"
                 value={hours}
                 onChange={(event) => setHours(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
             {kind === 'supervision' && (
@@ -307,6 +353,7 @@ export default function PracticeLogPage({ kind }) {
                   className="progress-notes-page__meta-input"
                   value={direction}
                   onChange={(event) => setDirection(event.target.value)}
+                  disabled={openReadOnly}
                 >
                   <option value="received">Received</option>
                   <option value="delivered">Delivered</option>
@@ -320,6 +367,7 @@ export default function PracticeLogPage({ kind }) {
                 value={label}
                 onChange={(event) => setLabel(event.target.value)}
                 placeholder={copy.placeholder}
+                disabled={openReadOnly}
               />
             </label>
           </>
@@ -335,6 +383,7 @@ export default function PracticeLogPage({ kind }) {
           mergeMode="document"
           mergeContext={mergeContext}
           clinicianProfile={clinicianProfile}
+          editable={!openReadOnly}
         />
       </DocumentWorkspace>
     )
@@ -343,22 +392,31 @@ export default function PracticeLogPage({ kind }) {
   return (
     <RecordListLayout
       title={copy.title}
-      newLabel={archiveScope === 'active' ? copy.newLabel : undefined}
-      onNew={archiveScope === 'active' ? openNew : undefined}
-      toolbar={<ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />}
+      newLabel={copy.newLabel}
+      onNew={openNew}
     >
       {error && <p className="form-error" role="alert">{error.message || 'Could not load this log.'}</p>}
+      <BulkStatusBar
+        count={selectedCount}
+        noun={copy.noun}
+        actions={bulk}
+        onClear={clearSelection}
+      />
       {!error && (
         <RecordTable
-          remember={`practice-${kind}`}
+          remember={`practice-${kind}-status`}
           columns={columns}
           rows={rows}
           countNoun={copy.noun}
           defaultSort={{ key: 'date', direction: 'desc' }}
-          emptyMessage={isPending
-            ? 'Loading…'
-            : (archiveScope === 'archived' ? copy.emptyArchived : copy.empty)}
+          defaultFilters={STATUS_DEFAULT_FILTERS}
+          selection={selection}
+          emptyMessage={isPending ? 'Loading…' : copy.empty}
           onRowClick={(row) => openExisting(row.entry)}
+          onFiltersChange={(next) => {
+            const status = String(next?.status || 'Active')
+            if (status !== statusFilter) setStatusFilter(status)
+          }}
         />
       )}
     </RecordListLayout>

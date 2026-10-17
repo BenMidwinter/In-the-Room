@@ -10,7 +10,8 @@ import {
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
-import { selectWithOptionalArchive, updateArchiveColumn } from './optionalArchive'
+import { isTrashExpired, statusTimestamps } from '../recordStatus'
+import { selectWithOptionalStatus, updateStatusColumns } from './optionalRecordStatus'
 
 type StoredLog = PracticeLog & { owner_id: string }
 
@@ -24,14 +25,19 @@ type LogRow = {
   created_at: string
   updated_at: string
   archived_at?: string | null
+  trashed_at?: string | null
 }
+
+type LogStatus = 'active' | 'archive' | 'trash'
 
 const localLogs: StoredLog[] = []
 
 const CPD_COLUMNS_BASE = 'id, occurred_on, minutes, label, encrypted_payload, payload_format, created_at, updated_at'
-const CPD_COLUMNS = `${CPD_COLUMNS_BASE}, archived_at`
+const CPD_COLUMNS_ARCHIVE = `${CPD_COLUMNS_BASE}, archived_at`
+const CPD_COLUMNS = `${CPD_COLUMNS_ARCHIVE}, trashed_at`
 const SUPERVISION_COLUMNS_BASE = 'id, occurred_on, minutes, label, direction, encrypted_payload, payload_format, created_at, updated_at'
-const SUPERVISION_COLUMNS = `${SUPERVISION_COLUMNS_BASE}, archived_at`
+const SUPERVISION_COLUMNS_ARCHIVE = `${SUPERVISION_COLUMNS_BASE}, archived_at`
+const SUPERVISION_COLUMNS = `${SUPERVISION_COLUMNS_ARCHIVE}, trashed_at`
 
 function toLog(kind: LogKind, row: LogRow): PracticeLog {
   const direction = row.direction === 'delivered' || row.direction === 'received'
@@ -48,6 +54,7 @@ function toLog(kind: LogKind, row: LogRow): PracticeLog {
     created_at: row.created_at,
     updated_at: row.updated_at,
     archived_at: row.archived_at || null,
+    trashed_at: row.trashed_at || null,
   }
 }
 
@@ -62,9 +69,26 @@ function sortLogs(items: PracticeLog[]): PracticeLog[] {
 function listLocal(kind: LogKind, userId: string): PracticeLog[] {
   return sortLogs(
     localLogs
-      .filter((entry) => entry.kind === kind && entry.owner_id === userId)
+      .filter((entry) => entry.kind === kind && entry.owner_id === userId && !isTrashExpired(entry.trashed_at))
       .map(({ owner_id: _owner, ...entry }) => entry),
   )
+}
+
+async function purgeExpired(kind: LogKind, rows: LogRow[]) {
+  const supabase = getSupabase()
+  if (!supabase) return rows
+  const table = kind === 'cpd' ? 'cpd_entries' : 'supervision_entries'
+  const keep: LogRow[] = []
+  for (const row of rows) {
+    if (!isTrashExpired(row.trashed_at)) {
+      keep.push(row)
+      continue
+    }
+    await supabase.from(table).delete().eq('id', row.id)
+    const index = localLogs.findIndex((entry) => entry.id === row.id)
+    if (index >= 0) localLogs.splice(index, 1)
+  }
+  return keep
 }
 
 export async function listPracticeLogs(kind: LogKind, userId: string): Promise<PracticeLog[]> {
@@ -74,19 +98,23 @@ export async function listPracticeLogs(kind: LogKind, userId: string): Promise<P
   if (!supabase) return listLocal(kind, userId)
 
   if (kind === 'cpd') {
-    const data = await selectWithOptionalArchive(
+    const data = await selectWithOptionalStatus(
       () => supabase.from('cpd_entries').select(CPD_COLUMNS).order('occurred_on', { ascending: false }),
+      () => supabase.from('cpd_entries').select(CPD_COLUMNS_ARCHIVE).order('occurred_on', { ascending: false }),
       () => supabase.from('cpd_entries').select(CPD_COLUMNS_BASE).order('occurred_on', { ascending: false }),
     )
-    const rows = await withOpenedPayloads('cpd_entries', data as LogRow[])
+    const surviving = await purgeExpired(kind, data as LogRow[])
+    const rows = await withOpenedPayloads('cpd_entries', surviving)
     return sortLogs(rows.map((row) => toLog(kind, row)))
   }
 
-  const data = await selectWithOptionalArchive(
+  const data = await selectWithOptionalStatus(
     () => supabase.from('supervision_entries').select(SUPERVISION_COLUMNS).order('occurred_on', { ascending: false }),
+    () => supabase.from('supervision_entries').select(SUPERVISION_COLUMNS_ARCHIVE).order('occurred_on', { ascending: false }),
     () => supabase.from('supervision_entries').select(SUPERVISION_COLUMNS_BASE).order('occurred_on', { ascending: false }),
   )
-  const rows = await withOpenedPayloads('supervision_entries', data as LogRow[])
+  const surviving = await purgeExpired(kind, data as LogRow[])
+  const rows = await withOpenedPayloads('supervision_entries', surviving)
   return sortLogs(rows.map((row) => toLog(kind, row)))
 }
 
@@ -137,29 +165,38 @@ export async function savePracticeLog(kind: LogKind, userId: string, input: Prac
   return toLog(kind, { ...(data as LogRow), encrypted_payload })
 }
 
-export async function setPracticeLogArchived(kind: LogKind, userId: string, id: string, archived: boolean): Promise<PracticeLog> {
+export async function setPracticeLogStatus(kind: LogKind, userId: string, id: string, nextStatus: LogStatus): Promise<PracticeLog> {
   if (!userId || !id || id === 'new') throw new Error('Entry not found')
-  const archivedAt = archived ? new Date().toISOString() : null
-  if (!isSupabaseConfigured()) {
+  if (!isSupabaseConfigured() || !getSupabase()) {
     const existing = localLogs.find((entry) => entry.id === id && entry.owner_id === userId && entry.kind === kind)
     if (!existing) throw new Error('Entry not found')
-    existing.archived_at = archivedAt
+    const patch = statusTimestamps(nextStatus, existing)
+    Object.assign(existing, patch)
     const { owner_id: _owner, ...entry } = existing
     return { ...entry }
   }
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
   const table = kind === 'cpd' ? 'cpd_entries' : 'supervision_entries'
-  await updateArchiveColumn(() => supabase.from(table).update({ archived_at: archivedAt }).eq('id', id))
   const columns = kind === 'cpd' ? CPD_COLUMNS : SUPERVISION_COLUMNS
+  const columnsArchive = kind === 'cpd' ? CPD_COLUMNS_ARCHIVE : SUPERVISION_COLUMNS_ARCHIVE
   const columnsBase = kind === 'cpd' ? CPD_COLUMNS_BASE : SUPERVISION_COLUMNS_BASE
-  const rows = await selectWithOptionalArchive(
+  const currentRows = await selectWithOptionalStatus(
     () => supabase.from(table).select(columns).eq('id', id),
+    () => supabase.from(table).select(columnsArchive).eq('id', id),
     () => supabase.from(table).select(columnsBase).eq('id', id),
   )
-  if (!rows[0]) throw new Error('Entry not found')
-  const [opened] = await withOpenedPayloads(table, [{ ...(rows[0] as LogRow), archived_at: archivedAt }])
+  if (!currentRows[0]) throw new Error('Entry not found')
+  const current = currentRows[0] as LogRow
+  const patch = statusTimestamps(nextStatus, current)
+  await updateStatusColumns(() => supabase.from(table).update(patch).eq('id', id))
+  const [opened] = await withOpenedPayloads(table, [{ ...current, ...patch }])
   return toLog(kind, opened)
+}
+
+/** @deprecated Prefer setPracticeLogStatus */
+export async function setPracticeLogArchived(kind: LogKind, userId: string, id: string, archived: boolean): Promise<PracticeLog> {
+  return setPracticeLogStatus(kind, userId, id, archived ? 'archive' : 'active')
 }
 
 function saveLocal(

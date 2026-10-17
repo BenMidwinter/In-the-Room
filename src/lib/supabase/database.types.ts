@@ -616,6 +616,7 @@ export type Database = {
       cpd_entries: {
         Row: {
           archived_at: string | null
+          trashed_at: string | null
           created_at: string
           encrypted_payload: Json
           id: string
@@ -628,6 +629,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          trashed_at?: string | null
           created_at?: string
           encrypted_payload: Json
           id?: string
@@ -640,6 +642,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          trashed_at?: string | null
           created_at?: string
           encrypted_payload?: Json
           id?: string
@@ -1107,6 +1110,7 @@ export type Database = {
       journal_entries: {
         Row: {
           archived_at: string | null
+          trashed_at: string | null
           author_id: string
           created_at: string
           encrypted_payload: Json
@@ -1120,6 +1124,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          trashed_at?: string | null
           author_id: string
           created_at?: string
           encrypted_payload: Json
@@ -1133,6 +1138,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          trashed_at?: string | null
           author_id?: string
           created_at?: string
           encrypted_payload?: Json
@@ -1197,6 +1203,7 @@ export type Database = {
       letters: {
         Row: {
           archived_at: string | null
+          trashed_at: string | null
           author_id: string
           client_id: string
           created_at: string
@@ -1212,6 +1219,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          trashed_at?: string | null
           author_id: string
           client_id: string
           created_at?: string
@@ -1227,6 +1235,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          trashed_at?: string | null
           author_id?: string
           client_id?: string
           created_at?: string
@@ -1465,6 +1474,7 @@ export type Database = {
       practice_items: {
         Row: {
           archived_at: string | null
+          trashed_at: string | null
           created_at: string
           encrypted_payload: Json | null
           id: string
@@ -1477,6 +1487,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          trashed_at?: string | null
           created_at?: string
           encrypted_payload?: Json | null
           id?: string
@@ -1489,6 +1500,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          trashed_at?: string | null
           created_at?: string
           encrypted_payload?: Json | null
           id?: string
@@ -1639,6 +1651,7 @@ export type Database = {
         Row: {
           appointment_id: string | null
           archived_at: string | null
+          trashed_at: string | null
           author_id: string
           client_id: string
           created_at: string
@@ -1660,6 +1673,7 @@ export type Database = {
         Insert: {
           appointment_id?: string | null
           archived_at?: string | null
+          trashed_at?: string | null
           author_id: string
           client_id: string
           created_at?: string
@@ -1681,6 +1695,7 @@ export type Database = {
         Update: {
           appointment_id?: string | null
           archived_at?: string | null
+          trashed_at?: string | null
           author_id?: string
           client_id?: string
           created_at?: string
@@ -1855,6 +1870,7 @@ export type Database = {
       reports: {
         Row: {
           archived_at: string | null
+          trashed_at: string | null
           author_id: string
           client_id: string
           created_at: string
@@ -1870,6 +1886,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          trashed_at?: string | null
           author_id: string
           client_id: string
           created_at?: string
@@ -1885,6 +1902,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          trashed_at?: string | null
           author_id?: string
           client_id?: string
           created_at?: string
@@ -1996,6 +2014,7 @@ export type Database = {
       supervision_entries: {
         Row: {
           archived_at: string | null
+          trashed_at: string | null
           created_at: string
           direction: string
           encrypted_payload: Json
@@ -2009,6 +2028,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          trashed_at?: string | null
           created_at?: string
           direction: string
           encrypted_payload: Json
@@ -2022,6 +2042,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          trashed_at?: string | null
           created_at?: string
           direction?: string
           encrypted_payload?: Json
@@ -2245,6 +2266,7 @@ export type Database = {
       working_documents: {
         Row: {
           archived_at: string | null
+          trashed_at: string | null
           author_id: string
           client_id: string
           created_at: string
@@ -2259,6 +2281,7 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          trashed_at?: string | null
           author_id: string
           client_id: string
           created_at?: string
@@ -2273,6 +2296,7 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          trashed_at?: string | null
           author_id?: string
           client_id?: string
           created_at?: string

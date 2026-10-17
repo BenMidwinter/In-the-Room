@@ -1114,39 +1114,67 @@ a.badge {
   gap: 0.5rem;
 }
 
-.archive-scope {
-  display: inline-flex;
-  align-items: stretch;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--bg-surface);
+.record-table__col--status {
+  width: 5.5rem;
+  max-width: 5.5rem;
+  white-space: nowrap;
 }
 
-.archive-scope__btn {
-  margin: 0;
-  padding: 0.35rem 0.75rem;
-  border: 0;
-  border-right: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--txt-muted);
-  font: inherit;
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
   font-size: var(--text-meta);
   font-weight: 600;
-  cursor: pointer;
+  line-height: 1.2;
+  border: 1px solid transparent;
 }
 
-.archive-scope__btn:last-child {
-  border-right: 0;
+.status-badge--active {
+  background: #e6f4ea;
+  color: #0d4f2b;
+  border-color: #0d4f2b;
 }
 
-.archive-scope__btn--active {
-  background: color-mix(in srgb, var(--col-primary) 14%, var(--bg-surface));
-  color: var(--col-primary-dark);
+.status-badge--archive {
+  background: var(--bg-page);
+  color: var(--txt-muted);
+  border-color: var(--border-strong);
 }
 
-.archive-scope__btn:hover {
-  color: var(--col-accent);
+.status-badge--trash {
+  background: #fde8e8;
+  color: #8a1f1f;
+  border-color: #8a1f1f;
+}
+
+.bulk-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--col-primary) 6%, var(--bg-surface));
+}
+
+.bulk-status-bar__count {
+  font-size: var(--text-meta);
+  font-weight: 600;
+  color: var(--txt-primary);
+}
+
+.bulk-status-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
 }
 
 

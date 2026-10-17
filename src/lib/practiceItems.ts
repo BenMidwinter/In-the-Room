@@ -11,6 +11,7 @@ export type PracticeItem = {
   created_at: string
   updated_at: string
   archived_at?: string | null
+  trashed_at?: string | null
 }
 
 export function practiceFolder(items: PracticeItem[], folderId: string | null): PracticeItem | null {

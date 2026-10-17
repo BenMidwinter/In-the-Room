@@ -9,6 +9,7 @@ import {
   listProgressNotesIndex,
   saveProgressNoteForUser,
   setProgressNoteArchived,
+  setProgressNoteStatus,
   signOffProgressNoteForUser,
 } from './supabase/progressNotesRepo'
 
@@ -156,6 +157,20 @@ export function useArchiveProgressNoteMutation(clientId) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ id, archived }: { id: string; archived: boolean }) => setProgressNoteArchived(id, archived),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.progressNotes })
+      if (clientId) {
+        queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.client(clientId) })
+        queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.feed(clientId) })
+      }
+    },
+  })
+}
+
+export function useSetProgressNoteStatusMutation(clientId) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'active' | 'archive' | 'trash' }) => setProgressNoteStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: progressNoteQueryKeys.progressNotes })
       if (clientId) {

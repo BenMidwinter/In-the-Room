@@ -122,14 +122,14 @@ function buildLetterheadHtml(letterhead?: PrintLetterhead) {
   return `<header class="letterhead">${brand}<hr class="letterhead__rule" /></header>`
 }
 
-function buildClinicalDocumentPrintHtml({
+export function buildClinicalDocumentPrintHtml({
   title,
   metaHtml,
   bodyHtml,
   letterhead,
 }: {
   title: string
-  metaHtml: string
+  metaHtml?: string
   bodyHtml: string
   letterhead?: PrintLetterhead
 }) {
@@ -147,7 +147,7 @@ function buildClinicalDocumentPrintHtml({
   <div class="clinical-pdf">
     ${buildLetterheadHtml(letterhead)}
     <h1>${escapeHtml(title)}</h1>
-    ${metaHtml}
+    ${metaHtml || ''}
     <div class="clinical-pdf__body">${bodyHtml || ''}</div>
   </div>
 </body>
@@ -423,6 +423,35 @@ export async function downloadLetterPdf(
 ) {
   if (!letter) return false
   return downloadDocumentPdf(buildLetterPrintHtml(letter, meta), pdfFilename(letter.title))
+}
+
+/**
+ * Shared PDF download for any rich-text clinical document (working docs,
+ * reports, journal, CPD, supervision, practice documents). Prefer the
+ * typed helpers (downloadLetterPdf / downloadProgressNotePdf) when they fit.
+ */
+export async function downloadRichDocumentPdf({
+  title,
+  bodyHtml,
+  metaHtml = '',
+  letterhead,
+  mergeContext,
+}: {
+  title: string
+  bodyHtml: string
+  metaHtml?: string
+  letterhead?: PrintLetterhead
+  mergeContext?: Record<string, string>
+}) {
+  return downloadDocumentPdf(
+    buildClinicalDocumentPrintHtml({
+      title,
+      metaHtml,
+      bodyHtml: withMergeFields(bodyHtml, mergeContext),
+      letterhead,
+    }),
+    pdfFilename(title),
+  )
 }
 
 /** Mock batch export — resolves after delay with a browser download. */

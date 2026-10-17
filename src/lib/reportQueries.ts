@@ -4,6 +4,7 @@ import {
   listReportsForEpisode,
   saveReportForUser,
   setReportArchived,
+  setReportStatus,
 } from './supabase/reportsRepo'
 import type { AppReport } from './store/reports'
 
@@ -50,6 +51,17 @@ export function useArchiveReportMutation(episodeId: string, clientId?: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ id, archived }: { id: string; archived: boolean }) => setReportArchived(id, archived),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reportQueryKeys.episode(episodeId) })
+      if (clientId) queryClient.invalidateQueries({ queryKey: ['client-activity', clientId] })
+    },
+  })
+}
+
+export function useSetReportStatusMutation(episodeId: string, clientId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'active' | 'archive' | 'trash' }) => setReportStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: reportQueryKeys.episode(episodeId) })
       if (clientId) queryClient.invalidateQueries({ queryKey: ['client-activity', clientId] })

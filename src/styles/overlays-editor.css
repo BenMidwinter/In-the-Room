@@ -273,6 +273,10 @@
   grid-column: 1 / -1;
 }
 
+.client-profile-overlay__field--gender .paper-input {
+  max-width: 12rem;
+}
+
 .client-profile-overlay__field label {
   display: block;
   margin-bottom: 0.45rem;

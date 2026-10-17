@@ -1,26 +1,36 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
+import BulkStatusBar from '../../components/BulkStatusBar'
+import RecordListLayout from '../../components/RecordListLayout'
+import RecordTable from '../../components/RecordTable'
 import RichTextEditor from '../../components/RichTextEditor'
-import { useClientSession } from '../../lib/useClientSession'
-import { filterByArchiveScope } from '../../lib/archiveScope'
+import RowMenu from '../../components/RowMenu'
+import StatusBadge from '../../components/StatusBadge'
+import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
+import { useConfirm, useToast } from '../../components/ui'
+import { useRowSelection } from '../../hooks/useRowSelection'
+import { useAuth } from '../../lib/auth/AuthProvider'
+import { downloadLetterPdf } from '../../lib/clinicalExport'
+import { preferredLetterhead, printLetterheadFromRow } from '../../lib/letterheadPrint'
+import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
+import {
+  STATUS_COLUMN,
+  STATUS_DEFAULT_FILTERS,
+  bulkActionsForStatus,
+  recordStatusOf,
+  statusLabelOf,
+  statusMenuItems,
+} from '../../lib/recordStatus'
 import { getProfile } from '../../lib/store'
 import {
   deleteLetter,
   listLettersForClient,
   saveLetterForUser,
-  setLetterArchived,
+  setLetterStatus,
 } from '../../lib/supabase/lettersRepo'
-import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
-import { useAuth } from '../../lib/auth/AuthProvider'
-import { useTemplatesQuery } from '../../lib/templateQueries'
-import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
-import { downloadLetterPdf } from '../../lib/clinicalExport'
-import { preferredLetterhead, printLetterheadFromRow } from '../../lib/letterheadPrint'
 import { listLetterheads } from '../../lib/supabase/letterheadsRepo'
-import RecordListLayout from '../../components/RecordListLayout'
-import RecordTable from '../../components/RecordTable'
-import { useConfirm, useToast } from '../../components/ui'
+import { useTemplatesQuery } from '../../lib/templateQueries'
+import { useClientSession } from '../../lib/useClientSession'
 import { useClientChrome } from './ClientChrome'
 import DocumentWorkspace from './DocumentWorkspace'
 import LetterheadPreview from './LetterheadPreview'
@@ -39,6 +49,7 @@ const LETTER_COLUMNS = [
   { key: 'recipient', label: 'Recipient', filter: 'text' },
   { key: 'date', label: 'Letter date', sort: 'date' },
   { key: 'updated', label: 'Updated', sort: 'date' },
+  STATUS_COLUMN,
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
@@ -48,8 +59,8 @@ export default function LettersPanel({ embedded = false }) {
     queryKey: ['letters', clientId],
     queryFn: () => listLettersForClient(clientId),
   })
-  const [archiveScope, setArchiveScope] = useState('active')
   const [selectedId, setSelectedId] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('Active')
   const [seenClientId, setSeenClientId] = useState(clientId)
   if (seenClientId !== clientId) {
     setSeenClientId(clientId)
@@ -63,6 +74,7 @@ export default function LettersPanel({ embedded = false }) {
   const [editorVersion, setEditorVersion] = useState(0)
   const toast = useToast()
   const confirm = useConfirm()
+  const { selectedIds, selection, clear: clearSelection, count: selectedCount } = useRowSelection()
   const { profile: accountProfile } = useAuth()
   const { data: letterheads = [] } = useQuery({
     queryKey: ['letterheads'],
@@ -165,21 +177,23 @@ export default function LettersPanel({ embedded = false }) {
     }
   }
 
-  const handleArchive = async (letter) => {
+  const moveStatus = async (letter, nextStatus, toastLabel) => {
     try {
-      await setLetterArchived(letter.id, !letter.archived_at)
+      await setLetterStatus(letter.id, nextStatus)
+      if (selectedId === letter.id && nextStatus !== 'active') setSelectedId(null)
       await refresh()
-      toast.saved(letter.archived_at ? 'Letter restored' : 'Letter archived')
+      clearSelection()
+      toast.saved(toastLabel)
     } catch (err) {
       toast.error(err?.message || 'Could not update this letter')
     }
   }
 
-  const handleDelete = async (letter) => {
+  const permanentlyDelete = async (letter) => {
     const ok = await confirm({
-      title: 'Delete this letter?',
-      message: 'This permanently removes the letter.',
-      confirmLabel: 'Delete',
+      title: 'Permanently delete this letter?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Permanently delete',
       tone: 'danger',
     })
     if (!ok) return
@@ -187,45 +201,80 @@ export default function LettersPanel({ embedded = false }) {
       await deleteLetter(letter.id)
       if (selectedId === letter.id) setSelectedId(null)
       await refresh()
-      toast.saved('Letter deleted')
+      clearSelection()
+      toast.saved('Letter permanently deleted')
     } catch (err) {
       toast.error(err?.message || 'Could not delete this letter')
     }
   }
 
-  const handleDownload = async () => {
+  const downloadOne = async (letter) => {
     try {
-      const letterhead = printLetterhead
-      const opened = await downloadLetterPdf(
-        {
-          title: title.trim() || 'Untitled letter',
-          content,
-          recipient,
-          letter_date: letterDate,
-        },
-        {
-          clientName: client?.real_name,
-          letterhead,
-          mergeContext,
-        },
-      )
+      const opened = await downloadLetterPdf(letter, {
+        clientName: client?.real_name,
+        letterhead: printLetterhead,
+        mergeContext: buildMergeContext({
+          client,
+          appointment: null,
+          profile: clinicianProfile,
+          sessionDate: letter.letter_date,
+        }),
+      })
       if (!opened) {
         toast.error('Could not create the PDF. Please try again.')
         return
       }
       toast.success('PDF downloaded.')
     } catch (err) {
-      toast.error(err?.message || 'Could not prepare the letterhead.')
+      toast.error(err?.message || 'Could not prepare the PDF.')
     }
   }
 
-  const scopedLetters = useMemo(
-    () => filterByArchiveScope(letters, archiveScope),
-    [letters, archiveScope],
-  )
+  const handleDownload = async () => {
+    await downloadOne({
+      title: title.trim() || 'Untitled letter',
+      content,
+      recipient,
+      letter_date: letterDate,
+    })
+  }
 
-  const rows = scopedLetters.map(letter => {
-    const archived = Boolean(letter.archived_at)
+  const runBulk = async (action) => {
+    const targets = letters.filter((letter) => selectedIds.includes(letter.id))
+    if (!targets.length) return
+    for (const letter of targets) {
+      // Sequential to keep toast noise down and respect rate limits.
+      // eslint-disable-next-line no-await-in-loop
+      await action(letter)
+    }
+  }
+
+  const bulk = bulkActionsForStatus(statusFilter, {
+    onArchive: () => runBulk((letter) => moveStatus(letter, 'archive', 'Letters archived')),
+    onRestore: () => runBulk((letter) => moveStatus(letter, 'active', 'Letters restored')),
+    onDelete: () => runBulk((letter) => moveStatus(letter, 'trash', 'Letters moved to trash')),
+    onRestoreToArchive: () => runBulk((letter) => moveStatus(letter, 'archive', 'Letters restored to archive')),
+    onPermanentDelete: async () => {
+      const ok = await confirm({
+        title: 'Permanently delete selected letters?',
+        message: 'This cannot be undone.',
+        confirmLabel: 'Permanently delete',
+        tone: 'danger',
+      })
+      if (!ok) return
+      await runBulk(async (letter) => {
+        await deleteLetter(letter.id)
+      })
+      await refresh()
+      clearSelection()
+      toast.saved('Letters permanently deleted')
+    },
+    onDownload: () => runBulk((letter) => downloadOne(letter)),
+  })
+
+  const rows = letters.map((letter) => {
+    const status = recordStatusOf(letter)
+    const readOnly = status !== 'active'
     return {
       id: letter.id,
       letter,
@@ -233,56 +282,36 @@ export default function LettersPanel({ embedded = false }) {
         title: letter.title,
         recipient: letter.recipient || '',
         date: formatDocDate(letter.letter_date),
+        status: statusLabelOf(letter),
       },
       sortValues: {
         title: letter.title,
         recipient: letter.recipient || '',
         date: letter.letter_date || '',
         updated: letter.updated_at || '',
+        status: statusLabelOf(letter),
       },
+      muted: readOnly,
       cells: {
         title: <span className="record-table__primary">{letter.title}</span>,
         recipient: letter.recipient || <span className="record-table__cell-muted">—</span>,
         date: formatDocDate(letter.letter_date),
         updated: formatDocDate(letter.updated_at),
+        status: <StatusBadge status={status} />,
         actions: (
-          <span className="practice-docs__actions">
-            {archived ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleArchive(letter)
-                  }}
-                >
-                  Restore
-                </button>
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleDelete(letter)
-                  }}
-                >
-                  Delete
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="secondary"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  handleArchive(letter)
-                }}
-              >
-                Archive
-              </button>
-            )}
-          </span>
+          <RowMenu
+            label={`Actions for ${letter.title}`}
+            items={statusMenuItems(status, {
+              onEdit: () => selectLetter(letter),
+              onView: () => selectLetter(letter),
+              onArchive: () => moveStatus(letter, 'archive', 'Letter archived'),
+              onRestore: () => moveStatus(letter, 'active', 'Letter restored'),
+              onDelete: () => moveStatus(letter, 'trash', 'Letter moved to trash'),
+              onRestoreToArchive: () => moveStatus(letter, 'archive', 'Letter restored to archive'),
+              onPermanentDelete: () => permanentlyDelete(letter),
+              onDownload: () => downloadOne(letter),
+            })}
+          />
         ),
       },
     }
@@ -291,7 +320,8 @@ export default function LettersPanel({ embedded = false }) {
   const editing = selectedId != null
   const editorTitle = selectedId === 'new' ? 'New letter' : title || 'Letter'
   const openLetter = letters.find((row) => row.id === selectedId)
-  const openArchived = Boolean(openLetter?.archived_at)
+  const openStatus = openLetter ? recordStatusOf(openLetter) : 'active'
+  const openReadOnly = selectedId !== 'new' && openStatus !== 'active'
 
   if (editing) {
     return (
@@ -302,20 +332,18 @@ export default function LettersPanel({ embedded = false }) {
         onBack={handleCancel}
         actions={(
           <>
-            {selectedId !== 'new' && openLetter && (
-              openArchived ? (
-                <>
-                  <button type="button" className="secondary" onClick={() => handleArchive(openLetter)}>Restore</button>
-                  <button type="button" className="danger" onClick={() => handleDelete(openLetter)}>Delete</button>
-                </>
-              ) : (
-                <button type="button" className="secondary" onClick={() => handleArchive(openLetter)}>Archive</button>
-              )
+            {selectedId !== 'new' && openLetter && openStatus === 'archive' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openLetter, 'active', 'Letter restored')}>Restore</button>
+            )}
+            {selectedId !== 'new' && openLetter && openStatus === 'trash' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openLetter, 'archive', 'Letter restored to archive')}>Restore to archive</button>
             )}
             <button type="button" className="secondary" onClick={handleDownload}>Download</button>
-            <button type="button" className="primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save letter'}
-            </button>
+            {!openReadOnly && (
+              <button type="button" className="primary" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving…' : 'Save letter'}
+              </button>
+            )}
           </>
         )}
         meta={(
@@ -326,6 +354,7 @@ export default function LettersPanel({ embedded = false }) {
                 className="progress-notes-page__meta-input"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
             <label className="progress-notes-page__meta-field">
@@ -335,6 +364,7 @@ export default function LettersPanel({ embedded = false }) {
                 value={recipient}
                 onChange={(event) => setRecipient(event.target.value)}
                 placeholder="e.g. Dr Smith"
+                disabled={openReadOnly}
               />
             </label>
             <label className="progress-notes-page__meta-field">
@@ -344,21 +374,24 @@ export default function LettersPanel({ embedded = false }) {
                 className="progress-notes-page__meta-input"
                 value={letterDate}
                 onChange={(event) => setLetterDate(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
-            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
-              <span className="progress-notes-page__meta-label">Template</span>
-              <select
-                className="progress-notes-page__meta-input"
-                value=""
-                onChange={(event) => applyLetterTemplate(event.target.value)}
-              >
-                <option value="">Choose a template…</option>
-                {letterTemplates.map((template) => (
-                  <option key={template.id} value={template.id}>{template.name}</option>
-                ))}
-              </select>
-            </label>
+            {!openReadOnly && (
+              <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+                <span className="progress-notes-page__meta-label">Template</span>
+                <select
+                  className="progress-notes-page__meta-input"
+                  value=""
+                  onChange={(event) => applyLetterTemplate(event.target.value)}
+                >
+                  <option value="">Choose a template…</option>
+                  {letterTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             {letterheads.length > 1 && (
               <label className="progress-notes-page__meta-field">
                 <span className="progress-notes-page__meta-label">Letterhead</span>
@@ -388,6 +421,7 @@ export default function LettersPanel({ embedded = false }) {
           mergeContext={mergeContext}
           clinicianProfile={clinicianProfile}
           pageHeader={<LetterheadPreview letterhead={printLetterhead} />}
+          editable={!openReadOnly}
         />
       </DocumentWorkspace>
     )
@@ -397,22 +431,31 @@ export default function LettersPanel({ embedded = false }) {
     <RecordListLayout
       embedded={embedded}
       title={embedded ? '' : 'Letters'}
-      newLabel={archiveScope === 'active' ? 'letter' : undefined}
-      onNew={archiveScope === 'active' ? handleNew : undefined}
-      toolbar={<ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />}
+      newLabel="letter"
+      onNew={handleNew}
     >
       {error && <p className="form-error" role="alert">{error.message || 'Could not load letters.'}</p>}
+      <BulkStatusBar
+        count={selectedCount}
+        noun="letters"
+        actions={bulk}
+        onClear={clearSelection}
+      />
       {!editing && !error && (
         <RecordTable
-          remember={`letters-${clientId}`}
+          remember={`letters-status-${clientId}`}
           columns={LETTER_COLUMNS}
           rows={rows}
           countNoun="letters"
           defaultSort={{ key: 'updated', direction: 'desc' }}
-          emptyMessage={isPending
-            ? 'Loading letters…'
-            : (archiveScope === 'archived' ? 'No archived letters.' : 'No letters yet.')}
+          defaultFilters={STATUS_DEFAULT_FILTERS}
+          selection={selection}
+          emptyMessage={isPending ? 'Loading letters…' : 'No letters yet.'}
           onRowClick={(row) => selectLetter(row.letter)}
+          onFiltersChange={(next) => {
+            const status = String(next?.status || 'Active')
+            if (status !== statusFilter) setStatusFilter(status)
+          }}
         />
       )}
     </RecordListLayout>

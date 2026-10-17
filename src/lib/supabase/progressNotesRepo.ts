@@ -1,7 +1,13 @@
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
-import { isMissingArchivedAtColumn, selectWithOptionalArchive, updateArchiveColumn } from './optionalArchive'
+import { isTrashExpired, statusTimestamps } from '../recordStatus'
+import {
+  isMissingArchivedAtColumn,
+  isMissingTrashedAtColumn,
+  selectWithOptionalStatus,
+  updateStatusColumns,
+} from './optionalRecordStatus'
 import { db } from '../data/collections'
 import type { StoreRecord } from '../types/collections'
 import { parseOrThrow, progressNoteInputSchema } from '../schemas'
@@ -23,14 +29,21 @@ const NOTE_NEEDS_APPOINTMENT = 'A Process Note is saved against an appointment.'
 const NOTE_NEEDS_EPISODE = 'Add this appointment to an episode before saving the Process Note.'
 
 const NOTE_COLUMNS_BASE = 'id, owner_id, organization_id, client_id, episode_id, appointment_id, author_id, note_number, session_date, noted_at, status, signed_off_at, lock_until, template_id, encrypted_payload, payload_format, created_at, updated_at'
-const NOTE_COLUMNS = `${NOTE_COLUMNS_BASE}, archived_at`
+const NOTE_COLUMNS_ARCHIVE = `${NOTE_COLUMNS_BASE}, archived_at`
+const NOTE_COLUMNS = `${NOTE_COLUMNS_ARCHIVE}, trashed_at`
+
+type NoteStatus = 'active' | 'archive' | 'trash'
 
 async function selectNotes(
   run: (columns: string) => PromiseLike<{ data: unknown; error: { message?: string; details?: string; hint?: string; code?: string } | null }>,
 ): Promise<NoteRow[]> {
-  const rows = await selectWithOptionalArchive(
+  const rows = await selectWithOptionalStatus(
     async () => {
       const result = await run(NOTE_COLUMNS)
+      return { data: (result.data as NoteRow[] | null) || [], error: result.error }
+    },
+    async () => {
+      const result = await run(NOTE_COLUMNS_ARCHIVE)
       return { data: (result.data as NoteRow[] | null) || [], error: result.error }
     },
     async () => {
@@ -46,6 +59,14 @@ async function selectNote(
 ): Promise<NoteRow | null> {
   const first = await run(NOTE_COLUMNS)
   if (!first.error) return (first.data as NoteRow | null) || null
+  if (isMissingTrashedAtColumn(first.error)) {
+    const second = await run(NOTE_COLUMNS_ARCHIVE)
+    if (!second.error) return (second.data as NoteRow | null) || null
+    if (!isMissingArchivedAtColumn(second.error)) throw second.error
+    const third = await run(NOTE_COLUMNS_BASE)
+    if (third.error) throw third.error
+    return (third.data as NoteRow | null) || null
+  }
   if (!isMissingArchivedAtColumn(first.error)) throw first.error
   const second = await run(NOTE_COLUMNS_BASE)
   if (second.error) throw second.error
@@ -89,6 +110,7 @@ type NoteRow = {
   created_at: string
   updated_at: string
   archived_at?: string | null
+  trashed_at?: string | null
 }
 
 async function materializeNotes(rows: NoteRow[]): Promise<NoteRow[]> {
@@ -159,6 +181,7 @@ function toAppNote(row: NoteRow) {
     created_at: row.created_at,
     updated_at: row.updated_at,
     archived_at: row.archived_at || null,
+    trashed_at: row.trashed_at || null,
   })
 }
 
@@ -188,15 +211,36 @@ async function episodeIdFromAppointment(appointmentId: string | null): Promise<s
   return episodeId
 }
 
-export async function fetchProgressNotesForClient(clientId: string) {
-  if (!clientId || !isSupabaseConfigured()) return getProgressNotes(clientId)
+async function purgeExpiredNotes(clientId: string, rows: NoteRow[]) {
   const supabase = getSupabase()
-  if (!supabase) return getProgressNotes(clientId)
+  if (!supabase) return rows
+  const keep: NoteRow[] = []
+  for (const row of rows) {
+    if (!isTrashExpired(row.trashed_at)) {
+      keep.push(row)
+      continue
+    }
+    await supabase.from('progress_notes').delete().eq('id', row.id).eq('client_id', clientId)
+    const idx = db.progressNotes.findIndex((item) => item.id === row.id)
+    if (idx !== -1) db.progressNotes.splice(idx, 1)
+  }
+  return keep
+}
+
+function clientNotesLocal(clientId: string) {
+  return getProgressNotes(clientId).filter((row) => !isTrashExpired((row as { trashed_at?: string | null }).trashed_at))
+}
+
+export async function fetchProgressNotesForClient(clientId: string) {
+  if (!clientId || !isSupabaseConfigured()) return clientNotesLocal(clientId)
+  const supabase = getSupabase()
+  if (!supabase) return clientNotesLocal(clientId)
   const data = await selectNotes((columns) => (
     supabase.from('progress_notes').select(columns).eq('client_id', clientId).order('session_date', { ascending: false })
   ))
-  for (const row of await materializeNotes(data)) remember(toAppNote(row))
-  return getProgressNotes(clientId)
+  const surviving = await purgeExpiredNotes(clientId, data)
+  for (const row of await materializeNotes(surviving)) remember(toAppNote(row))
+  return clientNotesLocal(clientId)
 }
 
 export async function fetchProgressNote(noteId: string) {
@@ -370,22 +414,34 @@ export async function signOffProgressNoteForUser(payload: Record<string, unknown
   return remember(toAppNote(row))
 }
 
-export async function setProgressNoteArchived(id: string, archived: boolean) {
+export async function setProgressNoteStatus(id: string, nextStatus: NoteStatus) {
   if (!id) throw new Error('Note not found')
-  const archivedAt = archived ? new Date().toISOString() : null
   if (!isSupabaseConfigured() || !isUuid(id)) {
     const idx = db.progressNotes.findIndex((row) => row.id === id)
     if (idx === -1) throw new Error('Note not found')
-    db.progressNotes[idx] = { ...db.progressNotes[idx], archived_at: archivedAt } as StoreRecord
+    const current = db.progressNotes[idx] as Record<string, unknown>
+    const patch = statusTimestamps(nextStatus, current)
+    db.progressNotes[idx] = { ...db.progressNotes[idx], ...patch } as StoreRecord
     return enrichProgressNoteLock(db.progressNotes[idx] as Record<string, unknown>)
   }
   const supabase = getSupabase()
   if (!supabase) throw new Error('Supabase is not configured')
-  await updateArchiveColumn(() => supabase.from('progress_notes').update({ archived_at: archivedAt }).eq('id', id))
+  const currentRows = await selectNotes((columns) => (
+    supabase.from('progress_notes').select(columns).eq('id', id)
+  ))
+  if (!currentRows[0]) throw new Error('Note not found')
+  const current = currentRows[0]
+  const patch = statusTimestamps(nextStatus, current)
+  await updateStatusColumns(() => supabase.from('progress_notes').update(patch).eq('id', id))
   const data = await selectNote((columns) => supabase.from('progress_notes').select(columns).eq('id', id).single())
   if (!data) throw new Error('Note not found')
-  const [row] = await materializeNotes([{ ...data, archived_at: archivedAt }])
+  const [row] = await materializeNotes([{ ...data, ...patch }])
   return remember(toAppNote(row))
+}
+
+/** @deprecated Prefer setProgressNoteStatus */
+export async function setProgressNoteArchived(id: string, archived: boolean) {
+  return setProgressNoteStatus(id, archived ? 'archive' : 'active')
 }
 
 export async function deleteProgressNote(id: string): Promise<void> {

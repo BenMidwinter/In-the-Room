@@ -1,18 +1,29 @@
 import { useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
+import BulkStatusBar from '../../components/BulkStatusBar'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import RichTextEditor from '../../components/RichTextEditor'
+import RowMenu from '../../components/RowMenu'
+import StatusBadge from '../../components/StatusBadge'
 import { useConfirm, useToast } from '../../components/ui'
-import { filterByArchiveScope } from '../../lib/archiveScope'
+import { useRowSelection } from '../../hooks/useRowSelection'
+import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { DEMO_TODAY } from '../../lib/dateArchitecture'
 import {
-  useArchiveJournalEntryMutation,
+  STATUS_COLUMN,
+  STATUS_DEFAULT_FILTERS,
+  bulkActionsForStatus,
+  recordStatusOf,
+  statusLabelOf,
+  statusMenuItems,
+} from '../../lib/recordStatus'
+import {
   useDeleteJournalEntryMutation,
   useJournalEntriesQuery,
   useSaveJournalEntryMutation,
+  useSetJournalEntryStatusMutation,
 } from '../../lib/journalQueries'
 import DocumentWorkspace from '../client/DocumentWorkspace'
 
@@ -50,6 +61,7 @@ const COLUMNS = [
   { key: 'time', label: 'Time', sort: 'text' },
   { key: 'somatic', label: 'Somatic state', filter: 'choice', sort: 'text' },
   { key: 'preview', label: 'Preview', filter: 'text' },
+  STATUS_COLUMN,
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
@@ -62,12 +74,10 @@ export default function ClinicianJournal() {
   const { data: entries = [], isPending, error } = useJournalEntriesQuery(userId)
   const saveEntry = useSaveJournalEntryMutation(userId)
   const removeEntry = useDeleteJournalEntryMutation(userId)
-  const archiveEntry = useArchiveJournalEntryMutation(userId)
-  const [archiveScope, setArchiveScope] = useState('active')
-  const sortedEntries = useMemo(
-    () => filterByArchiveScope(sortJournalEntries(entries), archiveScope),
-    [entries, archiveScope],
-  )
+  const setEntryStatus = useSetJournalEntryStatusMutation(userId)
+  const [statusFilter, setStatusFilter] = useState('Active')
+  const { selectedIds, selection, clear: clearSelection, count: selectedCount } = useRowSelection()
+  const sortedEntries = useMemo(() => sortJournalEntries(entries), [entries])
 
   const [openId, setOpenId] = useState(null)
   const [draftDate, setDraftDate] = useState(DEMO_TODAY)
@@ -121,53 +131,105 @@ export default function ClinicianJournal() {
     }
   }
 
-  const handleDelete = async (entryId = openId) => {
-    if (!entryId || entryId === 'new') {
-      close()
-      return
+  const moveStatus = async (entry, nextStatus, toastLabel) => {
+    try {
+      await setEntryStatus.mutateAsync({ id: entry.id, status: nextStatus })
+      if (openId === entry.id && nextStatus !== 'active') close()
+      clearSelection()
+      toast.saved(toastLabel)
+    } catch (err) {
+      toast.error(err?.message || 'Could not update this entry')
     }
+  }
+
+  const permanentlyDelete = async (entryId) => {
     const ok = await confirm({
-      title: 'Delete this entry?',
-      message: 'This removes it from your journal.',
-      confirmLabel: 'Delete',
+      title: 'Permanently delete this entry?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Permanently delete',
       tone: 'danger',
     })
     if (!ok) return
     try {
       await removeEntry.mutateAsync(entryId)
       if (openId === entryId) close()
-      toast.saved('Entry deleted')
+      clearSelection()
+      toast.saved('Entry permanently deleted')
     } catch (err) {
       toast.error(err?.message || 'Could not delete this entry')
     }
   }
 
-  const handleArchive = async (entry) => {
+  const downloadOne = async (entry) => {
     try {
-      await archiveEntry.mutateAsync({ id: entry.id, archived: !entry.archived_at })
-      if (openId === entry.id && !entry.archived_at) close()
-      toast.saved(entry.archived_at ? 'Entry restored' : 'Entry archived')
+      const title = `Journal ${formatJournalDate(entry.date)}`
+      const metaHtml = `<p>${entry.time || ''} · ${entry.somatic_state || ''}</p>`
+      const opened = await downloadRichDocumentPdf({
+        title,
+        bodyHtml: entry.body_text,
+        metaHtml,
+      })
+      if (!opened) {
+        toast.error('Could not create the PDF. Please try again.')
+        return
+      }
+      toast.success('PDF downloaded.')
     } catch (err) {
-      toast.error(err?.message || 'Could not update this entry')
+      toast.error(err?.message || 'Could not prepare the PDF.')
     }
   }
 
+  const runBulk = async (action) => {
+    const targets = entries.filter((entry) => selectedIds.includes(entry.id))
+    if (!targets.length) return
+    for (const entry of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      await action(entry)
+    }
+  }
+
+  const bulk = bulkActionsForStatus(statusFilter, {
+    onArchive: () => runBulk((entry) => moveStatus(entry, 'archive', 'Entries archived')),
+    onRestore: () => runBulk((entry) => moveStatus(entry, 'active', 'Entries restored')),
+    onDelete: () => runBulk((entry) => moveStatus(entry, 'trash', 'Entries moved to trash')),
+    onRestoreToArchive: () => runBulk((entry) => moveStatus(entry, 'archive', 'Entries restored to archive')),
+    onPermanentDelete: async () => {
+      const ok = await confirm({
+        title: 'Permanently delete selected entries?',
+        message: 'This cannot be undone.',
+        confirmLabel: 'Permanently delete',
+        tone: 'danger',
+      })
+      if (!ok) return
+      await runBulk(async (entry) => {
+        await removeEntry.mutateAsync(entry.id)
+      })
+      clearSelection()
+      toast.saved('Entries permanently deleted')
+    },
+    onDownload: () => runBulk((entry) => downloadOne(entry)),
+  })
+
   const rows = sortedEntries.map((entry) => {
     const preview = stripHtml(entry.body_text).slice(0, 90) || 'Empty entry'
-    const archived = Boolean(entry.archived_at)
+    const status = recordStatusOf(entry)
+    const readOnly = status !== 'active'
     return {
       id: entry.id,
       entry,
       filterValues: {
         somatic: entry.somatic_state || '',
         preview,
+        status: statusLabelOf(entry),
       },
       sortValues: {
         date: entry.date,
         time: entry.time || '',
         somatic: entry.somatic_state || '',
         preview,
+        status: statusLabelOf(entry),
       },
+      muted: readOnly,
       cells: {
         date: formatJournalDate(entry.date),
         time: entry.time || '—',
@@ -177,54 +239,29 @@ export default function ClinicianJournal() {
           </span>
         ),
         preview: <span className="record-table__primary">{preview}</span>,
+        status: <StatusBadge status={status} />,
         actions: (
-          <span className="practice-docs__actions">
-            {archived ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleArchive(entry)
-                  }}
-                  disabled={archiveEntry.isPending}
-                >
-                  Restore
-                </button>
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleDelete(entry.id)
-                  }}
-                  disabled={removeEntry.isPending}
-                >
-                  Delete
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="secondary"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  handleArchive(entry)
-                }}
-                disabled={archiveEntry.isPending}
-              >
-                Archive
-              </button>
-            )}
-          </span>
+          <RowMenu
+            label="Journal entry actions"
+            items={statusMenuItems(status, {
+              onEdit: () => openExisting(entry),
+              onView: () => openExisting(entry),
+              onArchive: () => moveStatus(entry, 'archive', 'Entry archived'),
+              onRestore: () => moveStatus(entry, 'active', 'Entry restored'),
+              onDelete: () => moveStatus(entry, 'trash', 'Entry moved to trash'),
+              onRestoreToArchive: () => moveStatus(entry, 'archive', 'Entry restored to archive'),
+              onPermanentDelete: () => permanentlyDelete(entry.id),
+              onDownload: () => downloadOne(entry),
+            })}
+          />
         ),
       },
     }
   })
 
   const openEntry = entries.find((entry) => entry.id === openId)
-  const openArchived = Boolean(openEntry?.archived_at)
+  const openStatus = openEntry ? recordStatusOf(openEntry) : 'active'
+  const openReadOnly = openId !== 'new' && openStatus !== 'active'
 
   if (openId) {
     return (
@@ -233,19 +270,29 @@ export default function ClinicianJournal() {
         onBack={close}
         actions={(
           <>
-            {openId !== 'new' && (
-              openArchived ? (
-                <>
-                  <button type="button" className="secondary" onClick={() => openEntry && handleArchive(openEntry)} disabled={archiveEntry.isPending || !openEntry}>Restore</button>
-                  <button type="button" className="danger" onClick={() => handleDelete(openId)} disabled={removeEntry.isPending}>Delete</button>
-                </>
-              ) : (
-                <button type="button" className="secondary" onClick={() => openEntry && handleArchive(openEntry)} disabled={archiveEntry.isPending || !openEntry}>Archive</button>
-              )
+            {openId !== 'new' && openEntry && openStatus === 'archive' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openEntry, 'active', 'Entry restored')} disabled={setEntryStatus.isPending}>Restore</button>
             )}
-            <button type="button" className="primary" onClick={handleSave} disabled={saveEntry.isPending}>
-              {saveEntry.isPending ? 'Saving…' : 'Save'}
+            {openId !== 'new' && openEntry && openStatus === 'trash' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openEntry, 'archive', 'Entry restored to archive')} disabled={setEntryStatus.isPending}>Restore to archive</button>
+            )}
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => downloadOne({
+                date: draftDate,
+                time: draftTime,
+                somatic_state: draftSomatic,
+                body_text: draftBody,
+              })}
+            >
+              Download
             </button>
+            {!openReadOnly && (
+              <button type="button" className="primary" onClick={handleSave} disabled={saveEntry.isPending}>
+                {saveEntry.isPending ? 'Saving…' : 'Save'}
+              </button>
+            )}
           </>
         )}
         meta={(
@@ -257,6 +304,7 @@ export default function ClinicianJournal() {
                 className="progress-notes-page__meta-input"
                 value={draftDate}
                 onChange={(event) => setDraftDate(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
             <label className="progress-notes-page__meta-field">
@@ -266,6 +314,7 @@ export default function ClinicianJournal() {
                 className="progress-notes-page__meta-input"
                 value={draftTime}
                 onChange={(event) => setDraftTime(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
             <label className="progress-notes-page__meta-field">
@@ -275,6 +324,7 @@ export default function ClinicianJournal() {
                 data-somatic={draftSomatic.toLowerCase()}
                 value={draftSomatic}
                 onChange={(event) => setDraftSomatic(event.target.value)}
+                disabled={openReadOnly}
               >
                 {SOMATIC_TAGS.map((tag) => (
                   <option key={tag} value={tag}>{tag}</option>
@@ -291,6 +341,7 @@ export default function ClinicianJournal() {
           layout="immersive"
           variant="a4"
           mode="clinical"
+          editable={!openReadOnly}
         />
       </DocumentWorkspace>
     )
@@ -299,22 +350,31 @@ export default function ClinicianJournal() {
   return (
     <RecordListLayout
       title="Journal"
-      newLabel={archiveScope === 'active' ? 'entry' : undefined}
-      onNew={archiveScope === 'active' ? openNew : undefined}
-      toolbar={<ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />}
+      newLabel="entry"
+      onNew={openNew}
     >
       {error && <p className="form-error" role="alert">{error.message || 'Could not load journal entries.'}</p>}
+      <BulkStatusBar
+        count={selectedCount}
+        noun="entries"
+        actions={bulk}
+        onClear={clearSelection}
+      />
       {!error && (
         <RecordTable
-          remember="practice-journal"
+          remember="practice-journal-status"
           columns={COLUMNS}
           rows={rows}
           countNoun="entries"
           defaultSort={{ key: 'date', direction: 'desc' }}
-          emptyMessage={isPending
-            ? 'Loading…'
-            : (archiveScope === 'archived' ? 'No archived journal entries.' : 'No journal entries yet.')}
+          defaultFilters={STATUS_DEFAULT_FILTERS}
+          selection={selection}
+          emptyMessage={isPending ? 'Loading…' : 'No journal entries yet.'}
           onRowClick={(row) => openExisting(row.entry)}
+          onFiltersChange={(next) => {
+            const status = String(next?.status || 'Active')
+            if (status !== statusFilter) setStatusFilter(status)
+          }}
         />
       )}
     </RecordListLayout>

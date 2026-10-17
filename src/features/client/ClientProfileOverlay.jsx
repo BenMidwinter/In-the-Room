@@ -147,7 +147,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
           <button type="submit" form="client-profile-form" className="primary" disabled={saving || !dirty}>
             {saving ? 'Saving…' : 'Save'}
           </button>
-          <button type="button" className="secondary" onClick={requestClose}>
+          <button type="button" className="secondary" onClick={requestClose} aria-label={dirty ? 'Close and discard unsaved changes' : 'Close'}>
             Close
           </button>
         </>
@@ -201,7 +201,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
                 onChange={(event) => setEmail(event.target.value)}
               />
             </div>
-            <div className="form-group client-profile-overlay__field">
+            <div className="form-group client-profile-overlay__field client-profile-overlay__field--gender">
               <label htmlFor="client-profile-gender">Gender</label>
               <input
                 id="client-profile-gender"
@@ -209,6 +209,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
                 value={gender}
                 onChange={(event) => setGender(event.target.value)}
                 placeholder="Optional"
+                autoComplete="sex"
               />
             </div>
             <div className="form-group client-profile-overlay__field">

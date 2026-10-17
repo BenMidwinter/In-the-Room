@@ -4,6 +4,7 @@ import {
   listJournalEntries,
   saveJournalEntryForUser,
   setJournalEntryArchived,
+  setJournalEntryStatus,
 } from './supabase/journalRepo'
 
 export const journalQueryKeys = {
@@ -48,6 +49,16 @@ export function useArchiveJournalEntryMutation(userId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ id, archived }: { id: string; archived: boolean }) => setJournalEntryArchived(userId, id, archived),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: journalQueryKeys.author(userId) })
+    },
+  })
+}
+
+export function useSetJournalEntryStatusMutation(userId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'active' | 'archive' | 'trash' }) => setJournalEntryStatus(userId, id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: journalQueryKeys.author(userId) })
     },

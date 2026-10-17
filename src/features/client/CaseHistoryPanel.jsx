@@ -1,8 +1,19 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
+import BulkStatusBar from '../../components/BulkStatusBar'
+import RowMenu from '../../components/RowMenu'
+import StatusBadge from '../../components/StatusBadge'
 import { useConfirm, useToast } from '../../components/ui'
-import { filterByArchiveScope } from '../../lib/archiveScope'
+import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
+import {
+  STATUS_COLUMN,
+  STATUS_DEFAULT_FILTERS,
+  bulkActionsForStatus,
+  recordStatusOf,
+  statusLabelOf,
+  statusMenuItems,
+} from '../../lib/recordStatus'
+import { useRowSelection } from '../../hooks/useRowSelection'
 import { useClientSession } from '../../lib/useClientSession'
 import {
   useClientEpisodesQuery,
@@ -14,10 +25,10 @@ import {
 } from '../../lib/episodeQueries'
 import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
 import {
-  useArchiveReportMutation,
   useDeleteReportMutation,
   useEpisodeReportsQuery,
   useSaveReportMutation,
+  useSetReportStatusMutation,
 } from '../../lib/reportQueries'
 import { attendanceLabel, formatSessionDateTime, isClientSessionAppointment } from '../../lib/appointmentUtils'
 import RecordTable from '../../components/RecordTable'
@@ -65,6 +76,7 @@ const APPOINTMENT_COLUMNS = [
 const REPORT_COLUMNS = [
   { key: 'title', label: 'Title', filter: 'text', sort: 'text' },
   { key: 'date', label: 'Date', sort: 'date' },
+  STATUS_COLUMN,
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
@@ -223,8 +235,9 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
   const { data: reports = [], isPending, error: reportsError } = useEpisodeReportsQuery(episode.id)
   const saveReport = useSaveReportMutation()
   const removeReport = useDeleteReportMutation(episode.id, clientId)
-  const archiveReport = useArchiveReportMutation(episode.id, clientId)
-  const [archiveScope, setArchiveScope] = useState('active')
+  const setReportStatus = useSetReportStatusMutation(episode.id, clientId)
+  const [statusFilter, setStatusFilter] = useState('Active')
+  const { selectedIds, selection, clear: clearSelection, count: selectedCount } = useRowSelection()
   const [openId, setOpenId] = useState(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('<p></p>')
@@ -295,37 +308,96 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
     }
   }
 
-  const onArchive = async (report) => {
+  const moveStatus = async (report, nextStatus, toastLabel) => {
     try {
-      await archiveReport.mutateAsync({ id: report.id, archived: !report.archived_at })
-      toast.saved(report.archived_at ? 'Report restored' : 'Report archived')
+      await setReportStatus.mutateAsync({ id: report.id, status: nextStatus })
+      if (openId === report.id && nextStatus !== 'active') setOpenId(null)
+      clearSelection()
+      toast.saved(toastLabel)
     } catch (err) {
       toast.error(err?.message || 'Could not update this report')
     }
   }
 
-  const onDelete = async (report) => {
+  const permanentlyDelete = async (report) => {
     const ok = await confirm({
-      title: 'Delete this report?',
-      message: 'This permanently removes the report from the course.',
-      confirmLabel: 'Delete',
+      title: 'Permanently delete this report?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Permanently delete',
       tone: 'danger',
     })
     if (!ok) return
     try {
       await removeReport.mutateAsync(report.id)
       if (openId === report.id) setOpenId(null)
-      toast.saved('Report deleted')
+      clearSelection()
+      toast.saved('Report permanently deleted')
     } catch (err) {
       toast.error(err?.message || 'Could not delete this report')
     }
   }
+
+  const downloadOne = async (report) => {
+    try {
+      const opened = await downloadRichDocumentPdf({
+        title: report.title || 'Report',
+        bodyHtml: report.body,
+        mergeContext: buildMergeContext({
+          client,
+          profile: clinicianProfile,
+          sessionDate: report.report_date,
+        }),
+      })
+      if (!opened) {
+        toast.error('Could not create the PDF. Please try again.')
+        return
+      }
+      toast.success('PDF downloaded.')
+    } catch (err) {
+      toast.error(err?.message || 'Could not prepare the PDF.')
+    }
+  }
+
+  const runBulk = async (action) => {
+    const targets = reports.filter((report) => selectedIds.includes(report.id))
+    if (!targets.length) return
+    for (const report of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      await action(report)
+    }
+  }
+
+  const bulk = bulkActionsForStatus(statusFilter, {
+    onArchive: () => runBulk((report) => moveStatus(report, 'archive', 'Reports archived')),
+    onRestore: () => runBulk((report) => moveStatus(report, 'active', 'Reports restored')),
+    onDelete: () => runBulk((report) => moveStatus(report, 'trash', 'Reports moved to trash')),
+    onRestoreToArchive: () => runBulk((report) => moveStatus(report, 'archive', 'Reports restored to archive')),
+    onPermanentDelete: async () => {
+      const ok = await confirm({
+        title: 'Permanently delete selected reports?',
+        message: 'This cannot be undone.',
+        confirmLabel: 'Permanently delete',
+        tone: 'danger',
+      })
+      if (!ok) return
+      await runBulk(async (report) => {
+        await removeReport.mutateAsync(report.id)
+      })
+      clearSelection()
+      toast.saved('Reports permanently deleted')
+    },
+    onDownload: () => runBulk((report) => downloadOne(report)),
+  })
 
   const mergeContext = buildMergeContext({
     client,
     profile: clinicianProfile,
     sessionDate: reportDate,
   })
+
+  const openReportRow = openId && openId !== 'new' ? reports.find((row) => row.id === openId) : null
+  const openStatus = openReportRow ? recordStatusOf(openReportRow) : 'active'
+  const openReadOnly = openId !== 'new' && openStatus !== 'active'
 
   if (openId) {
     return (
@@ -335,21 +407,24 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
         onBack={() => setOpenId(null)}
         actions={(
           <>
-            {openId !== 'new' && (() => {
-              const report = reports.find((row) => row.id === openId)
-              if (!report) return null
-              return report.archived_at ? (
-                <>
-                  <button type="button" className="secondary" onClick={() => onArchive(report)} disabled={archiveReport.isPending}>Restore</button>
-                  <button type="button" className="danger" onClick={() => onDelete(report)} disabled={removeReport.isPending}>Delete</button>
-                </>
-              ) : (
-                <button type="button" className="secondary" onClick={() => onArchive(report)} disabled={archiveReport.isPending}>Archive</button>
-              )
-            })()}
-            <button type="button" className="primary" onClick={save} disabled={saveReport.isPending}>
-              {saveReport.isPending ? 'Saving…' : 'Save report'}
+            {openReportRow && openStatus === 'archive' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openReportRow, 'active', 'Report restored')} disabled={setReportStatus.isPending}>Restore</button>
+            )}
+            {openReportRow && openStatus === 'trash' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openReportRow, 'archive', 'Report restored to archive')} disabled={setReportStatus.isPending}>Restore to archive</button>
+            )}
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => downloadOne({ title, body, report_date: reportDate })}
+            >
+              Download
             </button>
+            {!openReadOnly && (
+              <button type="button" className="primary" onClick={save} disabled={saveReport.isPending}>
+                {saveReport.isPending ? 'Saving…' : 'Save report'}
+              </button>
+            )}
           </>
         )}
         meta={(
@@ -360,6 +435,7 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
                 className="progress-notes-page__meta-input"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
             <label className="progress-notes-page__meta-field">
@@ -369,21 +445,24 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
                 className="progress-notes-page__meta-input"
                 value={reportDate}
                 onChange={(event) => setReportDate(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
-            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
-              <span className="progress-notes-page__meta-label">Template</span>
-              <select
-                className="progress-notes-page__meta-input"
-                value=""
-                onChange={(event) => applyTemplate(event.target.value)}
-              >
-                <option value="">Choose a template…</option>
-                {reportTemplates.map((template) => (
-                  <option key={template.id} value={template.id}>{template.name}</option>
-                ))}
-              </select>
-            </label>
+            {!openReadOnly && (
+              <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+                <span className="progress-notes-page__meta-label">Template</span>
+                <select
+                  className="progress-notes-page__meta-input"
+                  value=""
+                  onChange={(event) => applyTemplate(event.target.value)}
+                >
+                  <option value="">Choose a template…</option>
+                  {reportTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </>
         )}
       >
@@ -397,70 +476,47 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
           mergeMode="document"
           mergeContext={mergeContext}
           clinicianProfile={clinicianProfile}
+          editable={!openReadOnly}
         />
       </DocumentWorkspace>
     )
   }
 
-  const scopedReports = useMemo(
-    () => filterByArchiveScope(reports, archiveScope),
-    [reports, archiveScope],
-  )
-
-  const rows = scopedReports.map((report) => {
-    const archived = Boolean(report.archived_at)
+  const rows = reports.map((report) => {
+    const status = recordStatusOf(report)
+    const readOnly = status !== 'active'
     return {
       id: report.id,
       report,
       filterValues: {
         title: report.title || 'Untitled report',
         date: formatDate(report.report_date),
+        status: statusLabelOf(report),
       },
       sortValues: {
         title: report.title || '',
         date: report.report_date || '',
+        status: statusLabelOf(report),
       },
+      muted: readOnly,
       cells: {
         title: <span className="record-table__primary">{report.title || 'Untitled report'}</span>,
         date: formatDate(report.report_date),
+        status: <StatusBadge status={status} />,
         actions: (
-          <span className="practice-docs__actions">
-            {archived ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onArchive(report)
-                  }}
-                >
-                  Restore
-                </button>
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onDelete(report)
-                  }}
-                >
-                  Delete
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="secondary"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onArchive(report)
-                }}
-              >
-                Archive
-              </button>
-            )}
-          </span>
+          <RowMenu
+            label={`Actions for ${report.title || 'report'}`}
+            items={statusMenuItems(status, {
+              onEdit: () => openReport(report),
+              onView: () => openReport(report),
+              onArchive: () => moveStatus(report, 'archive', 'Report archived'),
+              onRestore: () => moveStatus(report, 'active', 'Report restored'),
+              onDelete: () => moveStatus(report, 'trash', 'Report moved to trash'),
+              onRestoreToArchive: () => moveStatus(report, 'archive', 'Report restored to archive'),
+              onPermanentDelete: () => permanentlyDelete(report),
+              onDownload: () => downloadOne(report),
+            })}
+          />
         ),
       },
     }
@@ -472,30 +528,35 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
       open={open}
       onToggle={onToggle}
       actions={(
-        <>
-          <ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />
-          {archiveScope === 'active' && (
-            <button type="button" className="secondary" onClick={startReport}>
-              Add
-            </button>
-          )}
-        </>
+        <button type="button" className="secondary" onClick={startReport}>
+          Add
+        </button>
       )}
     >
       {reportsError && (
         <p className="form-error" role="alert">{reportsError.message || 'Could not load reports.'}</p>
       )}
+      <BulkStatusBar
+        count={selectedCount}
+        noun="reports"
+        actions={bulk}
+        onClear={clearSelection}
+      />
       {!reportsError && (
         <RecordTable
-          remember={`course-reports-${clientId}`}
+          remember={`course-reports-status-${clientId}`}
           columns={REPORT_COLUMNS}
           rows={rows}
           countNoun="reports"
           defaultSort={{ key: 'date', direction: 'desc' }}
-          emptyMessage={isPending
-            ? 'Loading reports…'
-            : (archiveScope === 'archived' ? 'No archived reports.' : 'No reports on this course yet.')}
+          defaultFilters={STATUS_DEFAULT_FILTERS}
+          selection={selection}
+          emptyMessage={isPending ? 'Loading reports…' : 'No reports on this course yet.'}
           onRowClick={(row) => openReport(row.report)}
+          onFiltersChange={(next) => {
+            const status = String(next?.status || 'Active')
+            if (status !== statusFilter) setStatusFilter(status)
+          }}
         />
       )}
     </CourseAccordion>

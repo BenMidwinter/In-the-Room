@@ -1,13 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
+import BulkStatusBar from '../../components/BulkStatusBar'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import RichTextEditor from '../../components/RichTextEditor'
+import RowMenu from '../../components/RowMenu'
+import StatusBadge from '../../components/StatusBadge'
 import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { useConfirm, usePrompt, useToast } from '../../components/ui'
+import { useRowSelection } from '../../hooks/useRowSelection'
 import { useAuth } from '../../lib/auth/AuthProvider'
+import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
+import {
+  STATUS_COLUMN,
+  STATUS_DEFAULT_FILTERS,
+  bulkActionsForStatus,
+  recordStatusOf,
+  statusLabelOf,
+  statusMenuItems,
+} from '../../lib/recordStatus'
 import {
   childrenOf,
   practiceBreadcrumb,
@@ -28,6 +40,7 @@ const COLUMNS = [
   { key: 'mark', label: '', className: 'practice-docs__mark-col' },
   { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
   { key: 'updated', label: 'Updated', sort: 'date' },
+  STATUS_COLUMN,
   { key: 'actions', label: 'Actions', className: 'practice-docs__actions-col record-table__col--actions', sort: false },
 ]
 
@@ -72,6 +85,13 @@ function ItemMark({ kind }) {
   )
 }
 
+function folderMenuItems(item, { onRename, onDelete }) {
+  return [
+    { label: 'Rename', onSelect: onRename },
+    { label: 'Delete', onSelect: onDelete, danger: true },
+  ]
+}
+
 export default function PracticeDocumentsPage() {
   const toast = useToast()
   const confirm = useConfirm()
@@ -86,10 +106,17 @@ export default function PracticeDocumentsPage() {
   const folder = practiceFolder(items, requestedFolder)
   const folderId = folder?.id ?? null
   const [selectedId, setSelectedId] = useState(null)
-  const [archiveScope, setArchiveScope] = useState('active')
+  const [statusFilter, setStatusFilter] = useState('Active')
   const [name, setName] = useState('')
   const [content, setContent] = useState('<p></p>')
   const [editorVersion, setEditorVersion] = useState(0)
+  const { selectedIds, selection: baseSelection, clear: clearSelection, count: selectedCount } = useRowSelection()
+
+  const selection = useMemo(() => ({
+    ...baseSelection,
+    canSelect: (row) => row.item?.kind === 'document',
+    label: (row) => `Select ${row.item?.name || 'document'}`,
+  }), [baseSelection])
 
   const clinicianProfile = useMemo(
     () => clinicianProfileForEditor(accountProfile, user?.id ? getProfile(user.id) : null),
@@ -113,13 +140,7 @@ export default function PracticeDocumentsPage() {
   }
 
   const crumbs = practiceBreadcrumb(items, folderId)
-  const visible = useMemo(() => {
-    const children = childrenOf(items, folderId)
-    if (archiveScope === 'archived') {
-      return children.filter((item) => item.kind === 'document' && item.archived_at)
-    }
-    return children.filter((item) => item.kind === 'folder' || !item.archived_at)
-  }, [items, folderId, archiveScope])
+  const visible = useMemo(() => childrenOf(items, folderId), [items, folderId])
 
   const closeEditor = () => {
     setEditorOpen?.(false)
@@ -173,12 +194,10 @@ export default function PracticeDocumentsPage() {
     }
   }
 
-  const removeItem = async (item) => {
+  const removeFolder = async (item) => {
     const ok = await confirm({
-      title: item.kind === 'folder' ? 'Delete folder?' : 'Delete document?',
-      message: item.kind === 'folder'
-        ? `"${item.name}" and everything inside it will be removed.`
-        : `"${item.name}" will be removed.`,
+      title: 'Delete folder?',
+      message: `"${item.name}" and everything inside it will be removed.`,
       confirmLabel: 'Delete',
       tone: 'danger',
     })
@@ -186,20 +205,88 @@ export default function PracticeDocumentsPage() {
     try {
       await mutate.mutateAsync({ type: 'delete', id: item.id })
       if (selectedId === item.id) closeEditor()
-      toast.success(item.kind === 'folder' ? 'Folder deleted.' : 'Document deleted.')
+      toast.success('Folder deleted.')
     } catch (err) {
-      toast.error(err?.message || 'Could not delete that item.')
+      toast.error(err?.message || 'Could not delete that folder.')
     }
   }
 
-  const archiveItem = async (item) => {
+  const moveStatus = async (item, nextStatus, toastLabel) => {
     try {
-      await mutate.mutateAsync({ type: 'archive', id: item.id, archived: !item.archived_at })
-      toast.saved(item.archived_at ? 'Document restored' : 'Document archived')
+      await mutate.mutateAsync({ type: 'status', id: item.id, status: nextStatus })
+      if (selectedId === item.id && nextStatus !== 'active') closeEditor()
+      clearSelection()
+      toast.saved(toastLabel)
     } catch (err) {
-      toast.error(err?.message || 'Could not update that item.')
+      toast.error(err?.message || 'Could not update that document.')
     }
   }
+
+  const permanentlyDeleteDocument = async (item) => {
+    const ok = await confirm({
+      title: 'Permanently delete this document?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Permanently delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      await mutate.mutateAsync({ type: 'delete', id: item.id })
+      if (selectedId === item.id) closeEditor()
+      clearSelection()
+      toast.success('Document permanently deleted.')
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete that document.')
+    }
+  }
+
+  const downloadOne = async (item) => {
+    try {
+      const opened = await downloadRichDocumentPdf({
+        title: item.name,
+        bodyHtml: item.content,
+        mergeContext,
+      })
+      if (!opened) {
+        toast.error('Could not create the PDF. Please try again.')
+        return
+      }
+      toast.success('PDF downloaded.')
+    } catch (err) {
+      toast.error(err?.message || 'Could not prepare the PDF.')
+    }
+  }
+
+  const runBulk = async (action) => {
+    const targets = items.filter((item) => item.kind === 'document' && selectedIds.includes(item.id))
+    if (!targets.length) return
+    for (const item of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      await action(item)
+    }
+  }
+
+  const bulk = bulkActionsForStatus(statusFilter, {
+    onArchive: () => runBulk((item) => moveStatus(item, 'archive', 'Documents archived')),
+    onRestore: () => runBulk((item) => moveStatus(item, 'active', 'Documents restored')),
+    onDelete: () => runBulk((item) => moveStatus(item, 'trash', 'Documents moved to trash')),
+    onRestoreToArchive: () => runBulk((item) => moveStatus(item, 'archive', 'Documents restored to archive')),
+    onPermanentDelete: async () => {
+      const ok = await confirm({
+        title: 'Permanently delete selected documents?',
+        message: 'This cannot be undone.',
+        confirmLabel: 'Permanently delete',
+        tone: 'danger',
+      })
+      if (!ok) return
+      await runBulk(async (item) => {
+        await mutate.mutateAsync({ type: 'delete', id: item.id })
+      })
+      clearSelection()
+      toast.saved('Documents permanently deleted')
+    },
+    onDownload: () => runBulk((item) => downloadOne(item)),
+  })
 
   const applyTemplate = async (templateId) => {
     if (!templateId) return
@@ -235,94 +322,49 @@ export default function PracticeDocumentsPage() {
   }
 
   const rows = visible.map((item) => {
-    const archived = Boolean(item.archived_at)
+    const isFolder = item.kind === 'folder'
+    const status = isFolder ? 'active' : recordStatusOf(item)
+    const readOnly = !isFolder && status !== 'active'
     return {
       id: item.id,
       item,
       filterValues: {
         name: item.name,
+        status: isFolder ? 'Active' : statusLabelOf(item),
       },
       sortValues: {
         name: practiceNameSortKey(item),
         updated: item.updated_at,
+        status: isFolder ? 'Active' : statusLabelOf(item),
       },
+      muted: readOnly,
       cells: {
         mark: <ItemMark kind={item.kind} />,
         name: <span className="record-table__primary">{item.name}</span>,
         updated: formatUpdated(item.updated_at),
-        actions: (
-          <span className="practice-docs__actions">
-            {item.kind === 'folder' ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    renameItem(item)
-                  }}
-                >
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    removeItem(item)
-                  }}
-                >
-                  Delete
-                </button>
-              </>
-            ) : archived ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    archiveItem(item)
-                  }}
-                >
-                  Restore
-                </button>
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    removeItem(item)
-                  }}
-                >
-                  Delete
-                </button>
-              </>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    renameItem(item)
-                  }}
-                >
-                  Rename
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    archiveItem(item)
-                  }}
-                >
-                  Archive
-                </button>
-              </>
-            )}
-          </span>
+        status: isFolder ? <span className="record-table__cell-muted">—</span> : <StatusBadge status={status} />,
+        actions: isFolder ? (
+          <RowMenu
+            label={`Actions for ${item.name}`}
+            items={folderMenuItems(item, {
+              onRename: () => renameItem(item),
+              onDelete: () => removeFolder(item),
+            })}
+          />
+        ) : (
+          <RowMenu
+            label={`Actions for ${item.name}`}
+            items={statusMenuItems(status, {
+              onEdit: () => openDocument(item),
+              onView: () => openDocument(item),
+              onArchive: () => moveStatus(item, 'archive', 'Document archived'),
+              onRestore: () => moveStatus(item, 'active', 'Document restored'),
+              onDelete: () => moveStatus(item, 'trash', 'Document moved to trash'),
+              onRestoreToArchive: () => moveStatus(item, 'archive', 'Document restored to archive'),
+              onPermanentDelete: () => permanentlyDeleteDocument(item),
+              onDownload: () => downloadOne(item),
+            })}
+          />
         ),
       },
     }
@@ -330,6 +372,8 @@ export default function PracticeDocumentsPage() {
 
   const editing = selectedId != null
   const currentItem = items.find((item) => item.id === selectedId)
+  const openStatus = currentItem ? recordStatusOf(currentItem) : 'active'
+  const openReadOnly = selectedId !== 'new' && openStatus !== 'active'
 
   if (editing) {
     return (
@@ -338,19 +382,24 @@ export default function PracticeDocumentsPage() {
         onBack={closeEditor}
         actions={(
           <>
-            {selectedId !== 'new' && currentItem && (
-              currentItem.archived_at ? (
-                <>
-                  <button type="button" className="secondary" onClick={() => archiveItem(currentItem)} disabled={mutate.isPending}>Restore</button>
-                  <button type="button" className="danger" onClick={() => removeItem(currentItem)} disabled={mutate.isPending}>Delete</button>
-                </>
-              ) : (
-                <button type="button" className="secondary" onClick={() => archiveItem(currentItem)} disabled={mutate.isPending}>Archive</button>
-              )
+            {selectedId !== 'new' && currentItem && openStatus === 'archive' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(currentItem, 'active', 'Document restored')} disabled={mutate.isPending}>Restore</button>
             )}
-            <button type="button" className="primary" onClick={saveDocument} disabled={mutate.isPending}>
-              {mutate.isPending ? 'Saving…' : 'Save'}
+            {selectedId !== 'new' && currentItem && openStatus === 'trash' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(currentItem, 'archive', 'Document restored to archive')} disabled={mutate.isPending}>Restore to archive</button>
+            )}
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => downloadOne({ name, content })}
+            >
+              Download
             </button>
+            {!openReadOnly && (
+              <button type="button" className="primary" onClick={saveDocument} disabled={mutate.isPending}>
+                {mutate.isPending ? 'Saving…' : 'Save'}
+              </button>
+            )}
           </>
         )}
         meta={(
@@ -361,21 +410,24 @@ export default function PracticeDocumentsPage() {
                 className="progress-notes-page__meta-input"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
-            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
-              <span className="progress-notes-page__meta-label">Template</span>
-              <select
-                className="progress-notes-page__meta-input"
-                value=""
-                onChange={(event) => applyTemplate(event.target.value)}
-              >
-                <option value="">Choose a template…</option>
-                {documentTemplates.map((template) => (
-                  <option key={template.id} value={template.id}>{template.name}</option>
-                ))}
-              </select>
-            </label>
+            {!openReadOnly && (
+              <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+                <span className="progress-notes-page__meta-label">Template</span>
+                <select
+                  className="progress-notes-page__meta-input"
+                  value=""
+                  onChange={(event) => applyTemplate(event.target.value)}
+                >
+                  <option value="">Choose a template…</option>
+                  {documentTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </>
         )}
       >
@@ -388,20 +440,22 @@ export default function PracticeDocumentsPage() {
           mode="clinical"
           mergeContext={mergeContext}
           clinicianProfile={clinicianProfile}
+          editable={!openReadOnly}
         />
       </DocumentWorkspace>
     )
   }
 
+  const showNewActions = statusFilter === 'Active'
+
   return (
     <RecordListLayout
       title={folder?.name || 'My Documents'}
-      newLabel={archiveScope === 'active' ? 'document' : undefined}
-      onNew={archiveScope === 'active' ? startDocument : undefined}
-      headerActions={archiveScope === 'active' ? (
+      newLabel={showNewActions ? 'document' : undefined}
+      onNew={showNewActions ? startDocument : undefined}
+      headerActions={showNewActions ? (
         <button type="button" className="secondary" onClick={createFolder}>New folder</button>
       ) : null}
-      toolbar={<ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />}
     >
       {crumbs.length > 0 && (
         <nav className="practice-crumbs" aria-label="Folder">
@@ -424,21 +478,29 @@ export default function PracticeDocumentsPage() {
       {error && (
         <p className="form-error" role="alert">{error.message || 'Could not load documents.'}</p>
       )}
+      <BulkStatusBar
+        count={selectedCount}
+        noun="documents"
+        actions={bulk}
+        onClear={clearSelection}
+      />
       {!error && (
         <RecordTable
-          remember="practice-documents"
+          remember="practice-documents-status"
           columns={COLUMNS}
           rows={rows}
           countNoun="items"
           defaultSort={{ key: 'name', direction: 'asc' }}
-          emptyMessage={isPending
-            ? 'Loading documents…'
-            : (archiveScope === 'archived'
-              ? 'No archived documents here.'
-              : (folder ? 'This folder is empty.' : 'No documents yet.'))}
+          defaultFilters={STATUS_DEFAULT_FILTERS}
+          selection={selection}
+          emptyMessage={isPending ? 'Loading documents…' : (folder ? 'This folder is empty.' : 'No documents yet.')}
           onRowClick={(row) => {
             if (row.item.kind === 'folder') openFolder(row.item.id)
             else openDocument(row.item)
+          }}
+          onFiltersChange={(next) => {
+            const status = String(next?.status || 'Active')
+            if (status !== statusFilter) setStatusFilter(status)
           }}
         />
       )}

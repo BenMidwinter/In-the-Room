@@ -1,19 +1,30 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
+import BulkStatusBar from '../../components/BulkStatusBar'
 import RichTextEditor from '../../components/RichTextEditor'
+import RowMenu from '../../components/RowMenu'
+import StatusBadge from '../../components/StatusBadge'
 import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { useClientSession } from '../../lib/useClientSession'
-import { filterByArchiveScope } from '../../lib/archiveScope'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { useTemplatesQuery } from '../../lib/templateQueries'
 import { getProfile } from '../../lib/store'
+import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
+import {
+  STATUS_COLUMN,
+  STATUS_DEFAULT_FILTERS,
+  bulkActionsForStatus,
+  recordStatusOf,
+  statusLabelOf,
+  statusMenuItems,
+} from '../../lib/recordStatus'
+import { useRowSelection } from '../../hooks/useRowSelection'
 import {
   deleteWorkingDocument,
   listWorkingDocuments,
   saveWorkingDocumentForUser,
-  setWorkingDocumentArchived,
+  setWorkingDocumentStatus,
 } from '../../lib/supabase/workingDocumentsRepo'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
@@ -34,6 +45,7 @@ const DOC_COLUMNS = [
   { key: 'title', label: 'Title', filter: 'text' },
   { key: 'created', label: 'Created', sort: 'date' },
   { key: 'updated', label: 'Last updated', sort: 'date' },
+  STATUS_COLUMN,
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 
@@ -43,8 +55,8 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
     queryKey: ['working-documents', clientId],
     queryFn: () => listWorkingDocuments(clientId),
   })
-  const [archiveScope, setArchiveScope] = useState('active')
   const [selectedId, setSelectedId] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('Active')
   const [seenClientId, setSeenClientId] = useState(clientId)
   if (seenClientId !== clientId) {
     setSeenClientId(clientId)
@@ -56,6 +68,7 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
   const [editorVersion, setEditorVersion] = useState(0)
   const toast = useToast()
   const confirm = useConfirm()
+  const { selectedIds, selection, clear: clearSelection, count: selectedCount } = useRowSelection()
   const setEditorOpen = useClientChrome()?.setEditorOpen
 
   useEffect(() => {
@@ -144,21 +157,23 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
     })
   }
 
-  const handleArchive = async (doc) => {
+  const moveStatus = async (doc, nextStatus, toastLabel) => {
     try {
-      await setWorkingDocumentArchived(doc.id, !doc.archived_at)
+      await setWorkingDocumentStatus(doc.id, nextStatus)
+      if (selectedId === doc.id && nextStatus !== 'active') setSelectedId(null)
       await refresh()
-      toast.saved(doc.archived_at ? 'Document restored' : 'Document archived')
+      clearSelection()
+      toast.saved(toastLabel)
     } catch (err) {
       toast.error(err?.message || 'Could not update this document')
     }
   }
 
-  const handleDelete = async (doc) => {
+  const permanentlyDelete = async (doc) => {
     const ok = await confirm({
-      title: 'Delete this document?',
-      message: 'This permanently removes the working document.',
-      confirmLabel: 'Delete',
+      title: 'Permanently delete this document?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Permanently delete',
       tone: 'danger',
     })
     if (!ok) return
@@ -166,72 +181,108 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
       await deleteWorkingDocument(doc.id)
       if (selectedId === doc.id) setSelectedId(null)
       await refresh()
-      toast.saved('Document deleted')
+      clearSelection()
+      toast.saved('Document permanently deleted')
     } catch (err) {
       toast.error(err?.message || 'Could not delete this document')
     }
   }
 
-  const scopedDocuments = useMemo(
-    () => filterByArchiveScope(documents, archiveScope),
-    [documents, archiveScope],
-  )
+  const downloadOne = async (doc) => {
+    try {
+      const opened = await downloadRichDocumentPdf({
+        title: doc.title,
+        bodyHtml: doc.content,
+        mergeContext: buildMergeContext({
+          client,
+          appointment: null,
+          profile: clinicianProfile,
+          sessionDate: todayISO(),
+        }),
+      })
+      if (!opened) {
+        toast.error('Could not create the PDF. Please try again.')
+        return
+      }
+      toast.success('PDF downloaded.')
+    } catch (err) {
+      toast.error(err?.message || 'Could not prepare the PDF.')
+    }
+  }
 
-  const rows = scopedDocuments.map(doc => {
-    const archived = Boolean(doc.archived_at)
+  const handleDownload = () => downloadOne({
+    title: title.trim() || 'Untitled document',
+    content,
+  })
+
+  const runBulk = async (action) => {
+    const targets = documents.filter((doc) => selectedIds.includes(doc.id))
+    if (!targets.length) return
+    for (const doc of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      await action(doc)
+    }
+  }
+
+  const bulk = bulkActionsForStatus(statusFilter, {
+    onArchive: () => runBulk((doc) => moveStatus(doc, 'archive', 'Documents archived')),
+    onRestore: () => runBulk((doc) => moveStatus(doc, 'active', 'Documents restored')),
+    onDelete: () => runBulk((doc) => moveStatus(doc, 'trash', 'Documents moved to trash')),
+    onRestoreToArchive: () => runBulk((doc) => moveStatus(doc, 'archive', 'Documents restored to archive')),
+    onPermanentDelete: async () => {
+      const ok = await confirm({
+        title: 'Permanently delete selected documents?',
+        message: 'This cannot be undone.',
+        confirmLabel: 'Permanently delete',
+        tone: 'danger',
+      })
+      if (!ok) return
+      await runBulk(async (doc) => {
+        await deleteWorkingDocument(doc.id)
+      })
+      await refresh()
+      clearSelection()
+      toast.saved('Documents permanently deleted')
+    },
+    onDownload: () => runBulk((doc) => downloadOne(doc)),
+  })
+
+  const rows = documents.map(doc => {
+    const status = recordStatusOf(doc)
+    const readOnly = status !== 'active'
     return {
       id: doc.id,
       doc,
       filterValues: {
         title: doc.title,
+        status: statusLabelOf(doc),
       },
       sortValues: {
         title: doc.title,
         created: doc.created_at || '',
         updated: doc.updated_at || '',
+        status: statusLabelOf(doc),
       },
+      muted: readOnly,
       cells: {
         title: <span className="record-table__primary">{doc.title}</span>,
         created: formatDocDate(doc.created_at),
         updated: formatDocDate(doc.updated_at),
+        status: <StatusBadge status={status} />,
         actions: (
-          <span className="practice-docs__actions">
-            {archived ? (
-              <>
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleArchive(doc)
-                  }}
-                >
-                  Restore
-                </button>
-                <button
-                  type="button"
-                  className="danger"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    handleDelete(doc)
-                  }}
-                >
-                  Delete
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="secondary"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  handleArchive(doc)
-                }}
-              >
-                Archive
-              </button>
-            )}
-          </span>
+          <RowMenu
+            label={`Actions for ${doc.title}`}
+            items={statusMenuItems(status, {
+              onEdit: () => selectDocument(doc),
+              onView: () => selectDocument(doc),
+              onArchive: () => moveStatus(doc, 'archive', 'Document archived'),
+              onRestore: () => moveStatus(doc, 'active', 'Document restored'),
+              onDelete: () => moveStatus(doc, 'trash', 'Document moved to trash'),
+              onRestoreToArchive: () => moveStatus(doc, 'archive', 'Document restored to archive'),
+              onPermanentDelete: () => permanentlyDelete(doc),
+              onDownload: () => downloadOne(doc),
+            })}
+          />
         ),
       },
     }
@@ -240,7 +291,8 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
   const editing = selectedId != null
   const editorTitle = selectedId === 'new' ? 'New working document' : title || 'Working document'
   const openDoc = documents.find((row) => row.id === selectedId)
-  const openArchived = Boolean(openDoc?.archived_at)
+  const openStatus = openDoc ? recordStatusOf(openDoc) : 'active'
+  const openReadOnly = selectedId !== 'new' && openStatus !== 'active'
 
   if (editing) {
     return (
@@ -250,19 +302,18 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
         onBack={handleCancel}
         actions={(
           <>
-            {selectedId !== 'new' && openDoc && (
-              openArchived ? (
-                <>
-                  <button type="button" className="secondary" onClick={() => handleArchive(openDoc)}>Restore</button>
-                  <button type="button" className="danger" onClick={() => handleDelete(openDoc)}>Delete</button>
-                </>
-              ) : (
-                <button type="button" className="secondary" onClick={() => handleArchive(openDoc)}>Archive</button>
-              )
+            {selectedId !== 'new' && openDoc && openStatus === 'archive' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openDoc, 'active', 'Document restored')}>Restore</button>
             )}
-            <button type="button" className="primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save document'}
-            </button>
+            {selectedId !== 'new' && openDoc && openStatus === 'trash' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(openDoc, 'archive', 'Document restored to archive')}>Restore to archive</button>
+            )}
+            <button type="button" className="secondary" onClick={handleDownload}>Download</button>
+            {!openReadOnly && (
+              <button type="button" className="primary" onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving…' : 'Save document'}
+              </button>
+            )}
           </>
         )}
         meta={(
@@ -273,21 +324,24 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
                 className="progress-notes-page__meta-input"
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
+                disabled={openReadOnly}
               />
             </label>
-            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
-              <span className="progress-notes-page__meta-label">Template</span>
-              <select
-                className="progress-notes-page__meta-input"
-                value=""
-                onChange={(event) => applyDocumentTemplate(event.target.value)}
-              >
-                <option value="">Choose a template…</option>
-                {documentTemplates.map((template) => (
-                  <option key={template.id} value={template.id}>{template.name}</option>
-                ))}
-              </select>
-            </label>
+            {!openReadOnly && (
+              <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+                <span className="progress-notes-page__meta-label">Template</span>
+                <select
+                  className="progress-notes-page__meta-input"
+                  value=""
+                  onChange={(event) => applyDocumentTemplate(event.target.value)}
+                >
+                  <option value="">Choose a template…</option>
+                  {documentTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </>
         )}
       >
@@ -300,6 +354,7 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
           mode="clinical"
           mergeContext={mergeContext}
           clinicianProfile={clinicianProfile}
+          editable={!openReadOnly}
         />
       </DocumentWorkspace>
     )
@@ -309,22 +364,31 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
     <RecordListLayout
       embedded={embedded}
       title={embedded ? '' : 'Working documents'}
-      newLabel={archiveScope === 'active' ? 'working document' : undefined}
-      onNew={archiveScope === 'active' ? handleNew : undefined}
-      toolbar={<ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />}
+      newLabel="working document"
+      onNew={handleNew}
     >
       {error && <p className="form-error" role="alert">{error.message || 'Could not load documents.'}</p>}
+      <BulkStatusBar
+        count={selectedCount}
+        noun="documents"
+        actions={bulk}
+        onClear={clearSelection}
+      />
       {!editing && !error && (
         <RecordTable
-          remember={`working-documents-${clientId}`}
+          remember={`working-documents-status-${clientId}`}
           columns={DOC_COLUMNS}
           rows={rows}
           defaultSort={{ key: 'updated', direction: 'desc' }}
+          defaultFilters={STATUS_DEFAULT_FILTERS}
+          selection={selection}
           countNoun="documents"
-          emptyMessage={isPending
-            ? 'Loading documents…'
-            : (archiveScope === 'archived' ? 'No archived documents.' : 'No working documents yet.')}
+          emptyMessage={isPending ? 'Loading documents…' : 'No working documents yet.'}
           onRowClick={(row) => selectDocument(row.doc)}
+          onFiltersChange={(next) => {
+            const status = String(next?.status || 'Active')
+            if (status !== statusFilter) setStatusFilter(status)
+          }}
         />
       )}
     </RecordListLayout>

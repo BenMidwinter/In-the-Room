@@ -1,18 +1,20 @@
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
+import { isTrashExpired, statusTimestamps } from '../recordStatus'
+import { db } from '../data/collections'
 import {
   deleteLocalReport,
   listLocalReports,
   rememberLocalReport,
   saveLocalReport,
-  setLocalReportArchived,
   type AppReport,
 } from '../store/reports'
-import { selectWithOptionalArchive, updateArchiveColumn } from './optionalArchive'
+import { selectWithOptionalStatus, updateStatusColumns } from './optionalRecordStatus'
 
 const REPORT_COLUMNS_BASE = 'id, owner_id, organization_id, client_id, episode_id, author_id, report_date, encrypted_payload, payload_format, created_at, updated_at'
-const REPORT_COLUMNS = `${REPORT_COLUMNS_BASE}, archived_at`
+const REPORT_COLUMNS_ARCHIVE = `${REPORT_COLUMNS_BASE}, archived_at`
+const REPORT_COLUMNS = `${REPORT_COLUMNS_ARCHIVE}, trashed_at`
 
 type ReportRow = {
   id: string
@@ -27,7 +29,10 @@ type ReportRow = {
   created_at: string
   updated_at: string
   archived_at?: string | null
+  trashed_at?: string | null
 }
+
+type ReportStatus = 'active' | 'archive' | 'trash'
 
 function parseReport(raw: Json | null | undefined): { title: string; body: string } {
   const row = raw && typeof raw === 'object' && !Array.isArray(raw)
@@ -54,21 +59,43 @@ function toAppReport(row: ReportRow): AppReport {
     created_at: row.created_at,
     updated_at: row.updated_at,
     archived_at: row.archived_at || null,
+    trashed_at: row.trashed_at || null,
   }
+}
+
+function filterLocalReports(episodeId: string): AppReport[] {
+  return listLocalReports(episodeId).filter((row) => !isTrashExpired(row.trashed_at))
+}
+
+async function purgeExpired(episodeId: string, rows: ReportRow[]) {
+  const supabase = getSupabase()
+  if (!supabase) return rows
+  const keep: ReportRow[] = []
+  for (const row of rows) {
+    if (!isTrashExpired(row.trashed_at)) {
+      keep.push(row)
+      continue
+    }
+    await supabase.from('reports').delete().eq('id', row.id).eq('episode_id', episodeId)
+    deleteLocalReport(row.id)
+  }
+  return keep
 }
 
 export async function listReportsForEpisode(episodeId: string): Promise<AppReport[]> {
   if (!episodeId) return []
-  if (!isSupabaseConfigured()) return listLocalReports(episodeId)
+  if (!isSupabaseConfigured()) return filterLocalReports(episodeId)
   const supabase = getSupabase()
-  if (!supabase) return listLocalReports(episodeId)
-  const data = await selectWithOptionalArchive(
+  if (!supabase) return filterLocalReports(episodeId)
+  const data = await selectWithOptionalStatus(
     () => supabase.from('reports').select(REPORT_COLUMNS).eq('episode_id', episodeId).order('report_date', { ascending: false }),
+    () => supabase.from('reports').select(REPORT_COLUMNS_ARCHIVE).eq('episode_id', episodeId).order('report_date', { ascending: false }),
     () => supabase.from('reports').select(REPORT_COLUMNS_BASE).eq('episode_id', episodeId).order('report_date', { ascending: false }),
   )
-  const rows = await withOpenedPayloads('reports', data as ReportRow[])
+  const surviving = await purgeExpired(episodeId, data as ReportRow[])
+  const rows = await withOpenedPayloads('reports', surviving)
   for (const row of rows) rememberLocalReport(toAppReport(row))
-  return listLocalReports(episodeId)
+  return filterLocalReports(episodeId)
 }
 
 export async function saveReportForUser(input: {
@@ -153,20 +180,37 @@ export async function saveReportForUser(input: {
   }))
 }
 
-export async function setReportArchived(id: string, archived: boolean): Promise<AppReport> {
+function findLocalReport(id: string): AppReport | undefined {
+  const row = db.reports.find((item) => item.id === id)
+  return row ? (row as unknown as AppReport) : undefined
+}
+
+export async function setReportStatus(id: string, nextStatus: ReportStatus): Promise<AppReport> {
   if (!id) throw new Error('Report not found')
-  const archivedAt = archived ? new Date().toISOString() : null
-  if (!isSupabaseConfigured()) return setLocalReportArchived(id, archivedAt)
+  if (!isSupabaseConfigured() || !getSupabase()) {
+    const report = findLocalReport(id)
+    if (!report) throw new Error('Report not found')
+    const patch = statusTimestamps(nextStatus, report)
+    return rememberLocalReport({ ...report, ...patch })
+  }
   const supabase = getSupabase()
-  if (!supabase) return setLocalReportArchived(id, archivedAt)
-  await updateArchiveColumn(() => supabase.from('reports').update({ archived_at: archivedAt }).eq('id', id))
-  const rows = await selectWithOptionalArchive(
+  if (!supabase) throw new Error('Supabase is not configured')
+  const currentRows = await selectWithOptionalStatus(
     () => supabase.from('reports').select(REPORT_COLUMNS).eq('id', id),
+    () => supabase.from('reports').select(REPORT_COLUMNS_ARCHIVE).eq('id', id),
     () => supabase.from('reports').select(REPORT_COLUMNS_BASE).eq('id', id),
   )
-  if (!rows[0]) throw new Error('Report not found')
-  const [opened] = await withOpenedPayloads('reports', [{ ...(rows[0] as ReportRow), archived_at: archivedAt }])
+  if (!currentRows[0]) throw new Error('Report not found')
+  const current = currentRows[0] as ReportRow
+  const patch = statusTimestamps(nextStatus, current)
+  await updateStatusColumns(() => supabase.from('reports').update(patch).eq('id', id))
+  const [opened] = await withOpenedPayloads('reports', [{ ...current, ...patch }])
   return rememberLocalReport(toAppReport(opened))
+}
+
+/** @deprecated Prefer setReportStatus */
+export async function setReportArchived(id: string, archived: boolean): Promise<AppReport> {
+  return setReportStatus(id, archived ? 'archive' : 'active')
 }
 
 export async function deleteReport(id: string): Promise<void> {
