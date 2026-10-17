@@ -2,18 +2,30 @@
 
 Living plan. The clinical workspace (caseload, calendar, notes, services, forms, screener, Google Calendar busy sync) is in use. The order below is the broader list.
 
+## Next, in this order
+
+1. **Folders on Client files.** The same idea as My Documents under My Practice: create a folder, open it, rename it, and delete it, then put a file in the folder you are looking at.
+2. **Encrypt file names in the S3 bucket.** Object bytes can already use SSE-KMS. The object key still ends with the readable file name (`clients/{owner}/{client}/{id}/{file name}`). Encrypt that name in the key. The display name can stay in `client_files` for the signed-in owner. Someone who reaches the bucket should not be able to read the name from the key.
+3. **Recovery keys, an export gate, and account deletion.** A recovery sheet when the practice key is created. Closing or cancelling an account waits until a full export has been generated. Deletion then removes the database rows and the S3 objects.
+4. **Audit logging.** Show it somewhere, or at least keep a behind-the-scenes record that is ready for more than one practice later. Export already writes `export.requested` and `export.downloaded` to `audit_events`.
+5. **Sign-up through Stripe, with an admin code.** New accounts pay through Stripe. An admin code lets this practice open an account without that charge. Put a bot check on the form (Cloudflare Turnstile) so scripted sign-ups cannot spam it. This can run at the same time as item 6.
+6. **Marketing site, and the app on its own host.** A public site that search engines and AI crawlers can read. Move the signed-in app to `app.processandnote.app`, or another name in front, so the marketing site can use the bare domain.
+7. **Policies against the product.** Read the privacy notice, terms, and DPA against what the app actually does, and correct anything that has drifted.
+
+The export file-format sprint stays on the list and is not in this sequence. It is written up in `docs/LegalComplianceChecklist.md`: PDFs for clinical writing, and other files left in their own formats.
+
 ---
 
 ## 1. Missing features
 
 - [x] **Reporting.** Overview, Appointments & Notes, Clients, Waitlist, My Practice, and Finance. It opens on a rolling week, and every section can take other dates. Efficiency is appointment, support, and admin time as a percentage of availability minus busy time.
-- [x] **Invoicing.** The hub has All Invoices and Unbilled Sessions, using the same filter and sort tables as the rest of the app. A new invoice starts by choosing a client. Batch Invoice drafts one invoice per client or billing contact for a date range, in arrears or in advance. Send is still mark-as-sent and print until Resend is connected; the invoice stores the recipient email, sent time, and delivery method so a batch email can be switched on later. The invoice itself is one document: recipient, lines, and payment terms. People who share a Send invoices to contact still go on one invoice. Xero sync and expenses are still to do.
+- [x] **Invoicing.** The hub has All Invoices and Unbilled Sessions, using the same filter and sort tables as the rest of the app. A new invoice starts by choosing a client. Batch Invoice drafts one invoice per client or billing contact for a date range, in arrears or in advance. Send can email through Resend, or mark an invoice as sent manually. The invoice itself is one document: recipient, lines, and payment terms. People who share a Send invoices to contact still go on one invoice. Xero sync and expenses are still to do.
 
 Service prices, including whether the price already includes VAT, live on each service.
 
 ## Interface tweaks
 
-Noted from the hosted site. These stay on the list while encryption is the next piece of work.
+Noted from the hosted site.
 
 - [x] Standardise text size between pages.
 - [ ] Evaluate the calendar layout. The text is a bit squeezed.
@@ -24,7 +36,7 @@ Noted from the hosted site. These stay on the list while encryption is the next 
 - [ ] **Mobile calendar times.** In the phone calendar, appointment blocks overlap the time labels down the left. Keep those times readable, and keep the events in the grid beside them.
 - [ ] **Archive and delete on document tables.** A clinician needs to archive a document so it leaves the working list and stays recoverable. Follow All Invoices: the row action is a button in the last column (Open, on the right of each invoice). Put a Delete button in that same place on pretty much every document-based table: notes, letters, working documents, reports, practice documents, and the other document lists. Archive is the non-destructive action. Delete is the row button.
 
-## 2. Encryption and login — next
+## 2. Encryption and login
 
 Encryption wiring is the next piece of work. Organisation id is the owner of the clients, ready for a later workspace. The people using the app now are freelance clinicians, one account each. TOTP enrolment is in Settings. A verified authenticator must be entered before clinical pages on that sign-in. Recovery codes and an API-level AAL2 lock are still later.
 
@@ -35,7 +47,7 @@ Encryption wiring is the next piece of work. Organisation id is the owner of the
 ## 3. Data management
 
 - [x] Private document storage in a London S3 bucket, linked to AWS, with short-lived upload and download links. Client file metadata is in `client_files`. The browser talks to S3 directly.
-- [ ] **Export by email.** One client, or the whole practice, as a `.zip` of the individual files. The clinician chooses what is included. The server builds the file and emails a one-time link to the account address. The browser session never receives the file.
+- [x] **Export by email.** One client, or the whole practice, as a `.zip` of the individual files. The clinician chooses what is included. The server builds the file and emails a one-time link to the account address. The browser session never receives the file. Clinical writing in that zip is still HTML. The file-format sprint is in `docs/LegalComplianceChecklist.md`.
 
 The export uses the private London store for the zip, and the same mail provider as invoice email for the link. Supabase Auth email only sends sign-in messages, so it cannot carry this link. Clinical text is decrypted on the server for the person who asked, then placed in the zip. See the export plan below.
 
