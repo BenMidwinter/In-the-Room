@@ -15,11 +15,12 @@ Living tracker. Items checked here are in the product. Corporate registrations a
 - [ ] **Emergency recovery sheet:** Provide a printable or downloadable recovery key sheet during master key generation.
 
 ### 3. Authentication and key management UX
-- [ ] **Two-factor authentication (2FA/MFA):** Implement TOTP authenticator app support within Supabase Auth prior to public launch.
+- [x] **Two-factor authentication (2FA/MFA):** TOTP enrolment, a login challenge, and removal are in Settings. Sign-in with a code opens Home.
 - [ ] **Magic link delivery:** Test Resend integration via Supabase Auth for delivery rates and spam-filter edge cases.
 - [ ] **Client-side envelope key wrapping:** Validate the client-side encryption and decryption loop with AWS KMS (`eu-west-2`) to verify no unencrypted payloads reach the database.
 
 ### 4. Offboarding and export service
+- [ ] **Next major: export file formats.** The zip, the emailed link, and the download page work. The next hard sprint is only `export-data` and `supabase/functions/_shared/exportBundle.ts`. Clinical writing is currently saved as HTML (process notes, letters, working documents, reports, journal, templates, practice documents). Those need to be PDFs, using the same layout as `src/lib/clinicalExport.ts`. That PDF path runs in the browser (`html-to-image` and `pdf-lib`), so the export worker needs a server-side version of it. Do not turn the whole zip into PDF. Uploaded client files keep their own types. Contacts, appointments, invoices, services, tags, and letterheads stay CSV. Forms, scores, availability, form designs, and questionnaires stay JSON. Client uploads are still a placeholder text file and need to be the stored objects.
 - [ ] **Enforced export gate:** Build the UI barrier preventing account closure or subscription cancellation until a complete decrypted export has been generated.
 - [x] **Secure temporary export worker:** A server job opens sealed records with the practice key, builds a `.zip`, and stores it in the private `eu-west-2` bucket.
 - [x] **Time-limited single-use download:** The account email receives a link to a page on this site. Download works once, within 24 hours, and then the zip is deleted. Opening the page does not use the link.
