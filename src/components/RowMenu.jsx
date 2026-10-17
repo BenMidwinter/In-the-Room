@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 export default function RowMenu({ label, items }) {
   const [open, setOpen] = useState(false)
   const [box, setBox] = useState(null)
   const root = useRef(null)
   const button = useRef(null)
+  const list = useRef(null)
   const visible = items.filter((item) => !item.hidden)
 
   const place = () => {
@@ -22,7 +24,9 @@ export default function RowMenu({ label, items }) {
   useEffect(() => {
     if (!open) return undefined
     const onPointer = (event) => {
-      if (!root.current?.contains(event.target)) setOpen(false)
+      const target = event.target
+      if (root.current?.contains(target) || list.current?.contains(target)) return
+      setOpen(false)
     }
     const onKey = (event) => {
       if (event.key === 'Escape') setOpen(false)
@@ -66,8 +70,9 @@ export default function RowMenu({ label, items }) {
       >
         ···
       </button>
-      {open && (
+      {open && createPortal(
         <div
+          ref={list}
           className="row-menu__list"
           role="menu"
           style={box ? {
@@ -90,7 +95,8 @@ export default function RowMenu({ label, items }) {
               {item.label}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

@@ -2756,7 +2756,7 @@ button.agenda-event {
 
 .row-menu__list {
   position: fixed;
-  z-index: 40;
+  z-index: 1300;
   min-width: 10.5rem;
   padding: 0.3rem;
   border: 1px solid var(--border-light);
