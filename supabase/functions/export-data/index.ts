@@ -2,6 +2,7 @@ import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
 import { allowedGroups, buildExportArchive } from '../_shared/exportBundle.ts'
 import { secret } from '../_shared/secrets.ts'
 import { deleteExportObject, getExportObject, putExportObject } from '../_shared/s3.ts'
+import { buildExportReadyEmail } from '../_shared/emailTemplate.ts'
 import { sendResendEmail } from '../_shared/resend.ts'
 import { adminClient, userClient } from '../_shared/supabaseAdmin.ts'
 
@@ -128,10 +129,17 @@ async function prepareExport(
     const readyAt = new Date()
     const expiresAt = new Date(readyAt.getTime() + DAY_MS)
     const link = `${input.site}/export/${token}`
+    const scopeLabel = input.scope === 'practice' ? 'Practice' : 'Client record'
+    const rendered = buildExportReadyEmail({
+      scopeLabel,
+      downloadUrl: link,
+      siteUrl: input.site,
+    })
     await sendResendEmail({
       to: input.email,
       subject: 'Your Process&Note export is ready',
-      html: exportEmail(link),
+      html: rendered.html,
+      text: rendered.text,
       idempotencyKey: `export-${input.id}`,
     })
     const { error } = await admin.from('data_exports').update({
@@ -273,16 +281,6 @@ async function writeAudit(
   if (error) console.warn('[audit]', error.message)
 }
 
-function exportEmail(link: string): string {
-  const safe = escapeHtml(link)
-  return [
-    '<p>Your Process&Note export is ready.</p>',
-    `<p><a href="${safe}">Open the download page</a></p>`,
-    '<p>The page has a Download button. Opening the page does not use the link up. The button works once, and only within 24 hours.</p>',
-    '<p>If you did not ask for this export, contact support@processandnote.app.</p>',
-  ].join('')
-}
-
 function randomToken(): string {
   const bytes = new Uint8Array(32)
   crypto.getRandomValues(bytes)
@@ -302,12 +300,4 @@ function dateOrNull(value: unknown): string | null {
 function isUuid(value: unknown): boolean {
   return typeof value === 'string'
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
 }

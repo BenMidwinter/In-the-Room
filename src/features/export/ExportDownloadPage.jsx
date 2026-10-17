@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { brandLogoUrl, PRODUCT_NAME } from '../../lib/brand'
 import { downloadExportFile } from '../../lib/exportRequest'
 
@@ -23,28 +23,22 @@ export default function ExportDownloadPage() {
   }
 
   return (
-    <div className="legal-page">
-      <div className="legal-page__bar">
-        <Link to="/login" className="legal-page__brand">
-          <img src={brandLogoUrl} alt={PRODUCT_NAME} />
-        </Link>
-      </div>
-      <article className="legal-doc">
-        <header className="legal-doc__header">
-          <h1>Download your export</h1>
-        </header>
-        <p>
-          Opening this page does not use the link. Download collects the file once, and only within 24 hours of it being ready.
+    <div className="auth-page">
+      <div className="auth-page__card">
+        <img className="auth-page__logo" src={brandLogoUrl} alt={PRODUCT_NAME} />
+        <h1 className="auth-page__title">Download your export</h1>
+        <p className="auth-page__lead">
+          This is the export you asked for, packed as one zip. Download collects it once, and only within 24 hours of it being ready. Opening this page does not use the link.
         </p>
         {done ? (
-          <p>The file has been collected. The copy on the server has been removed.</p>
+          <p className="auth-page__info">The file has been collected. The copy on the server has been removed.</p>
         ) : (
-          <button type="button" className="btn btn-primary" onClick={onDownload} disabled={busy}>
+          <button type="button" className="btn btn-primary auth-page__submit" onClick={onDownload} disabled={busy || !token}>
             {busy ? 'Preparing the file…' : 'Download'}
           </button>
         )}
         {error && <p className="auth-page__alert" role="alert">{error}</p>}
-      </article>
+      </div>
     </div>
   )
 }

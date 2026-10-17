@@ -11,6 +11,7 @@ export async function sendResendEmail(message: {
   to: string
   subject: string
   html: string
+  text?: string
   idempotencyKey: string
 }): Promise<void> {
   const { key, from, ready } = resendSettings()
@@ -27,6 +28,7 @@ export async function sendResendEmail(message: {
       to: [message.to],
       subject: message.subject,
       html: message.html,
+      ...(message.text ? { text: message.text } : {}),
     }),
   })
   if (!response.ok) {
@@ -37,7 +39,7 @@ export async function sendResendEmail(message: {
 }
 
 export async function sendResendBatch(
-  messages: Array<{ from: string; to: string[]; reply_to?: string; subject: string; html: string }>,
+  messages: Array<{ from: string; to: string[]; reply_to?: string; subject: string; html: string; text?: string }>,
   idempotencyKey: string,
 ): Promise<{ id: string }> {
   const { key, ready } = resendSettings()

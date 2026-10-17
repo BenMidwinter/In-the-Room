@@ -1,4 +1,5 @@
 import { corsHeaders, jsonResponse } from '../_shared/cors.ts'
+import { buildInvoiceEmail } from '../_shared/emailTemplate.ts'
 import { organizationIdFor, readEnvelope } from '../_shared/practiceKey.ts'
 import { resendSettings, sendResendBatch } from '../_shared/resend.ts'
 import { adminClient, userClient } from '../_shared/supabaseAdmin.ts'
@@ -48,7 +49,7 @@ Deno.serve(async (req) => {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('invoice_account_name, invoice_sort_code, invoice_account_number, invoice_payment_note, sealed_bank, bank_format')
+      .select('display_name, invoice_account_name, invoice_sort_code, invoice_account_number, invoice_payment_note, sealed_bank, bank_format')
       .eq('id', user.id)
       .maybeSingle()
     const admin = adminClient()
@@ -102,18 +103,31 @@ Deno.serve(async (req) => {
     if (!ready.length) return jsonResponse({ email: true, batchId: null, sent: [], failed })
 
     const batchId = crypto.randomUUID()
+    const clinicianName = String(profile?.display_name || '').trim()
     const messages = ready.map((invoice) => {
+      const rendered = buildInvoiceEmail({
+        invoiceNumber: invoice.number,
+        billToName: invoice.bill_to_name,
+        forName: invoice.for_name || undefined,
+        amountFormatted: formatPence(invoice.total_pence),
+        dueDateFormatted: formatDue(invoice.due_on),
+        customNote: note || undefined,
+        paymentInstructions: paymentText,
+        clinicianName: clinicianName || undefined,
+      })
       const message: {
         from: string
         to: string[]
         reply_to?: string
         subject: string
         html: string
+        text: string
       } = {
         from: mail.from,
         to: emailList(invoice.bill_to_email),
         subject: `Invoice ${invoice.number}`,
-        html: invoiceHtml(invoice, note, paymentText),
+        html: rendered.html,
+        text: rendered.text,
       }
       if (user.email) message.reply_to = user.email
       return message
@@ -157,19 +171,6 @@ function paymentInstructions(profile: {
   return lines.join('\n')
 }
 
-function invoiceHtml(invoice: InvoiceRow, note: string, paymentText: string): string {
-  const who = invoice.for_name && invoice.for_name !== invoice.bill_to_name
-    ? `${invoice.bill_to_name} (${invoice.for_name})`
-    : invoice.bill_to_name
-  const lines = [
-    `<p>Invoice <strong>${escapeHtml(invoice.number)}</strong> for ${escapeHtml(who)}.</p>`,
-    `<p>Amount due: ${escapeHtml(formatPence(invoice.total_pence))}</p>`,
-  ]
-  if (note) lines.push(`<p>${escapeHtml(note)}</p>`)
-  if (paymentText) lines.push(`<p>How to pay:</p><p>${escapeHtml(paymentText).replaceAll('\n', '<br>')}</p>`)
-  return lines.join('')
-}
-
 function formatPence(pence: number): string {
   const amount = Math.max(0, Math.trunc(Number(pence) || 0))
   const pounds = Math.floor(amount / 100)
@@ -177,10 +178,13 @@ function formatPence(pence: number): string {
   return `£${pounds}.${rest}`
 }
 
-function escapeHtml(value: string): string {
-  return String(value || '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
+function formatDue(value: string | null): string | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined
+  const [year, month, day] = value.split('-').map(Number)
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)))
 }
