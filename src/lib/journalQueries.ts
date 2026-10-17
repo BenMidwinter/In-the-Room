@@ -3,6 +3,7 @@ import {
   deleteJournalEntryForUser,
   listJournalEntries,
   saveJournalEntryForUser,
+  setJournalEntryArchived,
 } from './supabase/journalRepo'
 
 export const journalQueryKeys = {
@@ -37,6 +38,16 @@ export function useDeleteJournalEntryMutation(userId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (entryId: string) => deleteJournalEntryForUser(userId, entryId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: journalQueryKeys.author(userId) })
+    },
+  })
+}
+
+export function useArchiveJournalEntryMutation(userId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, archived }: { id: string; archived: boolean }) => setJournalEntryArchived(userId, id, archived),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: journalQueryKeys.author(userId) })
     },

@@ -4,8 +4,10 @@ import { deleteJournalEntry, getJournalEntries, saveJournalEntry } from '../stor
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
+import { selectWithOptionalArchive, updateArchiveColumn } from './optionalArchive'
 
-const JOURNAL_COLUMNS = 'id, author_id, entry_date, somatic_state, encrypted_payload, payload_format'
+const JOURNAL_COLUMNS_BASE = 'id, author_id, entry_date, somatic_state, encrypted_payload, payload_format'
+const JOURNAL_COLUMNS = `${JOURNAL_COLUMNS_BASE}, archived_at`
 
 type JournalRow = {
   id: string
@@ -14,6 +16,7 @@ type JournalRow = {
   somatic_state: string | null
   encrypted_payload: Json | null
   payload_format?: string | null
+  archived_at?: string | null
 }
 
 function sortEntries(items: AppJournalEntry[]): AppJournalEntry[] {
@@ -29,13 +32,11 @@ export async function listJournalEntries(userId: string): Promise<AppJournalEntr
   if (!isSupabaseConfigured()) return getJournalEntries(userId) as AppJournalEntry[]
   const supabase = getSupabase()
   if (!supabase) return getJournalEntries(userId) as AppJournalEntry[]
-  const { data, error } = await supabase
-    .from('journal_entries')
-    .select(JOURNAL_COLUMNS)
-    .eq('author_id', userId)
-    .order('entry_date', { ascending: false })
-  if (error) throw error
-  const rows = await withOpenedPayloads('journal_entries', (data || []) as JournalRow[])
+  const data = await selectWithOptionalArchive(
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS).eq('author_id', userId).order('entry_date', { ascending: false }),
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS_BASE).eq('author_id', userId).order('entry_date', { ascending: false }),
+  )
+  const rows = await withOpenedPayloads('journal_entries', data as JournalRow[])
   return sortEntries(rows.map((row) => journalEntryFromRow(row)))
 }
 
@@ -82,7 +83,7 @@ export async function saveJournalEntryForUser(userId: string, input: {
     if (error) throw error
     const { data, error: readError } = await supabase
       .from('journal_entries')
-      .select(JOURNAL_COLUMNS)
+      .select(JOURNAL_COLUMNS_BASE)
       .eq('id', existingId)
       .single()
     if (readError) throw readError
@@ -93,6 +94,7 @@ export async function saveJournalEntryForUser(userId: string, input: {
       entry_date: row.entry_date,
       somatic_state: row.somatic_state,
       encrypted_payload,
+      archived_at: row.archived_at,
     })
   }
 
@@ -102,7 +104,7 @@ export async function saveJournalEntryForUser(userId: string, input: {
   }, encrypted_payload)
   const { data, error } = await supabase
     .from('journal_entries')
-    .select(JOURNAL_COLUMNS)
+    .select(JOURNAL_COLUMNS_BASE)
     .eq('id', created.id)
     .single()
   if (error) throw error
@@ -113,7 +115,33 @@ export async function saveJournalEntryForUser(userId: string, input: {
     entry_date: row.entry_date,
     somatic_state: row.somatic_state,
     encrypted_payload,
+    archived_at: row.archived_at,
   })
+}
+
+export async function setJournalEntryArchived(userId: string, entryId: string, archived: boolean): Promise<AppJournalEntry> {
+  if (!userId || !entryId || entryId === 'new') throw new Error('Entry not found')
+  const archivedAt = archived ? new Date().toISOString() : null
+  if (!isSupabaseConfigured()) {
+    const entries = getJournalEntries(userId) as AppJournalEntry[]
+    const current = entries.find((entry) => entry.id === entryId)
+    if (!current) throw new Error('Entry not found')
+    const next = { ...current, archived_at: archivedAt }
+    // Local store does not persist archived_at yet; return the updated shape for the UI.
+    return next
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  await updateArchiveColumn(() => (
+    supabase.from('journal_entries').update({ archived_at: archivedAt }).eq('id', entryId).eq('author_id', userId)
+  ))
+  const rows = await selectWithOptionalArchive(
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS).eq('id', entryId).eq('author_id', userId),
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS_BASE).eq('id', entryId).eq('author_id', userId),
+  )
+  if (!rows[0]) throw new Error('Entry not found')
+  const [opened] = await withOpenedPayloads('journal_entries', [{ ...(rows[0] as JournalRow), archived_at: archivedAt }])
+  return journalEntryFromRow(opened)
 }
 
 export async function deleteJournalEntryForUser(userId: string, entryId: string): Promise<void> {

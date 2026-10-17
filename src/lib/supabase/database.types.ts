@@ -615,6 +615,7 @@ export type Database = {
       }
       cpd_entries: {
         Row: {
+          archived_at: string | null
           created_at: string
           encrypted_payload: Json
           id: string
@@ -626,6 +627,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           encrypted_payload: Json
           id?: string
@@ -637,6 +639,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           encrypted_payload?: Json
           id?: string
@@ -1103,6 +1106,7 @@ export type Database = {
       }
       journal_entries: {
         Row: {
+          archived_at: string | null
           author_id: string
           created_at: string
           encrypted_payload: Json
@@ -1115,6 +1119,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           author_id: string
           created_at?: string
           encrypted_payload: Json
@@ -1127,6 +1132,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           author_id?: string
           created_at?: string
           encrypted_payload?: Json
@@ -1989,6 +1995,7 @@ export type Database = {
       }
       supervision_entries: {
         Row: {
+          archived_at: string | null
           created_at: string
           direction: string
           encrypted_payload: Json
@@ -2001,6 +2008,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           direction: string
           encrypted_payload: Json
@@ -2013,6 +2021,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           direction?: string
           encrypted_payload?: Json

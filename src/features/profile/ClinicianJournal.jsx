@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
+import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import RichTextEditor from '../../components/RichTextEditor'
 import { useConfirm, useToast } from '../../components/ui'
+import { filterByArchiveScope } from '../../lib/archiveScope'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { DEMO_TODAY } from '../../lib/dateArchitecture'
 import {
+  useArchiveJournalEntryMutation,
   useDeleteJournalEntryMutation,
   useJournalEntriesQuery,
   useSaveJournalEntryMutation,
@@ -59,7 +62,12 @@ export default function ClinicianJournal() {
   const { data: entries = [], isPending, error } = useJournalEntriesQuery(userId)
   const saveEntry = useSaveJournalEntryMutation(userId)
   const removeEntry = useDeleteJournalEntryMutation(userId)
-  const sortedEntries = useMemo(() => sortJournalEntries(entries), [entries])
+  const archiveEntry = useArchiveJournalEntryMutation(userId)
+  const [archiveScope, setArchiveScope] = useState('active')
+  const sortedEntries = useMemo(
+    () => filterByArchiveScope(sortJournalEntries(entries), archiveScope),
+    [entries, archiveScope],
+  )
 
   const [openId, setOpenId] = useState(null)
   const [draftDate, setDraftDate] = useState(DEMO_TODAY)
@@ -134,8 +142,19 @@ export default function ClinicianJournal() {
     }
   }
 
+  const handleArchive = async (entry) => {
+    try {
+      await archiveEntry.mutateAsync({ id: entry.id, archived: !entry.archived_at })
+      if (openId === entry.id && !entry.archived_at) close()
+      toast.saved(entry.archived_at ? 'Entry restored' : 'Entry archived')
+    } catch (err) {
+      toast.error(err?.message || 'Could not update this entry')
+    }
+  }
+
   const rows = sortedEntries.map((entry) => {
     const preview = stripHtml(entry.body_text).slice(0, 90) || 'Empty entry'
+    const archived = Boolean(entry.archived_at)
     return {
       id: entry.id,
       entry,
@@ -159,21 +178,53 @@ export default function ClinicianJournal() {
         ),
         preview: <span className="record-table__primary">{preview}</span>,
         actions: (
-          <button
-            type="button"
-            className="secondary"
-            onClick={(event) => {
-              event.stopPropagation()
-              handleDelete(entry.id)
-            }}
-            disabled={removeEntry.isPending}
-          >
-            Delete
-          </button>
+          <span className="practice-docs__actions">
+            {archived ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleArchive(entry)
+                  }}
+                  disabled={archiveEntry.isPending}
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleDelete(entry.id)
+                  }}
+                  disabled={removeEntry.isPending}
+                >
+                  Delete
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="secondary"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  handleArchive(entry)
+                }}
+                disabled={archiveEntry.isPending}
+              >
+                Archive
+              </button>
+            )}
+          </span>
         ),
       },
     }
   })
+
+  const openEntry = entries.find((entry) => entry.id === openId)
+  const openArchived = Boolean(openEntry?.archived_at)
 
   if (openId) {
     return (
@@ -182,9 +233,16 @@ export default function ClinicianJournal() {
         onBack={close}
         actions={(
           <>
-            <button type="button" className="secondary" onClick={handleDelete} disabled={removeEntry.isPending}>
-              Delete
-            </button>
+            {openId !== 'new' && openEntry && (
+              openArchived ? (
+                <>
+                  <button type="button" className="secondary" onClick={() => handleArchive(openEntry)} disabled={archiveEntry.isPending}>Restore</button>
+                  <button type="button" className="danger" onClick={() => handleDelete(openId)} disabled={removeEntry.isPending}>Delete</button>
+                </>
+              ) : (
+                <button type="button" className="secondary" onClick={() => handleArchive(openEntry)} disabled={archiveEntry.isPending}>Archive</button>
+              )
+            )}
             <button type="button" className="primary" onClick={handleSave} disabled={saveEntry.isPending}>
               {saveEntry.isPending ? 'Saving…' : 'Save'}
             </button>
@@ -239,7 +297,12 @@ export default function ClinicianJournal() {
   }
 
   return (
-    <RecordListLayout title="Journal" newLabel="entry" onNew={openNew}>
+    <RecordListLayout
+      title="Journal"
+      newLabel={archiveScope === 'active' ? 'entry' : undefined}
+      onNew={archiveScope === 'active' ? openNew : undefined}
+      toolbar={<ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />}
+    >
       {error && <p className="form-error" role="alert">{error.message || 'Could not load journal entries.'}</p>}
       {!error && (
         <RecordTable
@@ -248,7 +311,9 @@ export default function ClinicianJournal() {
           rows={rows}
           countNoun="entries"
           defaultSort={{ key: 'date', direction: 'desc' }}
-          emptyMessage={isPending ? 'Loading…' : 'No journal entries yet.'}
+          emptyMessage={isPending
+            ? 'Loading…'
+            : (archiveScope === 'archived' ? 'No archived journal entries.' : 'No journal entries yet.')}
           onRowClick={(row) => openExisting(row.entry)}
         />
       )}

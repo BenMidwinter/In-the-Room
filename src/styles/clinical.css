@@ -1081,19 +1081,72 @@ a.badge {
   cursor: pointer;
 }
 
-.documents-page__mast {
-  margin: 0 0 0.75rem;
-}
-
-.documents-page__mast .client-nav-bar {
-  margin: 0;
-}
-
 .documents-page__tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
+}
+
+/* Second row under client section nav — same bleed and inset, not inside padded main. */
+.client-nav-bar--sub {
+  position: relative;
+  top: auto;
+  z-index: 3;
+  border-top: 0;
+}
+
+.record-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0 0 0.85rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.record-list-toolbar__start,
+.record-list-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.archive-scope {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-surface);
+}
+
+.archive-scope__btn {
+  margin: 0;
+  padding: 0.35rem 0.75rem;
+  border: 0;
+  border-right: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--txt-muted);
+  font: inherit;
+  font-size: var(--text-meta);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.archive-scope__btn:last-child {
+  border-right: 0;
+}
+
+.archive-scope__btn--active {
+  background: color-mix(in srgb, var(--col-primary) 14%, var(--bg-surface));
+  color: var(--col-primary-dark);
+}
+
+.archive-scope__btn:hover {
+  color: var(--col-accent);
 }
 
 

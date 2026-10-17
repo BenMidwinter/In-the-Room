@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
 import RichTextEditor from '../../components/RichTextEditor'
 import { useClientSession } from '../../lib/useClientSession'
+import { filterByArchiveScope } from '../../lib/archiveScope'
 import { getProfile } from '../../lib/store'
 import {
   deleteLetter,
@@ -35,7 +37,6 @@ function todayISO() {
 const LETTER_COLUMNS = [
   { key: 'title', label: 'Title', filter: 'text' },
   { key: 'recipient', label: 'Recipient', filter: 'text' },
-  { key: 'status', label: 'Status', filter: 'choice' },
   { key: 'date', label: 'Letter date', sort: 'date' },
   { key: 'updated', label: 'Updated', sort: 'date' },
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
@@ -47,6 +48,7 @@ export default function LettersPanel({ embedded = false }) {
     queryKey: ['letters', clientId],
     queryFn: () => listLettersForClient(clientId),
   })
+  const [archiveScope, setArchiveScope] = useState('active')
   const [selectedId, setSelectedId] = useState(null)
   const [seenClientId, setSeenClientId] = useState(clientId)
   if (seenClientId !== clientId) {
@@ -217,52 +219,69 @@ export default function LettersPanel({ embedded = false }) {
     }
   }
 
-  const rows = letters.map(letter => {
-    const status = letter.archived_at ? 'Archived' : 'Active'
+  const scopedLetters = useMemo(
+    () => filterByArchiveScope(letters, archiveScope),
+    [letters, archiveScope],
+  )
+
+  const rows = scopedLetters.map(letter => {
+    const archived = Boolean(letter.archived_at)
     return {
       id: letter.id,
       letter,
       filterValues: {
         title: letter.title,
         recipient: letter.recipient || '',
-        status,
         date: formatDocDate(letter.letter_date),
       },
       sortValues: {
         title: letter.title,
         recipient: letter.recipient || '',
-        status,
         date: letter.letter_date || '',
         updated: letter.updated_at || '',
       },
       cells: {
         title: <span className="record-table__primary">{letter.title}</span>,
         recipient: letter.recipient || <span className="record-table__cell-muted">—</span>,
-        status: <span className={`badge ${letter.archived_at ? 'badge-grey' : 'badge-green'}`}>{status}</span>,
         date: formatDocDate(letter.letter_date),
         updated: formatDocDate(letter.updated_at),
         actions: (
           <span className="practice-docs__actions">
-            <button
-              type="button"
-              className="secondary"
-              onClick={(event) => {
-                event.stopPropagation()
-                handleArchive(letter)
-              }}
-            >
-              {letter.archived_at ? 'Restore' : 'Archive'}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={(event) => {
-                event.stopPropagation()
-                handleDelete(letter)
-              }}
-            >
-              Delete
-            </button>
+            {archived ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleArchive(letter)
+                  }}
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleDelete(letter)
+                  }}
+                >
+                  Delete
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="secondary"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  handleArchive(letter)
+                }}
+              >
+                Archive
+              </button>
+            )}
           </span>
         ),
       },
@@ -271,6 +290,8 @@ export default function LettersPanel({ embedded = false }) {
 
   const editing = selectedId != null
   const editorTitle = selectedId === 'new' ? 'New letter' : title || 'Letter'
+  const openLetter = letters.find((row) => row.id === selectedId)
+  const openArchived = Boolean(openLetter?.archived_at)
 
   if (editing) {
     return (
@@ -281,17 +302,15 @@ export default function LettersPanel({ embedded = false }) {
         onBack={handleCancel}
         actions={(
           <>
-            {selectedId !== 'new' && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  const letter = letters.find((row) => row.id === selectedId)
-                  if (letter) handleDelete(letter)
-                }}
-              >
-                Delete
-              </button>
+            {selectedId !== 'new' && openLetter && (
+              openArchived ? (
+                <>
+                  <button type="button" className="secondary" onClick={() => handleArchive(openLetter)}>Restore</button>
+                  <button type="button" className="danger" onClick={() => handleDelete(openLetter)}>Delete</button>
+                </>
+              ) : (
+                <button type="button" className="secondary" onClick={() => handleArchive(openLetter)}>Archive</button>
+              )
             )}
             <button type="button" className="secondary" onClick={handleDownload}>Download</button>
             <button type="button" className="primary" onClick={handleSave} disabled={saving}>
@@ -376,9 +395,11 @@ export default function LettersPanel({ embedded = false }) {
 
   return (
     <RecordListLayout
+      embedded={embedded}
       title={embedded ? '' : 'Letters'}
-      newLabel="letter"
-      onNew={handleNew}
+      newLabel={archiveScope === 'active' ? 'letter' : undefined}
+      onNew={archiveScope === 'active' ? handleNew : undefined}
+      toolbar={<ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />}
     >
       {error && <p className="form-error" role="alert">{error.message || 'Could not load letters.'}</p>}
       {!editing && !error && (
@@ -388,7 +409,9 @@ export default function LettersPanel({ embedded = false }) {
           rows={rows}
           countNoun="letters"
           defaultSort={{ key: 'updated', direction: 'desc' }}
-          emptyMessage={isPending ? 'Loading letters…' : 'No letters yet.'}
+          emptyMessage={isPending
+            ? 'Loading letters…'
+            : (archiveScope === 'archived' ? 'No archived letters.' : 'No letters yet.')}
           onRowClick={(row) => selectLetter(row.letter)}
         />
       )}

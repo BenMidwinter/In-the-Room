@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
 import { useConfirm, useToast } from '../../components/ui'
+import { filterByArchiveScope } from '../../lib/archiveScope'
 import { useClientSession } from '../../lib/useClientSession'
 import {
   useClientEpisodesQuery,
@@ -62,7 +64,6 @@ const APPOINTMENT_COLUMNS = [
 
 const REPORT_COLUMNS = [
   { key: 'title', label: 'Title', filter: 'text', sort: 'text' },
-  { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
   { key: 'date', label: 'Date', sort: 'date' },
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
@@ -223,6 +224,7 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
   const saveReport = useSaveReportMutation()
   const removeReport = useDeleteReportMutation(episode.id, clientId)
   const archiveReport = useArchiveReportMutation(episode.id, clientId)
+  const [archiveScope, setArchiveScope] = useState('active')
   const [openId, setOpenId] = useState(null)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('<p></p>')
@@ -333,19 +335,18 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
         onBack={() => setOpenId(null)}
         actions={(
           <>
-            {openId !== 'new' && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  const report = reports.find((row) => row.id === openId)
-                  if (report) onDelete(report)
-                }}
-                disabled={removeReport.isPending}
-              >
-                Delete
-              </button>
-            )}
+            {openId !== 'new' && (() => {
+              const report = reports.find((row) => row.id === openId)
+              if (!report) return null
+              return report.archived_at ? (
+                <>
+                  <button type="button" className="secondary" onClick={() => onArchive(report)} disabled={archiveReport.isPending}>Restore</button>
+                  <button type="button" className="danger" onClick={() => onDelete(report)} disabled={removeReport.isPending}>Delete</button>
+                </>
+              ) : (
+                <button type="button" className="secondary" onClick={() => onArchive(report)} disabled={archiveReport.isPending}>Archive</button>
+              )
+            })()}
             <button type="button" className="primary" onClick={save} disabled={saveReport.isPending}>
               {saveReport.isPending ? 'Saving…' : 'Save report'}
             </button>
@@ -401,47 +402,64 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
     )
   }
 
-  const rows = reports.map((report) => {
-    const status = report.archived_at ? 'Archived' : 'Active'
+  const scopedReports = useMemo(
+    () => filterByArchiveScope(reports, archiveScope),
+    [reports, archiveScope],
+  )
+
+  const rows = scopedReports.map((report) => {
+    const archived = Boolean(report.archived_at)
     return {
       id: report.id,
       report,
       filterValues: {
         title: report.title || 'Untitled report',
-        status,
         date: formatDate(report.report_date),
       },
       sortValues: {
         title: report.title || '',
-        status,
         date: report.report_date || '',
       },
       cells: {
         title: <span className="record-table__primary">{report.title || 'Untitled report'}</span>,
-        status: <span className={`badge ${report.archived_at ? 'badge-grey' : 'badge-green'}`}>{status}</span>,
         date: formatDate(report.report_date),
         actions: (
           <span className="practice-docs__actions">
-            <button
-              type="button"
-              className="secondary"
-              onClick={(event) => {
-                event.stopPropagation()
-                onArchive(report)
-              }}
-            >
-              {report.archived_at ? 'Restore' : 'Archive'}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={(event) => {
-                event.stopPropagation()
-                onDelete(report)
-              }}
-            >
-              Delete
-            </button>
+            {archived ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onArchive(report)
+                  }}
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onDelete(report)
+                  }}
+                >
+                  Delete
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="secondary"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onArchive(report)
+                }}
+              >
+                Archive
+              </button>
+            )}
           </span>
         ),
       },
@@ -454,9 +472,14 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
       open={open}
       onToggle={onToggle}
       actions={(
-        <button type="button" className="secondary" onClick={startReport}>
-          Add
-        </button>
+        <>
+          <ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />
+          {archiveScope === 'active' && (
+            <button type="button" className="secondary" onClick={startReport}>
+              Add
+            </button>
+          )}
+        </>
       )}
     >
       {reportsError && (
@@ -469,7 +492,9 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
           rows={rows}
           countNoun="reports"
           defaultSort={{ key: 'date', direction: 'desc' }}
-          emptyMessage={isPending ? 'Loading reports…' : 'No reports on this course yet.'}
+          emptyMessage={isPending
+            ? 'Loading reports…'
+            : (archiveScope === 'archived' ? 'No archived reports.' : 'No reports on this course yet.')}
           onRowClick={(row) => openReport(row.report)}
         />
       )}

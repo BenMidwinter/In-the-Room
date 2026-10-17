@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
 import RichTextEditor from '../../components/RichTextEditor'
 import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { useClientSession } from '../../lib/useClientSession'
+import { filterByArchiveScope } from '../../lib/archiveScope'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { useTemplatesQuery } from '../../lib/templateQueries'
@@ -30,7 +32,6 @@ function todayISO() {
 
 const DOC_COLUMNS = [
   { key: 'title', label: 'Title', filter: 'text' },
-  { key: 'status', label: 'Status', filter: 'choice' },
   { key: 'created', label: 'Created', sort: 'date' },
   { key: 'updated', label: 'Last updated', sort: 'date' },
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
@@ -42,6 +43,7 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
     queryKey: ['working-documents', clientId],
     queryFn: () => listWorkingDocuments(clientId),
   })
+  const [archiveScope, setArchiveScope] = useState('active')
   const [selectedId, setSelectedId] = useState(null)
   const [seenClientId, setSeenClientId] = useState(clientId)
   if (seenClientId !== clientId) {
@@ -170,48 +172,65 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
     }
   }
 
-  const rows = documents.map(doc => {
-    const status = doc.archived_at ? 'Archived' : 'Active'
+  const scopedDocuments = useMemo(
+    () => filterByArchiveScope(documents, archiveScope),
+    [documents, archiveScope],
+  )
+
+  const rows = scopedDocuments.map(doc => {
+    const archived = Boolean(doc.archived_at)
     return {
       id: doc.id,
       doc,
       filterValues: {
         title: doc.title,
-        status,
       },
       sortValues: {
         title: doc.title,
-        status,
         created: doc.created_at || '',
         updated: doc.updated_at || '',
       },
       cells: {
         title: <span className="record-table__primary">{doc.title}</span>,
-        status: <span className={`badge ${doc.archived_at ? 'badge-grey' : 'badge-green'}`}>{status}</span>,
         created: formatDocDate(doc.created_at),
         updated: formatDocDate(doc.updated_at),
         actions: (
           <span className="practice-docs__actions">
-            <button
-              type="button"
-              className="secondary"
-              onClick={(event) => {
-                event.stopPropagation()
-                handleArchive(doc)
-              }}
-            >
-              {doc.archived_at ? 'Restore' : 'Archive'}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={(event) => {
-                event.stopPropagation()
-                handleDelete(doc)
-              }}
-            >
-              Delete
-            </button>
+            {archived ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleArchive(doc)
+                  }}
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    handleDelete(doc)
+                  }}
+                >
+                  Delete
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="secondary"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  handleArchive(doc)
+                }}
+              >
+                Archive
+              </button>
+            )}
           </span>
         ),
       },
@@ -220,6 +239,8 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
 
   const editing = selectedId != null
   const editorTitle = selectedId === 'new' ? 'New working document' : title || 'Working document'
+  const openDoc = documents.find((row) => row.id === selectedId)
+  const openArchived = Boolean(openDoc?.archived_at)
 
   if (editing) {
     return (
@@ -229,17 +250,15 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
         onBack={handleCancel}
         actions={(
           <>
-            {selectedId !== 'new' && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  const doc = documents.find((row) => row.id === selectedId)
-                  if (doc) handleDelete(doc)
-                }}
-              >
-                Delete
-              </button>
+            {selectedId !== 'new' && openDoc && (
+              openArchived ? (
+                <>
+                  <button type="button" className="secondary" onClick={() => handleArchive(openDoc)}>Restore</button>
+                  <button type="button" className="danger" onClick={() => handleDelete(openDoc)}>Delete</button>
+                </>
+              ) : (
+                <button type="button" className="secondary" onClick={() => handleArchive(openDoc)}>Archive</button>
+              )
             )}
             <button type="button" className="primary" onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Save document'}
@@ -288,9 +307,11 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
 
   return (
     <RecordListLayout
+      embedded={embedded}
       title={embedded ? '' : 'Working documents'}
-      newLabel="working document"
-      onNew={handleNew}
+      newLabel={archiveScope === 'active' ? 'working document' : undefined}
+      onNew={archiveScope === 'active' ? handleNew : undefined}
+      toolbar={<ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />}
     >
       {error && <p className="form-error" role="alert">{error.message || 'Could not load documents.'}</p>}
       {!editing && !error && (
@@ -300,7 +321,9 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
           rows={rows}
           defaultSort={{ key: 'updated', direction: 'desc' }}
           countNoun="documents"
-          emptyMessage={isPending ? 'Loading documents…' : 'No working documents yet.'}
+          emptyMessage={isPending
+            ? 'Loading documents…'
+            : (archiveScope === 'archived' ? 'No archived documents.' : 'No working documents yet.')}
           onRowClick={(row) => selectDocument(row.doc)}
         />
       )}

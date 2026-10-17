@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import ArchiveScopeToggle from '../../components/ArchiveScopeToggle'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import RichTextEditor from '../../components/RichTextEditor'
@@ -26,7 +27,6 @@ function formatUpdated(iso) {
 const COLUMNS = [
   { key: 'mark', label: '', className: 'practice-docs__mark-col' },
   { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
-  { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
   { key: 'updated', label: 'Updated', sort: 'date' },
   { key: 'actions', label: 'Actions', className: 'practice-docs__actions-col record-table__col--actions', sort: false },
 ]
@@ -86,6 +86,7 @@ export default function PracticeDocumentsPage() {
   const folder = practiceFolder(items, requestedFolder)
   const folderId = folder?.id ?? null
   const [selectedId, setSelectedId] = useState(null)
+  const [archiveScope, setArchiveScope] = useState('active')
   const [name, setName] = useState('')
   const [content, setContent] = useState('<p></p>')
   const [editorVersion, setEditorVersion] = useState(0)
@@ -112,7 +113,13 @@ export default function PracticeDocumentsPage() {
   }
 
   const crumbs = practiceBreadcrumb(items, folderId)
-  const visible = childrenOf(items, folderId)
+  const visible = useMemo(() => {
+    const children = childrenOf(items, folderId)
+    if (archiveScope === 'archived') {
+      return children.filter((item) => item.kind === 'document' && item.archived_at)
+    }
+    return children.filter((item) => item.kind === 'folder' || !item.archived_at)
+  }, [items, folderId, archiveScope])
 
   const closeEditor = () => {
     setEditorOpen?.(false)
@@ -228,57 +235,92 @@ export default function PracticeDocumentsPage() {
   }
 
   const rows = visible.map((item) => {
-    const status = item.archived_at ? 'Archived' : 'Active'
+    const archived = Boolean(item.archived_at)
     return {
       id: item.id,
       item,
       filterValues: {
         name: item.name,
-        status,
       },
       sortValues: {
         name: practiceNameSortKey(item),
-        status,
         updated: item.updated_at,
       },
       cells: {
         mark: <ItemMark kind={item.kind} />,
         name: <span className="record-table__primary">{item.name}</span>,
-        status: <span className={`badge ${item.archived_at ? 'badge-grey' : 'badge-green'}`}>{status}</span>,
         updated: formatUpdated(item.updated_at),
         actions: (
           <span className="practice-docs__actions">
-            <button
-              type="button"
-              className="danger"
-              onClick={(event) => {
-                event.stopPropagation()
-                removeItem(item)
-              }}
-            >
-              Delete
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              onClick={(event) => {
-                event.stopPropagation()
-                renameItem(item)
-              }}
-            >
-              Rename
-            </button>
-            {item.kind === 'document' && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  archiveItem(item)
-                }}
-              >
-                {item.archived_at ? 'Restore' : 'Archive'}
-              </button>
+            {item.kind === 'folder' ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    renameItem(item)
+                  }}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    removeItem(item)
+                  }}
+                >
+                  Delete
+                </button>
+              </>
+            ) : archived ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    archiveItem(item)
+                  }}
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    removeItem(item)
+                  }}
+                >
+                  Delete
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    renameItem(item)
+                  }}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    archiveItem(item)
+                  }}
+                >
+                  Archive
+                </button>
+              </>
             )}
           </span>
         ),
@@ -296,15 +338,15 @@ export default function PracticeDocumentsPage() {
         onBack={closeEditor}
         actions={(
           <>
-            {selectedId !== 'new' && (
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => currentItem && removeItem(currentItem)}
-                disabled={mutate.isPending}
-              >
-                Delete
-              </button>
+            {selectedId !== 'new' && currentItem && (
+              currentItem.archived_at ? (
+                <>
+                  <button type="button" className="secondary" onClick={() => archiveItem(currentItem)} disabled={mutate.isPending}>Restore</button>
+                  <button type="button" className="danger" onClick={() => removeItem(currentItem)} disabled={mutate.isPending}>Delete</button>
+                </>
+              ) : (
+                <button type="button" className="secondary" onClick={() => archiveItem(currentItem)} disabled={mutate.isPending}>Archive</button>
+              )
             )}
             <button type="button" className="primary" onClick={saveDocument} disabled={mutate.isPending}>
               {mutate.isPending ? 'Saving…' : 'Save'}
@@ -354,11 +396,12 @@ export default function PracticeDocumentsPage() {
   return (
     <RecordListLayout
       title={folder?.name || 'My Documents'}
-      newLabel="document"
-      onNew={startDocument}
-      headerActions={(
+      newLabel={archiveScope === 'active' ? 'document' : undefined}
+      onNew={archiveScope === 'active' ? startDocument : undefined}
+      headerActions={archiveScope === 'active' ? (
         <button type="button" className="secondary" onClick={createFolder}>New folder</button>
-      )}
+      ) : null}
+      toolbar={<ArchiveScopeToggle value={archiveScope} onChange={setArchiveScope} />}
     >
       {crumbs.length > 0 && (
         <nav className="practice-crumbs" aria-label="Folder">
@@ -388,7 +431,11 @@ export default function PracticeDocumentsPage() {
           rows={rows}
           countNoun="items"
           defaultSort={{ key: 'name', direction: 'asc' }}
-          emptyMessage={isPending ? 'Loading documents…' : (folder ? 'This folder is empty.' : 'No documents yet.')}
+          emptyMessage={isPending
+            ? 'Loading documents…'
+            : (archiveScope === 'archived'
+              ? 'No archived documents here.'
+              : (folder ? 'This folder is empty.' : 'No documents yet.'))}
           onRowClick={(row) => {
             if (row.item.kind === 'folder') openFolder(row.item.id)
             else openDocument(row.item)
