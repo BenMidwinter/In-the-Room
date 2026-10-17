@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import DiagnosisPicker from '../../components/DiagnosisPicker'
 import FormOverlay from '../../components/FormOverlay'
 import ClientConcessionForm from './ClientConcessionForm'
-import { useToast } from '../../components/ui'
+import { useConfirm, useToast } from '../../components/ui'
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { joinDiagnosisList, parseDiagnosisList } from '../../lib/diagnosisList'
 import { isSupabaseConfigured } from '../../lib/supabase/client'
@@ -18,37 +18,85 @@ const TEXT_PROFILE_FIELDS = [
   },
 ]
 
+function snapshotFromClient(client) {
+  return {
+    firstName: client.first_name || '',
+    surname: client.surname || '',
+    dob: client.dob || '',
+    email: client.email || '',
+    gender: client.gender || '',
+    school: client.school || '',
+    medication: client.medication || '',
+    diagnoses: parseDiagnosisList(client.diagnosis),
+    profile: client.clinical_profile || {},
+  }
+}
+
 export default function ClientProfileOverlay({ client, onClose, onSaved }) {
   const { user } = useAuth()
   const toast = useToast()
-  const [firstName, setFirstName] = useState(client.first_name || '')
-  const [surname, setSurname] = useState(client.surname || '')
-  const [dob, setDob] = useState(client.dob || '')
-  const [email, setEmail] = useState(client.email || '')
-  const [gender, setGender] = useState(client.gender || '')
-  const [school, setSchool] = useState(client.school || '')
-  const [medication, setMedication] = useState(client.medication || '')
-  const [selectedDiagnoses, setSelectedDiagnoses] = useState([])
-  const [profile, setProfile] = useState(client.clinical_profile || {})
+  const confirm = useConfirm()
+  const initial = useMemo(() => snapshotFromClient(client), [client])
+  const [firstName, setFirstName] = useState(initial.firstName)
+  const [surname, setSurname] = useState(initial.surname)
+  const [dob, setDob] = useState(initial.dob)
+  const [email, setEmail] = useState(initial.email)
+  const [gender, setGender] = useState(initial.gender)
+  const [school, setSchool] = useState(initial.school)
+  const [medication, setMedication] = useState(initial.medication)
+  const [selectedDiagnoses, setSelectedDiagnoses] = useState(initial.diagnoses)
+  const [profile, setProfile] = useState(initial.profile)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState({})
   const [localClient, setLocalClient] = useState(client)
+  const [baseline, setBaseline] = useState(initial)
 
   useEffect(() => {
-    setFirstName(client.first_name || '')
-    setSurname(client.surname || '')
-    setDob(client.dob || '')
-    setEmail(client.email || '')
-    setGender(client.gender || '')
-    setSchool(client.school || '')
-    setMedication(client.medication || '')
-    setSelectedDiagnoses(parseDiagnosisList(client.diagnosis))
-    setProfile(client.clinical_profile || {})
+    const next = snapshotFromClient(client)
+    setFirstName(next.firstName)
+    setSurname(next.surname)
+    setDob(next.dob)
+    setEmail(next.email)
+    setGender(next.gender)
+    setSchool(next.school)
+    setMedication(next.medication)
+    setSelectedDiagnoses(next.diagnoses)
+    setProfile(next.profile)
     setLocalClient(client)
+    setBaseline(next)
   }, [client])
+
+  const dirty = useMemo(() => {
+    const current = {
+      firstName,
+      surname,
+      dob,
+      email,
+      gender,
+      school,
+      medication,
+      diagnoses: selectedDiagnoses,
+      profile,
+    }
+    return JSON.stringify(current) !== JSON.stringify(baseline)
+  }, [baseline, dob, email, firstName, gender, medication, profile, school, selectedDiagnoses, surname])
 
   const setProfileField = (key, value) => {
     setProfile((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const requestClose = async () => {
+    if (!dirty) {
+      onClose()
+      return
+    }
+    const ok = await confirm({
+      title: 'Discard unsaved changes?',
+      message: 'You have edited this client profile and have not saved. Close anyway?',
+      confirmLabel: 'Discard changes',
+      tone: 'danger',
+    })
+    if (ok) onClose()
   }
 
   const handleSubmit = async (event) => {
@@ -75,8 +123,10 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
       }
       updateClientClinicalDetails(client.id, details)
       updated = updateClientClinicalProfile(client.id, profile) || updated
-      setLocalClient({ ...updated, ...details, clinical_profile: profile })
-      onSaved?.({ ...updated, ...details, clinical_profile: profile })
+      const nextClient = { ...updated, ...details, clinical_profile: profile }
+      setLocalClient(nextClient)
+      setBaseline(snapshotFromClient(nextClient))
+      onSaved?.(nextClient)
       toast.success('Client profile saved.')
       onClose()
     } catch (err) {
@@ -90,13 +140,15 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
     <FormOverlay
       title="Edit client details"
       meta={`${firstName} ${surname}`.trim() || client.real_name}
-      onClose={onClose}
+      onClose={requestClose}
       size="lg"
-      footer={(
+      headerActions={(
         <>
-          <button type="button" className="secondary" onClick={onClose}>Cancel</button>
-          <button type="submit" form="client-profile-form" className="primary" disabled={saving}>
-            {saving ? 'Saving…' : 'Save profile'}
+          <button type="submit" form="client-profile-form" className="primary" disabled={saving || !dirty}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+          <button type="button" className="secondary" onClick={requestClose}>
+            Close
           </button>
         </>
       )}
@@ -149,13 +201,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
                 onChange={(event) => setEmail(event.target.value)}
               />
             </div>
-          </div>
-        </section>
-
-        <section className="client-profile-overlay__section">
-          <h3 className="client-profile-overlay__section-title">Core details</h3>
-          <div className="client-profile-overlay__grid client-profile-overlay__grid--core">
-            <div className="form-group client-profile-overlay__field client-profile-overlay__field--wide">
+            <div className="form-group client-profile-overlay__field">
               <label htmlFor="client-profile-gender">Gender</label>
               <input
                 id="client-profile-gender"
@@ -165,7 +211,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
                 placeholder="Optional"
               />
             </div>
-            <div className="form-group client-profile-overlay__field client-profile-overlay__field--wide">
+            <div className="form-group client-profile-overlay__field">
               <label htmlFor="client-profile-school">School / setting</label>
               <input
                 id="client-profile-school"
@@ -174,6 +220,12 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
                 onChange={(event) => setSchool(event.target.value)}
               />
             </div>
+          </div>
+        </section>
+
+        <section className="client-profile-overlay__section">
+          <h3 className="client-profile-overlay__section-title">Clinical summary</h3>
+          <div className="client-profile-overlay__grid client-profile-overlay__grid--core">
             <div className="form-group client-profile-overlay__field client-profile-overlay__field--wide">
               <label>Diagnosis</label>
               <DiagnosisPicker selected={selectedDiagnoses} onChange={setSelectedDiagnoses} />

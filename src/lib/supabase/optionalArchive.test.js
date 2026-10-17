@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { isMissingArchivedAtColumn, selectWithOptionalArchive, updateArchiveColumn } from './optionalArchive'
 
 describe('optionalArchive', () => {
@@ -9,21 +9,23 @@ describe('optionalArchive', () => {
     expect(isMissingArchivedAtColumn(null)).toBe(false)
   })
 
-  it('falls back when archived_at is missing, otherwise returns first result', async () => {
-    const withArchive = async () => ({
+  it('uses archived_at when present and falls back when the column is missing', async () => {
+    await expect(selectWithOptionalArchive(
+      async () => ({ data: [{ id: 'ok', archived_at: null }], error: null }),
+      async () => ({ data: [{ id: 'ok' }], error: null }),
+    )).resolves.toEqual([{ id: 'ok', archived_at: null }])
+
+    const withArchive = vi.fn(async () => ({
       data: null,
       error: { message: 'column archived_at does not exist', code: '42703' },
-    })
-    const withoutArchive = async () => ({
+    }))
+    const withoutArchive = vi.fn(async () => ({
       data: [{ id: '1' }],
       error: null,
-    })
+    }))
     await expect(selectWithOptionalArchive(withArchive, withoutArchive)).resolves.toEqual([{ id: '1' }])
-
-    await expect(selectWithOptionalArchive(
-      async () => ({ data: [{ id: 'ok' }], error: null }),
-      async () => ({ data: [], error: null }),
-    )).resolves.toEqual([{ id: 'ok' }])
+    expect(withArchive).toHaveBeenCalled()
+    expect(withoutArchive).toHaveBeenCalled()
   })
 
   it('surfaces a clear error when archive updates hit a missing column', async () => {

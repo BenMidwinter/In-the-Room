@@ -1535,6 +1535,8 @@ a.badge {
 
 .practice-docs__actions {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.35rem;
 }
 
@@ -1543,10 +1545,17 @@ a.badge {
   padding: 0.2rem 0.5rem;
 }
 
-.practice-docs__actions-col {
+.practice-docs__actions-col,
+.record-table th.practice-docs__actions-col,
+.record-table td.practice-docs__actions-col {
   width: 1%;
+  min-width: 12rem;
   white-space: nowrap;
   text-align: right;
+  position: sticky;
+  right: 0;
+  background: var(--bg-surface);
+  z-index: 1;
 }
 
 .record-table th.practice-docs__mark-col,

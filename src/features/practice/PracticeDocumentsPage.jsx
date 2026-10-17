@@ -28,7 +28,7 @@ const COLUMNS = [
   { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
   { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
   { key: 'updated', label: 'Updated', sort: 'date' },
-  { key: 'actions', label: '', className: 'practice-docs__actions-col', sort: false },
+  { key: 'actions', label: 'Actions', className: 'practice-docs__actions-col record-table__col--actions', sort: false },
 ]
 
 function ItemMark({ kind }) {
@@ -250,6 +250,16 @@ export default function PracticeDocumentsPage() {
           <span className="practice-docs__actions">
             <button
               type="button"
+              className="danger"
+              onClick={(event) => {
+                event.stopPropagation()
+                removeItem(item)
+              }}
+            >
+              Delete
+            </button>
+            <button
+              type="button"
               className="secondary"
               onClick={(event) => {
                 event.stopPropagation()
@@ -270,16 +280,6 @@ export default function PracticeDocumentsPage() {
                 {item.archived_at ? 'Restore' : 'Archive'}
               </button>
             )}
-            <button
-              type="button"
-              className="secondary"
-              onClick={(event) => {
-                event.stopPropagation()
-                removeItem(item)
-              }}
-            >
-              Delete
-            </button>
           </span>
         ),
       },

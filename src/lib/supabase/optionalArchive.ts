@@ -2,18 +2,21 @@
 export function isMissingArchivedAtColumn(error: { message?: string; details?: string; hint?: string; code?: string } | null | undefined): boolean {
   if (!error) return false
   const blob = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase()
-  return blob.includes('archived_at') && (
+  const mentionsArchive = blob.includes('archived_at')
+  const missingColumn = (
     blob.includes('does not exist')
     || blob.includes('could not find')
     || blob.includes('schema cache')
     || error.code === '42703'
     || error.code === 'PGRST204'
   )
+  return mentionsArchive && missingColumn
 }
 
 /**
- * Run a select that prefers columns including archived_at, then retries without it
- * when the live database has not received the archive migration yet.
+ * Prefer the select that includes archived_at (live schema now has it).
+ * If that column is missing on another environment, retry without it so lists
+ * still load.
  */
 export async function selectWithOptionalArchive<T>(
   withArchive: () => PromiseLike<{ data: T[] | null; error: { message?: string; details?: string; hint?: string; code?: string } | null }>,

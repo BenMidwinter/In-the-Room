@@ -73,69 +73,69 @@ export type Database = {
       }
       appointments: {
         Row: {
-          payload_format: string
           appointment_type: string
           attendance_status: string | null
           block_role: string
           charged_pence: number | null
-          fee_override_pence: number | null
-          do_not_invoice: boolean
           client_id: string | null
           clinician_id: string
           created_at: string
+          do_not_invoice: boolean
           encrypted_payload: Json | null
           ends_at: string
           episode_id: string | null
+          fee_override_pence: number | null
           id: string
           organization_id: string | null
           owner_id: string
           parent_appointment_id: string | null
+          payload_format: string
           series_id: string | null
           service_id: string | null
           starts_at: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           appointment_type?: string
           attendance_status?: string | null
           block_role?: string
           charged_pence?: number | null
-          fee_override_pence?: number | null
           client_id?: string | null
           clinician_id: string
-          do_not_invoice?: boolean
           created_at?: string
+          do_not_invoice?: boolean
           encrypted_payload?: Json | null
           ends_at: string
           episode_id?: string | null
+          fee_override_pence?: number | null
           id?: string
           organization_id?: string | null
           owner_id: string
           parent_appointment_id?: string | null
+          payload_format?: string
           series_id?: string | null
           service_id?: string | null
           starts_at: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           appointment_type?: string
           attendance_status?: string | null
           block_role?: string
           charged_pence?: number | null
-          fee_override_pence?: number | null
           client_id?: string | null
           clinician_id?: string
-          do_not_invoice?: boolean
           created_at?: string
+          do_not_invoice?: boolean
           encrypted_payload?: Json | null
           ends_at?: string
           episode_id?: string | null
+          fee_override_pence?: number | null
           id?: string
           organization_id?: string | null
           owner_id?: string
           parent_appointment_id?: string | null
+          payload_format?: string
           series_id?: string | null
           service_id?: string | null
           starts_at?: string
@@ -275,6 +275,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          location_key: string
           organization_id: string | null
           owner_id: string
           service_ids: string[]
@@ -285,6 +286,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          location_key?: string
           organization_id?: string | null
           owner_id: string
           service_ids?: string[]
@@ -295,6 +297,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          location_key?: string
           organization_id?: string | null
           owner_id?: string
           service_ids?: string[]
@@ -408,30 +411,30 @@ export type Database = {
       }
       client_clinical_profiles: {
         Row: {
-          payload_format: string
           client_id: string
           created_at: string
           encrypted_payload: Json
           organization_id: string | null
           owner_id: string
+          payload_format: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           client_id: string
           created_at?: string
           encrypted_payload: Json
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           client_id?: string
           created_at?: string
           encrypted_payload?: Json
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           updated_at?: string
         }
         Relationships: [
@@ -446,30 +449,30 @@ export type Database = {
       }
       client_identities: {
         Row: {
-          payload_format: string
           client_id: string
           created_at: string
           encrypted_payload: Json
           organization_id: string | null
           owner_id: string
+          payload_format: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           client_id: string
           created_at?: string
           encrypted_payload: Json
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           client_id?: string
           created_at?: string
           encrypted_payload?: Json
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           updated_at?: string
         }
         Relationships: [
@@ -482,9 +485,41 @@ export type Database = {
           },
         ]
       }
+      client_tag_links: {
+        Row: {
+          client_id: string
+          created_at: string
+          tag_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          tag_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_tag_links_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_tag_links_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
-          payload_format: string
           concession_kind: string
           concession_label: string | null
           concession_pence: number | null
@@ -494,11 +529,11 @@ export type Database = {
           id: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           status: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           concession_kind?: string
           concession_label?: string | null
           concession_pence?: number | null
@@ -508,11 +543,11 @@ export type Database = {
           id?: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           status?: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           concession_kind?: string
           concession_label?: string | null
           concession_pence?: number | null
@@ -522,6 +557,7 @@ export type Database = {
           id?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           status?: string
           updated_at?: string
         }
@@ -529,7 +565,6 @@ export type Database = {
       }
       contacts: {
         Row: {
-          payload_format: string
           client_id: string
           created_at: string
           encrypted_payload: Json
@@ -538,11 +573,11 @@ export type Database = {
           is_primary: boolean
           organization_id: string | null
           owner_id: string
+          payload_format: string
           role: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           client_id: string
           created_at?: string
           encrypted_payload: Json
@@ -551,11 +586,11 @@ export type Database = {
           is_primary?: boolean
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           role?: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           client_id?: string
           created_at?: string
           encrypted_payload?: Json
@@ -564,6 +599,7 @@ export type Database = {
           is_primary?: boolean
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           role?: string
           updated_at?: string
         }
@@ -579,7 +615,6 @@ export type Database = {
       }
       cpd_entries: {
         Row: {
-          payload_format: string
           created_at: string
           encrypted_payload: Json
           id: string
@@ -587,10 +622,10 @@ export type Database = {
           minutes: number
           occurred_on: string
           owner_id: string
+          payload_format: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           created_at?: string
           encrypted_payload: Json
           id?: string
@@ -598,10 +633,10 @@ export type Database = {
           minutes: number
           occurred_on: string
           owner_id: string
+          payload_format?: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           created_at?: string
           encrypted_payload?: Json
           id?: string
@@ -609,13 +644,13 @@ export type Database = {
           minutes?: number
           occurred_on?: string
           owner_id?: string
+          payload_format?: string
           updated_at?: string
         }
         Relationships: []
       }
       episodes: {
         Row: {
-          payload_format: string
           client_id: string
           created_at: string
           encrypted_payload: Json | null
@@ -624,13 +659,13 @@ export type Database = {
           id: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           referral_date: string | null
           start_date: string | null
           status: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           client_id: string
           created_at?: string
           encrypted_payload?: Json | null
@@ -639,13 +674,13 @@ export type Database = {
           id?: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           referral_date?: string | null
           start_date?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           client_id?: string
           created_at?: string
           encrypted_payload?: Json | null
@@ -654,6 +689,7 @@ export type Database = {
           id?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           referral_date?: string | null
           start_date?: string | null
           status?: string
@@ -730,9 +766,8 @@ export type Database = {
       }
       form_definitions: {
         Row: {
-          payload_format: string
-          sealed_payload: Json | null
           audience: string
+          autofill_client: boolean
           created_at: string
           description: string | null
           id: string
@@ -740,56 +775,65 @@ export type Database = {
           letterhead_id: string | null
           name: string
           organization_id: string | null
-          autofill_client: boolean
           owner_id: string
+          payload_format: string
           place_on_screener: boolean
           schema: Json
+          sealed_payload: Json | null
           slug: string
           status: string
           updated_at: string
           version: number
         }
         Insert: {
-          payload_format?: string
-          sealed_payload?: Json | null
           audience?: string
+          autofill_client?: boolean
           created_at?: string
           description?: string | null
           id?: string
           is_onboarding?: boolean
           letterhead_id?: string | null
           name: string
-          autofill_client?: boolean
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           place_on_screener?: boolean
           schema?: Json
+          sealed_payload?: Json | null
           slug: string
           status?: string
           updated_at?: string
           version?: number
         }
         Update: {
-          payload_format?: string
-          sealed_payload?: Json | null
           audience?: string
+          autofill_client?: boolean
           created_at?: string
           description?: string | null
           id?: string
           is_onboarding?: boolean
           letterhead_id?: string | null
           name?: string
-          autofill_client?: boolean
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           place_on_screener?: boolean
           schema?: Json
+          sealed_payload?: Json | null
           slug?: string
           status?: string
           updated_at?: string
           version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "form_definitions_letterhead_id_fkey"
+            columns: ["letterhead_id"]
+            isOneToOne: false
+            referencedRelation: "letterheads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       form_submissions: {
         Row: {
@@ -797,13 +841,13 @@ export type Database = {
           client_id: string | null
           created_at: string
           encrypted_payload: Json
-          payload_format: string
           episode_id: string | null
           form_definition_id: string
           form_version: number
           id: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           status: string
           submitted_at: string | null
           updated_at: string
@@ -813,13 +857,13 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           encrypted_payload: Json
-          payload_format?: string
           episode_id?: string | null
           form_definition_id: string
           form_version: number
           id?: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           status?: string
           submitted_at?: string | null
           updated_at?: string
@@ -829,13 +873,13 @@ export type Database = {
           client_id?: string | null
           created_at?: string
           encrypted_payload?: Json
-          payload_format?: string
           episode_id?: string | null
           form_definition_id?: string
           form_version?: number
           id?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           status?: string
           submitted_at?: string | null
           updated_at?: string
@@ -866,8 +910,6 @@ export type Database = {
       }
       invoice_lines: {
         Row: {
-          payload_format: string
-          sealed_payload: Json | null
           appointment_id: string | null
           created_at: string
           description: string
@@ -875,15 +917,15 @@ export type Database = {
           includes_vat: boolean
           invoice_id: string
           owner_id: string
+          payload_format: string
           position: number
           quantity: number
           released_at: string | null
+          sealed_payload: Json | null
           session_date: string | null
           unit_pence: number
         }
         Insert: {
-          payload_format?: string
-          sealed_payload?: Json | null
           appointment_id?: string | null
           created_at?: string
           description: string
@@ -891,15 +933,15 @@ export type Database = {
           includes_vat?: boolean
           invoice_id: string
           owner_id: string
+          payload_format?: string
           position?: number
           quantity?: number
           released_at?: string | null
+          sealed_payload?: Json | null
           session_date?: string | null
           unit_pence: number
         }
         Update: {
-          payload_format?: string
-          sealed_payload?: Json | null
           appointment_id?: string | null
           created_at?: string
           description?: string
@@ -907,93 +949,33 @@ export type Database = {
           includes_vat?: boolean
           invoice_id?: string
           owner_id?: string
+          payload_format?: string
           position?: number
           quantity?: number
           released_at?: string | null
+          sealed_payload?: Json | null
           session_date?: string | null
           unit_pence?: number
         }
-        Relationships: []
-      }
-      invoices: {
-        Row: {
-          payload_format: string
-          sealed_payload: Json | null
-          bill_to_name: string
-          bill_to_email: string
-          client_id: string | null
-          created_at: string
-          due_on: string | null
-          for_name: string
-          id: string
-          issued_on: string | null
-          number: string
-          owner_id: string
-          payment_details: string
-          recipient_email: string
-          resend_batch_id: string | null
-          sent_at: string | null
-          delivery_method: string
-          last_delivery_error: string | null
-          status: string
-          total_pence: number
-          updated_at: string
-          xero_invoice_id: string | null
-        }
-        Insert: {
-          payload_format?: string
-          sealed_payload?: Json | null
-          bill_to_name: string
-          bill_to_email?: string
-          client_id?: string | null
-          created_at?: string
-          due_on?: string | null
-          for_name?: string
-          id?: string
-          issued_on?: string | null
-          number: string
-          owner_id: string
-          payment_details?: string
-          recipient_email?: string
-          resend_batch_id?: string | null
-          sent_at?: string | null
-          delivery_method?: string
-          last_delivery_error?: string | null
-          status?: string
-          total_pence?: number
-          updated_at?: string
-          xero_invoice_id?: string | null
-        }
-        Update: {
-          payload_format?: string
-          sealed_payload?: Json | null
-          bill_to_name?: string
-          bill_to_email?: string
-          client_id?: string | null
-          created_at?: string
-          due_on?: string | null
-          for_name?: string
-          id?: string
-          issued_on?: string | null
-          number?: string
-          owner_id?: string
-          payment_details?: string
-          recipient_email?: string
-          resend_batch_id?: string | null
-          sent_at?: string | null
-          delivery_method?: string
-          last_delivery_error?: string | null
-          status?: string
-          total_pence?: number
-          updated_at?: string
-          xero_invoice_id?: string | null
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoice_lines_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_lines_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoice_payments: {
         Row: {
-          payload_format: string
-          sealed_payload: Json | null
           amount_pence: number
           created_at: string
           id: string
@@ -1001,10 +983,10 @@ export type Database = {
           note: string
           owner_id: string
           paid_on: string
+          payload_format: string
+          sealed_payload: Json | null
         }
         Insert: {
-          payload_format?: string
-          sealed_payload?: Json | null
           amount_pence: number
           created_at?: string
           id?: string
@@ -1012,10 +994,10 @@ export type Database = {
           note?: string
           owner_id: string
           paid_on: string
-        }
-        Update: {
           payload_format?: string
           sealed_payload?: Json | null
+        }
+        Update: {
           amount_pence?: number
           created_at?: string
           id?: string
@@ -1023,12 +1005,104 @@ export type Database = {
           note?: string
           owner_id?: string
           paid_on?: string
+          payload_format?: string
+          sealed_payload?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invoice_payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          bill_to_email: string
+          bill_to_name: string
+          client_id: string | null
+          created_at: string
+          delivery_method: string
+          due_on: string | null
+          for_name: string
+          id: string
+          issued_on: string | null
+          last_delivery_error: string | null
+          number: string
+          owner_id: string
+          payload_format: string
+          payment_details: string
+          recipient_email: string
+          resend_batch_id: string | null
+          sealed_payload: Json | null
+          sent_at: string | null
+          status: string
+          total_pence: number
+          updated_at: string
+          xero_invoice_id: string | null
+        }
+        Insert: {
+          bill_to_email?: string
+          bill_to_name: string
+          client_id?: string | null
+          created_at?: string
+          delivery_method?: string
+          due_on?: string | null
+          for_name?: string
+          id?: string
+          issued_on?: string | null
+          last_delivery_error?: string | null
+          number: string
+          owner_id: string
+          payload_format?: string
+          payment_details?: string
+          recipient_email?: string
+          resend_batch_id?: string | null
+          sealed_payload?: Json | null
+          sent_at?: string | null
+          status?: string
+          total_pence?: number
+          updated_at?: string
+          xero_invoice_id?: string | null
+        }
+        Update: {
+          bill_to_email?: string
+          bill_to_name?: string
+          client_id?: string | null
+          created_at?: string
+          delivery_method?: string
+          due_on?: string | null
+          for_name?: string
+          id?: string
+          issued_on?: string | null
+          last_delivery_error?: string | null
+          number?: string
+          owner_id?: string
+          payload_format?: string
+          payment_details?: string
+          recipient_email?: string
+          resend_batch_id?: string | null
+          sealed_payload?: Json | null
+          sent_at?: string | null
+          status?: string
+          total_pence?: number
+          updated_at?: string
+          xero_invoice_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       journal_entries: {
         Row: {
-          payload_format: string
           author_id: string
           created_at: string
           encrypted_payload: Json
@@ -1036,11 +1110,11 @@ export type Database = {
           id: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           somatic_state: string | null
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           author_id: string
           created_at?: string
           encrypted_payload: Json
@@ -1048,11 +1122,11 @@ export type Database = {
           id?: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           somatic_state?: string | null
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           author_id?: string
           created_at?: string
           encrypted_payload?: Json
@@ -1060,54 +1134,103 @@ export type Database = {
           id?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           somatic_state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      letterheads: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          address_line3: string | null
+          country: string | null
+          created_at: string
+          id: string
+          is_default: boolean
+          logo_url: string | null
+          name: string
+          owner_id: string
+          postcode: string | null
+          practice_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          address_line3?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          logo_url?: string | null
+          name: string
+          owner_id: string
+          postcode?: string | null
+          practice_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          address_line3?: string | null
+          country?: string | null
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          logo_url?: string | null
+          name?: string
+          owner_id?: string
+          postcode?: string | null
+          practice_name?: string | null
           updated_at?: string
         }
         Relationships: []
       }
       letters: {
         Row: {
+          archived_at: string | null
           author_id: string
           client_id: string
           created_at: string
-          archived_at: string | null
           encrypted_payload: Json
-          payload_format: string
           episode_id: string | null
           id: string
           letter_date: string | null
           organization_id: string | null
           owner_id: string
+          payload_format: string
           template_id: string | null
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           author_id: string
           client_id: string
           created_at?: string
-          archived_at?: string | null
           encrypted_payload: Json
-          payload_format?: string
           episode_id?: string | null
           id?: string
           letter_date?: string | null
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           template_id?: string | null
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           author_id?: string
           client_id?: string
           created_at?: string
-          archived_at?: string | null
           encrypted_payload?: Json
-          payload_format?: string
           episode_id?: string | null
           id?: string
           letter_date?: string | null
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           template_id?: string | null
           updated_at?: string
         }
@@ -1135,6 +1258,82 @@ export type Database = {
           },
         ]
       }
+      organization_keys: {
+        Row: {
+          created_at: string
+          kms_key_id: string
+          organization_id: string
+          wrapped_dek: string
+        }
+        Insert: {
+          created_at?: string
+          kms_key_id: string
+          organization_id: string
+          wrapped_dek: string
+        }
+        Update: {
+          created_at?: string
+          kms_key_id?: string
+          organization_id?: string
+          wrapped_dek?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_keys_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          created_at: string
+          organization_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          organization_id: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          organization_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       outcome_entries: {
         Row: {
           appointment_id: string | null
@@ -1142,12 +1341,12 @@ export type Database = {
           completion_status: string
           created_at: string
           encrypted_payload: Json
-          payload_format: string
           episode_id: string | null
           id: string
           measure_id: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           recorded_on: string
           updated_at: string
         }
@@ -1157,12 +1356,12 @@ export type Database = {
           completion_status?: string
           created_at?: string
           encrypted_payload: Json
-          payload_format?: string
           episode_id?: string | null
           id?: string
           measure_id: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           recorded_on: string
           updated_at?: string
         }
@@ -1172,12 +1371,12 @@ export type Database = {
           completion_status?: string
           created_at?: string
           encrypted_payload?: Json
-          payload_format?: string
           episode_id?: string | null
           id?: string
           measure_id?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           recorded_on?: string
           updated_at?: string
         }
@@ -1214,43 +1413,43 @@ export type Database = {
       }
       outcome_measure_defs: {
         Row: {
-          payload_format: string
-          sealed_payload: Json | null
           created_at: string
           id: string
           is_active: boolean
           name: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           schema: Json
+          sealed_payload: Json | null
           slug: string
           status: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
-          sealed_payload?: Json | null
           created_at?: string
           id?: string
           is_active?: boolean
           name: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           schema?: Json
+          sealed_payload?: Json | null
           slug: string
           status?: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
-          sealed_payload?: Json | null
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           schema?: Json
+          sealed_payload?: Json | null
           slug?: string
           status?: string
           updated_at?: string
@@ -1259,39 +1458,39 @@ export type Database = {
       }
       practice_items: {
         Row: {
-          payload_format: string
-          created_at: string
           archived_at: string | null
+          created_at: string
           encrypted_payload: Json | null
           id: string
           kind: string
           name: string
           owner_id: string
           parent_id: string | null
+          payload_format: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
-          created_at?: string
           archived_at?: string | null
+          created_at?: string
           encrypted_payload?: Json | null
           id?: string
           kind: string
           name: string
           owner_id: string
           parent_id?: string | null
+          payload_format?: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
-          created_at?: string
           archived_at?: string | null
+          created_at?: string
           encrypted_payload?: Json | null
           id?: string
           kind?: string
           name?: string
           owner_id?: string
           parent_id?: string | null
+          payload_format?: string
           updated_at?: string
         }
         Relationships: [
@@ -1307,28 +1506,27 @@ export type Database = {
       profiles: {
         Row: {
           bank_format: string
-          sealed_bank: Json | null
           bio: string | null
-          dpa_accepted: boolean
-          dpa_accepted_at: string | null
-          dpa_accepted_ip: string | null
-          dpa_version: string | null
           cancel_early_fee: string
           cancel_late_fee: string
           cancel_notice_hours: number
+          created_at: string
+          display_name: string | null
           dna_fee: string
+          dpa_accepted: boolean
+          dpa_accepted_at: string | null
+          dpa_accepted_ip: unknown
+          dpa_version: string | null
+          email: string | null
+          encrypted_private_key: Json | null
+          encrypted_private_key_recovery: Json | null
+          id: string
           invoice_account_name: string | null
           invoice_account_number: string | null
           invoice_due_days: number
           invoice_next_number: number
           invoice_payment_note: string | null
           invoice_sort_code: string | null
-          created_at: string
-          display_name: string | null
-          email: string | null
-          encrypted_private_key: Json | null
-          encrypted_private_key_recovery: Json | null
-          id: string
           job_title: string | null
           phone: string | null
           photo_url: string | null
@@ -1343,33 +1541,33 @@ export type Database = {
           public_key: string | null
           registration_number: string | null
           registration_numbers: Json
+          sealed_bank: Json | null
           timezone: string
           updated_at: string
         }
         Insert: {
           bank_format?: string
-          sealed_bank?: Json | null
           bio?: string | null
-          dpa_accepted?: boolean
-          dpa_accepted_at?: string | null
-          dpa_accepted_ip?: string | null
-          dpa_version?: string | null
           cancel_early_fee?: string
           cancel_late_fee?: string
           cancel_notice_hours?: number
+          created_at?: string
+          display_name?: string | null
           dna_fee?: string
+          dpa_accepted?: boolean
+          dpa_accepted_at?: string | null
+          dpa_accepted_ip?: unknown
+          dpa_version?: string | null
+          email?: string | null
+          encrypted_private_key?: Json | null
+          encrypted_private_key_recovery?: Json | null
+          id: string
           invoice_account_name?: string | null
           invoice_account_number?: string | null
           invoice_due_days?: number
           invoice_next_number?: number
           invoice_payment_note?: string | null
           invoice_sort_code?: string | null
-          created_at?: string
-          display_name?: string | null
-          email?: string | null
-          encrypted_private_key?: Json | null
-          encrypted_private_key_recovery?: Json | null
-          id: string
           job_title?: string | null
           phone?: string | null
           photo_url?: string | null
@@ -1384,33 +1582,33 @@ export type Database = {
           public_key?: string | null
           registration_number?: string | null
           registration_numbers?: Json
+          sealed_bank?: Json | null
           timezone?: string
           updated_at?: string
         }
         Update: {
           bank_format?: string
-          sealed_bank?: Json | null
           bio?: string | null
-          dpa_accepted?: boolean
-          dpa_accepted_at?: string | null
-          dpa_accepted_ip?: string | null
-          dpa_version?: string | null
           cancel_early_fee?: string
           cancel_late_fee?: string
           cancel_notice_hours?: number
+          created_at?: string
+          display_name?: string | null
           dna_fee?: string
+          dpa_accepted?: boolean
+          dpa_accepted_at?: string | null
+          dpa_accepted_ip?: unknown
+          dpa_version?: string | null
+          email?: string | null
+          encrypted_private_key?: Json | null
+          encrypted_private_key_recovery?: Json | null
+          id?: string
           invoice_account_name?: string | null
           invoice_account_number?: string | null
           invoice_due_days?: number
           invoice_next_number?: number
           invoice_payment_note?: string | null
           invoice_sort_code?: string | null
-          created_at?: string
-          display_name?: string | null
-          email?: string | null
-          encrypted_private_key?: Json | null
-          encrypted_private_key_recovery?: Json | null
-          id?: string
           job_title?: string | null
           phone?: string | null
           photo_url?: string | null
@@ -1425,6 +1623,7 @@ export type Database = {
           public_key?: string | null
           registration_number?: string | null
           registration_numbers?: Json
+          sealed_bank?: Json | null
           timezone?: string
           updated_at?: string
         }
@@ -1433,12 +1632,11 @@ export type Database = {
       progress_notes: {
         Row: {
           appointment_id: string | null
+          archived_at: string | null
           author_id: string
           client_id: string
           created_at: string
-          archived_at: string | null
           encrypted_payload: Json
-          payload_format: string
           episode_id: string
           id: string
           lock_until: string | null
@@ -1446,6 +1644,7 @@ export type Database = {
           noted_at: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           session_date: string
           signed_off_at: string | null
           status: string
@@ -1454,12 +1653,11 @@ export type Database = {
         }
         Insert: {
           appointment_id?: string | null
+          archived_at?: string | null
           author_id: string
           client_id: string
           created_at?: string
-          archived_at?: string | null
           encrypted_payload: Json
-          payload_format?: string
           episode_id: string
           id?: string
           lock_until?: string | null
@@ -1467,6 +1665,7 @@ export type Database = {
           noted_at?: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           session_date: string
           signed_off_at?: string | null
           status?: string
@@ -1475,12 +1674,11 @@ export type Database = {
         }
         Update: {
           appointment_id?: string | null
+          archived_at?: string | null
           author_id?: string
           client_id?: string
           created_at?: string
-          archived_at?: string | null
           encrypted_payload?: Json
-          payload_format?: string
           episode_id?: string
           id?: string
           lock_until?: string | null
@@ -1488,6 +1686,7 @@ export type Database = {
           noted_at?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           session_date?: string
           signed_off_at?: string | null
           status?: string
@@ -1649,46 +1848,46 @@ export type Database = {
       }
       reports: {
         Row: {
+          archived_at: string | null
           author_id: string
           client_id: string
           created_at: string
-          archived_at: string | null
           encrypted_payload: Json
-          payload_format: string
           episode_id: string | null
           id: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           report_date: string | null
           template_id: string | null
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           author_id: string
           client_id: string
           created_at?: string
-          archived_at?: string | null
           encrypted_payload: Json
-          payload_format?: string
           episode_id?: string | null
           id?: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           report_date?: string | null
           template_id?: string | null
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           author_id?: string
           client_id?: string
           created_at?: string
-          archived_at?: string | null
           encrypted_payload?: Json
-          payload_format?: string
           episode_id?: string | null
           id?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           report_date?: string | null
           template_id?: string | null
           updated_at?: string
@@ -1790,7 +1989,6 @@ export type Database = {
       }
       supervision_entries: {
         Row: {
-          payload_format: string
           created_at: string
           direction: string
           encrypted_payload: Json
@@ -1799,10 +1997,10 @@ export type Database = {
           minutes: number
           occurred_on: string
           owner_id: string
+          payload_format: string
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           created_at?: string
           direction: string
           encrypted_payload: Json
@@ -1811,10 +2009,10 @@ export type Database = {
           minutes: number
           occurred_on: string
           owner_id: string
+          payload_format?: string
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           created_at?: string
           direction?: string
           encrypted_payload?: Json
@@ -1823,13 +2021,52 @@ export type Database = {
           minutes?: number
           occurred_on?: string
           owner_id?: string
+          payload_format?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      tags: {
+        Row: {
+          color: string
+          created_at: string
+          id: string
+          kind: string
+          name: string
+          organization_id: string | null
+          owner_id: string
+          payload_format: string
+          sealed_payload: Json | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          id?: string
+          kind: string
+          name: string
+          organization_id?: string | null
+          owner_id: string
+          payload_format?: string
+          sealed_payload?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          name?: string
+          organization_id?: string | null
+          owner_id?: string
+          payload_format?: string
+          sealed_payload?: Json | null
           updated_at?: string
         }
         Relationships: []
       }
       templates: {
         Row: {
-          payload_format: string
           created_at: string
           description: string | null
           encrypted_payload: Json | null
@@ -1839,11 +2076,11 @@ export type Database = {
           name: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           schema: Json | null
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           created_at?: string
           description?: string | null
           encrypted_payload?: Json | null
@@ -1853,11 +2090,11 @@ export type Database = {
           name: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           schema?: Json | null
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           created_at?: string
           description?: string | null
           encrypted_payload?: Json | null
@@ -1867,6 +2104,7 @@ export type Database = {
           name?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           schema?: Json | null
           updated_at?: string
         }
@@ -1874,7 +2112,6 @@ export type Database = {
       }
       timeline_events: {
         Row: {
-          payload_format: string
           actor_id: string | null
           client_id: string
           created_at: string
@@ -1886,12 +2123,12 @@ export type Database = {
           occurred_at: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           ref_id: string | null
           ref_table: string | null
           updated_at: string
         }
         Insert: {
-          payload_format?: string
           actor_id?: string | null
           client_id: string
           created_at?: string
@@ -1903,12 +2140,12 @@ export type Database = {
           occurred_at?: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           ref_id?: string | null
           ref_table?: string | null
           updated_at?: string
         }
         Update: {
-          payload_format?: string
           actor_id?: string | null
           client_id?: string
           created_at?: string
@@ -1920,6 +2157,7 @@ export type Database = {
           occurred_at?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           ref_id?: string | null
           ref_table?: string | null
           updated_at?: string
@@ -1941,46 +2179,100 @@ export type Database = {
           },
         ]
       }
+      waitlist_placements: {
+        Row: {
+          client_id: string
+          created_at: string
+          information: string
+          organization_id: string | null
+          owner_id: string
+          payload_format: string
+          preferred_times: string
+          sealed_payload: Json | null
+          service_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          information?: string
+          organization_id?: string | null
+          owner_id: string
+          payload_format?: string
+          preferred_times?: string
+          sealed_payload?: Json | null
+          service_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          information?: string
+          organization_id?: string | null
+          owner_id?: string
+          payload_format?: string
+          preferred_times?: string
+          sealed_payload?: Json | null
+          service_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waitlist_placements_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waitlist_placements_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       working_documents: {
         Row: {
-          payload_format: string
+          archived_at: string | null
           author_id: string
           client_id: string
           created_at: string
-          archived_at: string | null
           encrypted_payload: Json
           episode_id: string | null
           id: string
           organization_id: string | null
           owner_id: string
+          payload_format: string
           template_id: string | null
           updated_at: string
         }
         Insert: {
-          payload_format?: string
+          archived_at?: string | null
           author_id: string
           client_id: string
           created_at?: string
-          archived_at?: string | null
           encrypted_payload: Json
           episode_id?: string | null
           id?: string
           organization_id?: string | null
           owner_id: string
+          payload_format?: string
           template_id?: string | null
           updated_at?: string
         }
         Update: {
-          payload_format?: string
+          archived_at?: string | null
           author_id?: string
           client_id?: string
           created_at?: string
-          archived_at?: string | null
           encrypted_payload?: Json
           episode_id?: string | null
           id?: string
           organization_id?: string | null
           owner_id?: string
+          payload_format?: string
           template_id?: string | null
           updated_at?: string
         }
@@ -2008,120 +2300,35 @@ export type Database = {
           },
         ]
       }
-      tags: {
-        Row: {
-          payload_format: string
-          sealed_payload: Json | null
-          color: string
-          created_at: string
-          id: string
-          kind: string
-          name: string
-          organization_id: string | null
-          owner_id: string
-          updated_at: string
-        }
-        Insert: {
-          payload_format?: string
-          sealed_payload?: Json | null
-          color?: string
-          created_at?: string
-          id?: string
-          kind: string
-          name: string
-          organization_id?: string | null
-          owner_id: string
-          updated_at?: string
-        }
-        Update: {
-          payload_format?: string
-          sealed_payload?: Json | null
-          color?: string
-          created_at?: string
-          id?: string
-          kind?: string
-          name?: string
-          organization_id?: string | null
-          owner_id?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      client_tag_links: {
-        Row: {
-          client_id: string
-          created_at: string
-          tag_id: string
-        }
-        Insert: {
-          client_id: string
-          created_at?: string
-          tag_id: string
-        }
-        Update: {
-          client_id?: string
-          created_at?: string
-          tag_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "client_tag_links_tag_id_fkey"
-            columns: ["tag_id"]
-            isOneToOne: false
-            referencedRelation: "tags"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      waitlist_placements: {
-        Row: {
-          payload_format: string
-          sealed_payload: Json | null
-          client_id: string
-          created_at: string
-          information: string
-          organization_id: string | null
-          owner_id: string
-          preferred_times: string
-          service_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          payload_format?: string
-          sealed_payload?: Json | null
-          client_id: string
-          created_at?: string
-          information?: string
-          organization_id?: string | null
-          owner_id: string
-          preferred_times?: string
-          service_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          payload_format?: string
-          sealed_payload?: Json | null
-          client_id?: string
-          created_at?: string
-          information?: string
-          organization_id?: string | null
-          owner_id?: string
-          preferred_times?: string
-          service_id?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       current_uid: { Args: never; Returns: string }
+      form_link_commit_sealed: {
+        Args: {
+          outcome_envelopes: Json
+          plain_payload: Json
+          sealed_episode: Json
+          sealed_identity: Json
+          sealed_payload: Json
+          sealed_pseudonym: Json
+          token: string
+        }
+        Returns: Json
+      }
       form_link_open: { Args: { token: string }; Returns: Json }
-      form_link_save: { Args: { token: string; answers: Json }; Returns: undefined }
+      form_link_save: {
+        Args: { answers: Json; token: string }
+        Returns: undefined
+      }
       form_link_submit: { Args: { token: string }; Returns: Json }
       form_public_start: { Args: { form_id: string }; Returns: string }
+      form_score_measure: {
+        Args: { answer: Json; measure_schema: Json }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
