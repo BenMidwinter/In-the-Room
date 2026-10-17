@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import SectionCard from '../../components/SectionCard'
+import TotpCodeInput from '../auth/TotpCodeInput'
 import { confirmCurrentPassword } from '../../lib/auth/confirmPassword'
 import { getSupabase } from '../../lib/supabase/client'
 
@@ -14,7 +15,9 @@ export default function TwoFactorSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [enrolment, setEnrolment] = useState(null)
-  const [code, setCode] = useState('')
+  const [naming, setNaming] = useState(false)
+  const [factorName, setFactorName] = useState('')
+  const [codeAttempt, setCodeAttempt] = useState(0)
   const [busy, setBusy] = useState(false)
   const [password, setPassword] = useState('')
   const [removingId, setRemovingId] = useState(null)
@@ -52,17 +55,21 @@ export default function TwoFactorSettingsPage() {
       for (const factor of factors.filter((item) => item.status !== 'verified')) {
         await supabase.auth.mfa.unenroll({ factorId: factor.id })
       }
+      const friendlyName = factorName.trim()
+      if (!friendlyName) throw new Error('Name this authenticator.')
       const { data, error: enrolError } = await supabase.auth.mfa.enroll({
         factorType: 'totp',
-        friendlyName: 'Authenticator app',
+        friendlyName,
       })
       if (enrolError || !data?.id || !data.totp) throw new Error(enrolError?.message || 'Enrolment could not start.')
+      setNaming(false)
       setEnrolment({
         id: data.id,
+        name: friendlyName,
         qr: data.totp.qr_code,
         secret: data.totp.secret,
       })
-      setCode('')
+      setCodeAttempt(0)
       await load()
     } catch (err) {
       setError(err?.message || 'Enrolment could not start.')
@@ -71,15 +78,9 @@ export default function TwoFactorSettingsPage() {
     }
   }
 
-  const confirmEnrol = async (event) => {
-    event.preventDefault()
+  const confirmEnrol = async (digits) => {
     const supabase = getSupabase()
-    if (!supabase || !enrolment) return
-    const digits = code.replace(/\s/g, '')
-    if (!/^\d{6}$/.test(digits)) {
-      setError('Enter the six-digit code from your authenticator app.')
-      return
-    }
+    if (!supabase || !enrolment || busy) return
     setBusy(true)
     setError('')
     const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({
@@ -89,10 +90,11 @@ export default function TwoFactorSettingsPage() {
     setBusy(false)
     if (verifyError) {
       setError(verifyError.message)
+      setCodeAttempt((value) => value + 1)
       return
     }
     setEnrolment(null)
-    setCode('')
+    setFactorName('')
     await load()
   }
 
@@ -100,7 +102,8 @@ export default function TwoFactorSettingsPage() {
     const supabase = getSupabase()
     if (supabase && enrolment) await supabase.auth.mfa.unenroll({ factorId: enrolment.id })
     setEnrolment(null)
-    setCode('')
+    setNaming(false)
+    setFactorName('')
     await load()
   }
 
@@ -188,39 +191,54 @@ export default function TwoFactorSettingsPage() {
               </div>
             </form>
           )}
-          {!enrolment && !removingId && (
+          {!enrolment && !removingId && !naming && (
             <div className="settings-form__actions">
-              <button type="button" className="btn btn-primary" onClick={startEnrol} disabled={busy || loading}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => { setNaming(true); setFactorName(''); setError('') }}
+                disabled={busy || loading}
+              >
                 {verified.length ? 'Add another authenticator' : 'Enrol authenticator'}
               </button>
             </div>
           )}
-          {enrolment && (
-            <form className="settings-form" onSubmit={confirmEnrol}>
-              <p className="settings-form__hint">
-                Scan this code with Google Authenticator, 1Password, or Apple Passwords. You can also type the secret.
-              </p>
-              {enrolment.qr && (
-                <img className="totp-qr" src={qrSrc(enrolment.qr)} alt="Authenticator QR code" width="180" height="180" />
-              )}
-              {enrolment.secret && <p className="totp-secret">{enrolment.secret}</p>}
-              <label className="settings-form__field" htmlFor="totp-confirm-code">
-                <span>Code</span>
+          {naming && !enrolment && (
+            <form className="settings-form" onSubmit={(event) => { event.preventDefault(); startEnrol() }}>
+              <label className="settings-form__field" htmlFor="totp-factor-name">
+                <span>Name</span>
                 <input
-                  id="totp-confirm-code"
+                  id="totp-factor-name"
                   className="paper-input"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  value={code}
-                  onChange={(event) => setCode(event.target.value)}
+                  value={factorName}
+                  maxLength={40}
+                  autoFocus
+                  onChange={(event) => setFactorName(event.target.value)}
                   required
                 />
+                <p className="settings-form__hint">For example, iPhone or 1Password. This is the name shown in the list.</p>
               </label>
               <div className="settings-form__actions">
-                <button type="submit" className="btn btn-primary" disabled={busy}>Confirm code</button>
-                <button type="button" className="btn btn-secondary" onClick={cancelEnrol} disabled={busy}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={busy || !factorName.trim()}>Continue</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setNaming(false)} disabled={busy}>Cancel</button>
               </div>
             </form>
+          )}
+          {enrolment && (
+            <div className="settings-form">
+              <p className="settings-form__hint">
+                Scan this code for {enrolment.name} with your authenticator app. You can also type the secret. The code is accepted as soon as all six digits are in.
+              </p>
+              {enrolment.qr && (
+                <img className="totp-qr" src={qrSrc(enrolment.qr)} alt={`QR code for ${enrolment.name}`} width="180" height="180" />
+              )}
+              {enrolment.secret && <p className="totp-secret">{enrolment.secret}</p>}
+              <TotpCodeInput key={codeAttempt} onComplete={confirmEnrol} disabled={busy} />
+              {busy && <p className="text-muted">Checking…</p>}
+              <div className="settings-form__actions">
+                <button type="button" className="btn btn-secondary" onClick={cancelEnrol} disabled={busy}>Cancel</button>
+              </div>
+            </div>
           )}
           {error && <p className="auth-page__alert" role="alert">{error}</p>}
         </div>

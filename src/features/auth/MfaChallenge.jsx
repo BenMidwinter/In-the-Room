@@ -1,20 +1,24 @@
 import { useState } from 'react'
 import { brandLogoUrl, PRODUCT_NAME } from '../../lib/brand'
 import { useAuth } from '../../lib/auth/AuthProvider'
+import TotpCodeInput from './TotpCodeInput'
 
 export default function MfaChallenge() {
   const { verifyTotp, signOut } = useAuth()
-  const [code, setCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
+  const [attempt, setAttempt] = useState(0)
 
-  const onSubmit = async (event) => {
-    event.preventDefault()
+  const onComplete = async (code) => {
+    if (busy) return
     setBusy(true)
     setError(null)
     const result = await verifyTotp(code)
     setBusy(false)
-    if (result.error) setError(result.error)
+    if (result.error) {
+      setError(result.error)
+      setAttempt((value) => value + 1)
+    }
   }
 
   return (
@@ -25,25 +29,11 @@ export default function MfaChallenge() {
         <p className="auth-page__lead">
           This account has an authenticator app. Enter the current six-digit code to continue.
         </p>
-        <form className="auth-page__form" onSubmit={onSubmit}>
-          <label className="auth-page__field" htmlFor="mfa-code">
-            Code
-            <input
-              id="mfa-code"
-              className="paper-input"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              autoFocus
-              value={code}
-              onChange={(event) => setCode(event.target.value)}
-              required
-            />
-          </label>
+        <div className="auth-page__form">
+          <TotpCodeInput key={attempt} onComplete={onComplete} disabled={busy} />
+          {busy && <p className="text-muted">Checking…</p>}
           {error && <p className="auth-page__alert" role="alert">{error}</p>}
-          <button type="submit" className="btn btn-primary auth-page__submit" disabled={busy}>
-            {busy ? 'Checking…' : 'Continue'}
-          </button>
-        </form>
+        </div>
         <p className="auth-page__switch">
           <button type="button" className="auth-page__link" onClick={() => signOut()}>
             Sign out

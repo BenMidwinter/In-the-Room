@@ -9,7 +9,7 @@ const PRIMARY_TABS = [
   { to: '/settings/templates', label: 'Templates' },
   { to: '/settings/forms', label: 'Forms' },
   { to: '/settings/tags', label: 'Tags' },
-  { to: '/settings/2fa', label: '[2FA]' },
+  { to: '/settings/2fa', label: '2FA' },
   { to: '/settings/integrations', label: 'Integrations' },
   { to: '/settings/export', label: 'Export' },
   { to: '/settings/legal', label: 'Legal' },
