@@ -761,9 +761,11 @@ function ClientsSection({ clients, appointments, episodes, range, tagId, service
     seen.set(appointment.clientId, current)
   }
   const tagged = (client) => matchesClientTag(client.id, tagId, tagsByClient) && onService(client.id)
-  const active = clients.filter((client) => client.status === 'active' && tagged(client))
+  const onFile = (client) => !client.archived_at && !client.trashed_at
+  const active = clients.filter((client) => client.status === 'active' && onFile(client) && tagged(client))
   const newcomers = clients.filter((client) => (
     tagged(client)
+    && onFile(client)
     && client.status !== 'screener'
     && client.status !== 'waitlist'
     && client.status !== 'rejected'

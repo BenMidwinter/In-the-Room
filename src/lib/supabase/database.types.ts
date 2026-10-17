@@ -575,6 +575,8 @@ export type Database = {
           owner_id: string
           payload_format: string
           status: string
+          archived_at: string | null
+          trashed_at: string | null
           updated_at: string
         }
         Insert: {
@@ -589,6 +591,8 @@ export type Database = {
           owner_id: string
           payload_format?: string
           status?: string
+          archived_at?: string | null
+          trashed_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -603,6 +607,8 @@ export type Database = {
           owner_id?: string
           payload_format?: string
           status?: string
+          archived_at?: string | null
+          trashed_at?: string | null
           updated_at?: string
         }
         Relationships: []

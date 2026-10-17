@@ -62,7 +62,7 @@ export default function FormsSettingsPage() {
       await copy(formStartUrl(form.id), 'Link copied. Put it on your website, or send it to someone new.')
       return
     }
-    const options = (clients || []).filter((client) => client.is_active).map((client) => ({
+    const options = (clients || []).filter((client) => client.is_active && !client.archived_at && !client.trashed_at).map((client) => ({
       value: client.id,
       label: client.real_name,
     }))

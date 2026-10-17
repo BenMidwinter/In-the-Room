@@ -81,7 +81,7 @@ export function DialogProvider({ children }) {
         <DialogSurface
           dialog={dialog}
           onCancel={() => settle(dialog.type === 'confirm' ? false : null)}
-          onConfirm={(value) => settle(dialog.type === 'confirm' ? true : value)}
+          onConfirm={(value) => settle(dialog.type === 'confirm' ? (value === 'export' ? 'export' : true) : value)}
         />
       )}
     </DialogContext.Provider>
@@ -89,7 +89,7 @@ export function DialogProvider({ children }) {
 }
 
 function DialogSurface({ dialog, onCancel, onConfirm }) {
-  const { type, title, message, label, placeholder, defaultValue, confirmLabel, cancelLabel, tone, options = [] } = dialog
+  const { type, title, message, label, placeholder, defaultValue, confirmLabel, cancelLabel, altLabel, tone, options = [] } = dialog
   const [value, setValue] = useState(defaultValue ?? '')
   const inputRef = useRef(null)
   const confirmRef = useRef(null)
@@ -165,6 +165,11 @@ function DialogSurface({ dialog, onCancel, onConfirm }) {
           <button type="button" className="secondary" onClick={onCancel}>
             {cancelLabel}
           </button>
+          {type === 'confirm' && altLabel ? (
+            <button type="button" className="secondary" onClick={() => onConfirm('export')}>
+              {altLabel}
+            </button>
+          ) : null}
           <button
             ref={confirmRef}
             type="submit"

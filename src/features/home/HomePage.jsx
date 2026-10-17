@@ -184,7 +184,7 @@ export default function HomePage() {
   )
 
   const caseloadRows = useMemo(
-    () => clients.filter((client) => client.is_active).map((client) => {
+    () => clients.filter((client) => client.is_active && !client.archived_at && !client.trashed_at).map((client) => {
       const next = upcomingByClient.get(client.id) || null
       return {
         id: client.id,

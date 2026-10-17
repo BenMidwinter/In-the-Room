@@ -1,5 +1,8 @@
+import { isTrashExpired, statusTimestamps } from '../recordStatus'
 import { getSupabase, isSupabaseConfigured } from './client'
 import { writeAuditEvent } from './audit'
+import { deleteClientFile } from './clientFilesRepo'
+import { isMissingStatusColumn, selectWithOptionalStatus } from './optionalRecordStatus'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import type { Json } from './database.types'
 import type { ClinicalProfile } from '../clinicalProfile'
@@ -19,6 +22,25 @@ type IdentityPayload = {
   medication?: string
   gender?: string
   email?: string
+}
+
+type ClientListRow = {
+  id: string
+  owner_id: string
+  organization_id: string | null
+  status: string
+  concession_kind?: string | null
+  concession_percent?: number | null
+  concession_pence?: number | null
+  concession_label?: string | null
+  payload_format: string
+  encrypted_pseudonym: Json | null
+  created_at: string
+  updated_at?: string
+  archived_at?: string | null
+  trashed_at?: string | null
+  client_identities?: { encrypted_payload: Json; payload_format?: string } | { encrypted_payload: Json; payload_format?: string }[] | null
+  client_clinical_profiles?: { encrypted_payload: Json; payload_format?: string } | { encrypted_payload: Json; payload_format?: string }[] | null
 }
 
 type PseudonymPayload = {
@@ -50,6 +72,8 @@ export type AppClientRecord = {
   on_screener: boolean
   on_waitlist: boolean
   status: string
+  archived_at?: string | null
+  trashed_at?: string | null
   created_at: string
   updated_at?: string
 }
@@ -95,6 +119,8 @@ function toAppClient(row: {
   owner_id: string
   organization_id: string | null
   status: string
+  archived_at?: string | null
+  trashed_at?: string | null
   created_at: string
   updated_at?: string
   concession_kind?: string | null
@@ -129,6 +155,8 @@ function toAppClient(row: {
     on_screener: row.status === 'screener',
     on_waitlist: row.status === 'waitlist',
     status: row.status,
+    archived_at: row.archived_at || null,
+    trashed_at: row.trashed_at || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   }
@@ -146,23 +174,34 @@ export async function listClientsFromSupabase(): Promise<AppClientRecord[]> {
   const supabase = getSupabase()
   if (!supabase) return []
 
-  const { data, error } = await supabase
-    .from('clients')
-    .select('id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, payload_format, encrypted_pseudonym, created_at, updated_at, client_identities(encrypted_payload, payload_format), client_clinical_profiles(encrypted_payload, payload_format)')
-    .order('created_at', { ascending: false })
-
-  if (error) throw error
-  const rows = data || []
-  const identityRows = rows.flatMap((row) => {
+  const detail = 'id, owner_id, organization_id, status, concession_kind, concession_percent, concession_pence, concession_label, payload_format, encrypted_pseudonym, created_at, updated_at, client_identities(encrypted_payload, payload_format), client_clinical_profiles(encrypted_payload, payload_format)'
+  const rows = await selectWithOptionalStatus<ClientListRow>(
+    () => supabase.from('clients').select(`archived_at, trashed_at, ${detail}`).order('created_at', { ascending: false }),
+    () => supabase.from('clients').select(`archived_at, ${detail}`).order('created_at', { ascending: false }),
+    () => supabase.from('clients').select(detail).order('created_at', { ascending: false }),
+  )
+  const kept: ClientListRow[] = []
+  for (const row of rows) {
+    if (isTrashExpired(row.trashed_at)) {
+      try {
+        await permanentlyDeleteClient(row.id)
+      } catch {
+        kept.push(row)
+      }
+    } else {
+      kept.push(row)
+    }
+  }
+  const identityRows = kept.flatMap((row) => {
     const identity = one(row.client_identities)
     return identity ? [{ id: row.id, payload_format: identity.payload_format, encrypted_payload: identity.encrypted_payload }] : []
   })
-  const profileRows = rows.flatMap((row) => {
+  const profileRows = kept.flatMap((row) => {
     const profile = one(row.client_clinical_profiles)
     return profile ? [{ id: row.id, payload_format: profile.payload_format, encrypted_payload: profile.encrypted_payload }] : []
   })
   const [openedClients, openedIdentities, openedProfiles] = await Promise.all([
-    withOpenedPayloads('clients', rows.map((row) => ({
+    withOpenedPayloads('clients', kept.map((row) => ({
       id: row.id,
       payload_format: row.payload_format,
       encrypted_payload: row.encrypted_pseudonym ?? {},
@@ -173,7 +212,7 @@ export async function listClientsFromSupabase(): Promise<AppClientRecord[]> {
   const identityByClient = new Map(openedIdentities.map((row) => [row.id, row.encrypted_payload]))
   const profileByClient = new Map(openedProfiles.map((row) => [row.id, row.encrypted_payload]))
   const pseudoByClient = new Map(openedClients.map((row) => [row.id, row]))
-  return rows.map((row) => {
+  return kept.map((row) => {
     const pseudo = pseudoByClient.get(row.id)
     const pseudoBody = pseudo && typeof pseudo.encrypted_payload === 'object' && pseudo.encrypted_payload
       ? pseudo.encrypted_payload as Record<string, unknown>
@@ -483,6 +522,74 @@ export async function promoteWaitlistClient(clientId: string): Promise<void> {
       } as StoreRecord
     }
   }
+}
+
+export async function setClientStatus(id: string, nextStatus: 'active' | 'archive' | 'trash'): Promise<void> {
+  if (!id) throw new Error('Client not found')
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { data, error } = await supabase
+    .from('clients')
+    .select('id, archived_at, trashed_at')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) {
+    if (isMissingStatusColumn(error)) {
+      throw new Error('Archive and trash are not available until the database migration has been applied.')
+    }
+    throw error
+  }
+  if (!data) throw new Error('Client not found')
+  const patch = statusTimestamps(nextStatus, data)
+  const { error: updateError } = await supabase.from('clients').update(patch).eq('id', id)
+  if (updateError) {
+    if (isMissingStatusColumn(updateError)) {
+      throw new Error('Archive and trash are not available until the database migration has been applied.')
+    }
+    throw updateError
+  }
+  const idx = db.clients.findIndex((row) => row.id === id)
+  if (idx !== -1) db.clients[idx] = { ...db.clients[idx], ...patch } as StoreRecord
+  await writeAuditEvent({
+    action: `client.${nextStatus}`,
+    entityType: 'client',
+    entityId: id,
+    clientId: id,
+  })
+}
+
+/** Removes the client, their records, and every file stored for them in London. */
+export async function permanentlyDeleteClient(id: string): Promise<void> {
+  if (!id) return
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+
+  const { data: files, error: filesError } = await supabase
+    .from('client_files')
+    .select('id')
+    .eq('client_id', id)
+  if (filesError) throw new Error(filesError.message)
+  for (const file of files || []) {
+    await deleteClientFile(file.id)
+  }
+
+  const { error: invoiceError } = await supabase.from('invoices').delete().eq('client_id', id)
+  if (invoiceError) throw new Error(invoiceError.message)
+  const { error: appointmentError } = await supabase.from('appointments').delete().eq('client_id', id)
+  if (appointmentError) throw new Error(appointmentError.message)
+  const { error: formError } = await supabase.from('form_submissions').delete().eq('client_id', id)
+  if (formError) throw new Error(formError.message)
+
+  const { error } = await supabase.from('clients').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+  const idx = db.clients.findIndex((row) => row.id === id)
+  if (idx !== -1) db.clients.splice(idx, 1)
+  await writeAuditEvent({
+    action: 'client.deleted',
+    entityType: 'client',
+    entityId: id,
+    metadata: { client_id: id },
+  })
 }
 
 export async function acceptWaitlistClient(clientId: string): Promise<void> {

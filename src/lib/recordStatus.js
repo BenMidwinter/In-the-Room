@@ -69,6 +69,16 @@ export function isTrashExpired(trashedAt, now = new Date()) {
   return end.getTime() <= now.getTime()
 }
 
+/** Days left before a trashed record is removed. */
+export function trashCountdownLabel(trashedAt, now = new Date()) {
+  const end = trashExpiresAt(trashedAt)
+  if (!end) return null
+  const days = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+  if (days <= 0) return 'Deletes today'
+  if (days === 1) return 'Deletes in 1 day'
+  return `Deletes in ${days} days`
+}
+
 /** Ellipsis menu items for a row, given its status and action handlers. */
 export function statusMenuItems(status, {
   onEdit,

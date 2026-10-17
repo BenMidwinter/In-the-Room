@@ -120,8 +120,10 @@ export async function listScreenerBoard(): Promise<ScreenerPerson[]> {
   const supabase = supabaseOrThrow()
   const { data: clients, error } = await supabase
     .from('clients')
-    .select('id, status, created_at, client_identities(encrypted_payload, payload_format)')
+    .select('id, status, archived_at, trashed_at, created_at, client_identities(encrypted_payload, payload_format)')
     .in('status', ['screener', 'waitlist', 'closed', 'rejected'])
+    .is('archived_at', null)
+    .is('trashed_at', null)
     .order('created_at', { ascending: true })
   if (error) throw error
   const rows = clients || []
