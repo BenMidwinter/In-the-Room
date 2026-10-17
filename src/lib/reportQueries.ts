@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { listReportsForEpisode, saveReportForUser } from './supabase/reportsRepo'
+import {
+  deleteReport,
+  listReportsForEpisode,
+  saveReportForUser,
+  setReportArchived,
+  setReportStatus,
+} from './supabase/reportsRepo'
 import type { AppReport } from './store/reports'
 
 export const reportQueryKeys = {
@@ -26,6 +32,39 @@ export function useSaveReportMutation() {
       if (saved.client_id) {
         queryClient.invalidateQueries({ queryKey: ['client-activity', saved.client_id] })
       }
+    },
+  })
+}
+
+export function useDeleteReportMutation(episodeId: string, clientId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => deleteReport(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reportQueryKeys.episode(episodeId) })
+      if (clientId) queryClient.invalidateQueries({ queryKey: ['client-activity', clientId] })
+    },
+  })
+}
+
+export function useArchiveReportMutation(episodeId: string, clientId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, archived }: { id: string; archived: boolean }) => setReportArchived(id, archived),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reportQueryKeys.episode(episodeId) })
+      if (clientId) queryClient.invalidateQueries({ queryKey: ['client-activity', clientId] })
+    },
+  })
+}
+
+export function useSetReportStatusMutation(episodeId: string, clientId?: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: 'active' | 'archive' | 'trash' }) => setReportStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reportQueryKeys.episode(episodeId) })
+      if (clientId) queryClient.invalidateQueries({ queryKey: ['client-activity', clientId] })
     },
   })
 }

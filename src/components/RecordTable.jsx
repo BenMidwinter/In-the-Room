@@ -181,6 +181,18 @@ function FilterPopover({
  * Shared table for caseload and client records.
  * Sort from the column arrows. Filter from the funnel, which opens a small panel.
  */
+function withDefaultFilters(filters, defaultFilters) {
+  const cleaned = cleanFilters(filters)
+  if (!defaultFilters || typeof defaultFilters !== 'object') return cleaned
+  const next = { ...cleaned }
+  for (const [key, value] of Object.entries(defaultFilters)) {
+    if (!String(next[key] || '').trim() && value != null && value !== '') {
+      next[key] = String(value)
+    }
+  }
+  return next
+}
+
 export default function RecordTable({
   columns,
   rows,
@@ -190,6 +202,10 @@ export default function RecordTable({
   selectedId = null,
   className = '',
   defaultSort = null,
+  /** Applied when a filter key is empty (e.g. Status → Active). */
+  defaultFilters = null,
+  /** Called whenever effective filters change (after defaults are applied). */
+  onFiltersChange = null,
   countNoun = 'rows',
   scroll = false,
   headerAction = null,
@@ -199,10 +215,12 @@ export default function RecordTable({
 }) {
   const fallbackSort = initialSort(defaultSort)
   const [stored, setStored] = useBrowserPref(remember ? `table.${remember}` : '', null)
-  const [localFilters, setLocalFilters] = useState({})
+  const [localFilters, setLocalFilters] = useState(() => withDefaultFilters({}, defaultFilters))
   const [localSort, setLocalSort] = useState(fallbackSort)
-  const filters = remember ? cleanFilters(stored?.filters) : localFilters
+  const rawFilters = remember ? cleanFilters(stored?.filters) : localFilters
+  const filters = withDefaultFilters(rawFilters, defaultFilters)
   const sort = remember ? cleanSort(stored?.sort, fallbackSort) : localSort
+  const filtersNotifyRef = useRef('')
   const setFilters = (action) => {
     if (!remember) {
       setLocalFilters(action)
@@ -244,6 +262,14 @@ export default function RecordTable({
   const activeFilterCount = Object.values(filters).filter((value) => String(value || '').trim()).length
   const openColumn = columns.find((col) => col.key === openFilter) || null
 
+  useEffect(() => {
+    if (!onFiltersChange) return
+    const serialized = JSON.stringify(filters)
+    if (serialized === filtersNotifyRef.current) return
+    filtersNotifyRef.current = serialized
+    onFiltersChange(filters)
+  }, [filters, onFiltersChange])
+
   const toggleSort = (column) => {
     if (!columnSortKind(column)) return
     setSort((current) => {
@@ -256,8 +282,14 @@ export default function RecordTable({
   }
 
   const clearFilters = () => {
-    setFilters({})
+    setFilters(defaultFilters ? { ...defaultFilters } : {})
     setOpenFilter(null)
+  }
+
+  const filterOptionsFor = (column) => {
+    const fixed = column?.filter?.options
+    if (Array.isArray(fixed) && fixed.length) return fixed.map(String)
+    return choiceOptions(rows, column.key)
   }
 
   const countLabel = activeFilterCount
@@ -403,7 +435,7 @@ export default function RecordTable({
         <FilterPopover
           column={openColumn}
           value={filters[openColumn.key] || ''}
-          options={choiceOptions(rows, openColumn.key)}
+          options={filterOptionsFor(openColumn)}
           anchorRef={{ current: filterButtonRefs.current[openColumn.key] }}
           onChange={(value) => setFilters((current) => ({ ...current, [openColumn.key]: value }))}
           onClose={() => setOpenFilter(null)}

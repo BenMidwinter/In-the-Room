@@ -1,11 +1,15 @@
 import { journalEntryFromRow, type AppJournalEntry } from '../journalEntry'
 import { parseOrThrow, journalEntryInputSchema } from '../schemas'
-import { getJournalEntries, saveJournalEntry } from '../store/journal'
+import { isTrashExpired, statusTimestamps } from '../recordStatus'
+import { deleteJournalEntry, getJournalEntries, saveJournalEntry } from '../store/journal'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
+import { selectWithOptionalStatus, updateStatusColumns } from './optionalRecordStatus'
 
-const JOURNAL_COLUMNS = 'id, author_id, entry_date, somatic_state, encrypted_payload, payload_format'
+const JOURNAL_COLUMNS_BASE = 'id, author_id, entry_date, somatic_state, encrypted_payload, payload_format'
+const JOURNAL_COLUMNS_ARCHIVE = `${JOURNAL_COLUMNS_BASE}, archived_at`
+const JOURNAL_COLUMNS = `${JOURNAL_COLUMNS_ARCHIVE}, trashed_at`
 
 type JournalRow = {
   id: string
@@ -14,7 +18,11 @@ type JournalRow = {
   somatic_state: string | null
   encrypted_payload: Json | null
   payload_format?: string | null
+  archived_at?: string | null
+  trashed_at?: string | null
 }
+
+type JournalStatus = 'active' | 'archive' | 'trash'
 
 function sortEntries(items: AppJournalEntry[]): AppJournalEntry[] {
   return [...items].sort((a, b) => {
@@ -24,18 +32,39 @@ function sortEntries(items: AppJournalEntry[]): AppJournalEntry[] {
   })
 }
 
+function localEntries(userId: string): AppJournalEntry[] {
+  return sortEntries(
+    (getJournalEntries(userId) as AppJournalEntry[]).filter((row) => !isTrashExpired(row.trashed_at)),
+  )
+}
+
+async function purgeExpired(userId: string, rows: JournalRow[]) {
+  const supabase = getSupabase()
+  if (!supabase) return rows
+  const keep: JournalRow[] = []
+  for (const row of rows) {
+    if (!isTrashExpired(row.trashed_at)) {
+      keep.push(row)
+      continue
+    }
+    await supabase.from('journal_entries').delete().eq('id', row.id).eq('author_id', userId)
+    deleteJournalEntry(userId, row.id)
+  }
+  return keep
+}
+
 export async function listJournalEntries(userId: string): Promise<AppJournalEntry[]> {
   if (!userId) return []
-  if (!isSupabaseConfigured()) return getJournalEntries(userId) as AppJournalEntry[]
+  if (!isSupabaseConfigured()) return localEntries(userId)
   const supabase = getSupabase()
-  if (!supabase) return getJournalEntries(userId) as AppJournalEntry[]
-  const { data, error } = await supabase
-    .from('journal_entries')
-    .select(JOURNAL_COLUMNS)
-    .eq('author_id', userId)
-    .order('entry_date', { ascending: false })
-  if (error) throw error
-  const rows = await withOpenedPayloads('journal_entries', (data || []) as JournalRow[])
+  if (!supabase) return localEntries(userId)
+  const data = await selectWithOptionalStatus(
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS).eq('author_id', userId).order('entry_date', { ascending: false }),
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS_ARCHIVE).eq('author_id', userId).order('entry_date', { ascending: false }),
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS_BASE).eq('author_id', userId).order('entry_date', { ascending: false }),
+  )
+  const surviving = await purgeExpired(userId, data as JournalRow[])
+  const rows = await withOpenedPayloads('journal_entries', surviving)
   return sortEntries(rows.map((row) => journalEntryFromRow(row)))
 }
 
@@ -82,7 +111,7 @@ export async function saveJournalEntryForUser(userId: string, input: {
     if (error) throw error
     const { data, error: readError } = await supabase
       .from('journal_entries')
-      .select(JOURNAL_COLUMNS)
+      .select(JOURNAL_COLUMNS_BASE)
       .eq('id', existingId)
       .single()
     if (readError) throw readError
@@ -93,6 +122,8 @@ export async function saveJournalEntryForUser(userId: string, input: {
       entry_date: row.entry_date,
       somatic_state: row.somatic_state,
       encrypted_payload,
+      archived_at: row.archived_at,
+      trashed_at: row.trashed_at,
     })
   }
 
@@ -102,7 +133,7 @@ export async function saveJournalEntryForUser(userId: string, input: {
   }, encrypted_payload)
   const { data, error } = await supabase
     .from('journal_entries')
-    .select(JOURNAL_COLUMNS)
+    .select(JOURNAL_COLUMNS_BASE)
     .eq('id', created.id)
     .single()
   if (error) throw error
@@ -113,5 +144,55 @@ export async function saveJournalEntryForUser(userId: string, input: {
     entry_date: row.entry_date,
     somatic_state: row.somatic_state,
     encrypted_payload,
+    archived_at: row.archived_at,
+    trashed_at: row.trashed_at,
   })
+}
+
+export async function setJournalEntryStatus(userId: string, entryId: string, nextStatus: JournalStatus): Promise<AppJournalEntry> {
+  if (!userId || !entryId || entryId === 'new') throw new Error('Entry not found')
+  if (!isSupabaseConfigured() || !getSupabase()) {
+    const entries = getJournalEntries(userId) as AppJournalEntry[]
+    const current = entries.find((entry) => entry.id === entryId)
+    if (!current) throw new Error('Entry not found')
+    const patch = statusTimestamps(nextStatus, current)
+    return { ...current, ...patch }
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const currentRows = await selectWithOptionalStatus(
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS).eq('id', entryId).eq('author_id', userId),
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS_ARCHIVE).eq('id', entryId).eq('author_id', userId),
+    () => supabase.from('journal_entries').select(JOURNAL_COLUMNS_BASE).eq('id', entryId).eq('author_id', userId),
+  )
+  if (!currentRows[0]) throw new Error('Entry not found')
+  const current = currentRows[0] as JournalRow
+  const patch = statusTimestamps(nextStatus, current)
+  await updateStatusColumns(() => (
+    supabase.from('journal_entries').update(patch).eq('id', entryId).eq('author_id', userId)
+  ))
+  const [opened] = await withOpenedPayloads('journal_entries', [{ ...current, ...patch }])
+  return journalEntryFromRow(opened)
+}
+
+/** @deprecated Prefer setJournalEntryStatus */
+export async function setJournalEntryArchived(userId: string, entryId: string, archived: boolean): Promise<AppJournalEntry> {
+  return setJournalEntryStatus(userId, entryId, archived ? 'archive' : 'active')
+}
+
+export async function deleteJournalEntryForUser(userId: string, entryId: string): Promise<void> {
+  if (!userId || !entryId || entryId === 'new') return
+  if (!isSupabaseConfigured()) {
+    deleteJournalEntry(userId, entryId)
+    return
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { error } = await supabase
+    .from('journal_entries')
+    .delete()
+    .eq('id', entryId)
+    .eq('author_id', userId)
+  if (error) throw error
+  deleteJournalEntry(userId, entryId)
 }

@@ -4,36 +4,29 @@ You are an expert full-stack engineer and security architect building "In the Ro
 
 ---
 
-## 1. THE GOLDEN RULE (CLIENT-SIDE ENCRYPTION ONLY)
+## 1. THE GOLDEN RULE (SERVER-SIDE KMS ENVELOPE ENCRYPTION)
 
-- **Zero Plaintext at Rest:** The database (Supabase / PostgreSQL) MUST NEVER receive, process, or store unencrypted clinical data, notes, formulations, assessments, or patient-identifiable data (PID/PII).
-- **Client-Side Boundary:** All sensitive text, process notes, and identifiers must be encrypted in the browser (via the WebCrypto API) BEFORE hitting the network or any Supabase client API call.
-- **Strict Server Blindness:** The backend server and Supabase database are treated as untrusted storage. If the entire database were leaked publicly, an attacker must only see opaque ciphertext blobs.
+- **Zero Plaintext at Rest:** The database (Supabase / PostgreSQL) MUST NEVER store unencrypted clinical data, notes, formulations, assessments, or patient-identifiable data (PID/PII).
+- **Server-Side Boundary:** Clinical and identifying payloads are sealed and opened by the `clinical-record` Edge Function (`supabase/functions/clinical-record/index.ts`) using `_shared/practiceKey.ts` (`dekFor`, `openJson`, `sealJson`) and AWS KMS (`_shared/awsKms.ts`) in `eu-west-2`.
+- **Organisation Keys:** Practice DEKs are wrapped with keys recorded in `organization_keys`. Frontend code never talks to KMS directly; it goes through `src/lib/supabase/clinicalEnvelope.ts` (`createClinicalRecord`, `sealClinicalRecord`, `withOpenedPayloads`) and the matching `*Repo.ts` modules.
+- **Strict Storage Blindness:** If the database were leaked publicly, an attacker must only see opaque ciphertext blobs.
 
 ---
 
-## 2. CRYPTOGRAPHIC ARCHITECTURE (HYBRID ENVELOPE ENCRYPTION)
+## 2. CRYPTOGRAPHIC ARCHITECTURE (AWS KMS ENVELOPE ENCRYPTION)
 
-To give individual clinicians complete privacy today while enabling workplace delegation and supervisor access later without re-encrypting notes, follow this Hybrid Envelope Encryption model:
+The live path is server-side envelope encryption. The Edge Function obtains or unwraps a data encryption key via AWS KMS, then seals JSON payloads before they are written to Supabase.
 
-### A. User Keys (Generated at Registration)
+### A. Practice / Organisation Keys
 
-1. **Key Pair Generation:**
-   - Each user generates an asymmetric key pair in-browser using WebCrypto (`RSA-OAEP` with 4096-bit keys and SHA-256, or `ECDH` P-256).
-   - `public_key`: Exported as SPKI format and stored in plaintext in `profiles.public_key`.
-   - `private_key`: Exported as PKCS#8 format and encrypted client-side using a Key Encryption Key (KEK).
-2. **KEK Derivation:**
-   - Derived client-side from the clinician's master passphrase via PBKDF2 (SHA-256, >= 600,000 iterations) or Argon2id with a unique 16-byte random salt.
-   - The master passphrase is NEVER sent to the server or saved to disk.
-3. **Emergency Recovery Escrow:**
-   - A high-entropy 24-word recovery phrase (or 256-bit hex key) is generated during onboarding.
-   - The user's private key is also encrypted with a key derived from this recovery phrase and stored in `profiles.encrypted_private_key_recovery`.
-   - The UI must enforce printing or saving this recovery sheet so clinicians satisfy statutory record retention obligations even if passphrases are forgotten.
+1. Organisation (or solo-practice) keys live in `organization_keys`.
+2. `_shared/practiceKey.ts` resolves the active practice key material and exposes `dekFor`, `openJson`, and `sealJson`.
+3. `_shared/awsKms.ts` talks to AWS KMS in `eu-west-2` to generate and unwrap data encryption keys.
 
 ### B. Record Encryption (DEK - Data Encryption Key)
 
-1. Each record (session, client profile, formulation) generates its own random 256-bit symmetric DEK (`AES-GCM-256`).
-2. The payload is serialized to JSON and encrypted using the DEK with a fresh 12-byte initialization vector (`iv`).
+1. Each clinical write goes through `clinical-record`, which seals the payload with a DEK under the practice key.
+2. The payload is serialized to JSON and encrypted using the DEK (AES-GCM) with a fresh IV.
 3. Database storage structure for ciphertext columns:
 
    ```json
@@ -44,17 +37,7 @@ To give individual clinicians complete privacy today while enabling workplace de
    }
    ```
 
-4. **Future Workplace Key Delegation (`record_access_keys` table):**
-   - The DEK is encrypted with the clinician's `public_key`.
-   - Store wrapped DEKs in a dedicated access table:
-     - `record_id` (UUID)
-     - `user_id` (UUID)
-     - `wrapped_dek` (text, base64)
-   - When delegating a case to a supervisor or workplace in Phase 2:
-     - The clinician's client decrypts the 32-byte DEK using their own private key.
-     - The client encrypts that same DEK with the supervisor's `public_key`.
-     - The client inserts a new row into `record_access_keys` for that supervisor.
-     - The underlying clinical record and ciphertext remain untouched.
+4. Frontend repos never invent a second crypto path. Reads and writes must use `src/lib/supabase/*Repo.ts` plus `clinicalEnvelope.ts`. Do not build new features against legacy synchronous `src/lib/store/*` or `mockData.js`.
 
 ---
 
@@ -69,7 +52,7 @@ To give individual clinicians complete privacy today while enabling workplace de
    - Full table list and column rules: see **SUPABASE DATA SCHEMA (FOUNDATION)** below.
 2. **Mandatory Row Level Security (RLS):**
    - Every single table MUST run `ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`.
-   - Do not rely solely on client-side encryption. RLS policies must strictly verify `auth.uid() = owner_id` (or `user_id` on access-key tables) or check authorized entries in `record_access_keys`.
+   - Do not rely solely on ciphertext. RLS policies must strictly verify `auth.uid() = owner_id` (or `user_id` on access-key tables) or check authorized entries in `record_access_keys`.
    - Never write permissive `USING (true)` policies, even in local development or test migrations.
 3. **Prevent URL Query Parameter Leaks:**
    - PostgREST logs all URL query parameters by default.
@@ -104,7 +87,7 @@ Before producing any database migration, API route, or frontend component, verif
 - [ ] Is any plaintext clinical or identifying text being sent over the network to Supabase? (If yes, reject and encrypt client-side).
 - [ ] Is RLS enabled with explicit restrictive policies?
 - [ ] Is the DEK stored separately in an encrypted format per authorized user?
-- [ ] Does the cryptographic implementation use standard WebCrypto (`window.crypto.subtle`) primitives exclusively?
+- [ ] Do clinical reads/writes go through `clinical-record` / `clinicalEnvelope.ts` and AWS KMS in `eu-west-2`?
 
 ---
 

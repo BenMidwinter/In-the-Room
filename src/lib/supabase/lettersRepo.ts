@@ -1,12 +1,16 @@
 import { letterInputSchema, parseOrThrow } from '../schemas'
 import { db } from '../data/collections'
+import { isTrashExpired, statusTimestamps } from '../recordStatus'
 import { saveLetter } from '../store/clinicalDocs'
 import type { StoreRecord } from '../types/collections'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
+import { selectWithOptionalStatus, updateStatusColumns } from './optionalRecordStatus'
 
-const LETTER_COLUMNS = 'id, owner_id, organization_id, client_id, episode_id, author_id, letter_date, encrypted_payload, payload_format, created_at, updated_at'
+const LETTER_COLUMNS_BASE = 'id, owner_id, organization_id, client_id, episode_id, author_id, letter_date, encrypted_payload, payload_format, created_at, updated_at'
+const LETTER_COLUMNS_ARCHIVE = `${LETTER_COLUMNS_BASE}, archived_at`
+const LETTER_COLUMNS = `${LETTER_COLUMNS_ARCHIVE}, trashed_at`
 
 type LetterPayload = {
   v: 0
@@ -27,6 +31,8 @@ type LetterRow = {
   payload_format: string
   created_at: string
   updated_at: string
+  archived_at?: string | null
+  trashed_at?: string | null
 }
 
 export type AppLetter = {
@@ -39,7 +45,11 @@ export type AppLetter = {
   letter_date: string
   created_at: string
   updated_at: string
+  archived_at?: string | null
+  trashed_at?: string | null
 }
+
+type LetterStatus = 'active' | 'archive' | 'trash'
 
 function isUuid(value: unknown): value is string {
   return typeof value === 'string'
@@ -70,6 +80,8 @@ function toAppLetter(row: LetterRow): AppLetter {
     letter_date: row.letter_date || String(row.created_at).slice(0, 10),
     created_at: row.created_at,
     updated_at: row.updated_at,
+    archived_at: row.archived_at || null,
+    trashed_at: row.trashed_at || null,
   }
 }
 
@@ -84,20 +96,37 @@ function localLetters(clientId: string): AppLetter[] {
   return db.letters
     .filter((row) => row.client_id === clientId)
     .map((row) => row as unknown as AppLetter)
+    .filter((row) => !isTrashExpired(row.trashed_at))
     .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+}
+
+async function purgeExpired(clientId: string, rows: LetterRow[]) {
+  const supabase = getSupabase()
+  if (!supabase) return rows
+  const keep: LetterRow[] = []
+  for (const row of rows) {
+    if (!isTrashExpired(row.trashed_at)) {
+      keep.push(row)
+      continue
+    }
+    await supabase.from('letters').delete().eq('id', row.id).eq('client_id', clientId)
+    const idx = db.letters.findIndex((item) => item.id === row.id)
+    if (idx !== -1) db.letters.splice(idx, 1)
+  }
+  return keep
 }
 
 export async function listLettersForClient(clientId: string): Promise<AppLetter[]> {
   if (!clientId || !isSupabaseConfigured() || !isUuid(clientId)) return localLetters(clientId)
   const supabase = getSupabase()
   if (!supabase) return localLetters(clientId)
-  const { data, error } = await supabase
-    .from('letters')
-    .select(LETTER_COLUMNS)
-    .eq('client_id', clientId)
-    .order('updated_at', { ascending: false })
-  if (error) throw error
-  const rows = await withOpenedPayloads('letters', (data || []) as LetterRow[])
+  const data = await selectWithOptionalStatus(
+    () => supabase.from('letters').select(LETTER_COLUMNS).eq('client_id', clientId).order('updated_at', { ascending: false }),
+    () => supabase.from('letters').select(LETTER_COLUMNS_ARCHIVE).eq('client_id', clientId).order('updated_at', { ascending: false }),
+    () => supabase.from('letters').select(LETTER_COLUMNS_BASE).eq('client_id', clientId).order('updated_at', { ascending: false }),
+  )
+  const surviving = await purgeExpired(clientId, data as LetterRow[])
+  const rows = await withOpenedPayloads('letters', surviving)
   return rows.map((row) => remember(toAppLetter(row)))
 }
 
@@ -132,7 +161,7 @@ export async function saveLetterForUser(payload: Record<string, unknown>, userId
       .from('letters')
       .update({ letter_date: letterDate })
       .eq('id', existingId)
-      .select(LETTER_COLUMNS)
+      .select(LETTER_COLUMNS_BASE)
       .single()
     if (error) throw error
     return remember(toAppLetter({
@@ -148,7 +177,7 @@ export async function saveLetterForUser(payload: Record<string, unknown>, userId
   }, body)
   const { data, error } = await supabase
     .from('letters')
-    .select(LETTER_COLUMNS)
+    .select(LETTER_COLUMNS_BASE)
     .eq('id', created.id)
     .single()
   if (error) throw error
@@ -157,4 +186,49 @@ export async function saveLetterForUser(payload: Record<string, unknown>, userId
     encrypted_payload: body as unknown as Json,
     payload_format: 'envelope',
   }))
+}
+
+export async function setLetterStatus(id: string, nextStatus: LetterStatus): Promise<AppLetter> {
+  if (!id) throw new Error('Letter not found')
+  if (!isSupabaseConfigured() || !isUuid(id)) {
+    const idx = db.letters.findIndex((row) => row.id === id)
+    if (idx === -1) throw new Error('Letter not found')
+    const current = db.letters[idx] as unknown as AppLetter
+    const patch = statusTimestamps(nextStatus, current)
+    db.letters[idx] = { ...db.letters[idx], ...patch } as StoreRecord
+    return db.letters[idx] as unknown as AppLetter
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const currentRows = await selectWithOptionalStatus(
+    () => supabase.from('letters').select(LETTER_COLUMNS).eq('id', id),
+    () => supabase.from('letters').select(LETTER_COLUMNS_ARCHIVE).eq('id', id),
+    () => supabase.from('letters').select(LETTER_COLUMNS_BASE).eq('id', id),
+  )
+  if (!currentRows[0]) throw new Error('Letter not found')
+  const current = currentRows[0] as LetterRow
+  const patch = statusTimestamps(nextStatus, current)
+  await updateStatusColumns(() => supabase.from('letters').update(patch).eq('id', id))
+  const [opened] = await withOpenedPayloads('letters', [{ ...current, ...patch }])
+  return remember(toAppLetter(opened))
+}
+
+/** @deprecated Prefer setLetterStatus */
+export async function setLetterArchived(id: string, archived: boolean): Promise<AppLetter> {
+  return setLetterStatus(id, archived ? 'archive' : 'active')
+}
+
+export async function deleteLetter(id: string): Promise<void> {
+  if (!id) return
+  if (!isSupabaseConfigured() || !isUuid(id)) {
+    const idx = db.letters.findIndex((row) => row.id === id)
+    if (idx !== -1) db.letters.splice(idx, 1)
+    return
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const { error } = await supabase.from('letters').delete().eq('id', id)
+  if (error) throw error
+  const idx = db.letters.findIndex((row) => row.id === id)
+  if (idx !== -1) db.letters.splice(idx, 1)
 }

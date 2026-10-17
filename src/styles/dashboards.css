@@ -264,7 +264,21 @@
     padding: 1.25rem var(--space-inline) 2rem;
     min-height: 50vh;
   }
+
+  .home-dashboard .section-card,
+  .page--home .section-card {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .home-dashboard .home-stat-card,
+  .home-dashboard .section-card__panel {
+    border: none;
+    box-shadow: none;
+  }
 }
+
 
 /* Clinical editor enhancements */
 .doc-editor--clinical .doc-editor__toolbar {

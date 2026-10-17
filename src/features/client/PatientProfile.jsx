@@ -1,19 +1,24 @@
 import { useState, useEffect } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate, matchPath } from 'react-router-dom'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useAppClients } from '../../lib/queries'
 import ClientDetailsBar from './ClientDetailsBar'
 import ClientNav from './ClientNav'
+import ClientDocumentsSubnav from './ClientDocumentsSubnav'
 import { ClientChromeProvider, useClientChrome } from './ClientChrome'
 import ClientClinicalAlerts from './ClientClinicalAlerts'
-import ClientConcessionForm from './ClientConcessionForm'
 
 function PatientProfileFrame({ client: initialClient }) {
   const { editorOpen } = useClientChrome()
   const navigate = useNavigate()
+  const location = useLocation()
   const { session } = useAppSession()
   const { clients } = useAppClients()
   const [client, setClient] = useState(initialClient)
+  const onDocuments = Boolean(matchPath(
+    { path: '/clients/:clientId/documents', end: true },
+    location.pathname,
+  ))
 
   useEffect(() => {
     setClient(initialClient)
@@ -60,15 +65,8 @@ function PatientProfileFrame({ client: initialClient }) {
       </header>
       )}
 
-      {!editorOpen && (
-        <ClientConcessionForm
-          key={`${client.id}:${client.concession_kind}:${client.concession_percent}:${client.concession_pence}:${client.concession_label}`}
-          client={client}
-          onSaved={(fields) => handleClientUpdated({ ...client, ...fields })}
-        />
-      )}
-
       {!editorOpen && <ClientNav clientId={client.id} client={client} />}
+      {!editorOpen && onDocuments && <ClientDocumentsSubnav />}
 
       {!editorOpen && <ClientClinicalAlerts clientId={client.id} />}
 

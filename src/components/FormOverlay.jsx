@@ -13,6 +13,7 @@ export default function FormOverlay({
   children,
   size = 'md',
   footer = null,
+  headerActions = null,
 }) {
   useEffect(() => {
     const onKey = (e) => {
@@ -48,9 +49,14 @@ export default function FormOverlay({
               <h2 id="form-overlay-title" className="form-overlay__title">{title}</h2>
               {meta && <p className="form-overlay__meta">{meta}</p>}
             </div>
-            <button type="button" className="form-overlay__close secondary" onClick={onClose} aria-label="Close">
-              Close
-            </button>
+            <div className="form-overlay__header-actions">
+              {headerActions}
+              {!headerActions && (
+                <button type="button" className="form-overlay__close secondary" onClick={onClose} aria-label="Close">
+                  Close
+                </button>
+              )}
+            </div>
           </header>
           <div className="form-overlay__body">{children}</div>
           {footer && <footer className="form-overlay__footer">{footer}</footer>}

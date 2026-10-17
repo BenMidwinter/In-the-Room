@@ -583,6 +583,20 @@ a.badge {
   min-height: 100%;
 }
 
+@media (max-width: 640px) {
+  .doc-editor--immersive .doc-editor__write {
+    padding-left: var(--space-inline);
+    padding-right: var(--space-inline);
+    max-width: none;
+    width: 100%;
+  }
+
+  .letterhead-preview {
+    padding: 1rem var(--space-inline) 0;
+  }
+}
+
+
 .doc-editor--immersive .doc-editor__prose,
 .doc-editor--immersive .ProseMirror {
   min-height: 12rem;
@@ -1074,6 +1088,96 @@ a.badge {
   margin-bottom: 1rem;
 }
 
+/* Second row under client section nav — same bleed and inset, not inside padded main. */
+.client-nav-bar--sub {
+  position: relative;
+  top: auto;
+  z-index: 3;
+  border-top: 0;
+}
+
+.record-list-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0 0 0.85rem;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.record-list-toolbar__start,
+.record-list-toolbar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.record-table__col--status,
+.record-table__col--state {
+  width: 8.5rem;
+  min-width: 8.5rem;
+  white-space: nowrap;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.25rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-meta);
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid transparent;
+}
+
+.status-badge--active {
+  background: #e6f4ea;
+  color: #0d4f2b;
+  border-color: #0d4f2b;
+}
+
+.status-badge--archive {
+  background: var(--bg-page);
+  color: var(--txt-muted);
+  border-color: var(--border-strong);
+}
+
+.status-badge--trash {
+  background: #fde8e8;
+  color: #8a1f1f;
+  border-color: #8a1f1f;
+}
+
+.bulk-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem 1rem;
+  margin: 0 0 0.85rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--col-primary) 6%, var(--bg-surface));
+}
+
+.bulk-status-bar__count {
+  font-size: var(--text-meta);
+  font-weight: 600;
+  color: var(--txt-primary);
+}
+
+.bulk-status-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
 
 @media (max-width: 800px) {
   .course-page__body {
@@ -1513,6 +1617,8 @@ a.badge {
 
 .practice-docs__actions {
   display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 0.35rem;
 }
 
@@ -1521,10 +1627,17 @@ a.badge {
   padding: 0.2rem 0.5rem;
 }
 
-.practice-docs__actions-col {
+.practice-docs__actions-col,
+.record-table th.practice-docs__actions-col,
+.record-table td.practice-docs__actions-col {
   width: 1%;
+  min-width: 12rem;
   white-space: nowrap;
   text-align: right;
+  position: sticky;
+  right: 0;
+  background: var(--bg-surface);
+  z-index: 1;
 }
 
 .record-table th.practice-docs__mark-col,
@@ -1952,9 +2065,9 @@ button.agenda-event {
   flex-wrap: wrap;
   gap: 0.55rem 0.75rem;
   align-items: end;
-  padding: 0.65rem 0.85rem;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-light);
+  padding: 0.15rem 0 0;
+  background: transparent;
+  border: 0;
 }
 
 .client-concession label {
@@ -2643,7 +2756,7 @@ button.agenda-event {
 
 .row-menu__list {
   position: fixed;
-  z-index: 40;
+  z-index: 1300;
   min-width: 10.5rem;
   padding: 0.3rem;
   border: 1px solid var(--border-light);

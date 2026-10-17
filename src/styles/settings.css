@@ -344,3 +344,27 @@
   background: transparent;
   cursor: pointer;
 }
+
+@media (max-width: 640px) {
+  .settings-panel .section-card,
+  .page--settings .section-card,
+  .section-card-stack .section-card {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .settings-panel .section-card__panel,
+  .settings-form,
+  .svc-card {
+    border-left: none;
+    box-shadow: none;
+  }
+
+  .svc-card {
+    border-radius: 0;
+    background: transparent;
+  }
+}
+

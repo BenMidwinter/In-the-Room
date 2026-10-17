@@ -1,12 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import BulkStatusBar from '../../components/BulkStatusBar'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import RichTextEditor from '../../components/RichTextEditor'
+import RowMenu from '../../components/RowMenu'
+import StatusBadge from '../../components/StatusBadge'
+import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { useConfirm, usePrompt, useToast } from '../../components/ui'
+import { useRowSelection } from '../../hooks/useRowSelection'
 import { useAuth } from '../../lib/auth/AuthProvider'
+import { useLetterheadDownload } from '../../hooks/useLetterheadDownload'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
-import { getProfile } from '../../lib/store'
+import {
+  STATUS_COLUMN,
+  STATUS_DEFAULT_FILTERS,
+  bulkActionsForStatus,
+  recordStatusOf,
+  statusLabelOf,
+  statusMenuItems,
+} from '../../lib/recordStatus'
 import {
   childrenOf,
   practiceBreadcrumb,
@@ -14,6 +27,9 @@ import {
   practiceNameSortKey,
 } from '../../lib/practiceItems'
 import { usePracticeItemMutation, usePracticeItemsQuery } from '../../lib/practiceQueries'
+import { getProfile } from '../../lib/store'
+import { useTemplatesQuery } from '../../lib/templateQueries'
+import DocumentWorkspace from '../client/DocumentWorkspace'
 
 function formatUpdated(iso) {
   if (!iso) return '—'
@@ -24,7 +40,8 @@ const COLUMNS = [
   { key: 'mark', label: '', className: 'practice-docs__mark-col' },
   { key: 'name', label: 'Name', filter: 'text', sort: 'text' },
   { key: 'updated', label: 'Updated', sort: 'date' },
-  { key: 'actions', label: '', className: 'practice-docs__actions-col' },
+  STATUS_COLUMN,
+  { key: 'actions', label: 'Actions', className: 'practice-docs__actions-col record-table__col--actions', sort: false },
 ]
 
 function ItemMark({ kind }) {
@@ -68,22 +85,39 @@ function ItemMark({ kind }) {
   )
 }
 
+function folderMenuItems(item, { onRename, onDelete }) {
+  return [
+    { label: 'Rename', onSelect: onRename },
+    { label: 'Delete', onSelect: onDelete, danger: true },
+  ]
+}
+
 export default function PracticeDocumentsPage() {
   const toast = useToast()
+  const { downloadDocument } = useLetterheadDownload()
   const confirm = useConfirm()
   const prompt = usePrompt()
   const { setEditorOpen } = useOutletContext() || {}
   const { profile: accountProfile, user } = useAuth()
   const { data: items = [], isPending, error } = usePracticeItemsQuery()
   const mutate = usePracticeItemMutation()
+  const { data: documentTemplates = [] } = useTemplatesQuery('working_document')
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedFolder = searchParams.get('folder')
   const folder = practiceFolder(items, requestedFolder)
   const folderId = folder?.id ?? null
   const [selectedId, setSelectedId] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('Active')
   const [name, setName] = useState('')
   const [content, setContent] = useState('<p></p>')
   const [editorVersion, setEditorVersion] = useState(0)
+  const { selectedIds, selection: baseSelection, clear: clearSelection, count: selectedCount } = useRowSelection()
+
+  const selection = useMemo(() => ({
+    ...baseSelection,
+    canSelect: (row) => row.item?.kind === 'document',
+    label: (row) => `Select ${row.item?.name || 'document'}`,
+  }), [baseSelection])
 
   const clinicianProfile = useMemo(
     () => clinicianProfileForEditor(accountProfile, user?.id ? getProfile(user.id) : null),
@@ -107,7 +141,12 @@ export default function PracticeDocumentsPage() {
   }
 
   const crumbs = practiceBreadcrumb(items, folderId)
-  const visible = childrenOf(items, folderId)
+  const visible = useMemo(() => childrenOf(items, folderId), [items, folderId])
+
+  const closeEditor = () => {
+    setEditorOpen?.(false)
+    setSelectedId(null)
+  }
 
   const openDocument = (item) => {
     setEditorOpen?.(true)
@@ -156,22 +195,115 @@ export default function PracticeDocumentsPage() {
     }
   }
 
-  const removeItem = async (item) => {
+  const removeFolder = async (item) => {
     const ok = await confirm({
-      title: item.kind === 'folder' ? 'Delete folder?' : 'Delete document?',
-      message: item.kind === 'folder'
-        ? `“${item.name}” and everything inside it will be removed.`
-        : `“${item.name}” will be removed.`,
+      title: 'Delete folder?',
+      message: `"${item.name}" and everything inside it will be removed.`,
       confirmLabel: 'Delete',
       tone: 'danger',
     })
     if (!ok) return
     try {
       await mutate.mutateAsync({ type: 'delete', id: item.id })
-      toast.success(item.kind === 'folder' ? 'Folder deleted.' : 'Document deleted.')
+      if (selectedId === item.id) closeEditor()
+      toast.success('Folder deleted.')
     } catch (err) {
-      toast.error(err?.message || 'Could not delete that item.')
+      toast.error(err?.message || 'Could not delete that folder.')
     }
+  }
+
+  const moveStatus = async (item, nextStatus, toastLabel) => {
+    try {
+      await mutate.mutateAsync({ type: 'status', id: item.id, status: nextStatus })
+      if (selectedId === item.id && nextStatus !== 'active') closeEditor()
+      clearSelection()
+      toast.saved(toastLabel)
+    } catch (err) {
+      toast.error(err?.message || 'Could not update that document.')
+    }
+  }
+
+  const permanentlyDeleteDocument = async (item) => {
+    const ok = await confirm({
+      title: 'Permanently delete this document?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Permanently delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      await mutate.mutateAsync({ type: 'delete', id: item.id })
+      if (selectedId === item.id) closeEditor()
+      clearSelection()
+      toast.success('Document permanently deleted.')
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete that document.')
+    }
+  }
+
+  const downloadOne = async (item) => {
+    try {
+      const opened = await downloadDocument({
+        title: item.name,
+        bodyHtml: item.content,
+        mergeContext,
+      })
+      if (!opened) {
+        toast.error('Could not create the PDF. Please try again.')
+        return
+      }
+      toast.success('PDF downloaded.')
+    } catch (err) {
+      toast.error(err?.message || 'Could not prepare the PDF.')
+    }
+  }
+
+  const runBulk = async (action) => {
+    const targets = items.filter((item) => item.kind === 'document' && selectedIds.includes(item.id))
+    if (!targets.length) return
+    for (const item of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      await action(item)
+    }
+  }
+
+  const bulk = bulkActionsForStatus(statusFilter, {
+    onArchive: () => runBulk((item) => moveStatus(item, 'archive', 'Documents archived')),
+    onRestore: () => runBulk((item) => moveStatus(item, 'active', 'Documents restored')),
+    onDelete: () => runBulk((item) => moveStatus(item, 'trash', 'Documents moved to trash')),
+    onRestoreToArchive: () => runBulk((item) => moveStatus(item, 'archive', 'Documents restored to archive')),
+    onPermanentDelete: async () => {
+      const ok = await confirm({
+        title: 'Permanently delete selected documents?',
+        message: 'This cannot be undone.',
+        confirmLabel: 'Permanently delete',
+        tone: 'danger',
+      })
+      if (!ok) return
+      await runBulk(async (item) => {
+        await mutate.mutateAsync({ type: 'delete', id: item.id })
+      })
+      clearSelection()
+      toast.saved('Documents permanently deleted')
+    },
+    onDownload: () => runBulk((item) => downloadOne(item)),
+  })
+
+  const applyTemplate = async (templateId) => {
+    if (!templateId) return
+    const template = documentTemplates.find((item) => item.id === templateId)
+    if (!template) return
+    if (hasMeaningfulEditorContent(content)) {
+      const ok = await confirm({
+        title: 'Replace document content?',
+        message: 'This replaces the current document with the selected template.',
+        confirmLabel: 'Replace',
+      })
+      if (!ok) return
+    }
+    setContent(template.content || '<p></p>')
+    if (!name.trim() || name === 'Untitled document') setName(template.name)
+    setEditorVersion((value) => value + 1)
   }
 
   const saveDocument = async () => {
@@ -190,91 +322,143 @@ export default function PracticeDocumentsPage() {
     }
   }
 
-  const rows = visible.map((item) => ({
-    id: item.id,
-    item,
-    filterValues: {
-      name: item.name,
-    },
-    sortValues: {
-      name: practiceNameSortKey(item),
-      updated: item.updated_at,
-    },
-    cells: {
-      mark: <ItemMark kind={item.kind} />,
-      name: <span className="record-table__primary">{item.name}</span>,
-      updated: formatUpdated(item.updated_at),
-      actions: (
-        <span className="practice-docs__actions">
-          <button
-            type="button"
-            className="secondary"
-            onClick={(event) => {
-              event.stopPropagation()
-              renameItem(item)
-            }}
-          >
-            Rename
-          </button>
-          <button
-            type="button"
-            className="secondary"
-            onClick={(event) => {
-              event.stopPropagation()
-              removeItem(item)
-            }}
-          >
-            Delete
-          </button>
-        </span>
-      ),
-    },
-  }))
+  const rows = visible.map((item) => {
+    const isFolder = item.kind === 'folder'
+    const status = isFolder ? 'active' : recordStatusOf(item)
+    const readOnly = !isFolder && status !== 'active'
+    return {
+      id: item.id,
+      item,
+      filterValues: {
+        name: item.name,
+        state: isFolder ? 'Active' : statusLabelOf(item),
+      },
+      sortValues: {
+        name: practiceNameSortKey(item),
+        updated: item.updated_at,
+        state: isFolder ? 'Active' : statusLabelOf(item),
+      },
+      muted: readOnly,
+      cells: {
+        mark: <ItemMark kind={item.kind} />,
+        name: <span className="record-table__primary">{item.name}</span>,
+        updated: formatUpdated(item.updated_at),
+        state: isFolder ? <span className="record-table__cell-muted">—</span> : <StatusBadge status={status} />,
+        actions: isFolder ? (
+          <RowMenu
+            label={`Actions for ${item.name}`}
+            items={folderMenuItems(item, {
+              onRename: () => renameItem(item),
+              onDelete: () => removeFolder(item),
+            })}
+          />
+        ) : (
+          <RowMenu
+            label={`Actions for ${item.name}`}
+            items={statusMenuItems(status, {
+              onEdit: () => openDocument(item),
+              onView: () => openDocument(item),
+              onArchive: () => moveStatus(item, 'archive', 'Document archived'),
+              onRestore: () => moveStatus(item, 'active', 'Document restored'),
+              onDelete: () => moveStatus(item, 'trash', 'Document moved to trash'),
+              onRestoreToArchive: () => moveStatus(item, 'archive', 'Document restored to archive'),
+              onPermanentDelete: () => permanentlyDeleteDocument(item),
+              onDownload: () => downloadOne(item),
+            })}
+          />
+        ),
+      },
+    }
+  })
 
   const editing = selectedId != null
+  const currentItem = items.find((item) => item.id === selectedId)
+  const openStatus = currentItem ? recordStatusOf(currentItem) : 'active'
+  const openReadOnly = selectedId !== 'new' && openStatus !== 'active'
 
-  const editor = (
-    <div className="record-editor split-layout__main split-layout__main--doc">
-      <div className="doc-meta-fields">
-        <div className="form-group doc-meta-fields__title">
-          <label htmlFor="practice-doc-name">Name</label>
-          <input
-            id="practice-doc-name"
-            className="paper-input doc-meta-fields__title-input"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </div>
-      </div>
-      <RichTextEditor
-        key={`${selectedId}-${editorVersion}`}
-        content={content}
-        onChange={setContent}
-        mode="clinical"
-        mergeContext={mergeContext}
-        clinicianProfile={clinicianProfile}
-      />
-    </div>
-  )
+  if (editing) {
+    return (
+      <DocumentWorkspace
+        title={name.trim() || 'Document'}
+        onBack={closeEditor}
+        actions={(
+          <>
+            {selectedId !== 'new' && currentItem && openStatus === 'archive' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(currentItem, 'active', 'Document restored')} disabled={mutate.isPending}>Restore</button>
+            )}
+            {selectedId !== 'new' && currentItem && openStatus === 'trash' && (
+              <button type="button" className="secondary" onClick={() => moveStatus(currentItem, 'archive', 'Document restored to archive')} disabled={mutate.isPending}>Restore to archive</button>
+            )}
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => downloadOne({ name, content })}
+            >
+              Download
+            </button>
+            {!openReadOnly && (
+              <button type="button" className="primary" onClick={saveDocument} disabled={mutate.isPending}>
+                {mutate.isPending ? 'Saving…' : 'Save'}
+              </button>
+            )}
+          </>
+        )}
+        meta={(
+          <>
+            <label className="progress-notes-page__meta-field progress-notes-page__meta-field--title">
+              <span className="progress-notes-page__meta-label">Title</span>
+              <input
+                className="progress-notes-page__meta-input"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                disabled={openReadOnly}
+              />
+            </label>
+            {!openReadOnly && (
+              <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+                <span className="progress-notes-page__meta-label">Template</span>
+                <select
+                  className="progress-notes-page__meta-input"
+                  value=""
+                  onChange={(event) => applyTemplate(event.target.value)}
+                >
+                  <option value="">Choose a template…</option>
+                  {documentTemplates.map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </>
+        )}
+      >
+        <RichTextEditor
+          key={`${selectedId}-${editorVersion}`}
+          content={content}
+          onChange={setContent}
+          layout="immersive"
+          variant="a4"
+          mode="clinical"
+          mergeContext={mergeContext}
+          clinicianProfile={clinicianProfile}
+          editable={!openReadOnly}
+        />
+      </DocumentWorkspace>
+    )
+  }
+
+  const showNewActions = statusFilter === 'Active'
 
   return (
     <RecordListLayout
-      title={editing ? (name.trim() || 'Document') : (folder?.name || 'My Documents')}
-      newLabel={editing ? undefined : 'document'}
-      onNew={editing ? undefined : startDocument}
-      headerActions={editing ? (
-        <>
-          <button type="button" className="secondary" onClick={() => { setEditorOpen?.(false); setSelectedId(null) }}>Back</button>
-          <button type="button" className="primary" onClick={saveDocument} disabled={mutate.isPending}>
-            {mutate.isPending ? 'Saving…' : 'Save document'}
-          </button>
-        </>
-      ) : (
+      title={folder?.name || 'My Documents'}
+      newLabel={showNewActions ? 'document' : undefined}
+      onNew={showNewActions ? startDocument : undefined}
+      headerActions={showNewActions ? (
         <button type="button" className="secondary" onClick={createFolder}>New folder</button>
-      )}
-      editor={editing ? editor : undefined}
+      ) : null}
     >
-      {!editing && crumbs.length > 0 && (
+      {crumbs.length > 0 && (
         <nav className="practice-crumbs" aria-label="Folder">
           <button type="button" onClick={() => openFolder(null)}>My Documents</button>
           {crumbs.map((crumb, index) => {
@@ -292,20 +476,32 @@ export default function PracticeDocumentsPage() {
           })}
         </nav>
       )}
-      {!editing && error && (
-        <p className="text-muted">{error.message || 'Could not load documents.'}</p>
+      {error && (
+        <p className="form-error" role="alert">{error.message || 'Could not load documents.'}</p>
       )}
-      {!editing && !error && (
+      <BulkStatusBar
+        count={selectedCount}
+        noun="documents"
+        actions={bulk}
+        onClear={clearSelection}
+      />
+      {!error && (
         <RecordTable
-          remember="practice-documents"
+          remember="practice-documents-status"
           columns={COLUMNS}
           rows={rows}
           countNoun="items"
           defaultSort={{ key: 'name', direction: 'asc' }}
+          defaultFilters={STATUS_DEFAULT_FILTERS}
+          selection={selection}
           emptyMessage={isPending ? 'Loading documents…' : (folder ? 'This folder is empty.' : 'No documents yet.')}
           onRowClick={(row) => {
             if (row.item.kind === 'folder') openFolder(row.item.id)
             else openDocument(row.item)
+          }}
+          onFiltersChange={(next) => {
+            const status = String(next?.state || 'Active')
+            if (status !== statusFilter) setStatusFilter(status)
           }}
         />
       )}

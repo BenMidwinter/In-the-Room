@@ -13,6 +13,8 @@ import {
 } from '../invoices'
 import type { DeliveryMethod, InvoiceLine, InvoiceLineInput, InvoicePayment, InvoiceRecord, InvoiceStatus, PaymentDetails } from '../invoices'
 import { todayYmd } from '../dateArchitecture'
+import { isTrashExpired, statusTimestamps } from '../recordStatus'
+import { updateStatusColumns } from './optionalRecordStatus'
 
 type InvoiceRow = {
   id: string
@@ -31,6 +33,8 @@ type InvoiceRow = {
   resend_batch_id: string | null
   last_delivery_error: string | null
   total_pence: number
+  archived_at?: string | null
+  trashed_at?: string | null
   payload_format?: string | null
   sealed_payload?: unknown
 }
@@ -60,7 +64,7 @@ type PaymentRow = {
   sealed_payload?: unknown
 }
 
-const INVOICE_COLUMNS = 'id, client_id, number, status, issued_on, due_on, bill_to_name, for_name, bill_to_email, recipient_email, sent_at, delivery_method, resend_batch_id, last_delivery_error, payment_details, total_pence, payload_format, sealed_payload'
+const INVOICE_COLUMNS = 'id, client_id, number, status, issued_on, due_on, bill_to_name, for_name, bill_to_email, recipient_email, sent_at, delivery_method, resend_batch_id, last_delivery_error, payment_details, total_pence, archived_at, trashed_at, payload_format, sealed_payload'
 const LINE_COLUMNS = 'id, invoice_id, appointment_id, position, description, session_date, unit_pence, quantity, includes_vat, released_at, payload_format, sealed_payload'
 const PAYMENT_COLUMNS = 'id, invoice_id, amount_pence, paid_on, note, payload_format, sealed_payload'
 
@@ -145,6 +149,8 @@ function mapInvoice(row: InvoiceRow, lines: LineRow[], payments: PaymentRow[]): 
     deliveryMethod: row.delivery_method === 'resend' ? 'resend' : 'manual',
     resendBatchId: row.resend_batch_id || null,
     lastDeliveryError: row.last_delivery_error || null,
+    archivedAt: row.archived_at || null,
+    trashedAt: row.trashed_at || null,
     lines: lines
       .filter((line) => line.invoice_id === row.id)
       .sort((a, b) => a.position - b.position)
@@ -187,7 +193,12 @@ export async function listInvoices(): Promise<InvoiceRecord[]> {
     .eq('owner_id', user.id)
     .order('created_at', { ascending: false })
   if (error) throw error
-  const invoices = (data || []) as InvoiceRow[]
+  const invoices = ((data || []) as InvoiceRow[]).filter((row) => !isTrashExpired(row.trashed_at))
+  for (const row of (data || []) as InvoiceRow[]) {
+    if (isTrashExpired(row.trashed_at)) {
+      await supabase.from('invoices').delete().eq('id', row.id)
+    }
+  }
   if (!invoices.length) return []
   const ids = invoices.map((invoice) => invoice.id)
   const [{ data: lineData, error: lineError }, { data: paymentData, error: paymentError }] = await Promise.all([
@@ -534,6 +545,26 @@ export async function stampInvoiceDelivery(
       payment_details: current.paymentDetails,
     })
   }
+}
+
+export async function setInvoiceLifecycle(
+  invoiceId: string,
+  nextStatus: 'active' | 'archive' | 'trash',
+): Promise<InvoiceRecord> {
+  const { supabase, user } = await requireUser()
+  const current = await reloadInvoice(supabase, user.id, invoiceId)
+  const patch = statusTimestamps(nextStatus, {
+    archived_at: current.archivedAt,
+    trashed_at: current.trashedAt,
+  })
+  await updateStatusColumns(() => supabase.from('invoices').update(patch).eq('id', invoiceId).eq('owner_id', user.id))
+  return reloadInvoice(supabase, user.id, invoiceId)
+}
+
+export async function purgeInvoice(invoiceId: string): Promise<void> {
+  const { supabase } = await requireUser()
+  const { error } = await supabase.from('invoices').delete().eq('id', invoiceId)
+  if (error) throw error
 }
 
 export async function deleteInvoice(invoiceId: string): Promise<void> {

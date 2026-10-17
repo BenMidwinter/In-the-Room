@@ -1,7 +1,8 @@
 import HelpTip from './HelpTip'
 
 /**
- * Consistent shell for list-first client modules (appointments, notes, letters, etc.).
+ * Consistent shell for list-first modules.
+ * `embedded`: no page title — slim toolbar only (used under Documents subnav).
  */
 export default function RecordListLayout({
   title,
@@ -13,31 +14,42 @@ export default function RecordListLayout({
   children,
   editor,
   className = '',
+  embedded = false,
 }) {
+  const showNew = Boolean(newLabel && onNew)
+  const actions = (
+    <>
+      {headerActions}
+      {showNew && (
+        <button type="button" className="primary" onClick={onNew}>
+          + New {newLabel}
+        </button>
+      )}
+    </>
+  )
+
   return (
     <div className={`flex min-w-0 flex-col gap-0 ${className}`.trim()}>
-      <header className="mb-0 flex flex-wrap items-start justify-between gap-3 border-b border-line-light pb-4">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <h2 className="m-0 text-lg font-bold leading-tight text-accent">{title}</h2>
-          {subtitle ? <HelpTip text={subtitle} label={`About ${title}`} /> : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {headerActions}
-          {newLabel && onNew && (
-            <button type="button" className="primary" onClick={onNew}>
-              + New {newLabel}
-            </button>
-          )}
-        </div>
-      </header>
+      {!embedded && (title || subtitle || headerActions || showNew) && (
+        <header className="mb-0 flex flex-wrap items-start justify-between gap-3 border-b border-line-light pb-4">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {title ? <h2 className="m-0 text-lg font-bold leading-tight text-accent">{title}</h2> : <span />}
+            {subtitle ? <HelpTip text={subtitle} label={`About ${title || 'this list'}`} /> : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        </header>
+      )}
 
-      {toolbar && (
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-2 border-b border-line-light py-3.5">
-          {toolbar}
+      {(toolbar || embedded) && (
+        <div className="record-list-toolbar">
+          <div className="record-list-toolbar__start">{toolbar}</div>
+          {embedded && (
+            <div className="record-list-toolbar__actions">{actions}</div>
+          )}
         </div>
       )}
 
-      <div className="pt-5">{children}</div>
+      <div className="pt-4">{children}</div>
 
       {editor && (
         <div className="mt-5 border-t border-line-light pt-5">{editor}</div>

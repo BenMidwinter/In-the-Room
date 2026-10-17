@@ -17,6 +17,7 @@ import {
   listScreenerBoard,
   listTags,
   moveClientToWaitlist,
+  closeWaitlistClient,
   rejectScreenerClient,
   saveWaitlistPlacement,
 } from '../lib/supabase/screenerRepo'
@@ -287,7 +288,9 @@ export default function ScreenerPage() {
   const { refreshClients } = useAppSession()
   const { clients } = useAppClients()
   const [storedView, setView] = useBrowserPref('screener.view', 'screener')
-  const view = storedView === 'waitlist' || storedView === 'rejected' ? storedView : 'screener'
+  const view = storedView === 'waitlist' || storedView === 'closed' || storedView === 'rejected'
+    ? storedView
+    : 'screener'
   const [editor, setEditor] = useState(null)
   const [adding, setAdding] = useState(false)
   const board = useQuery({
@@ -334,11 +337,28 @@ export default function ScreenerPage() {
     }
   }
 
+  const markClosed = async (person) => {
+    const ok = await confirm({
+      title: 'Mark as closed?',
+      message: `${person.name} leaves the waitlist without being seen and stays on Closed.`,
+      confirmLabel: 'Mark as closed',
+    })
+    if (!ok) return
+    try {
+      await closeWaitlistClient(person.id)
+      toast.saved('Marked as closed')
+      refresh()
+    } catch (err) {
+      toast.error(err.message || 'Could not close this waitlist entry')
+    }
+  }
+
   const rows = people.map((person) => {
     const href = formPath(person)
     const menu = [
       href ? { label: 'View form', onSelect: () => navigate(href) } : null,
-      view === 'rejected' ? null : { label: 'Edit details', onSelect: () => setEditor({ person, mode: 'edit' }) },
+      view === 'waitlist' ? { label: 'Mark as closed', onSelect: () => markClosed(person) } : null,
+      view === 'rejected' || view === 'closed' ? null : { label: 'Edit details', onSelect: () => setEditor({ person, mode: 'edit' }) },
     ].filter(Boolean)
     return {
       id: person.id,
@@ -406,15 +426,18 @@ export default function ScreenerPage() {
           title="Screener"
           help={view === 'waitlist'
             ? 'People waiting for a session. Add someone already on your client list, or accept them from the screener.'
-            : view === 'rejected'
-              ? 'People who were referred and not taken onto the waitlist.'
-              : 'People who sent a form that places them here, waiting to be screened.'}
+            : view === 'closed'
+              ? 'People who were on the waitlist and closed without being seen.'
+              : view === 'rejected'
+                ? 'People who were referred and not taken onto the waitlist.'
+                : 'People who sent a form that places them here, waiting to be screened.'}
         />
         <SectionNav
           label="Screener lists"
           items={[
             { key: 'screener', label: 'Screener', active: view === 'screener', onSelect: () => setView('screener') },
             { key: 'waitlist', label: 'Waitlist', active: view === 'waitlist', onSelect: () => setView('waitlist') },
+            { key: 'closed', label: 'Closed', active: view === 'closed', onSelect: () => setView('closed') },
             { key: 'rejected', label: 'Rejected', active: view === 'rejected', onSelect: () => setView('rejected') },
           ]}
         />
@@ -427,17 +450,19 @@ export default function ScreenerPage() {
             Add client
           </button>
         ) : null}
-        columns={view === 'waitlist' ? waitlistColumns : view === 'rejected' ? rejectedColumns : screenerColumns}
+        columns={view === 'waitlist' || view === 'closed' ? waitlistColumns : view === 'rejected' ? rejectedColumns : screenerColumns}
         rows={rows}
         countNoun="people"
-        defaultSort={view === 'waitlist' ? { key: 'name', direction: 'asc' } : { key: 'added', direction: 'asc' }}
+        defaultSort={view === 'waitlist' || view === 'closed' ? { key: 'name', direction: 'asc' } : { key: 'added', direction: 'asc' }}
         emptyMessage={board.isPending
           ? 'Loading…'
           : view === 'waitlist'
             ? 'Nobody is on the waitlist yet. Add a client from your list, or accept someone from the screener.'
-            : view === 'rejected'
-              ? 'Nobody has been rejected.'
-              : 'Nobody is waiting to be screened. Publish a form and choose “Place the person on the screener”.'}
+            : view === 'closed'
+              ? 'Nobody has been marked as closed.'
+              : view === 'rejected'
+                ? 'Nobody has been rejected.'
+                : 'Nobody is waiting to be screened. Publish a form and choose “Place the person on the screener”.'}
       />
       {board.error && <p className="form-error" role="alert">{board.error.message}</p>}
       {adding && (

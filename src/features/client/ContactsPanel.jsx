@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import FormOverlay from '../../components/FormOverlay'
 import RecordListLayout from '../../components/RecordListLayout'
 import RecordTable from '../../components/RecordTable'
 import { useConfirm, useToast } from '../../components/ui'
@@ -103,48 +104,58 @@ export default function ContactsPanel() {
     <RecordListLayout
       title="Contacts"
       subtitle="Invoices go to the client unless a contact is marked Send invoices to."
-      newLabel={form ? '' : 'contact'}
+      newLabel="contact"
       onNew={openNew}
     >
       {form && (
-        <form className="settings-form" onSubmit={onSave}>
-          <label className="settings-form__field">
-            <span>Name</span>
-            <input className="paper-input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-          </label>
-          <label className="settings-form__field">
-            <span>Email</span>
-            <input className="paper-input" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-          </label>
-          <label className="settings-form__field">
-            <span>Phone</span>
-            <input className="paper-input" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-          </label>
-          <label className="settings-form__field">
-            <span>Relationship</span>
-            <select className="paper-input" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
-              {ROLES.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
-            </select>
-          </label>
-          <label className="settings-form__field">
-            <span>Invoices</span>
-            <span className="contact-invoice-flag">
-              <input
-                type="checkbox"
-                checked={form.sendInvoices}
-                onChange={(event) => setForm({ ...form, sendInvoices: event.target.checked })}
-              />
-              Send invoices to this contact
-            </span>
-          </label>
-          <div className="settings-form__actions">
-            <button type="submit" className="btn btn-primary" disabled={busy}>Save contact</button>
-            <button type="button" className="btn btn-secondary" onClick={() => setForm(null)}>Cancel</button>
-            {form.id && (
-              <button type="button" className="btn btn-secondary" onClick={onDelete} disabled={busy}>Delete</button>
-            )}
-          </div>
-        </form>
+        <FormOverlay
+          title={form.id ? 'Edit contact' : 'New contact'}
+          onClose={() => setForm(null)}
+          size="sm"
+          footer={(
+            <>
+              <button type="button" className="secondary" onClick={() => setForm(null)}>Cancel</button>
+              {form.id && (
+                <button type="button" className="secondary" onClick={onDelete} disabled={busy}>Delete</button>
+              )}
+              <button type="submit" form="contact-form" className="primary" disabled={busy}>
+                Save contact
+              </button>
+            </>
+          )}
+        >
+          <form id="contact-form" className="settings-form" onSubmit={onSave}>
+            <label className="settings-form__field">
+              <span>Name</span>
+              <input className="paper-input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+            </label>
+            <label className="settings-form__field">
+              <span>Email</span>
+              <input className="paper-input" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
+            </label>
+            <label className="settings-form__field">
+              <span>Phone</span>
+              <input className="paper-input" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
+            </label>
+            <label className="settings-form__field">
+              <span>Relationship</span>
+              <select className="paper-input" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
+                {ROLES.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+              </select>
+            </label>
+            <label className="settings-form__field">
+              <span>Invoices</span>
+              <span className="contact-invoice-flag">
+                <input
+                  type="checkbox"
+                  checked={form.sendInvoices}
+                  onChange={(event) => setForm({ ...form, sendInvoices: event.target.checked })}
+                />
+                Send invoices to this contact
+              </span>
+            </label>
+          </form>
+        </FormOverlay>
       )}
       <RecordTable
         remember={`contacts-${clientId}`}

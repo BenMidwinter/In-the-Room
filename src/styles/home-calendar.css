@@ -2199,7 +2199,31 @@ button.calendar-event {
     grid-template-columns: 3.4rem repeat(var(--calendar-cols), minmax(3.65rem, 1fr));
     min-width: min(100%, calc(3.4rem + var(--calendar-cols) * 3.65rem));
   }
+
+  /* Keep hour labels and the corner above interactive appointment blocks. */
+  .calendar-time-grid__corner {
+    z-index: 8;
+  }
+
+  .calendar-time-grid__hour-label {
+    z-index: 7;
+  }
+
+  .calendar-col__events {
+    z-index: 3;
+    left: 0;
+    right: 0;
+  }
+
+  .calendar-col__events .calendar-event--interactive {
+    z-index: 4;
+  }
+
+  .calendar-col {
+    overflow: hidden;
+  }
 }
+
 
 @media (max-width: 480px) {
   .calendar-module {

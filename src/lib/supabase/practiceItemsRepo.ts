@@ -2,6 +2,14 @@ import { type PracticeItem, type PracticeKind } from '../practiceItems'
 import { createClinicalRecord, sealClinicalRecord, withOpenedPayloads } from './clinicalEnvelope'
 import { getSupabase, isSupabaseConfigured } from './client'
 import type { Json } from './database.types'
+import { isTrashExpired, statusTimestamps } from '../recordStatus'
+import { selectWithOptionalStatus, updateStatusColumns } from './optionalRecordStatus'
+
+const PRACTICE_COLUMNS_BASE = 'id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at'
+const PRACTICE_COLUMNS_ARCHIVE = `${PRACTICE_COLUMNS_BASE}, archived_at`
+const PRACTICE_COLUMNS = `${PRACTICE_COLUMNS_ARCHIVE}, trashed_at`
+
+type ItemStatus = 'active' | 'archive' | 'trash'
 
 type PracticeRow = {
   id: string
@@ -12,6 +20,8 @@ type PracticeRow = {
   payload_format?: string | null
   created_at: string
   updated_at: string
+  archived_at?: string | null
+  trashed_at?: string | null
 }
 
 const localItems: PracticeItem[] = []
@@ -40,6 +50,8 @@ function toItem(row: PracticeRow): PracticeItem {
         : (contentFromPayload(row.encrypted_payload) || '<p></p>'),
     created_at: row.created_at,
     updated_at: row.updated_at,
+    archived_at: row.archived_at || null,
+    trashed_at: row.trashed_at || null,
   }
 }
 
@@ -75,16 +87,38 @@ function removeLocalTree(id: string) {
   }
 }
 
-export async function listPracticeItems(): Promise<PracticeItem[]> {
-  if (!isSupabaseConfigured()) return localItems.map((item) => ({ ...item }))
+function localPracticeItems(): PracticeItem[] {
+  return localItems
+    .filter((item) => item.kind === 'folder' || !isTrashExpired(item.trashed_at))
+    .map((item) => ({ ...item }))
+}
+
+async function purgeExpiredPracticeItems(rows: PracticeRow[]) {
   const supabase = getSupabase()
-  if (!supabase) return localItems.map((item) => ({ ...item }))
-  const { data, error } = await supabase
-    .from('practice_items')
-    .select('id, parent_id, kind, name, encrypted_payload, payload_format, created_at, updated_at')
-    .order('name', { ascending: true })
-  if (error) throw error
-  const rows = await withOpenedPayloads('practice_items', (data || []) as PracticeRow[])
+  if (!supabase) return rows
+  const keep: PracticeRow[] = []
+  for (const row of rows) {
+    if (row.kind === 'folder' || !isTrashExpired(row.trashed_at)) {
+      keep.push(row)
+      continue
+    }
+    await supabase.from('practice_items').delete().eq('id', row.id)
+    removeLocalTree(row.id)
+  }
+  return keep
+}
+
+export async function listPracticeItems(): Promise<PracticeItem[]> {
+  if (!isSupabaseConfigured()) return localPracticeItems()
+  const supabase = getSupabase()
+  if (!supabase) return localPracticeItems()
+  const data = await selectWithOptionalStatus(
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS).order('name', { ascending: true }),
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS_ARCHIVE).order('name', { ascending: true }),
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS_BASE).order('name', { ascending: true }),
+  )
+  const surviving = await purgeExpiredPracticeItems(data as PracticeRow[])
+  const rows = await withOpenedPayloads('practice_items', surviving)
   return rows.map((row) => toItem(row)).sort((a, b) => a.name.localeCompare(b.name))
 }
 
@@ -226,4 +260,34 @@ export async function deletePracticeItem(id: string): Promise<void> {
   if (!supabase) throw new Error('Supabase is not configured')
   const { error } = await supabase.from('practice_items').delete().eq('id', id)
   if (error) throw error
+}
+
+export async function setPracticeItemStatus(id: string, nextStatus: ItemStatus): Promise<PracticeItem> {
+  if (!id || id === 'new') throw new Error('Document not found')
+  if (!isSupabaseConfigured() || !getSupabase()) {
+    const idx = localItems.findIndex((item) => item.id === id)
+    if (idx === -1) throw new Error('Document not found')
+    if (localItems[idx].kind !== 'document') throw new Error('Only documents support archive and trash')
+    const patch = statusTimestamps(nextStatus, localItems[idx])
+    localItems[idx] = { ...localItems[idx], ...patch }
+    return { ...localItems[idx] }
+  }
+  const supabase = getSupabase()
+  if (!supabase) throw new Error('Supabase is not configured')
+  const currentRows = await selectWithOptionalStatus(
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS).eq('id', id).eq('kind', 'document'),
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS_ARCHIVE).eq('id', id).eq('kind', 'document'),
+    () => supabase.from('practice_items').select(PRACTICE_COLUMNS_BASE).eq('id', id).eq('kind', 'document'),
+  )
+  if (!currentRows[0]) throw new Error('Document not found')
+  const current = currentRows[0] as PracticeRow
+  const patch = statusTimestamps(nextStatus, current)
+  await updateStatusColumns(() => supabase.from('practice_items').update(patch).eq('id', id).eq('kind', 'document'))
+  const [opened] = await withOpenedPayloads('practice_items', [{ ...current, ...patch }])
+  return toItem(opened)
+}
+
+/** @deprecated Prefer setPracticeItemStatus */
+export async function setPracticeItemArchived(id: string, archived: boolean): Promise<PracticeItem> {
+  return setPracticeItemStatus(id, archived ? 'archive' : 'active')
 }

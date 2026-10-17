@@ -7,6 +7,8 @@ export type AppJournalEntry = {
   time: string
   somatic_state: string
   body_text: string
+  archived_at?: string | null
+  trashed_at?: string | null
 }
 
 const SOMATIC_STATES = new Set([
@@ -37,6 +39,8 @@ export function journalEntryFromRow(row: {
   entry_date: string
   somatic_state: string | null
   encrypted_payload: Json | null
+  archived_at?: string | null
+  trashed_at?: string | null
 }): AppJournalEntry {
   const content = journalContentFromPayload(row.encrypted_payload)
   return {
@@ -46,5 +50,7 @@ export function journalEntryFromRow(row: {
     time: content.time,
     somatic_state: row.somatic_state && SOMATIC_STATES.has(row.somatic_state) ? row.somatic_state : 'Grounded',
     body_text: content.body_text,
+    archived_at: row.archived_at || null,
+    trashed_at: row.trashed_at || null,
   }
 }

@@ -68,6 +68,8 @@ export type InvoiceRecord = {
   deliveryMethod: DeliveryMethod
   resendBatchId: string | null
   lastDeliveryError: string | null
+  archivedAt?: string | null
+  trashedAt?: string | null
   lines: InvoiceLine[]
   payments: InvoicePayment[]
 }

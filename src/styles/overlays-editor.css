@@ -5,10 +5,15 @@
   inset: 0;
   z-index: 1400;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: 1.5rem;
-  overflow-y: auto;
+  padding: 1.25rem;
+  overflow: hidden;
+}
+
+html:has(.form-overlay),
+body:has(.form-overlay) {
+  overflow: hidden;
 }
 
 .form-overlay__backdrop {
@@ -22,8 +27,12 @@
 .form-overlay__panel {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
   width: min(40rem, 100%);
-  margin: auto;
+  max-height: calc(100dvh - 2.5rem);
+  margin: 0;
+  overflow: hidden;
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -36,6 +45,7 @@
 
 .form-overlay__header {
   display: flex;
+  flex-shrink: 0;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1.5rem;
@@ -87,14 +97,24 @@
   color: var(--txt-muted);
 }
 
+.form-overlay__header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
 .form-overlay__close {
   flex-shrink: 0;
   white-space: nowrap;
 }
 
 .form-overlay__body {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 1.5rem 1.75rem 1.75rem;
-  max-height: calc(100vh - 8rem);
   overflow-y: auto;
 }
 
@@ -210,9 +230,9 @@
   display: flex;
   flex-direction: column;
   gap: 2rem;
-  padding: 2rem;
-  max-height: calc(100vh - 4rem);
-  overflow-y: auto;
+  padding: 0;
+  max-height: none;
+  overflow: visible;
 }
 
 .client-profile-overlay__section-title {
@@ -262,6 +282,10 @@
 
 .client-profile-overlay__field--wide {
   grid-column: 1 / -1;
+}
+
+.client-profile-overlay__field--gender .paper-input {
+  max-width: 12rem;
 }
 
 .client-profile-overlay__field label {

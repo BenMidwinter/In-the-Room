@@ -871,6 +871,7 @@ function RichTextEditorSurface({
         />
         {immersive ? (
           <div className={EDITOR_WRITE_IMMERSIVE}>
+            {pageHeader}
             <EditorContent editor={editor} />
           </div>
         ) : (
