@@ -4,17 +4,20 @@ Living plan. The clinical workspace (caseload, calendar, notes, services, forms,
 
 ## Next, in this order
 
-1. **Folders on Client files.** The same idea as My Documents under My Practice: create a folder, open it, rename it, and delete it, then put a file in the folder you are looking at.
-2. **Encrypt file names in the S3 bucket.** Object bytes can already use SSE-KMS. The object key still ends with the readable file name (`clients/{owner}/{client}/{id}/{file name}`). Encrypt that name in the key. The display name can stay in `client_files` for the signed-in owner. Someone who reaches the bucket should not be able to read the name from the key.
-3. **Recovery keys, an export gate, and account deletion.** A recovery sheet when the practice key is created. Closing or cancelling an account waits until a full export has been generated. Deletion then removes the database rows and the S3 objects.
-4. **Audit logging.** Show it somewhere, or at least keep a behind-the-scenes record that is ready for more than one practice later. Export already writes `export.requested` and `export.downloaded` to `audit_events`.
-5. **Sign-up through Stripe, with an admin code.** New accounts pay through Stripe. An admin code lets this practice open an account without that charge. Put a bot check on the form (Cloudflare Turnstile) so scripted sign-ups cannot spam it. This can run at the same time as item 6.
-6. **Marketing site, and the app on its own host.** A public site that search engines and AI crawlers can read. Move the signed-in app to `app.processandnote.app`, or another name in front, so the marketing site can use the bare domain.
-7. **Policies against the product.** Read the privacy notice, terms, and DPA against what the app actually does, and correct anything that has drifted.
+1. Add modules as a type of RTE editor. This includes adding the consent record as a default module, as well as the DAP note as a default module. Also add Supervision notes as a default module, which will allow people to add these things a bit more flexibly.
+2. **Folders on Client files and Supervision Log.** The same idea as My Documents under My Practice: create a folder, open it, rename it, and delete it, then put a file in the folder you are looking at. Want the same for Supervision, so you can have your supervision log for each client.
+3. **Encrypt file names in the S3 bucket.** Object bytes can already use SSE-KMS. The object key still ends with the readable file name (`clients/{owner}/{client}/{id}/{file name}`). Encrypt that name in the key. The display name can stay in `client_files` for the signed-in owner. Someone who reaches the bucket should not be able to read the name from the key.
+4. **Recovery keys, an export gate, and account deletion.** A recovery sheet when the practice key is created. Closing or cancelling an account waits until a full export has been generated. Deletion then removes the database rows and the S3 objects.
+5. **Audit logging.** Show it somewhere, or at least keep a behind-the-scenes record that is ready for more than one practice later. Export already writes `export.requested` and `export.downloaded` to `audit_events`.
+6. **Sign-up through Stripe, with an admin code.** New accounts pay through Stripe. An admin code lets this practice open an account without that charge. Put a bot check on the form (Cloudflare Turnstile) so scripted sign-ups cannot spam it. This can run at the same time as item 7.
+7. **Marketing site, and the app on its own host.** A public site that search engines and AI crawlers can read. Move the signed-in app to `app.processandnote.app`, or another name in front, so the marketing site can use the bare domain.
+8. **Policies against the product.** Read the privacy notice, terms, and DPA against what the app actually does, and correct anything that has drifted.
 
 The export file-format sprint stays on the list and is not in this sequence. It is written up in `docs/LegalComplianceChecklist.md`: PDFs for clinical writing, and other files left in their own formats.
 
 ---
+
+
 
 ## 1. Missing features
 
@@ -36,6 +39,8 @@ Noted from the hosted site.
 - [ ] **Mobile calendar times.** In the phone calendar, appointment blocks overlap the time labels down the left. Keep those times readable, and keep the events in the grid beside them.
 - [ ] **Archive and delete on document tables.** A clinician needs to archive a document so it leaves the working list and stays recoverable. Follow All Invoices: the row action is a button in the last column (Open, on the right of each invoice). Put a Delete button in that same place on pretty much every document-based table: notes, letters, working documents, reports, practice documents, and the other document lists. Archive is the non-destructive action. Delete is the row button.
 
+
+
 ## 2. Encryption and login
 
 Encryption wiring is the next piece of work. Organisation id is the owner of the clients, ready for a later workspace. The people using the app now are freelance clinicians, one account each. TOTP enrolment is in Settings. A verified authenticator must be entered before clinical pages on that sign-in. Recovery codes and an API-level AAL2 lock are still later.
@@ -43,6 +48,8 @@ Encryption wiring is the next piece of work. Organisation id is the owner of the
 - [ ] Envelope encryption for client text and editor text, on top of notes, letters, reports, form answers, and outcome totals. Client names, contacts, clinical profiles, appointment notes, waitlist text, tags, and invoice addressees are included. Journal, working documents, practice documents, templates, form wording, questionnaires, and CPD or supervision notes are included. Bank details are included. The clinician’s name, email, phone, bio, registration, and letterhead stay readable so an account can be supported. Operational columns stay readable: appointment times, attendance, note status, invoice amounts, and service prices.
 - [ ] Keep the current dummy rows. New writes use the envelope. Existing rows stay plain, so the two can be compared. Wipe every test row in one go only when a stable beta is ready.
 - [x] Data processing agreement, version 1.1. Accepted at signup, or on the next sign-in for an account that does not have the current version yet. A verified authenticator, once enrolled, is asked for after that agreement.
+
+
 
 ## 3. Data management
 
@@ -59,7 +66,11 @@ The export uses the private London store for the zip, and the same mail provider
 
 ---
 
+
+
 ## Later detail: Authentication Hardening, DPA Governance, & Data Portability
+
+
 
 ### Account Security, Legal Compliance (DPA), & Caseload Portability
 
@@ -111,7 +122,11 @@ The export uses the private London store for the zip, and the same mail provider
 
 ---
 
+
+
 ## Later detail: Confidential document storage
+
+
 
 ### Low-Velocity Confidential Document Storage (AWS S3 + Supabase Architecture)
 
@@ -146,3 +161,4 @@ The app side is in place. `client_files` stores metadata for the signed-in owner
   - Implement `create-upload-url` Edge Function: Validates session JWT, checks workspace RLS permissions, and returns an AWS S3 PUT presigned URL (valid for 5 minutes).
   - Implement `get-document-url` Edge Function: Validates session JWT, verifies the clinician has access to the `client_id`, and returns an AWS S3 GET presigned URL (strictly expiring after 60 seconds).
   - Ensure zero document binary payload passes through Supabase compute; file data streams directly between client browser and AWS S3.
+
