@@ -35,9 +35,17 @@ export default function InvoiceSheet({
   onRemoveLine,
   onRecordPayment,
   onRemovePayment,
+  locked = false,
 }) {
   const display = invoiceDisplayStatus(invoice, today)
-  const draft = invoice.status === 'draft'
+  const draft = invoice.status === 'draft' && !locked
+
+  useEffect(() => {
+    if (sessionStorage.getItem('print-invoice') !== invoice.id) return undefined
+    sessionStorage.removeItem('print-invoice')
+    const timer = window.setTimeout(() => window.print(), 250)
+    return () => window.clearTimeout(timer)
+  }, [invoice.id])
   const balance = invoiceBalancePence(invoice)
   const paid = paidPence(invoice.payments)
   const [editingId, setEditingId] = useState(null)
@@ -53,20 +61,23 @@ export default function InvoiceSheet({
       <header className="invoice-bar invoicing-no-print">
         <button type="button" className="invoice-bar__back" onClick={onBack}>← Invoices</button>
         <span className={statusClass(display)}>{STATUS_LABEL[display] || display}</span>
+        {locked ? <span className="text-small text-muted">Read only</span> : null}
         <div className="invoice-bar__actions">
           <button type="button" className="secondary" onClick={() => window.print()}>Preview / PDF</button>
           {draft && (
             <button type="button" className="primary" onClick={() => onStatus('issued')}>Send Invoice</button>
           )}
-          <OverflowMenu>
-            {draft && <button type="button" onClick={onDelete}>Delete</button>}
-            {invoice.status !== 'void' && invoice.status !== 'draft' && (
-              <button type="button" onClick={() => onStatus('void')}>Void</button>
-            )}
-            {invoice.status === 'issued' && balance > 0 && (
-              <button type="button" onClick={() => setPaymentOpen(true)}>Record payment</button>
-            )}
-          </OverflowMenu>
+          {!locked && (
+            <OverflowMenu>
+              {draft && <button type="button" onClick={onDelete}>Delete</button>}
+              {invoice.status !== 'void' && invoice.status !== 'draft' && (
+                <button type="button" onClick={() => onStatus('void')}>Void</button>
+              )}
+              {invoice.status === 'issued' && balance > 0 && (
+                <button type="button" onClick={() => setPaymentOpen(true)}>Record payment</button>
+              )}
+            </OverflowMenu>
+          )}
         </div>
       </header>
 

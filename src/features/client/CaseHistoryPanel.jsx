@@ -4,7 +4,7 @@ import BulkStatusBar from '../../components/BulkStatusBar'
 import RowMenu from '../../components/RowMenu'
 import StatusBadge from '../../components/StatusBadge'
 import { useConfirm, useToast } from '../../components/ui'
-import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
+import { useLetterheadDownload } from '../../hooks/useLetterheadDownload'
 import {
   STATUS_COLUMN,
   STATUS_DEFAULT_FILTERS,
@@ -229,6 +229,7 @@ function EpisodeAppointments({ episode, clientId, episodes, open, onToggle }) {
 
 function EpisodeReports({ episode, client, clientId, userId, organizationId, open, onToggle }) {
   const toast = useToast()
+  const { downloadDocument } = useLetterheadDownload()
   const confirm = useConfirm()
   const { profile: accountProfile } = useAuth()
   const { data: reportTemplates = [] } = useTemplatesQuery('report')
@@ -339,7 +340,7 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
 
   const downloadOne = async (report) => {
     try {
-      const opened = await downloadRichDocumentPdf({
+      const opened = await downloadDocument({
         title: report.title || 'Report',
         bodyHtml: report.body,
         mergeContext: buildMergeContext({
@@ -491,18 +492,18 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
       filterValues: {
         title: report.title || 'Untitled report',
         date: formatDate(report.report_date),
-        status: statusLabelOf(report),
+        state: statusLabelOf(report),
       },
       sortValues: {
         title: report.title || '',
         date: report.report_date || '',
-        status: statusLabelOf(report),
+        state: statusLabelOf(report),
       },
       muted: readOnly,
       cells: {
         title: <span className="record-table__primary">{report.title || 'Untitled report'}</span>,
         date: formatDate(report.report_date),
-        status: <StatusBadge status={status} />,
+        state: <StatusBadge status={status} />,
         actions: (
           <RowMenu
             label={`Actions for ${report.title || 'report'}`}
@@ -554,7 +555,7 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
           emptyMessage={isPending ? 'Loading reports…' : 'No reports on this course yet.'}
           onRowClick={(row) => openReport(row.report)}
           onFiltersChange={(next) => {
-            const status = String(next?.status || 'Active')
+            const status = String(next?.state || 'Active')
             if (status !== statusFilter) setStatusFilter(status)
           }}
         />

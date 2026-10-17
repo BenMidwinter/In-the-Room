@@ -9,7 +9,7 @@ import StatusBadge from '../../components/StatusBadge'
 import { useConfirm, useToast } from '../../components/ui'
 import { useRowSelection } from '../../hooks/useRowSelection'
 import { useAuth } from '../../lib/auth/AuthProvider'
-import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
+import { useLetterheadDownload } from '../../hooks/useLetterheadDownload'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import { hoursFromMinutes } from '../../lib/practiceLogs'
 import {
@@ -71,6 +71,7 @@ function formatHours(minutes) {
 export default function PracticeLogPage({ kind }) {
   const copy = COPY[kind]
   const toast = useToast()
+  const { downloadDocument } = useLetterheadDownload()
   const confirm = useConfirm()
   const { setEditorOpen } = useOutletContext() || {}
   const { profile: accountProfile, user } = useAuth()
@@ -175,7 +176,7 @@ export default function PracticeLogPage({ kind }) {
   const downloadOne = async (entry) => {
     try {
       const metaHtml = `<p>${formatDate(entry.occurred_on)} · ${formatHours(entry.minutes)} hours</p>`
-      const opened = await downloadRichDocumentPdf({
+      const opened = await downloadDocument({
         title: entry.label || copy.title,
         bodyHtml: entry.content,
         metaHtml,
@@ -250,14 +251,14 @@ export default function PracticeLogPage({ kind }) {
       filterValues: {
         label: entry.label,
         direction: type,
-        status: statusLabelOf(entry),
+        state: statusLabelOf(entry),
       },
       sortValues: {
         date: entry.occurred_on,
         direction: type,
         label: entry.label,
         hours: entry.minutes,
-        status: statusLabelOf(entry),
+        state: statusLabelOf(entry),
       },
       muted: readOnly,
       cells: {
@@ -265,7 +266,7 @@ export default function PracticeLogPage({ kind }) {
         direction: type,
         label: <span className="record-table__primary">{entry.label}</span>,
         hours: hoursLabel,
-        status: <StatusBadge status={status} />,
+        state: <StatusBadge status={status} />,
         actions: (
           <RowMenu
             label={`Actions for ${entry.label}`}
@@ -414,7 +415,7 @@ export default function PracticeLogPage({ kind }) {
           emptyMessage={isPending ? 'Loading…' : copy.empty}
           onRowClick={(row) => openExisting(row.entry)}
           onFiltersChange={(next) => {
-            const status = String(next?.status || 'Active')
+            const status = String(next?.state || 'Active')
             if (status !== statusFilter) setStatusFilter(status)
           }}
         />

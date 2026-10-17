@@ -4,7 +4,7 @@ import BulkStatusBar from '../../components/BulkStatusBar'
 import RowMenu from '../../components/RowMenu'
 import StatusBadge from '../../components/StatusBadge'
 import { useClientSession } from '../../lib/useClientSession'
-import { downloadProgressNotePdf } from '../../lib/clinicalExport'
+import { useLetterheadDownload } from '../../hooks/useLetterheadDownload'
 import {
   STATUS_COLUMN,
   STATUS_DEFAULT_FILTERS,
@@ -50,6 +50,7 @@ export default function NotesHistoryPanel() {
   const { clientId, client } = useClientSession()
   const navigate = useNavigate()
   const toast = useToast()
+  const { downloadNote } = useLetterheadDownload()
   const confirm = useConfirm()
   const [statusFilter, setStatusFilter] = useState('Active')
   const { data: notes = [], isPending, error } = useProgressNotesFeedQuery(clientId)
@@ -93,7 +94,7 @@ export default function NotesHistoryPanel() {
 
   const downloadOne = async (note) => {
     try {
-      const opened = await downloadProgressNotePdf(note, { clientName: client?.real_name })
+      const opened = await downloadNote(note, { clientName: client?.real_name })
       if (!opened) {
         toast.error('Could not create the PDF. Please try again.')
         return
@@ -159,14 +160,14 @@ export default function NotesHistoryPanel() {
         template: note.template_name || '',
         date: when,
         appointment: appointmentLabel || 'None',
-        status: statusLabelOf(note),
+        state: statusLabelOf(note),
       },
       sortValues: {
         title: note.title,
         noteStatus,
         date: note.session_date || '',
         appointment: appt ? `${appt.session_date || ''}T${appt.start_time || ''}` : '',
-        status: statusLabelOf(note),
+        state: statusLabelOf(note),
       },
       muted: readOnly,
       cells: {
@@ -177,7 +178,7 @@ export default function NotesHistoryPanel() {
         appointment: appointmentLabel
           ? appointmentLabel
           : <span className="record-table__cell-muted">None</span>,
-        status: <StatusBadge status={lifecycle} />,
+        state: <StatusBadge status={lifecycle} />,
         actions: (
           <RowMenu
             label={`Actions for ${note.title}`}
@@ -218,7 +219,7 @@ export default function NotesHistoryPanel() {
           emptyMessage={isPending ? 'Loading notes…' : 'No Process Notes recorded yet.'}
           onRowClick={(row) => openNote(row.note)}
           onFiltersChange={(next) => {
-            const status = String(next?.status || 'Active')
+            const status = String(next?.state || 'Active')
             if (status !== statusFilter) setStatusFilter(status)
           }}
         />

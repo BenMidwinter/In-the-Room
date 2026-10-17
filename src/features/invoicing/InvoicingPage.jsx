@@ -6,8 +6,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import PageHeader from '../../components/PageHeader'
 import SectionNav from '../../components/SectionNav'
 import FormOverlay from '../../components/FormOverlay'
+import BulkStatusBar from '../../components/BulkStatusBar'
 import RecordTable from '../../components/RecordTable'
+import RowMenu from '../../components/RowMenu'
+import StatusBadge from '../../components/StatusBadge'
 import { useConfirm, useToast } from '../../components/ui'
+import {
+  STATUS_COLUMN,
+  STATUS_DEFAULT_FILTERS,
+  bulkActionsForStatus,
+  recordStatusOf,
+  statusLabelOf,
+  statusMenuItems,
+} from '../../lib/recordStatus'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { useClientsQuery } from '../../lib/queries'
 import { useAllAppointmentsQuery, useSaveAppointmentMutation } from '../../lib/appointmentQueries'
@@ -37,6 +48,8 @@ import {
   createInvoice,
   deleteInvoice,
   listInvoices,
+  purgeInvoice,
+  setInvoiceLifecycle,
   loadPaymentDetails,
   recordInvoicePayment,
   removeInvoiceLine,
@@ -57,7 +70,8 @@ const INVOICE_COLUMNS = [
   { key: 'due', label: 'Due date', sort: 'date' },
   { key: 'status', label: 'Status', filter: 'choice', sort: 'text' },
   { key: 'total', label: 'Total', sort: 'number' },
-  { key: 'action', label: '', sort: false },
+  STATUS_COLUMN,
+  { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
 const UNBILLED_COLUMNS = [
   { key: 'date', label: 'Date', sort: 'date', sortFirst: 'desc' },
@@ -107,6 +121,7 @@ export default function InvoicingPage() {
   const [creatingId, setCreatingId] = useState('')
   const [selected, setSelected] = useState({})
   const [pickedInvoices, setPickedInvoices] = useState({})
+  const [stateFilter, setStateFilter] = useState('Active')
   const [batchOpen, setBatchOpen] = useState(false)
   const [dispatchState, setDispatchState] = useState(null)
   const [chooserOpen, setChooserOpen] = useState(false)
@@ -243,19 +258,36 @@ export default function InvoicingPage() {
         due: invoice.dueOn ? formatDisplayDate(invoice.dueOn) : '—',
         status: <span className={statusClass(display)}>{STATUS_LABEL[display]}</span>,
         total: formatGbpFromPence(invoice.totalPence),
-        action: (
-          <button type="button" className="secondary" onClick={(event) => { event.stopPropagation(); showInvoice(invoice.id) }}>
-            Open
-          </button>
+        state: <StatusBadge item={{ archived_at: invoice.archivedAt, trashed_at: invoice.trashedAt }} />,
+        actions: (
+          <RowMenu
+            label={`Actions for ${invoice.number}`}
+            items={statusMenuItems(recordStatusOf({ archived_at: invoice.archivedAt, trashed_at: invoice.trashedAt }), {
+              onEdit: () => showInvoice(invoice.id),
+              onView: () => showInvoice(invoice.id),
+              onArchive: () => moveInvoice(invoice, 'archive', 'Invoice archived'),
+              onRestore: () => moveInvoice(invoice, 'active', 'Invoice restored'),
+              onDelete: () => moveInvoice(invoice, 'trash', 'Invoice moved to trash'),
+              onRestoreToArchive: () => moveInvoice(invoice, 'archive', 'Invoice restored to archive'),
+              onPermanentDelete: () => permanentlyDeleteInvoice(invoice),
+              onDownload: () => downloadInvoice(invoice.id),
+            })}
+          />
         ),
       },
-      filterValues: { number: invoice.number, client: clientLabel, status: STATUS_LABEL[display] },
+      filterValues: {
+        number: invoice.number,
+        client: clientLabel,
+        status: STATUS_LABEL[display],
+        state: statusLabelOf({ archived_at: invoice.archivedAt, trashed_at: invoice.trashedAt }),
+      },
       sortValues: {
         number: invoice.number,
         client: clientLabel,
         issued: invoice.issuedOn || '',
         due: invoice.dueOn || '',
         status: STATUS_LABEL[display],
+        state: statusLabelOf({ archived_at: invoice.archivedAt, trashed_at: invoice.trashedAt }),
         total: invoice.totalPence,
       },
     }
@@ -309,6 +341,41 @@ export default function InvoicingPage() {
     if (id) next.set('invoice', id)
     else next.delete('invoice')
     setParams(next)
+  }
+
+  function downloadInvoice(id) {
+    sessionStorage.setItem('print-invoice', id)
+    showInvoice(id)
+  }
+
+  async function moveInvoice(invoice, nextStatus, message) {
+    try {
+      remember(await setInvoiceLifecycle(invoice.id, nextStatus))
+      if (openId === invoice.id && nextStatus !== 'active') goBack()
+      setPickedInvoices({})
+      toast.saved(message)
+    } catch (err) {
+      toast.error(err?.message || 'Could not update this invoice')
+    }
+  }
+
+  async function permanentlyDeleteInvoice(invoice) {
+    const ok = await confirm({
+      title: 'Permanently delete this invoice?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Permanently delete',
+      tone: 'danger',
+    })
+    if (!ok) return
+    try {
+      await purgeInvoice(invoice.id)
+      if (openId === invoice.id) goBack()
+      queryClient.invalidateQueries({ queryKey: ['invoices', userId] })
+      setPickedInvoices({})
+      toast.saved('Invoice permanently deleted')
+    } catch (err) {
+      toast.error(err?.message || 'Could not delete this invoice')
+    }
   }
 
   function remember(invoice) {
@@ -591,6 +658,7 @@ export default function InvoicingPage() {
           onRemoveLine={onRemoveLine}
           onRecordPayment={onRecordPayment}
           onRemovePayment={onRemovePayment}
+          locked={recordStatusOf({ archived_at: open.archivedAt, trashed_at: open.trashedAt }) !== 'active'}
         />
       </div>
     )
@@ -627,14 +695,48 @@ export default function InvoicingPage() {
 
       {tab === 'invoices' ? (
         <section className="invoicing-panel">
+          <BulkStatusBar
+            count={pickedInvoiceList.length}
+            noun="invoices"
+            actions={bulkActionsForStatus(stateFilter, {
+              onArchive: () => pickedInvoiceList.forEach((invoice) => moveInvoice(invoice, 'archive', 'Invoices archived')),
+              onRestore: () => pickedInvoiceList.forEach((invoice) => moveInvoice(invoice, 'active', 'Invoices restored')),
+              onDelete: () => pickedInvoiceList.forEach((invoice) => moveInvoice(invoice, 'trash', 'Invoices moved to trash')),
+              onRestoreToArchive: () => pickedInvoiceList.forEach((invoice) => moveInvoice(invoice, 'archive', 'Invoices restored to archive')),
+              onPermanentDelete: async () => {
+                const ok = await confirm({
+                  title: 'Permanently delete selected invoices?',
+                  message: 'This cannot be undone.',
+                  confirmLabel: 'Permanently delete',
+                  tone: 'danger',
+                })
+                if (!ok) return
+                for (const invoice of pickedInvoiceList) {
+                  await purgeInvoice(invoice.id)
+                }
+                queryClient.invalidateQueries({ queryKey: ['invoices', userId] })
+                setPickedInvoices({})
+                toast.saved('Invoices permanently deleted')
+              },
+              onDownload: () => {
+                if (pickedInvoiceList[0]) downloadInvoice(pickedInvoiceList[0].id)
+              },
+            })}
+            onClear={() => setPickedInvoices({})}
+          />
           <RecordTable
-            remember="invoices"
+            remember="invoices-state"
             columns={INVOICE_COLUMNS}
             rows={invoiceRows}
             countNoun="invoices"
             emptyMessage="No invoices yet."
             defaultSort={{ key: 'number', direction: 'desc' }}
+            defaultFilters={STATUS_DEFAULT_FILTERS}
             onRowClick={(row) => showInvoice(row.id)}
+            onFiltersChange={(next) => {
+              const state = String(next?.state || 'Active')
+              if (state !== stateFilter) setStateFilter(state)
+            }}
             selection={{
               isSelected: (row) => Boolean(pickedInvoices[row.id]),
               label: (row) => `Select ${row.sortValues.number}`,

@@ -1114,9 +1114,10 @@ a.badge {
   gap: 0.5rem;
 }
 
-.record-table__col--status {
-  width: 5.5rem;
-  max-width: 5.5rem;
+.record-table__col--status,
+.record-table__col--state {
+  width: 8.5rem;
+  min-width: 8.5rem;
   white-space: nowrap;
 }
 
@@ -2064,9 +2065,9 @@ button.agenda-event {
   flex-wrap: wrap;
   gap: 0.55rem 0.75rem;
   align-items: end;
-  padding: 0.65rem 0.85rem;
-  background: var(--bg-surface);
-  border-bottom: 1px solid var(--border-light);
+  padding: 0.15rem 0 0;
+  background: transparent;
+  border: 0;
 }
 
 .client-concession label {

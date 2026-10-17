@@ -10,7 +10,7 @@ import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { useConfirm, usePrompt, useToast } from '../../components/ui'
 import { useRowSelection } from '../../hooks/useRowSelection'
 import { useAuth } from '../../lib/auth/AuthProvider'
-import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
+import { useLetterheadDownload } from '../../hooks/useLetterheadDownload'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import {
   STATUS_COLUMN,
@@ -94,6 +94,7 @@ function folderMenuItems(item, { onRename, onDelete }) {
 
 export default function PracticeDocumentsPage() {
   const toast = useToast()
+  const { downloadDocument } = useLetterheadDownload()
   const confirm = useConfirm()
   const prompt = usePrompt()
   const { setEditorOpen } = useOutletContext() || {}
@@ -242,7 +243,7 @@ export default function PracticeDocumentsPage() {
 
   const downloadOne = async (item) => {
     try {
-      const opened = await downloadRichDocumentPdf({
+      const opened = await downloadDocument({
         title: item.name,
         bodyHtml: item.content,
         mergeContext,
@@ -330,19 +331,19 @@ export default function PracticeDocumentsPage() {
       item,
       filterValues: {
         name: item.name,
-        status: isFolder ? 'Active' : statusLabelOf(item),
+        state: isFolder ? 'Active' : statusLabelOf(item),
       },
       sortValues: {
         name: practiceNameSortKey(item),
         updated: item.updated_at,
-        status: isFolder ? 'Active' : statusLabelOf(item),
+        state: isFolder ? 'Active' : statusLabelOf(item),
       },
       muted: readOnly,
       cells: {
         mark: <ItemMark kind={item.kind} />,
         name: <span className="record-table__primary">{item.name}</span>,
         updated: formatUpdated(item.updated_at),
-        status: isFolder ? <span className="record-table__cell-muted">—</span> : <StatusBadge status={status} />,
+        state: isFolder ? <span className="record-table__cell-muted">—</span> : <StatusBadge status={status} />,
         actions: isFolder ? (
           <RowMenu
             label={`Actions for ${item.name}`}
@@ -499,7 +500,7 @@ export default function PracticeDocumentsPage() {
             else openDocument(row.item)
           }}
           onFiltersChange={(next) => {
-            const status = String(next?.status || 'Active')
+            const status = String(next?.state || 'Active')
             if (status !== statusFilter) setStatusFilter(status)
           }}
         />

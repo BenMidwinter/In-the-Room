@@ -8,7 +8,7 @@ import RowMenu from '../../components/RowMenu'
 import StatusBadge from '../../components/StatusBadge'
 import { useConfirm, useToast } from '../../components/ui'
 import { useRowSelection } from '../../hooks/useRowSelection'
-import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
+import { useLetterheadDownload } from '../../hooks/useLetterheadDownload'
 import { useAppSession } from '../../lib/AppSessionContext'
 import { DEMO_TODAY } from '../../lib/dateArchitecture'
 import {
@@ -69,6 +69,7 @@ export default function ClinicianJournal() {
   const { session } = useAppSession()
   const userId = session?.user?.id ?? ''
   const toast = useToast()
+  const { downloadDocument } = useLetterheadDownload()
   const confirm = useConfirm()
   const { setEditorOpen } = useOutletContext() || {}
   const { data: entries = [], isPending, error } = useJournalEntriesQuery(userId)
@@ -164,7 +165,7 @@ export default function ClinicianJournal() {
     try {
       const title = `Journal ${formatJournalDate(entry.date)}`
       const metaHtml = `<p>${entry.time || ''} · ${entry.somatic_state || ''}</p>`
-      const opened = await downloadRichDocumentPdf({
+      const opened = await downloadDocument({
         title,
         bodyHtml: entry.body_text,
         metaHtml,
@@ -220,14 +221,14 @@ export default function ClinicianJournal() {
       filterValues: {
         somatic: entry.somatic_state || '',
         preview,
-        status: statusLabelOf(entry),
+        state: statusLabelOf(entry),
       },
       sortValues: {
         date: entry.date,
         time: entry.time || '',
         somatic: entry.somatic_state || '',
         preview,
-        status: statusLabelOf(entry),
+        state: statusLabelOf(entry),
       },
       muted: readOnly,
       cells: {
@@ -239,7 +240,7 @@ export default function ClinicianJournal() {
           </span>
         ),
         preview: <span className="record-table__primary">{preview}</span>,
-        status: <StatusBadge status={status} />,
+        state: <StatusBadge status={status} />,
         actions: (
           <RowMenu
             label="Journal entry actions"
@@ -372,7 +373,7 @@ export default function ClinicianJournal() {
           emptyMessage={isPending ? 'Loading…' : 'No journal entries yet.'}
           onRowClick={(row) => openExisting(row.entry)}
           onFiltersChange={(next) => {
-            const status = String(next?.status || 'Active')
+            const status = String(next?.state || 'Active')
             if (status !== statusFilter) setStatusFilter(status)
           }}
         />

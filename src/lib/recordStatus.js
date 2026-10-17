@@ -10,16 +10,16 @@ export const STATUS_LABEL = {
 
 export const STATUS_FILTER_OPTIONS = ['Active', 'Archive', 'Trash']
 
-/** Narrow Status column for RecordTable. Filter defaults to Active via defaultFilters. */
+/** Narrow State column. Filter defaults to Active via defaultFilters. */
 export const STATUS_COLUMN = {
-  key: 'status',
-  label: 'Status',
+  key: 'state',
+  label: 'State',
   filter: { type: 'choice', options: STATUS_FILTER_OPTIONS },
   sort: 'text',
-  className: 'record-table__col--status',
+  className: 'record-table__col--state',
 }
 
-export const STATUS_DEFAULT_FILTERS = { status: 'Active' }
+export const STATUS_DEFAULT_FILTERS = { state: 'Active' }
 
 export const TRASH_RETENTION_DAYS = 30
 

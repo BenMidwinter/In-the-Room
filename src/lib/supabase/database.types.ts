@@ -1044,6 +1044,8 @@ export type Database = {
           resend_batch_id: string | null
           sealed_payload: Json | null
           sent_at: string | null
+          archived_at: string | null
+          trashed_at: string | null
           status: string
           total_pence: number
           updated_at: string
@@ -1068,6 +1070,8 @@ export type Database = {
           resend_batch_id?: string | null
           sealed_payload?: Json | null
           sent_at?: string | null
+          archived_at?: string | null
+          trashed_at?: string | null
           status?: string
           total_pence?: number
           updated_at?: string
@@ -1092,6 +1096,8 @@ export type Database = {
           resend_batch_id?: string | null
           sealed_payload?: Json | null
           sent_at?: string | null
+          archived_at?: string | null
+          trashed_at?: string | null
           status?: string
           total_pence?: number
           updated_at?: string

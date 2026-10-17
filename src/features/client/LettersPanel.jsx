@@ -10,7 +10,7 @@ import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
 import { useConfirm, useToast } from '../../components/ui'
 import { useRowSelection } from '../../hooks/useRowSelection'
 import { useAuth } from '../../lib/auth/AuthProvider'
-import { downloadLetterPdf } from '../../lib/clinicalExport'
+import { useLetterheadDownload } from '../../hooks/useLetterheadDownload'
 import { preferredLetterhead, printLetterheadFromRow } from '../../lib/letterheadPrint'
 import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFields'
 import {
@@ -73,6 +73,7 @@ export default function LettersPanel({ embedded = false }) {
   const [saving, setSaving] = useState(false)
   const [editorVersion, setEditorVersion] = useState(0)
   const toast = useToast()
+  const { downloadLetter } = useLetterheadDownload()
   const confirm = useConfirm()
   const { selectedIds, selection, clear: clearSelection, count: selectedCount } = useRowSelection()
   const { profile: accountProfile } = useAuth()
@@ -210,9 +211,8 @@ export default function LettersPanel({ embedded = false }) {
 
   const downloadOne = async (letter) => {
     try {
-      const opened = await downloadLetterPdf(letter, {
+      const opened = await downloadLetter(letter, {
         clientName: client?.real_name,
-        letterhead: printLetterhead,
         mergeContext: buildMergeContext({
           client,
           appointment: null,
@@ -282,14 +282,14 @@ export default function LettersPanel({ embedded = false }) {
         title: letter.title,
         recipient: letter.recipient || '',
         date: formatDocDate(letter.letter_date),
-        status: statusLabelOf(letter),
+        state: statusLabelOf(letter),
       },
       sortValues: {
         title: letter.title,
         recipient: letter.recipient || '',
         date: letter.letter_date || '',
         updated: letter.updated_at || '',
-        status: statusLabelOf(letter),
+        state: statusLabelOf(letter),
       },
       muted: readOnly,
       cells: {
@@ -297,7 +297,7 @@ export default function LettersPanel({ embedded = false }) {
         recipient: letter.recipient || <span className="record-table__cell-muted">—</span>,
         date: formatDocDate(letter.letter_date),
         updated: formatDocDate(letter.updated_at),
-        status: <StatusBadge status={status} />,
+        state: <StatusBadge status={status} />,
         actions: (
           <RowMenu
             label={`Actions for ${letter.title}`}
@@ -453,7 +453,7 @@ export default function LettersPanel({ embedded = false }) {
           emptyMessage={isPending ? 'Loading letters…' : 'No letters yet.'}
           onRowClick={(row) => selectLetter(row.letter)}
           onFiltersChange={(next) => {
-            const status = String(next?.status || 'Active')
+            const status = String(next?.state || 'Active')
             if (status !== statusFilter) setStatusFilter(status)
           }}
         />

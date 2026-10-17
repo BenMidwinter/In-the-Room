@@ -10,7 +10,7 @@ import { buildMergeContext, clinicianProfileForEditor } from '../../lib/mergeFie
 import { useAuth } from '../../lib/auth/AuthProvider'
 import { useTemplatesQuery } from '../../lib/templateQueries'
 import { getProfile } from '../../lib/store'
-import { downloadRichDocumentPdf } from '../../lib/clinicalExport'
+import { useLetterheadDownload } from '../../hooks/useLetterheadDownload'
 import {
   STATUS_COLUMN,
   STATUS_DEFAULT_FILTERS,
@@ -67,6 +67,7 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
   const [saving, setSaving] = useState(false)
   const [editorVersion, setEditorVersion] = useState(0)
   const toast = useToast()
+  const { downloadDocument } = useLetterheadDownload()
   const confirm = useConfirm()
   const { selectedIds, selection, clear: clearSelection, count: selectedCount } = useRowSelection()
   const setEditorOpen = useClientChrome()?.setEditorOpen
@@ -190,7 +191,7 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
 
   const downloadOne = async (doc) => {
     try {
-      const opened = await downloadRichDocumentPdf({
+      const opened = await downloadDocument({
         title: doc.title,
         bodyHtml: doc.content,
         mergeContext: buildMergeContext({
@@ -255,20 +256,20 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
       doc,
       filterValues: {
         title: doc.title,
-        status: statusLabelOf(doc),
+        state: statusLabelOf(doc),
       },
       sortValues: {
         title: doc.title,
         created: doc.created_at || '',
         updated: doc.updated_at || '',
-        status: statusLabelOf(doc),
+        state: statusLabelOf(doc),
       },
       muted: readOnly,
       cells: {
         title: <span className="record-table__primary">{doc.title}</span>,
         created: formatDocDate(doc.created_at),
         updated: formatDocDate(doc.updated_at),
-        status: <StatusBadge status={status} />,
+        state: <StatusBadge status={status} />,
         actions: (
           <RowMenu
             label={`Actions for ${doc.title}`}
@@ -386,7 +387,7 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
           emptyMessage={isPending ? 'Loading documents…' : 'No working documents yet.'}
           onRowClick={(row) => selectDocument(row.doc)}
           onFiltersChange={(next) => {
-            const status = String(next?.status || 'Active')
+            const status = String(next?.state || 'Active')
             if (status !== statusFilter) setStatusFilter(status)
           }}
         />
