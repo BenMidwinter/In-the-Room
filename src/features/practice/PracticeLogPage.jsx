@@ -262,14 +262,14 @@ export default function PracticeLogPage({ kind }) {
         onBack={close}
         actions={(
           <>
-            {openId !== 'new' && openEntry && (
+            {openId !== 'new' && (
               openArchived ? (
                 <>
-                  <button type="button" className="secondary" onClick={() => handleArchive(openEntry)} disabled={archiveEntry.isPending}>Restore</button>
+                  <button type="button" className="secondary" onClick={() => openEntry && handleArchive(openEntry)} disabled={archiveEntry.isPending || !openEntry}>Restore</button>
                   <button type="button" className="danger" onClick={() => remove(openId)} disabled={removeEntry.isPending}>Delete</button>
                 </>
               ) : (
-                <button type="button" className="secondary" onClick={() => handleArchive(openEntry)} disabled={archiveEntry.isPending}>Archive</button>
+                <button type="button" className="secondary" onClick={() => openEntry && handleArchive(openEntry)} disabled={archiveEntry.isPending || !openEntry}>Archive</button>
               )
             )}
             <button type="button" className="primary" onClick={save} disabled={saveEntry.isPending}>
