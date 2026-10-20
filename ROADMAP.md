@@ -15,7 +15,11 @@ Open work is first. Finished work is ticked at the bottom.
 7. **Marketing site, and the app on its own host.** A public site that search engines and AI crawlers can read. Move the signed-in app to `app.processandnote.app`, or another name in front, so the marketing site can use the bare domain.
 8. **Policies against the product.** Read the privacy notice, terms, and DPA against what the app actually does, and correct anything that has drifted.
 
-The export file-format sprint stays on the list and is not in this sequence. See below.
+The export file-format sprint, and the Process Log below, stay on the list and are not in this sequence.
+
+## Wider piece: Process Log
+
+- [ ] **Process Log.** A process log is linked to an appointment, and stored in My Practice rather than on the client record. The pieces of admin are Process Mats. Welcome Mat is one example. A clinician fills one in after a session, before writing the note. What the mats contain is not settled yet. The storage also has to let a clinician submit them without those answers forming part of the client's file, so they stay out of a subject access request for that client. How that separation works under UK GDPR is still to be decided.
 
 ## Also open
 
