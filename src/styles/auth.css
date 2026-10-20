@@ -23,7 +23,7 @@
 
 .auth-page__logo {
   display: block;
-  width: min(10.5rem, 70%);
+  width: min(18rem, 100%);
   height: auto;
   margin: 0 auto 0.85rem;
 }
@@ -194,7 +194,7 @@
 
 .legal-page__brand img {
   display: block;
-  width: min(10.5rem, 70%);
+  width: min(18rem, 100%);
   height: auto;
 }
 

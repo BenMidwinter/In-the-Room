@@ -149,8 +149,8 @@ export function renderEmailTemplate(opts: EmailTemplateOptions): { html: string;
               <img
                 src="${escapeHtml(logoUrl)}"
                 alt="Process&amp;Note"
-                width="180"
-                style="display: block; margin: 0 auto; max-width: 180px; width: 180px; height: auto; border: 0; outline: none; text-decoration: none;"
+                width="280"
+                style="display: block; margin: 0 auto; max-width: 280px; width: 280px; height: auto; border: 0; outline: none; text-decoration: none;"
               />
             </td>
           </tr>
