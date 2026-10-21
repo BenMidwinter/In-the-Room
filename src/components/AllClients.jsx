@@ -221,9 +221,6 @@ export default function AllClients() {
       <PageHeader
         title="All clients"
         help="Everyone on your list, including the screener, the waitlist, and people you have discharged. Archive keeps a client out of the working list. Delete starts a 30-day countdown, then removes the client and every record and stored file."
-        actions={(
-          <button type="button" className="primary" onClick={() => navigate('/clients/add')}>New client</button>
-        )}
       />
 
       <BulkStatusBar
@@ -232,6 +229,10 @@ export default function AllClients() {
         actions={bulk}
         onClear={clearSelection}
       />
+
+      <div className="tray-action-row">
+        <button type="button" className="primary" onClick={() => navigate('/clients/add')}>New client</button>
+      </div>
 
       <RecordTable
         remember="clients"

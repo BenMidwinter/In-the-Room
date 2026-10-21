@@ -160,7 +160,7 @@ function TagList({ kind, title, description }) {
 
 export default function TagsSettingsPage() {
   return (
-    <div className="section-card-stack">
+    <div className="section-card-stack tray-grid">
       <TagList
         kind="client"
         title="Client tags"

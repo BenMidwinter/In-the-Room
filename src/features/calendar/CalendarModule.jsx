@@ -1131,11 +1131,12 @@ export default function CalendarModule({ persona }) {
           </button>
         </div>
       )}
-      <header className="page-header page-header--with-toolbar page-header--calendar">
+      <header className="page-header page-header--calendar">
         <div className="page-header__text">
           <h1 className="page-header__title">Calendar</h1>
         </div>
-        <div className="page-header__toolbar calendar-toolbar">
+      </header>
+      <div className="calendar-toolbar calendar-toolbar--island">
           <div className="calendar-toolbar__primary">
             <button type="button" className="primary" onClick={openAddAppointment}>
               + New booking
@@ -1181,7 +1182,6 @@ export default function CalendarModule({ persona }) {
             </div>
           </div>
         </div>
-      </header>
 
       <CalendarWorkspaceFrame
         paneOpen={false}

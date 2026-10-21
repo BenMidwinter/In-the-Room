@@ -289,30 +289,30 @@ export default function HomePage() {
               clients={clients}
               onSelect={overlay.openView}
             />
-
-            <section className="home-caseload" aria-labelledby="home-caseload-title">
-              <div className="home-caseload__bar">
-                <div>
-                  <h3 id="home-caseload-title" className="card__title">Active cases</h3>
-                  <p className="text-small text-muted">Your current clients. Open one to start work.</p>
-                </div>
-                <div className="home-caseload__actions">
-                  <Link to="/clients" className="secondary">All clients</Link>
-                  <Link to="/clients/add" className="primary">New client</Link>
-                </div>
-              </div>
-              <RecordTable
-                remember="home-cases"
-                columns={CASELOAD_COLUMNS}
-                rows={caseloadRows}
-                defaultSort={{ key: 'next', direction: 'asc' }}
-                countNoun="clients"
-                scroll
-                emptyMessage="No active clients yet."
-                onRowClick={(row) => navigate(`/clients/${row.id}`)}
-              />
-            </section>
           </div>
+        </SectionCard>
+
+        <SectionCard
+          blockId="home-cases"
+          title="Active cases"
+          description="Your current clients. Open one to start work."
+          actions={(
+            <>
+              <Link to="/clients" className="secondary">All clients</Link>
+              <Link to="/clients/add" className="primary">New client</Link>
+            </>
+          )}
+        >
+          <RecordTable
+            remember="home-cases"
+            columns={CASELOAD_COLUMNS}
+            rows={caseloadRows}
+            defaultSort={{ key: 'next', direction: 'asc' }}
+            countNoun="clients"
+            scroll
+            emptyMessage="No active clients yet."
+            onRowClick={(row) => navigate(`/clients/${row.id}`)}
+          />
         </SectionCard>
       </div>
     </div>

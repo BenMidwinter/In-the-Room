@@ -667,17 +667,7 @@ export default function InvoicingPage() {
   return (
     <div className={pickedInvoiceList.length > 0 && tab === 'invoices' ? 'page page--invoicing page--invoice-selecting' : 'page page--invoicing'}>
       <div className="page-mast">
-        <PageHeader
-          title="Invoicing"
-          actions={(
-            <>
-              <button type="button" className="secondary" onClick={() => setBatchOpen(true)}>Batch Invoice</button>
-              <button type="button" className="primary" onClick={() => { setChooserOpen(true); setClientQuery('') }}>
-                + New Invoice
-              </button>
-            </>
-          )}
-        />
+        <PageHeader title="Invoicing" />
         <SectionNav
           label="Invoicing sections"
           items={[
@@ -691,6 +681,13 @@ export default function InvoicingPage() {
         <Stat label="Total outstanding" value={formatGbpFromPence(outstandingPence)} />
         <Stat label="Drafts" value={String(draftCount)} />
         <Stat label="Paid" value={formatGbpFromPence(paidTotal)} />
+      </div>
+
+      <div className="tray-action-row">
+        <button type="button" className="secondary" onClick={() => setBatchOpen(true)}>Batch Invoice</button>
+        <button type="button" className="primary" onClick={() => { setChooserOpen(true); setClientQuery('') }}>
+          + New Invoice
+        </button>
       </div>
 
       {tab === 'invoices' ? (

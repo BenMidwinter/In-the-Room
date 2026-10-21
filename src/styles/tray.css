@@ -98,9 +98,13 @@ body:has(.app-shell--tray) {
   z-index: 20;
   height: auto;
   align-self: stretch;
-  background: transparent;
-  border-right: 1px solid var(--edge-hairline);
-  box-shadow: none;
+  margin: var(--pad-bezel);
+  margin-right: 0;
+  overflow: hidden;
+  background: var(--surface-tray);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-tray);
+  box-shadow: var(--edge-recessed);
 }
 
 .app-shell--tray .top-nav__link {
@@ -192,16 +196,19 @@ body:has(.app-shell--tray) {
 
   .app-shell--tray .top-nav--tray {
     position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
+    top: var(--pad-bezel);
+    left: var(--pad-bezel);
+    bottom: var(--pad-bezel);
     z-index: 100;
     width: min(var(--nav-width), 86vw);
-    height: 100dvh;
-    transform: translateX(-105%);
-    background: var(--surface-bezel);
-    border-right: 1px solid var(--edge-hairline);
-    box-shadow: none;
+    height: auto;
+    margin: 0;
+    overflow: hidden;
+    transform: translateX(calc(-100% - 1.25rem));
+    background: var(--surface-tray);
+    border: 1px solid var(--edge-hairline);
+    border-radius: var(--radius-tray);
+    box-shadow: var(--edge-recessed);
   }
 
   .app-shell--tray .top-nav--tray.top-nav--open {
@@ -339,28 +346,246 @@ body:has(.app-shell--tray) {
 
 .app-shell--tray .section-card__tray .record-table-wrap,
 .app-shell--tray .section-card__body .record-table-wrap {
-  background: var(--surface-tray);
+  background: var(--surface-inset);
   border-radius: var(--radius-inset);
   box-shadow: none;
 }
 
 .app-shell--tray .record-table th,
 .app-shell--tray .record-table td {
-  background: transparent;
   border-bottom-color: var(--edge-hairline);
 }
 
-.app-shell--tray .record-table th {
+.app-shell--tray .record-table th,
+.app-shell--tray .section-card__body .record-table th,
+.app-shell--tray .record-table__count {
   background: var(--surface-inset);
 }
 
-.app-shell--tray .section-card__body .record-table th {
+.app-shell--tray .record-table__count {
+  border-top-color: var(--edge-hairline);
+}
+
+.app-shell--tray .record-table tbody td {
   background: var(--surface-tray);
+}
+
+.app-shell--tray .record-table tbody tr.record-table__row--clickable:hover td {
+  background: color-mix(in srgb, var(--accent-tint) 72%, var(--surface-tray));
+}
+
+.app-shell--tray .record-table tbody tr.record-table__row--selected td {
+  background: var(--accent-tint);
 }
 
 .app-shell--tray .record-table tbody tr.record-table__row--clickable:hover td:first-child,
 .app-shell--tray .record-table tbody tr.record-table__row--selected td:first-child {
   box-shadow: none;
+}
+
+/* Phase D: nav card, sticky utilities, pill commands, white table rows. */
+
+.app-shell--tray {
+  --tray-utilities-inset: 6.25rem;
+}
+
+.tray-utilities {
+  position: sticky;
+  top: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+  overflow: visible;
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.tray-utilities__cluster {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0.7rem 0.75rem 0 0;
+}
+
+.tray-utilities .theme-toggle__menu {
+  top: calc(100% + 6px);
+  bottom: auto;
+  left: auto;
+  right: 0;
+}
+
+.app-shell--tray .page-header,
+.app-shell--tray .page-header--calendar,
+.app-shell--tray .client-shell__header,
+.app-shell--tray .room-sticky-bar,
+.app-shell--tray .progress-notes-page__header {
+  padding-right: var(--tray-utilities-inset);
+}
+
+.app-shell--tray .client-layout {
+  background: transparent;
+}
+
+.app-shell--tray :is(
+  .primary,
+  .secondary,
+  .danger,
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .record-table__add,
+  .section-card__toolbar-new,
+  .section-card__toolbar-item
+) {
+  border-radius: var(--radius-pill);
+}
+
+.app-shell--tray .section-card__toolbar-new {
+  border-color: var(--edge-hairline);
+  background: transparent;
+  color: var(--txt-body);
+  box-shadow: none;
+}
+
+.app-shell--tray :is(.badge, .status-badge, .room-tag, .tag-label) {
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.65rem;
+  min-width: 0;
+  min-height: 1.35rem;
+  font-size: var(--text-meta);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.app-shell--tray .badge[data-somatic='grounded'] {
+  background: var(--somatic-grounded-bg);
+  border-color: var(--somatic-grounded-border);
+  color: var(--somatic-grounded-txt);
+}
+
+.app-shell--tray .badge[data-somatic='activated'] {
+  background: var(--somatic-activated-bg);
+  border-color: var(--somatic-activated-border);
+  color: var(--somatic-activated-txt);
+}
+
+.app-shell--tray .badge[data-somatic='fatigued'] {
+  background: var(--somatic-fatigued-bg);
+  border-color: var(--somatic-fatigued-border);
+  color: var(--somatic-fatigued-txt);
+}
+
+.app-shell--tray .badge[data-somatic='open'] {
+  background: var(--somatic-open-bg);
+  border-color: var(--somatic-open-border);
+  color: var(--somatic-open-txt);
+}
+
+.app-shell--tray .badge[data-somatic='constricted'] {
+  background: var(--somatic-constricted-bg);
+  border-color: var(--somatic-constricted-border);
+  color: var(--somatic-constricted-txt);
+}
+
+.app-shell--tray .badge[data-somatic='settled'] {
+  background: var(--somatic-settled-bg);
+  border-color: var(--somatic-settled-border);
+  color: var(--somatic-settled-txt);
+}
+
+.app-shell--tray .tray-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  margin: 0 0 0.75rem;
+}
+
+.app-shell--tray .tray-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.app-shell--tray .reporting-metrics,
+.app-shell--tray .client-overview__visits {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+}
+
+.app-shell--tray .client-overview__panel {
+  min-width: 0;
+  background: var(--surface-inset);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-tray);
+  box-shadow: var(--edge-recessed);
+  padding: var(--pad-tray);
+}
+
+.app-shell--tray .reporting-metric {
+  background: var(--surface-inset);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-tray);
+  box-shadow: var(--edge-recessed);
+}
+
+.app-shell--tray .client-overview__panel .card__title {
+  margin: 0 0 0.65rem;
+  padding-left: 0;
+  border-left: 0;
+}
+
+.app-shell--tray button.client-visit-card {
+  background: var(--surface-tray);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-inset);
+  box-shadow: none;
+}
+
+.app-shell--tray .page-header--calendar {
+  height: 4.25rem;
+  flex-wrap: nowrap;
+  margin-bottom: 0.35rem;
+}
+
+.app-shell--tray .calendar-toolbar--island {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 0 0.75rem;
+  padding: 0.3rem;
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  box-sizing: border-box;
+}
+
+.app-shell--tray .calendar-toolbar__views {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.app-shell--tray .calendar-toolbar__view-tabs {
+  gap: 0.12rem;
+  padding: 0.12rem;
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+}
+
+.app-shell--tray .calendar-toolbar__view {
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  box-shadow: none;
+}
+
+.app-shell--tray .calendar-toolbar__view--active {
+  background: var(--surface-tray);
+  border-color: var(--edge-hairline);
+  box-shadow: var(--edge-recessed);
 }
 
 @media print {

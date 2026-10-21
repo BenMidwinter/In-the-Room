@@ -233,7 +233,7 @@ export default function FormsSettingsPage() {
   })
 
   return (
-    <div className="section-card-stack">
+    <div className="section-card-stack tray-grid">
       <SettingsSectionCard
         blockId="settings_measures"
         title="Questionnaires you track"

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useClientSession } from '../../lib/useClientSession'
+import ClientDetailsBar from './ClientDetailsBar'
 import ClientTimeline from './ClientTimeline'
 import { getClientTimeline } from '../../lib/store'
 import { useClientAppointmentsQuery } from '../../lib/appointmentQueries'
@@ -28,6 +29,7 @@ function VisitBox({ label, empty, appointment, onOpen }) {
 
 export default function ClientPanelEmpty() {
   const { id: clientId } = useParams()
+  const { client } = useClientSession()
   const overlay = useAppointmentOverlay()
   const { data: appointments = [] } = useClientAppointmentsQuery(clientId)
   const visits = useMemo(
@@ -52,20 +54,31 @@ export default function ClientPanelEmpty() {
 
   return (
     <div className="client-overview">
-      <section className="client-overview__visits" aria-label="Appointments">
-        <VisitBox
-          label="Last appointment"
-          empty="No previous appointment"
-          appointment={visits.last}
-          onOpen={overlay.openView}
-        />
-        <VisitBox
-          label="Next appointment"
-          empty="No upcoming appointment"
-          appointment={visits.next}
-          onOpen={overlay.openView}
-        />
-      </section>
+      <div className="tray-grid">
+        <section className="client-overview__panel" aria-labelledby="client-details-title">
+          <h2 id="client-details-title" className="card__title">Details</h2>
+          {client ? <ClientDetailsBar client={client} embedded /> : (
+            <p className="text-muted">Loading details…</p>
+          )}
+        </section>
+        <section className="client-overview__panel" aria-labelledby="client-sessions-title">
+          <h2 id="client-sessions-title" className="card__title">Sessions</h2>
+          <div className="client-overview__visits">
+            <VisitBox
+              label="Last appointment"
+              empty="No previous appointment"
+              appointment={visits.last}
+              onOpen={overlay.openView}
+            />
+            <VisitBox
+              label="Next appointment"
+              empty="No upcoming appointment"
+              appointment={visits.next}
+              onOpen={overlay.openView}
+            />
+          </div>
+        </section>
+      </div>
       <section className="client-overview__timeline" aria-label="Client timeline">
         <ClientTimeline events={timeline} orientation="horizontal" />
       </section>

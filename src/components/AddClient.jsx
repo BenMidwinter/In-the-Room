@@ -92,10 +92,7 @@ export default function AddClient() {
 
   return (
     <div className="page">
-      <PageHeader
-        title={isEditMode ? 'Edit client' : 'New client'}
-        actions={<button type="button" className="secondary" onClick={() => navigate('/clients')}>Cancel</button>}
-      />
+      <PageHeader title={isEditMode ? 'Edit client' : 'New client'} />
 
       <form onSubmit={handleSubmit} className="card" style={{ maxWidth: '560px' }} noValidate>
         {errors.form && (
@@ -166,6 +163,7 @@ export default function AddClient() {
           <DiagnosisPicker selected={selectedDiagnoses} onChange={setSelectedDiagnoses} />
         </div>
         <div className="form-actions">
+          <button type="button" className="secondary" onClick={() => navigate('/clients')}>Cancel</button>
           <button type="submit" className="primary" disabled={loading}>{loading ? 'Saving…' : 'Save client'}</button>
         </div>
       </form>

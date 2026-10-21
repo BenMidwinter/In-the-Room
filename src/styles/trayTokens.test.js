@@ -6,6 +6,9 @@ const tray = readFileSync(new URL('./tray.css', import.meta.url), 'utf8')
 const index = readFileSync(new URL('../index.css', import.meta.url), 'utf8')
 const layout = readFileSync(new URL('../components/AppLayout.jsx', import.meta.url), 'utf8')
 const workspace = readFileSync(new URL('../features/client/DocumentWorkspace.jsx', import.meta.url), 'utf8')
+const home = readFileSync(new URL('../features/home/HomePage.jsx', import.meta.url), 'utf8')
+const tags = readFileSync(new URL('../features/settings/TagsSettingsPage.jsx', import.meta.url), 'utf8')
+const overview = readFileSync(new URL('../features/client/ClientPanelEmpty.jsx', import.meta.url), 'utf8')
 
 describe('hardware inset tray tokens', () => {
   it('keeps the legacy radius and paper elevation scale', () => {
@@ -64,5 +67,23 @@ describe('hardware inset tray tokens', () => {
     expect(tray).toContain('.app-shell--tray .home-stat-card')
     expect(tray).toContain('.app-shell--tray .record-table-wrap')
     expect(tray).toContain('border-bottom-color: var(--edge-hairline)')
+  })
+
+  it('keeps the nav, badges, and table frame on the tray scale', () => {
+    expect(layout).toContain('tray-utilities')
+    expect(layout).toContain('Sign out')
+    expect(tray).toContain('.app-shell--tray .top-nav--tray')
+    expect(tray).toContain('border-radius: var(--radius-tray)')
+    expect(tray).toContain('.app-shell--tray .client-layout')
+    expect(tray).toContain('.app-shell--tray :is(.badge, .status-badge, .room-tag, .tag-label)')
+    expect(tray).toContain('border-radius: var(--radius-pill)')
+    expect(tray).toContain('.app-shell--tray .record-table tbody td')
+    expect(tray).toContain('.app-shell--tray .record-table__count')
+    expect(tray).toContain('.tray-grid')
+    expect(home).toContain('title="Active cases"')
+    expect(home).not.toContain('home-caseload')
+    expect(tags).toContain('tray-grid')
+    expect(overview).toContain('client-details-title')
+    expect(overview).toContain('className="tray-grid"')
   })
 })

@@ -116,27 +116,13 @@ function AppShell() {
           </nav>
 
           <div className="top-nav__actions">
-            <div className="top-nav__utilities">
-              <div className="top-nav__utilities-row">
-                <ThemeToggle />
-                <button
-                  type="button"
-                  className="top-nav__utility-btn"
-                  onClick={() => navigate('/settings/account')}
-                  aria-label="Settings"
-                  title="Settings"
-                >
-                  <GearIcon />
-                </button>
-              </div>
-              <button
-                type="button"
-                className="top-nav__profile-btn"
-                onClick={handleSignOut}
-              >
-                Sign out
-              </button>
-            </div>
+            <button
+              type="button"
+              className="top-nav__profile-btn"
+              onClick={handleSignOut}
+            >
+              Sign out
+            </button>
           </div>
         </div>
       </header>
@@ -157,6 +143,20 @@ function AppShell() {
           </button>
         </div>
         <div className="viewport-tray">
+          <div className="tray-utilities">
+            <div className="tray-utilities__cluster">
+              <ThemeToggle />
+              <button
+                type="button"
+                className="top-nav__utility-btn"
+                onClick={() => navigate('/settings/account')}
+                aria-label="Settings"
+                title="Settings"
+              >
+                <GearIcon />
+              </button>
+            </div>
+          </div>
           <RouteErrorBoundary>
             <AppSessionProvider value={appSession}>
               <AppointmentOverlayProvider>

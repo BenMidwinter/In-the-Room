@@ -20,6 +20,10 @@ function PatientProfileFrame({ client: initialClient }) {
     { path: '/clients/:clientId/documents', end: true },
     location.pathname,
   ))
+  const onOverview = Boolean(matchPath(
+    { path: '/clients/:id', end: true },
+    location.pathname,
+  ))
 
   useEffect(() => {
     setClient(initialClient)
@@ -54,11 +58,13 @@ function PatientProfileFrame({ client: initialClient }) {
           </p>
         </div>
 
-        <ClientDetailsBar
-          client={client}
-          embedded
-          onClientUpdated={handleClientUpdated}
-        />
+        {!onOverview && (
+          <ClientDetailsBar
+            client={client}
+            embedded
+            onClientUpdated={handleClientUpdated}
+          />
+        )}
 
         <div className="client-shell__actions">
           <button type="button" className="secondary" onClick={() => setExportOpen(true)}>Export</button>
