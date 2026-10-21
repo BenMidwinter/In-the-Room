@@ -706,10 +706,30 @@ body:has(.app-shell--tray) {
 
 /* Phone only. Wider layouts keep the bezel, the calendar pill, and the editor chrome. */
 @media (max-width: 639px) {
+  html:has(.app-shell--tray),
+  body:has(.app-shell--tray) {
+    background-color: var(--surface-tray);
+    min-height: 100dvh;
+    /* Safari's dynamic viewport can sit short of the visible screen.
+       Keep 100dvh, then grow to the filled viewport when that is taller. */
+    min-height: max(100dvh, -webkit-fill-available);
+  }
+
+  body:has(.app-shell--tray) {
+    height: 100dvh;
+    height: -webkit-fill-available;
+    max-height: none;
+  }
+
   .app-shell--tray {
     --pad-bezel: 0px;
     --space-inline: 0.75rem;
     padding: 0;
+    height: 100dvh;
+    height: -webkit-fill-available;
+    max-height: none;
+    min-height: 100dvh;
+    min-height: max(100dvh, -webkit-fill-available);
     background: var(--surface-tray);
   }
 
@@ -736,6 +756,65 @@ body:has(.app-shell--tray) {
     min-height: calc(52px + env(safe-area-inset-top, 0px));
     box-sizing: border-box;
     overflow: visible;
+    background-color: var(--surface-tray);
+  }
+
+  /* The tray is the scrollport and the phone bar sits above it.
+     Sticking the section nav 52px down opened a gap the next heading
+     scrolled through. Top 0 keeps the bar flush under the phone bar. */
+  .app-shell--tray .client-nav-bar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: var(--surface-tray);
+    border-bottom: 1px solid var(--edge-hairline);
+  }
+
+  .app-shell--tray .client-nav-bar__list {
+    background-color: var(--surface-tray);
+  }
+
+  .app-shell--tray .client-nav-bar.client-nav-bar--sub {
+    position: relative;
+    top: auto;
+    z-index: 3;
+  }
+
+  .app-shell--tray .viewport-tray:has(.page--client) {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--surface-tray);
+    padding-bottom: 0;
+  }
+
+  .app-shell--tray .page--client:not(:has(.client-layout--writing)) {
+    flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    min-height: calc(100dvh - var(--nav-height) - env(safe-area-inset-top, 0px));
+    margin-top: 0;
+    background-color: var(--surface-tray);
+  }
+
+  .app-shell--tray .page--client:not(:has(.client-layout--writing)) .client-layout {
+    flex: 1 0 auto;
+    display: flex;
+    flex-direction: column;
+    margin-top: 0;
+    background-color: var(--surface-tray);
+  }
+
+  .app-shell--tray .page--client:not(:has(.client-layout--writing)) .client-layout__main {
+    flex: 1 0 auto;
+    margin-top: 0;
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-shell--tray .top-nav--tray {
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .app-shell--tray .top-nav__phone-utilities {
