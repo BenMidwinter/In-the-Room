@@ -704,26 +704,47 @@ body:has(.app-shell--tray) {
   box-shadow: var(--edge-recessed);
 }
 
-/* Phone only. Wider layouts keep the bezel, the calendar pill, and the editor chrome. */
+/* Phone only. Wider layouts keep the bezel, the calendar pill, and the editor chrome.
+   The window itself scrolls. An inner frame with overflow hidden stops iOS from
+   collapsing the address bar, and the clipped edge reads as a hard stop. */
 @media (max-width: 639px) {
-  /* 100dvh stops at the Safari toolbar, so the app treats that chin as the
-     bottom of the screen. 100lvh is the full screen, and the toolbar overlays it. */
   html:has(.app-shell--tray),
   body:has(.app-shell--tray) {
-    background-color: var(--surface-tray);
-    height: 100lvh;
-    min-height: 100lvh;
+    height: auto;
     max-height: none;
+    overflow: visible;
+    background-color: var(--surface-tray);
+  }
+
+  body:has(.app-shell--tray) {
+    min-height: 100lvh;
   }
 
   .app-shell--tray {
     --pad-bezel: 0px;
     --space-inline: 0.75rem;
+    --phone-bar-height: calc(52px + env(safe-area-inset-top, 0px));
+    --layout-header-sticky-top: var(--phone-bar-height);
     padding: 0;
-    height: 100lvh;
+    height: auto;
     max-height: none;
     min-height: 100lvh;
+    overflow: visible;
     background: var(--surface-tray);
+  }
+
+  .app-shell--tray .app-bezel,
+  .app-shell--tray .main-content--tray,
+  .app-shell--tray .main-content:has(.page--calendar),
+  .app-shell--tray .viewport-tray,
+  .app-shell--tray .viewport-tray:has(.page--calendar),
+  .app-shell--tray .page--calendar,
+  .app-shell--tray .note-split,
+  .app-shell--tray .progress-notes-page__editor,
+  .app-shell--tray .progress-notes-page__canvas-zone {
+    height: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   .app-shell--tray .app-bezel {
@@ -731,6 +752,7 @@ body:has(.app-shell--tray) {
     border-radius: 0;
     box-shadow: none;
     background: transparent;
+    min-height: 100lvh;
   }
 
   .app-shell--tray .viewport-tray {
@@ -738,9 +760,18 @@ body:has(.app-shell--tray) {
     border: 0;
     border-radius: 0;
     box-shadow: none;
+    flex: 1 0 auto;
     padding-right: env(safe-area-inset-right, 0px);
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  .app-shell--tray .note-split,
+  .app-shell--tray .progress-notes-page__editor,
+  .app-shell--tray .progress-notes-page__canvas-zone,
+  .app-shell--tray .progress-notes-page__canvas-zone .doc-editor {
+    flex: 1 0 auto;
+    min-height: 0;
   }
 
   .app-shell--tray .top-nav__mobile-bar {
@@ -752,12 +783,10 @@ body:has(.app-shell--tray) {
     background-color: var(--surface-tray);
   }
 
-  /* The tray is the scrollport and the phone bar sits above it.
-     Sticking the section nav 52px down opened a gap the next heading
-     scrolled through. Top 0 keeps the bar flush under the phone bar. */
+  /* The window scrolls, so the section nav sticks under the phone bar. */
   .app-shell--tray .client-nav-bar {
     position: sticky;
-    top: 0;
+    top: var(--phone-bar-height);
     z-index: 20;
     background-color: var(--surface-tray);
     border-bottom: 1px solid var(--edge-hairline);
