@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useClientSession } from '../../lib/useClientSession'
+import SectionCard from '../../components/SectionCard'
 import ClientDetailsBar from './ClientDetailsBar'
 import ClientTimeline from './ClientTimeline'
 import { getClientTimeline } from '../../lib/store'
@@ -55,14 +56,12 @@ export default function ClientPanelEmpty() {
   return (
     <div className="client-overview">
       <div className="tray-grid">
-        <section className="client-overview__panel" aria-labelledby="client-details-title">
-          <h2 id="client-details-title" className="card__title">Details</h2>
+        <SectionCard blockId="client-details" title="Details">
           {client ? <ClientDetailsBar client={client} embedded /> : (
             <p className="text-muted">Loading details…</p>
           )}
-        </section>
-        <section className="client-overview__panel" aria-labelledby="client-sessions-title">
-          <h2 id="client-sessions-title" className="card__title">Sessions</h2>
+        </SectionCard>
+        <SectionCard blockId="client-sessions" title="Sessions">
           <div className="client-overview__visits">
             <VisitBox
               label="Last appointment"
@@ -77,11 +76,11 @@ export default function ClientPanelEmpty() {
               onOpen={overlay.openView}
             />
           </div>
-        </section>
+        </SectionCard>
       </div>
-      <section className="client-overview__timeline" aria-label="Client timeline">
+      <SectionCard blockId="client-timeline" title="Timeline">
         <ClientTimeline events={timeline} orientation="horizontal" />
-      </section>
+      </SectionCard>
     </div>
   )
 }

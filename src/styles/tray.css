@@ -98,9 +98,20 @@ body:has(.app-shell--tray) {
   z-index: 20;
   height: auto;
   align-self: stretch;
-  margin: var(--pad-bezel);
-  margin-right: 0;
-  overflow: hidden;
+  margin: 0;
+  overflow: visible;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app-shell--tray .top-nav__links {
+  flex: 0 0 auto;
+  margin: 0.15rem 0.4rem 0;
+  padding: 0.35rem;
+  gap: 0.15rem;
+  overflow: visible;
   background: var(--surface-tray);
   border: 1px solid var(--edge-hairline);
   border-radius: var(--radius-tray);
@@ -125,7 +136,7 @@ body:has(.app-shell--tray) {
 }
 
 .app-shell--tray .top-nav__actions {
-  border-top-color: var(--edge-hairline);
+  border-top: 0;
 }
 
 .app-shell--tray .top-nav__utility-btn,
@@ -196,19 +207,20 @@ body:has(.app-shell--tray) {
 
   .app-shell--tray .top-nav--tray {
     position: fixed;
-    top: var(--pad-bezel);
-    left: var(--pad-bezel);
-    bottom: var(--pad-bezel);
+    top: 0;
+    left: 0;
+    bottom: 0;
     z-index: 100;
     width: min(var(--nav-width), 86vw);
-    height: auto;
+    height: 100dvh;
     margin: 0;
-    overflow: hidden;
-    transform: translateX(calc(-100% - 1.25rem));
-    background: var(--surface-tray);
-    border: 1px solid var(--edge-hairline);
-    border-radius: var(--radius-tray);
-    box-shadow: var(--edge-recessed);
+    overflow: auto;
+    transform: translateX(-105%);
+    background: var(--surface-bezel);
+    border: 0;
+    border-right: 1px solid var(--edge-hairline);
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .app-shell--tray .top-nav--tray.top-nav--open {
@@ -337,18 +349,20 @@ body:has(.app-shell--tray) {
 }
 
 .app-shell--tray .record-table-wrap {
-  padding: 0.2rem var(--pad-tray) 0.15rem;
+  padding: 0;
+  overflow: auto;
   background: var(--surface-inset);
   border: 1px solid var(--edge-hairline);
   border-radius: var(--radius-tray);
   box-shadow: var(--edge-recessed);
 }
 
-.app-shell--tray .section-card__tray .record-table-wrap,
-.app-shell--tray .section-card__body .record-table-wrap {
-  background: var(--surface-inset);
-  border-radius: var(--radius-inset);
+.app-shell--tray .section-card__body:has(.record-table-wrap) {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   box-shadow: none;
+  padding: 0;
 }
 
 .app-shell--tray .record-table th,
@@ -405,8 +419,9 @@ body:has(.app-shell--tray) {
   pointer-events: auto;
   display: flex;
   align-items: center;
+  height: 4.25rem;
   gap: 0.35rem;
-  margin: 0.7rem 0.75rem 0 0;
+  margin: 0 1rem 0 0;
 }
 
 .tray-utilities .theme-toggle__menu {
@@ -508,21 +523,23 @@ body:has(.app-shell--tray) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
   gap: 1.25rem;
-  align-items: start;
+  align-items: stretch;
+}
+
+.app-shell--tray .tray-grid > .section-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+}
+
+.app-shell--tray .tray-grid > .section-card > .section-card__body {
+  flex: 1 1 auto;
 }
 
 .app-shell--tray .reporting-metrics,
 .app-shell--tray .client-overview__visits {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
-}
-
-.app-shell--tray .client-overview__panel {
-  min-width: 0;
-  background: var(--surface-inset);
-  border: 1px solid var(--edge-hairline);
-  border-radius: var(--radius-tray);
-  box-shadow: var(--edge-recessed);
-  padding: var(--pad-tray);
 }
 
 .app-shell--tray .reporting-metric {
@@ -532,10 +549,12 @@ body:has(.app-shell--tray) {
   box-shadow: var(--edge-recessed);
 }
 
-.app-shell--tray .client-overview__panel .card__title {
-  margin: 0 0 0.65rem;
-  padding-left: 0;
-  border-left: 0;
+.app-shell--tray .section-card__body .timeline-card {
+  max-height: none;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
 
 .app-shell--tray button.client-visit-card {

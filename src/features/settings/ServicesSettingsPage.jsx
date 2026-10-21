@@ -280,8 +280,10 @@ export default function ServicesSettingsPage() {
 
   return (
     <div className="section-card-stack">
-      <SettingsSectionCard blockId="settings_services" title="Services">
-        <div className="settings-services-toolbar">
+      <SettingsSectionCard
+        blockId="settings_services"
+        title="Services"
+        actions={(
           <button
             type="button"
             className="btn btn-primary"
@@ -290,8 +292,8 @@ export default function ServicesSettingsPage() {
           >
             + New Service
           </button>
-        </div>
-
+        )}
+      >
         {!isSupabaseConfigured() && (
           <p className="auth-page__alert">Supabase env vars required to manage services.</p>
         )}

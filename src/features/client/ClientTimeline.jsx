@@ -108,18 +108,12 @@ export default function ClientTimeline({ events = [], orientation = 'vertical' }
 
   if (!events.length) {
     return (
-      <div className={`card timeline-card${isHorizontal ? ' timeline-card--horizontal' : ''}`}>
-        <h3 className="card__title">Timeline</h3>
-        <p className="text-muted empty-state" style={{ padding: '1.5rem 0' }}>No timeline events yet.</p>
-      </div>
+      <p className="text-muted">No timeline events yet.</p>
     )
   }
 
   return (
-    <div className={`card timeline-card${isHorizontal ? ' timeline-card--horizontal' : ''}`}>
-      <div className="timeline-card__header">
-        <h3 className="card__title">Timeline</h3>
-      </div>
+    <div className={`timeline-card${isHorizontal ? ' timeline-card--horizontal' : ''}`}>
       <div
         ref={scrollRef}
         className={`timeline-card__scroll${isHorizontal ? ' timeline-card__scroll--horizontal' : ''}`}
