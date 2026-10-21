@@ -15,6 +15,7 @@ const TEXT_PROFILE_FIELDS = [
     label: 'Working formulation',
     placeholder: 'Clinical hypothesis and formulation snapshot…',
     size: 'large',
+    maxLength: 2000,
   },
 ]
 
@@ -262,7 +263,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
             Working formulation notes for this client.
           </p>
           <div className="client-profile-overlay__grid client-profile-overlay__grid--clinical">
-            {TEXT_PROFILE_FIELDS.map(({ key, label, placeholder, size }) => (
+            {TEXT_PROFILE_FIELDS.map(({ key, label, placeholder, size, maxLength }) => (
               <div key={key} className="form-group client-profile-overlay__field client-profile-overlay__field--wide">
                 <label htmlFor={`client-profile-${key}`}>{label}</label>
                 <textarea
@@ -271,6 +272,7 @@ export default function ClientProfileOverlay({ client, onClose, onSaved }) {
                   value={profile[key] || ''}
                   onChange={(event) => setProfileField(key, event.target.value)}
                   placeholder={placeholder}
+                  maxLength={maxLength}
                 />
               </div>
             ))}

@@ -9,6 +9,7 @@ const workspace = readFileSync(new URL('../features/client/DocumentWorkspace.jsx
 const home = readFileSync(new URL('../features/home/HomePage.jsx', import.meta.url), 'utf8')
 const tags = readFileSync(new URL('../features/settings/TagsSettingsPage.jsx', import.meta.url), 'utf8')
 const overview = readFileSync(new URL('../features/client/ClientPanelEmpty.jsx', import.meta.url), 'utf8')
+const profileOverlay = readFileSync(new URL('../features/client/ClientProfileOverlay.jsx', import.meta.url), 'utf8')
 
 describe('hardware inset tray tokens', () => {
   it('keeps the legacy radius and paper elevation scale', () => {
@@ -86,9 +87,19 @@ describe('hardware inset tray tokens', () => {
     expect(tags).toContain('tray-grid')
     expect(tray).toContain('--module-card: 32rem')
     expect(tray).toContain('.app-shell--tray .top-nav__inner')
+    expect(tray).toContain('text-align: left')
+    expect(tray).toContain('justify-content: flex-start')
+    expect(tray).toContain('max-height: 8.5rem')
+    const pageSurface = tray.slice(
+      tray.indexOf('.app-shell--tray .page,'),
+      tray.indexOf('.page-header::before'),
+    )
+    expect(pageSurface).toContain('background: var(--surface-tray)')
     expect(overview).toContain('client-details__formulation')
     expect(overview).toContain('blockId="client-details"')
     expect(overview).toContain('blockId="client-sessions"')
     expect(overview).toContain('className="tray-grid"')
+    expect(profileOverlay).toContain('maxLength: 2000')
+    expect(profileOverlay).toContain('maxLength={maxLength}')
   })
 })

@@ -317,6 +317,7 @@ body:has(.form-overlay) {
 
 .client-profile-overlay__textarea--large {
   min-height: 10rem;
+  max-height: 16rem;
 }
 
 .client-profile-overlay__actions {

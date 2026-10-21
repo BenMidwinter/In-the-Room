@@ -110,6 +110,12 @@ body:has(.app-shell--tray) {
   padding: var(--pad-bezel);
   padding-right: 0;
   gap: var(--pad-bezel);
+  text-align: left;
+}
+
+.app-shell--tray .top-nav__brand-row,
+.app-shell--tray .top-nav__brand {
+  justify-content: flex-start;
 }
 
 .app-shell--tray .top-nav__links {
@@ -130,6 +136,7 @@ body:has(.app-shell--tray) {
   border: 1px solid transparent;
   border-radius: var(--radius-pill);
   margin-right: 0;
+  text-align: left;
 }
 
 .app-shell--tray .top-nav__link:hover {
@@ -145,6 +152,7 @@ body:has(.app-shell--tray) {
 
 .app-shell--tray .top-nav__actions {
   border-top: 0;
+  text-align: left;
 }
 
 .app-shell--tray .top-nav__utility-btn,
@@ -181,6 +189,10 @@ body:has(.app-shell--tray) {
 .app-shell--tray .progress-notes-page,
 .app-shell--tray .room-workspace {
   min-height: 100%;
+  /* Cover the viewport inset ring. A transparent page let that ring
+     show beside the body, so the body looked a pixel narrower than
+     the opaque header and subheader above it. */
+  background: var(--surface-tray);
 }
 
 .app-shell--tray .page-header::before {
@@ -601,7 +613,10 @@ body:has(.app-shell--tray) {
 
 .app-shell--tray .client-details__formulation-text {
   margin: 0.35rem 0 0;
+  max-height: 8.5rem;
+  overflow: auto;
   white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 
 .app-shell--tray .reporting-metric {
