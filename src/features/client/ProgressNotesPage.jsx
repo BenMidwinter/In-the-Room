@@ -895,12 +895,14 @@ function ProgressNotesPageContent() {
               clinicianProfile={clinicianProfile}
             />
           </div>
-          <ArtworkAttachmentZone
-            clientId={client?.id}
-            attachments={artworkAttachments}
-            onChange={setArtworkAttachments}
-            disabled={!editorEditable}
-          />
+          {!phone && (
+            <ArtworkAttachmentZone
+              clientId={client?.id}
+              attachments={artworkAttachments}
+              onChange={setArtworkAttachments}
+              disabled={!editorEditable}
+            />
+          )}
           {addendums.length > 0 && (
             <div className="progress-note-addenda">
               {addendums.map((item) => (
@@ -981,6 +983,12 @@ function ProgressNotesPageContent() {
             </p>
           ) : null}
           {metaBar}
+          <ArtworkAttachmentZone
+            clientId={client?.id}
+            attachments={artworkAttachments}
+            onChange={setArtworkAttachments}
+            disabled={!editorEditable}
+          />
           <div className="editor-inspector__extras">
             <button type="button" className="secondary" onClick={handleDownload}>
               Download

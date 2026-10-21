@@ -706,18 +706,13 @@ body:has(.app-shell--tray) {
 
 /* Phone only. Wider layouts keep the bezel, the calendar pill, and the editor chrome. */
 @media (max-width: 639px) {
+  /* 100dvh stops at the Safari toolbar, so the app treats that chin as the
+     bottom of the screen. 100lvh is the full screen, and the toolbar overlays it. */
   html:has(.app-shell--tray),
   body:has(.app-shell--tray) {
     background-color: var(--surface-tray);
-    min-height: 100dvh;
-    /* Safari's dynamic viewport can sit short of the visible screen.
-       Keep 100dvh, then grow to the filled viewport when that is taller. */
-    min-height: max(100dvh, -webkit-fill-available);
-  }
-
-  body:has(.app-shell--tray) {
-    height: 100dvh;
-    height: -webkit-fill-available;
+    height: 100lvh;
+    min-height: 100lvh;
     max-height: none;
   }
 
@@ -725,11 +720,9 @@ body:has(.app-shell--tray) {
     --pad-bezel: 0px;
     --space-inline: 0.75rem;
     padding: 0;
-    height: 100dvh;
-    height: -webkit-fill-available;
+    height: 100lvh;
     max-height: none;
-    min-height: 100dvh;
-    min-height: max(100dvh, -webkit-fill-available);
+    min-height: 100lvh;
     background: var(--surface-tray);
   }
 
@@ -746,7 +739,7 @@ body:has(.app-shell--tray) {
     border-radius: 0;
     box-shadow: none;
     padding-right: env(safe-area-inset-right, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
     padding-left: env(safe-area-inset-left, 0px);
   }
 
@@ -778,37 +771,6 @@ body:has(.app-shell--tray) {
     position: relative;
     top: auto;
     z-index: 3;
-  }
-
-  .app-shell--tray .viewport-tray:has(.page--client) {
-    display: flex;
-    flex-direction: column;
-    background-color: var(--surface-tray);
-    padding-bottom: 0;
-  }
-
-  .app-shell--tray .page--client:not(:has(.client-layout--writing)) {
-    flex: 1 0 auto;
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    min-height: calc(100dvh - var(--nav-height) - env(safe-area-inset-top, 0px));
-    margin-top: 0;
-    background-color: var(--surface-tray);
-  }
-
-  .app-shell--tray .page--client:not(:has(.client-layout--writing)) .client-layout {
-    flex: 1 0 auto;
-    display: flex;
-    flex-direction: column;
-    margin-top: 0;
-    background-color: var(--surface-tray);
-  }
-
-  .app-shell--tray .page--client:not(:has(.client-layout--writing)) .client-layout__main {
-    flex: 1 0 auto;
-    margin-top: 0;
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
   }
 
   .app-shell--tray .top-nav--tray {
