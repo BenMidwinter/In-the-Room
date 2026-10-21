@@ -389,8 +389,9 @@ function CalendarViewOptions({
         onClick={onToggle}
         aria-expanded={open}
         aria-haspopup="dialog"
+        aria-label="View options"
       >
-        View options
+        View<span className="calendar-toolbar__label-full"> options</span>
       </button>
       {panel && createPortal(panel, document.body)}
     </div>
@@ -1139,8 +1140,9 @@ export default function CalendarModule({ persona }) {
       <div className="calendar-toolbar calendar-toolbar--island">
           <div className="calendar-toolbar__primary">
             <div className="calendar-toolbar__cluster calendar-toolbar__cluster--action">
-              <button type="button" className="primary" onClick={openAddAppointment}>
-                + New booking
+              <button type="button" className="primary" onClick={openAddAppointment} aria-label="New booking">
+                <span className="calendar-toolbar__label-full">+ New booking</span>
+                <span className="calendar-toolbar__label-short">+ New</span>
               </button>
             </div>
             <div className="calendar-toolbar__cluster calendar-toolbar__cluster--nav">
