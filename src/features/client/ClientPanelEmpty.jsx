@@ -57,7 +57,18 @@ export default function ClientPanelEmpty() {
     <div className="client-overview">
       <div className="tray-grid">
         <SectionCard blockId="client-details" title="Details">
-          {client ? <ClientDetailsBar client={client} embedded /> : (
+          {client ? (
+            <>
+              <ClientDetailsBar client={client} embedded />
+              <div className="client-details__formulation">
+                <p className="client-details__formulation-label">Formulation</p>
+                <p className="client-details__formulation-text">
+                  {client.clinical_profile?.working_formulation?.trim()
+                    || 'No formulation recorded yet.'}
+                </p>
+              </div>
+            </>
+          ) : (
             <p className="text-muted">Loading details…</p>
           )}
         </SectionCard>

@@ -106,12 +106,20 @@ body:has(.app-shell--tray) {
   box-shadow: none;
 }
 
+.app-shell--tray .top-nav__inner {
+  padding: var(--pad-bezel);
+  padding-right: 0;
+  gap: var(--pad-bezel);
+}
+
 .app-shell--tray .top-nav__links {
   flex: 0 0 auto;
-  margin: 0.15rem 0.4rem 0;
+  width: 100%;
+  margin: 0;
   padding: 0.35rem;
   gap: 0.15rem;
   overflow: visible;
+  box-sizing: border-box;
   background: var(--surface-tray);
   border: 1px solid var(--edge-hairline);
   border-radius: var(--radius-tray);
@@ -225,6 +233,10 @@ body:has(.app-shell--tray) {
 
   .app-shell--tray .top-nav--tray.top-nav--open {
     transform: translateX(0);
+  }
+
+  .app-shell--tray .top-nav__inner {
+    padding: var(--pad-bezel);
   }
 
   .app-shell--tray .top-nav__mobile-bar {
@@ -401,6 +413,7 @@ body:has(.app-shell--tray) {
 
 .app-shell--tray {
   --tray-utilities-inset: 6.25rem;
+  --module-card: 32rem;
 }
 
 .tray-utilities {
@@ -519,27 +532,76 @@ body:has(.app-shell--tray) {
   margin: 0 0 0.75rem;
 }
 
+.app-shell--tray .section-card-stack,
 .app-shell--tray .tray-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  display: flex;
+  flex-flow: row wrap;
+  align-items: flex-start;
   gap: 1.25rem;
+}
+
+.app-shell--tray .tray-grid {
   align-items: stretch;
 }
 
+.app-shell--tray .section-card-stack > .section-card,
 .app-shell--tray .tray-grid > .section-card {
   display: flex;
   flex-direction: column;
+  flex: 0 1 var(--module-card);
+  width: min(100%, var(--module-card));
+  max-width: var(--module-card);
   min-width: 0;
-  height: 100%;
+  height: auto;
 }
 
-.app-shell--tray .tray-grid > .section-card > .section-card__body {
+.app-shell--tray .section-card-stack > .section-card:has(.record-table-wrap),
+.app-shell--tray .section-card-stack > .section-card:has(.home-dashboard),
+.app-shell--tray .section-card-stack > .section-card:has(.section-card__toolbar),
+.app-shell--tray .section-card-stack > .section-card:has(.timeline-card),
+.app-shell--tray .section-card-stack > .section-card:has(.profile-identity__layout),
+.app-shell--tray .section-card-stack > .section-card:has(.profile-availability) {
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: none;
+}
+
+.app-shell--tray .tray-grid > .section-card > .section-card__body,
+.app-shell--tray .section-card-stack > .section-card > .section-card__body {
   flex: 1 1 auto;
 }
 
-.app-shell--tray .reporting-metrics,
+.app-shell--tray .settings-form {
+  max-width: none;
+}
+
+.app-shell--tray .reporting-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 18rem));
+  justify-content: start;
+}
+
 .app-shell--tray .client-overview__visits {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+}
+
+.app-shell--tray .client-details__formulation {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--edge-hairline);
+}
+
+.app-shell--tray .client-details__formulation-label {
+  margin: 0;
+  font-size: var(--text-meta);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--txt-muted);
+}
+
+.app-shell--tray .client-details__formulation-text {
+  margin: 0.35rem 0 0;
+  white-space: pre-wrap;
 }
 
 .app-shell--tray .reporting-metric {
