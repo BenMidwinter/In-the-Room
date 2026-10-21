@@ -42,12 +42,11 @@ describe('hardware inset tray tokens', () => {
     expect(block).toContain('--surface-base: #ffffff;')
   })
 
-  it('exposes tray utilities and leaves section cards for a later phase', () => {
+  it('exposes tray utilities', () => {
     expect(index).toContain('./styles/tray.css')
     for (const name of ['edge-hairline', 'edge-milled', 'edge-recessed', 'tray-panel', 'tray-inset', 'island-pill', 'divider-indented', 'radius-concentric']) {
       expect(tray).toContain(`@utility ${name}`)
     }
-    expect(tray).not.toContain('.section-card')
   })
 
   it('seats the signed-in shell in a bezel and a viewport tray', () => {
@@ -58,5 +57,12 @@ describe('hardware inset tray tokens', () => {
     expect(tray).toContain('.viewport-tray')
     expect(tray).toContain('.page-header::before')
     expect(workspace).toContain("querySelector('.viewport-tray')")
+  })
+
+  it('turns section cards and record tables into recessed trays', () => {
+    expect(tray).toContain('.app-shell--tray .section-card__body')
+    expect(tray).toContain('.app-shell--tray .home-stat-card')
+    expect(tray).toContain('.app-shell--tray .record-table-wrap')
+    expect(tray).toContain('border-bottom-color: var(--edge-hairline)')
   })
 })

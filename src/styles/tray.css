@@ -214,6 +214,155 @@ body:has(.app-shell--tray) {
   }
 }
 
+/* Phase C: section labels sit outside a recessed tray.
+   Home stats and upcoming chips are wells inside that tray.
+   Record tables are recessed, with row rules inset from the tray edge. */
+
+.app-shell--tray .section-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell--tray .section-card__header,
+.app-shell--tray .section-card__header--actions-only {
+  padding: 0 0.15rem 0.5rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.app-shell--tray .section-card__toolbar {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 0.65rem;
+  padding: 0.3rem;
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+}
+
+.app-shell--tray .section-card__toolbar-item {
+  border-radius: var(--radius-pill);
+  border-color: var(--edge-hairline);
+  background: transparent;
+}
+
+.app-shell--tray .section-card__toolbar-item--active {
+  border-color: var(--edge-hairline);
+  background: var(--col-primary-light);
+  color: var(--col-primary);
+  box-shadow: var(--edge-recessed);
+}
+
+.app-shell--tray .section-card__body {
+  background: var(--surface-inset);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-tray);
+  box-shadow: var(--edge-recessed);
+  padding: var(--pad-tray);
+}
+
+.app-shell--tray .section-card__actions .secondary,
+.app-shell--tray .section-card__actions .primary,
+.app-shell--tray .home-caseload__actions .secondary,
+.app-shell--tray .home-caseload__actions .primary,
+.app-shell--tray .record-module__actions .secondary,
+.app-shell--tray .record-module__actions .primary,
+.app-shell--tray .record-list-toolbar__actions .secondary,
+.app-shell--tray .record-list-toolbar__actions .primary {
+  border-radius: var(--radius-pill);
+}
+
+.app-shell--tray .section-card__actions .secondary,
+.app-shell--tray .home-caseload__actions .secondary {
+  border-color: var(--edge-hairline);
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+
+.app-shell--tray .home-stat-card {
+  background: var(--surface-tray);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-inset);
+  box-shadow: none;
+}
+
+.app-shell--tray .home-upcoming-timeline,
+.app-shell--tray .home-caseload {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0.9rem 0.15rem 0;
+}
+
+.app-shell--tray .home-caseload .card__title,
+.app-shell--tray .home-upcoming-timeline .card__title {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.app-shell--tray .timeline--horizontal .timeline__body {
+  background: var(--surface-tray);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-inset);
+  box-shadow: none;
+}
+
+.app-shell--tray .timeline--horizontal .timeline__line--horizontal {
+  height: 1px;
+  background: var(--edge-hairline);
+}
+
+.app-shell--tray .home-upcoming-timeline__card--later,
+.app-shell--tray .timeline__item--future .timeline__body {
+  background: var(--surface-tray);
+  border-color: var(--edge-hairline);
+}
+
+.app-shell--tray .record-list-toolbar,
+.app-shell--tray .record-module__header,
+.app-shell--tray .record-module__toolbar,
+.app-shell--tray .record-module__editor {
+  border-color: var(--edge-hairline);
+}
+
+.app-shell--tray .record-table-wrap {
+  padding: 0.2rem var(--pad-tray) 0.15rem;
+  background: var(--surface-inset);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-tray);
+  box-shadow: var(--edge-recessed);
+}
+
+.app-shell--tray .section-card__tray .record-table-wrap,
+.app-shell--tray .section-card__body .record-table-wrap {
+  background: var(--surface-tray);
+  border-radius: var(--radius-inset);
+  box-shadow: none;
+}
+
+.app-shell--tray .record-table th,
+.app-shell--tray .record-table td {
+  background: transparent;
+  border-bottom-color: var(--edge-hairline);
+}
+
+.app-shell--tray .record-table th {
+  background: var(--surface-inset);
+}
+
+.app-shell--tray .section-card__body .record-table th {
+  background: var(--surface-tray);
+}
+
+.app-shell--tray .record-table tbody tr.record-table__row--clickable:hover td:first-child,
+.app-shell--tray .record-table tbody tr.record-table__row--selected td:first-child {
+  box-shadow: none;
+}
+
 @media print {
   body:has(.app-shell--tray) {
     height: auto;
