@@ -83,8 +83,9 @@ function AppShell() {
   }
 
   return (
-    <div className={`app-shell${menuOpen ? ' app-shell--nav-open' : ''}`}>
-      <header className={`top-nav${menuOpen ? ' top-nav--open' : ''}`}>
+    <div className={`app-shell app-shell--tray${menuOpen ? ' app-shell--nav-open' : ''}`} data-chrome="tray">
+      <div className="app-bezel">
+      <header className={`top-nav top-nav--tray${menuOpen ? ' top-nav--open' : ''}`}>
         <div className="top-nav__inner">
           <div className="top-nav__brand-row">
             <NavLink to="/home" className="top-nav__brand" aria-label={PRODUCT_NAME}>
@@ -140,16 +141,7 @@ function AppShell() {
         </div>
       </header>
 
-      {menuOpen && (
-        <button
-          type="button"
-          className="top-nav__backdrop"
-          aria-label="Close menu"
-          onClick={() => setMenuOpen(false)}
-        />
-      )}
-
-      <main className={`main-content${isProgressNotes ? ' main-content--progress-notes' : ''}`}>
+      <main className={`main-content main-content--tray${isProgressNotes ? ' main-content--progress-notes' : ''}`}>
         <div className="top-nav__mobile-bar">
           <NavLink to="/home" className="top-nav__brand top-nav__brand--compact" aria-label={PRODUCT_NAME}>
             <img className="top-nav__brand-mark" src={brandIconUrl} alt="" />
@@ -164,14 +156,26 @@ function AppShell() {
             {menuOpen ? '✕' : '☰'}
           </button>
         </div>
-        <RouteErrorBoundary>
-          <AppSessionProvider value={appSession}>
-            <AppointmentOverlayProvider>
-              <Outlet />
-            </AppointmentOverlayProvider>
-          </AppSessionProvider>
-        </RouteErrorBoundary>
+        <div className="viewport-tray">
+          <RouteErrorBoundary>
+            <AppSessionProvider value={appSession}>
+              <AppointmentOverlayProvider>
+                <Outlet />
+              </AppointmentOverlayProvider>
+            </AppSessionProvider>
+          </RouteErrorBoundary>
+        </div>
       </main>
+      </div>
+
+      {menuOpen && (
+        <button
+          type="button"
+          className="top-nav__backdrop"
+          aria-label="Close menu"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -62,3 +62,176 @@
   border: 1px solid var(--edge-hairline);
   box-shadow: none;
 }
+
+/* Phase B: signed-in chassis. Auth screens stay outside this shell.
+   The bezel does not clip, so the theme menu can open over the tray. */
+
+body:has(.app-shell--tray) {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell--tray {
+  box-sizing: border-box;
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--pad-bezel);
+  background: var(--surface-base);
+}
+
+.app-bezel {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--surface-bezel);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-bezel);
+  box-shadow: var(--edge-milled);
+}
+
+.app-shell--tray .top-nav--tray {
+  position: relative;
+  z-index: 20;
+  height: auto;
+  align-self: stretch;
+  background: transparent;
+  border-right: 1px solid var(--edge-hairline);
+  box-shadow: none;
+}
+
+.app-shell--tray .top-nav__link {
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  margin-right: 0;
+}
+
+.app-shell--tray .top-nav__link:hover {
+  border-right-color: transparent;
+  background: color-mix(in srgb, var(--txt-body) 5%, transparent);
+}
+
+.app-shell--tray .top-nav__link--active {
+  border-color: var(--edge-hairline);
+  background: var(--col-primary-light);
+  box-shadow: var(--edge-recessed);
+}
+
+.app-shell--tray .top-nav__actions {
+  border-top-color: var(--edge-hairline);
+}
+
+.app-shell--tray .top-nav__utility-btn,
+.app-shell--tray .top-nav__profile-btn,
+.app-shell--tray .top-nav__menu-btn {
+  border-radius: var(--radius-pill);
+  border-color: var(--edge-hairline);
+  background: var(--surface-raised);
+}
+
+.app-shell--tray .main-content--tray {
+  min-height: 0;
+  height: 100%;
+  background: transparent;
+}
+
+.viewport-tray {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin: var(--pad-bezel);
+  overflow: auto;
+  background: var(--surface-tray);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-tray);
+  box-shadow: var(--edge-recessed);
+}
+
+.app-shell--tray .page,
+.app-shell--tray .page--client,
+.app-shell--tray .page--practice,
+.app-shell--tray .progress-notes-page,
+.app-shell--tray .room-workspace {
+  min-height: 100%;
+}
+
+.app-shell--tray .page-header::before {
+  content: none;
+}
+
+.app-shell--tray .main-content:has(.page--calendar) {
+  height: auto;
+  max-height: none;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell--tray .viewport-tray:has(.page--calendar) {
+  overflow: hidden;
+}
+
+.viewport-tray:has(.clinical-doc-overlay) {
+  position: relative;
+}
+
+.viewport-tray > .clinical-doc-overlay {
+  top: 0;
+}
+
+@media (max-width: 900px) {
+  .app-shell--tray {
+    --pad-bezel: 4px;
+    --layout-header-sticky-top: 0px;
+  }
+
+  .app-shell--tray .top-nav--tray {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+    width: min(var(--nav-width), 86vw);
+    height: 100dvh;
+    transform: translateX(-105%);
+    background: var(--surface-bezel);
+    border-right: 1px solid var(--edge-hairline);
+    box-shadow: none;
+  }
+
+  .app-shell--tray .top-nav--tray.top-nav--open {
+    transform: translateX(0);
+  }
+
+  .app-shell--tray .top-nav__mobile-bar {
+    background: transparent;
+    border-bottom: 1px solid var(--edge-hairline);
+  }
+}
+
+@media print {
+  body:has(.app-shell--tray) {
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-shell--tray,
+  .app-shell--tray .app-bezel,
+  .app-shell--tray .viewport-tray,
+  .app-shell--tray .main-content--tray {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: white;
+  }
+}

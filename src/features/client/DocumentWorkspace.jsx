@@ -45,7 +45,7 @@ export default function DocumentWorkspace({
 
   const host = typeof document === 'undefined'
     ? null
-    : (document.querySelector('.main-content') || document.body)
+    : (document.querySelector('.viewport-tray') || document.querySelector('.main-content') || document.body)
   if (!host) return page
   return createPortal(page, host)
 }

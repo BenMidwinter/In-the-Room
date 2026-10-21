@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest'
 const tokens = readFileSync(new URL('./tokens.css', import.meta.url), 'utf8')
 const tray = readFileSync(new URL('./tray.css', import.meta.url), 'utf8')
 const index = readFileSync(new URL('../index.css', import.meta.url), 'utf8')
+const layout = readFileSync(new URL('../components/AppLayout.jsx', import.meta.url), 'utf8')
+const workspace = readFileSync(new URL('../features/client/DocumentWorkspace.jsx', import.meta.url), 'utf8')
 
 describe('hardware inset tray tokens', () => {
   it('keeps the legacy radius and paper elevation scale', () => {
@@ -40,12 +42,21 @@ describe('hardware inset tray tokens', () => {
     expect(block).toContain('--surface-base: #ffffff;')
   })
 
-  it('exposes tray utilities without wiring them into current chrome', () => {
+  it('exposes tray utilities and leaves section cards for a later phase', () => {
     expect(index).toContain('./styles/tray.css')
     for (const name of ['edge-hairline', 'edge-milled', 'edge-recessed', 'tray-panel', 'tray-inset', 'island-pill', 'divider-indented', 'radius-concentric']) {
       expect(tray).toContain(`@utility ${name}`)
     }
     expect(tray).not.toContain('.section-card')
-    expect(tray).not.toContain('.app-shell')
+  })
+
+  it('seats the signed-in shell in a bezel and a viewport tray', () => {
+    expect(layout).toContain('data-chrome="tray"')
+    expect(layout).toContain('app-bezel')
+    expect(layout).toContain('viewport-tray')
+    expect(tray).toContain('.app-bezel')
+    expect(tray).toContain('.viewport-tray')
+    expect(tray).toContain('.page-header::before')
+    expect(workspace).toContain("querySelector('.viewport-tray')")
   })
 })
