@@ -2,10 +2,12 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGoBack } from '../../lib/useGoBack'
 import { useClientSession } from '../../lib/useClientSession'
+import EditorInspector from '../../components/EditorInspector'
 import {
   WorkspaceLayout,
   StickyContextBar,
 } from '../../components/LayoutComponents'
+import { usePhoneLayout } from '../../lib/usePhoneLayout'
 import RichTextEditor from '../../components/RichTextEditor'
 import ArtworkAttachmentZone from './ArtworkAttachmentZone'
 import { hasMeaningfulEditorContent } from '../../components/TemplatePicker'
@@ -197,6 +199,9 @@ function ProgressNotesPageContent() {
   const [addendumBody, setAddendumBody] = useState('<p></p>')
   const [addendumVersion, setAddendumVersion] = useState(0)
   const [historyOpen, setHistoryOpen] = useState(true)
+  const phone = usePhoneLayout()
+  const [inspectorOpen, setInspectorOpen] = useState(false)
+  const canvasRef = useRef(null)
   const [historyWidth, setHistoryWidth] = useState(360)
   const [now, setNow] = useState(() => Date.now())
   const [noteMeta, setNoteMeta] = useState({
@@ -713,6 +718,65 @@ function ProgressNotesPageContent() {
 
   if (!prefillReady) return null
 
+  const closeInspector = () => {
+    setInspectorOpen(false)
+    window.requestAnimationFrame(() => {
+      canvasRef.current?.querySelector('.ProseMirror')?.focus()
+    })
+  }
+
+  const metaBar = (
+    <div className="progress-notes-page__meta-bar" role="group" aria-label="Note metadata">
+      <label className="progress-notes-page__meta-field progress-notes-page__meta-field--title">
+        <span className="progress-notes-page__meta-label">Title</span>
+        <input
+          className="progress-notes-page__meta-input"
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Session note title"
+          disabled={!editorEditable}
+        />
+      </label>
+
+      <label className="progress-notes-page__meta-field">
+        <span className="progress-notes-page__meta-label">Session date</span>
+        <input
+          type="date"
+          className="progress-notes-page__meta-input"
+          value={sessionDate}
+          onChange={e => setSessionDate(e.target.value)}
+          disabled={!editorEditable}
+        />
+      </label>
+
+      <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
+        <span className="progress-notes-page__meta-label">Template</span>
+        <select
+          className="progress-notes-page__meta-input"
+          value={templateId}
+          onChange={(event) => applyNoteTemplate(event.target.value)}
+          disabled={!editorEditable}
+        >
+          <option value="">No template</option>
+          {noteTemplates.map((template) => (
+            <option key={template.id} value={template.id}>{template.name}</option>
+          ))}
+        </select>
+      </label>
+    </div>
+  )
+
+  const historyPanel = (
+    <PastCaseNotesPanel
+      previewableNotes={previewableNotes}
+      previewNote={previewNote}
+      previewNoteId={previewNoteId}
+      previewIndex={previewIndex}
+      onSelectNote={setPreviewNoteId}
+      onCycle={cyclePreview}
+    />
+  )
+
   return (
     <WorkspaceLayout className="progress-notes-page">
       <StickyContextBar
@@ -726,16 +790,29 @@ function ProgressNotesPageContent() {
             <span className="text-small text-muted">{client.real_name}</span>
           </>
         )}
+        meta={phone ? (
+          <button
+            type="button"
+            className="editor-context-chip"
+            aria-expanded={inspectorOpen}
+            aria-haspopup="dialog"
+            onClick={() => setInspectorOpen(true)}
+          >
+            {sessionDate
+              ? new Date(`${sessionDate}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+              : 'Details'}
+          </button>
+        ) : null}
         trailing={(
           <div className="progress-notes-page__header-actions">
             <span className="progress-notes-page__save-status text-small text-muted" aria-live="polite">
               {noteLocked ? 'Locked' : editorEditable ? autoSaveLabel : 'Signed off'}
             </span>
-            <button type="button" className="secondary" onClick={handleDownload}>
+            <button type="button" className="secondary editor-header__overflow" onClick={handleDownload}>
               Download
             </button>
             {!historyOpen && (
-              <button type="button" className="secondary" onClick={() => setHistoryOpen(true)}>
+              <button type="button" className="secondary editor-header__overflow" onClick={() => setHistoryOpen(true)}>
                 Previous notes
               </button>
             )}
@@ -801,46 +878,9 @@ function ProgressNotesPageContent() {
         </div>
       ) : null}
 
-      <div className="progress-notes-page__meta-bar" role="group" aria-label="Note metadata">
-        <label className="progress-notes-page__meta-field progress-notes-page__meta-field--title">
-          <span className="progress-notes-page__meta-label">Title</span>
-          <input
-            className="progress-notes-page__meta-input"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="Session note title"
-            disabled={!editorEditable}
-          />
-        </label>
+      {!phone && metaBar}
 
-        <label className="progress-notes-page__meta-field">
-          <span className="progress-notes-page__meta-label">Session date</span>
-          <input
-            type="date"
-            className="progress-notes-page__meta-input"
-            value={sessionDate}
-            onChange={e => setSessionDate(e.target.value)}
-            disabled={!editorEditable}
-          />
-        </label>
-
-        <label className="progress-notes-page__meta-field progress-notes-page__meta-field--template">
-          <span className="progress-notes-page__meta-label">Template</span>
-          <select
-            className="progress-notes-page__meta-input"
-            value={templateId}
-            onChange={(event) => applyNoteTemplate(event.target.value)}
-            disabled={!editorEditable}
-          >
-            <option value="">No template</option>
-            {noteTemplates.map((template) => (
-              <option key={template.id} value={template.id}>{template.name}</option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className={`note-split${historyOpen ? ' note-split--open' : ''}`}>
+      <div className={`note-split${historyOpen && !phone ? ' note-split--open' : ''}`} ref={canvasRef}>
         <main className="note-split__editor progress-notes-page__editor">
           <div className="progress-notes-page__canvas-zone">
             <RichTextEditor
@@ -905,7 +945,7 @@ function ProgressNotesPageContent() {
             </div>
           )}
         </main>
-        {historyOpen && (
+        {historyOpen && !phone && (
           <>
             <div
               className="note-split__handle"
@@ -925,18 +965,25 @@ function ProgressNotesPageContent() {
                   Hide
                 </button>
               </div>
-              <PastCaseNotesPanel
-                previewableNotes={previewableNotes}
-                previewNote={previewNote}
-                previewNoteId={previewNoteId}
-                previewIndex={previewIndex}
-                onSelectNote={setPreviewNoteId}
-                onCycle={cyclePreview}
-              />
+              {historyPanel}
             </aside>
           </>
         )}
       </div>
+      {phone && (
+        <EditorInspector open={inspectorOpen} title="Note details" onClose={closeInspector}>
+          {metaBar}
+          <div className="editor-inspector__extras">
+            <button type="button" className="secondary" onClick={handleDownload}>
+              Download
+            </button>
+          </div>
+          <details className="editor-inspector__notes">
+            <summary>Previous notes</summary>
+            {historyPanel}
+          </details>
+        </EditorInspector>
+      )}
     </WorkspaceLayout>
   )
 }

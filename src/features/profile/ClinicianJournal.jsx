@@ -44,6 +44,13 @@ function formatJournalDate(date) {
   })
 }
 
+function journalContextLabel(date, time, somatic) {
+  const when = date
+    ? new Date(`${date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    : ''
+  return [when, time, somatic].filter(Boolean).join(' · ')
+}
+
 function sortJournalEntries(items) {
   return [...items].sort((a, b) => {
     const byDate = b.date.localeCompare(a.date)
@@ -265,7 +272,8 @@ export default function ClinicianJournal() {
       <DocumentWorkspace
         title="Journal entry"
         onBack={close}
-        actions={(
+        contextLabel={journalContextLabel(draftDate, draftTime, draftSomatic)}
+        inspectorExtras={(
           <>
             {openId !== 'new' && openEntry && openStatus === 'archive' && (
               <button type="button" className="secondary" onClick={() => moveStatus(openEntry, 'active', 'Entry restored')} disabled={setEntryStatus.isPending}>Restore</button>
@@ -285,13 +293,13 @@ export default function ClinicianJournal() {
             >
               Download
             </button>
-            {!openReadOnly && (
-              <button type="button" className="primary" onClick={handleSave} disabled={saveEntry.isPending}>
-                {saveEntry.isPending ? 'Saving…' : 'Save'}
-              </button>
-            )}
           </>
         )}
+        actions={!openReadOnly ? (
+          <button type="button" className="primary" onClick={handleSave} disabled={saveEntry.isPending}>
+            {saveEntry.isPending ? 'Saving…' : 'Save'}
+          </button>
+        ) : null}
         meta={(
           <>
             <label className="progress-notes-page__meta-field">

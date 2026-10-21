@@ -684,6 +684,222 @@ body:has(.app-shell--tray) {
   box-shadow: var(--edge-recessed);
 }
 
+/* Phone only. Wider layouts keep the bezel, the calendar pill, and the editor chrome. */
+@media (max-width: 639px) {
+  .app-shell--tray {
+    --pad-bezel: 0px;
+    --space-inline: 0.75rem;
+    padding: 0;
+    background: var(--surface-tray);
+  }
+
+  .app-shell--tray .app-bezel {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .app-shell--tray .viewport-tray {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+  }
+
+  .app-shell--tray .top-nav__mobile-bar {
+    padding-top: env(safe-area-inset-top, 0px);
+    height: auto;
+    min-height: calc(52px + env(safe-area-inset-top, 0px));
+    box-sizing: border-box;
+  }
+
+  .app-shell--tray .page--calendar {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .app-shell--tray .page-header--calendar {
+    margin-left: 0.75rem;
+    margin-right: 0.75rem;
+    padding-left: 0;
+    padding-right: 0;
+    width: auto;
+  }
+
+  .app-shell--tray .calendar-toolbar--island {
+    flex-direction: column;
+    align-items: stretch;
+    width: auto;
+    margin-left: 0.75rem;
+    margin-right: 0.75rem;
+    border-radius: var(--radius-tray);
+    gap: 0.55rem;
+  }
+
+  .app-shell--tray .calendar-toolbar__primary,
+  .app-shell--tray .calendar-toolbar__options {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
+  .app-shell--tray .calendar-toolbar__primary {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .app-shell--tray .calendar-toolbar__cluster {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.65rem;
+    width: 100%;
+  }
+
+  .app-shell--tray .calendar-toolbar__cluster--action .primary {
+    width: 100%;
+  }
+
+  .app-shell--tray .calendar-toolbar__period {
+    white-space: normal;
+  }
+
+  .app-shell--tray .calendar-toolbar__view-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: none;
+  }
+
+  .app-shell--tray .calendar-toolbar__view-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-shell--tray .calendar-time-grid:not(.calendar-time-grid--day-only) {
+    grid-template-columns: 3.25rem repeat(var(--calendar-cols), minmax(6.75rem, 1fr));
+    width: calc(3.25rem + var(--calendar-cols) * 6.75rem);
+    min-width: calc(3.25rem + var(--calendar-cols) * 6.75rem);
+  }
+
+  .app-shell--tray .calendar-month__head,
+  .app-shell--tray .calendar-month__grid {
+    min-width: calc(7 * 4.75rem);
+  }
+
+  .doc-editor__toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .doc-editor__toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .room-sticky-bar {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .room-sticky-bar__leading {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .room-sticky-bar__leading h1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 1.05rem;
+    max-width: 100%;
+  }
+
+  .room-sticky-bar__leading .text-muted,
+  .progress-notes-page__save-status,
+  .editor-header__overflow {
+    display: none;
+  }
+
+  .editor-context-chip {
+    display: inline-flex;
+    align-items: center;
+    max-width: 11.5rem;
+    min-height: 1.85rem;
+    padding: 0.15rem 0.7rem;
+    border: 1px solid var(--edge-hairline);
+    border-radius: var(--radius-pill);
+    background: var(--surface-inset);
+    color: var(--txt-body);
+    font: inherit;
+    font-size: var(--text-meta);
+    font-weight: 650;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+
+  .form-overlay:has(.form-overlay__panel--sheet) {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .form-overlay__panel--sheet {
+    width: 100%;
+    max-height: min(78dvh, 100%);
+    border-radius: var(--radius-tray) var(--radius-tray) 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: editor-sheet-in 200ms ease-out;
+  }
+
+  .form-overlay__panel--sheet .progress-notes-page__meta-bar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 0;
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .form-overlay__panel--sheet .progress-notes-page__meta-field,
+  .form-overlay__panel--sheet .progress-notes-page__meta-field--title,
+  .form-overlay__panel--sheet .progress-notes-page__meta-field--template {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .editor-inspector__extras {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.85rem;
+  }
+
+  .editor-inspector__notes {
+    margin-top: 1rem;
+    border-top: 1px solid var(--edge-hairline);
+    padding-top: 0.75rem;
+  }
+
+  .editor-inspector__notes summary {
+    cursor: pointer;
+    font-weight: 700;
+  }
+}
+
+@keyframes editor-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
 @media print {
   body:has(.app-shell--tray) {
     height: auto;

@@ -1138,19 +1138,23 @@ export default function CalendarModule({ persona }) {
       </header>
       <div className="calendar-toolbar calendar-toolbar--island">
           <div className="calendar-toolbar__primary">
-            <button type="button" className="primary" onClick={openAddAppointment}>
-              + New booking
-            </button>
-            <button type="button" className="secondary" onClick={jumpToday}>
-              Today
-            </button>
-            {viewMode !== 'upcoming' && (
-              <div className="calendar-toolbar__nav">
-                <button type="button" className="secondary" onClick={() => navigateDate(viewMode === 'month' ? -30 : viewMode === 'day' ? -1 : -7)} aria-label="Previous period">←</button>
-                <button type="button" className="secondary" onClick={() => navigateDate(viewMode === 'month' ? 30 : viewMode === 'day' ? 1 : 7)} aria-label="Next period">→</button>
-              </div>
-            )}
-            <p className="calendar-toolbar__period">{periodLabel}</p>
+            <div className="calendar-toolbar__cluster calendar-toolbar__cluster--action">
+              <button type="button" className="primary" onClick={openAddAppointment}>
+                + New booking
+              </button>
+            </div>
+            <div className="calendar-toolbar__cluster calendar-toolbar__cluster--nav">
+              <button type="button" className="secondary" onClick={jumpToday}>
+                Today
+              </button>
+              {viewMode !== 'upcoming' && (
+                <div className="calendar-toolbar__nav">
+                  <button type="button" className="secondary" onClick={() => navigateDate(viewMode === 'month' ? -30 : viewMode === 'day' ? -1 : -7)} aria-label="Previous period">←</button>
+                  <button type="button" className="secondary" onClick={() => navigateDate(viewMode === 'month' ? 30 : viewMode === 'day' ? 1 : 7)} aria-label="Next period">→</button>
+                </div>
+              )}
+              <p className="calendar-toolbar__period">{periodLabel}</p>
+            </div>
           </div>
           <div className="calendar-toolbar__options">
             <div className="calendar-toolbar__views">

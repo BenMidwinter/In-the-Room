@@ -1134,6 +1134,11 @@ button.home-stat-card__link {
   min-width: 0;
 }
 
+/* Wider screens keep these children in the parent row. Phones stack the clusters. */
+.calendar-toolbar__cluster {
+  display: contents;
+}
+
 .calendar-toolbar__options {
   display: flex;
   align-items: center;
