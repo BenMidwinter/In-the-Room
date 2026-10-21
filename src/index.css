@@ -2,6 +2,7 @@
 
 /* Design tokens + Tailwind @theme bridge (custom properties — unlayered). */
 @import "./styles/tokens.css";
+@import "./styles/tray.css";
 
 /* Legacy component/base styles live in Tailwind's `components` layer so that
    `utilities` (a later layer) reliably override them. This is what lets us

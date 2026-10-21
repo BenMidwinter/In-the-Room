@@ -33,6 +33,27 @@
   --color-editor-canvas: var(--editor-canvas-bg);
   --color-editor-sheet: var(--editor-sheet-bg);
   --color-editor-prose: var(--editor-prose-color);
+
+  /* Hardware inset tray. Bridges to :root surface variables so themes can recolour them. */
+  --color-surface-base: var(--surface-base);
+  --color-surface-bezel: var(--surface-bezel);
+  --color-surface-tray: var(--surface-tray);
+  --color-surface-inset: var(--surface-inset);
+  --color-surface-raised: var(--surface-raised);
+  --color-edge: var(--edge-hairline);
+  --color-edge-strong: var(--edge-hairline-strong);
+
+  /* Concentric scale. Tray radius is bezel 20 minus pad 8. Inset radius is tray 12 minus nest gap 4.
+     Literals stay in step with --pad-bezel and --space-tray-nest below.
+     Legacy --radius-sm/md/lg are intentionally not retargeted. */
+  --radius-bezel: 20px;
+  --radius-tray: 12px;
+  --radius-inset: 8px;
+  --radius-control: 8px;
+  --radius-pill: 999px;
+
+  --shadow-milled: var(--edge-milled);
+  --shadow-recessed: var(--edge-recessed);
 }
 
 :root,
@@ -61,6 +82,24 @@
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
+
+  /* Hardware inset tray. Not applied to existing chrome yet.
+     Opt in later with data-chrome="tray" on the document element. */
+  --surface-base: var(--bg-canvas);
+  --surface-bezel: color-mix(in srgb, var(--bg-canvas) 88%, var(--txt-body) 12%);
+  --surface-tray: var(--bg-surface);
+  --surface-inset: color-mix(in srgb, var(--bg-muted) 85%, var(--bg-canvas) 15%);
+  --surface-raised: var(--bg-surface);
+
+  --edge-hairline: color-mix(in srgb, var(--txt-body) 12%, transparent);
+  --edge-hairline-strong: color-mix(in srgb, var(--txt-body) 18%, transparent);
+  --edge-inset-highlight: color-mix(in srgb, #ffffff 55%, transparent);
+  --edge-milled: inset 0 1px 0 var(--edge-inset-highlight), inset 0 0 0 1px var(--edge-hairline);
+  --edge-recessed: inset 0 1px 1px color-mix(in srgb, var(--txt-body) 8%, transparent), inset 0 0 0 1px var(--edge-hairline);
+
+  --pad-bezel: 8px;
+  --pad-tray: 12px;
+  --space-tray-nest: 4px;
 
   --shadow-sm: none;
   --shadow-md: 0 1px 3px rgba(35, 34, 32, 0.06);
@@ -407,6 +446,22 @@
   --border-color: color-mix(in srgb, var(--txt-body) 55%, var(--bg-page));
   --border-subtle: color-mix(in srgb, var(--txt-body) 55%, var(--bg-page));
   --border-light: color-mix(in srgb, var(--txt-body) 45%, var(--bg-page));
+  --edge-hairline: color-mix(in srgb, var(--txt-body) 55%, transparent);
+  --edge-hairline-strong: var(--txt-body);
+}
+
+/* High contrast keeps solid rules. Tone-on-tone hairlines would disappear. */
+[data-theme='reading-contrast'] {
+  --surface-base: #ffffff;
+  --surface-bezel: #ffffff;
+  --surface-tray: #ffffff;
+  --surface-inset: #ffffff;
+  --surface-raised: #ffffff;
+  --edge-hairline: #000000;
+  --edge-hairline-strong: #000000;
+  --edge-inset-highlight: transparent;
+  --edge-milled: inset 0 0 0 1px #000000;
+  --edge-recessed: inset 0 0 0 2px #000000;
 }
 
 [data-plain-type='on'] {

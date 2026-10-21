@@ -1,0 +1,64 @@
+/* Hardware inset tray utilities.
+   Depth is a tone step plus a hairline, not a drop shadow.
+   Existing components do not use these classes yet, so the current interface
+   stays as it is. Later phases opt in with data-chrome="tray".
+
+   Concentric rule: inner radius = outer radius − the gap at that corner.
+   --radius-tray is --radius-bezel minus --pad-bezel (12px).
+   --radius-inset is --radius-tray minus --space-tray-nest (8px).
+   --pad-tray is content padding and can be larger than the nest gap.
+
+   Paper elevation stays on clinical sheets only:
+   .room-clinical-paper, .doc-editor__page, and print or PDF surfaces.
+   Do not put --elevation-paper-* on the app shell, page header, section cards,
+   record tables, form overlays, dialogs, toasts, bulk bars, or navigation
+   once those pieces move to tray chrome. */
+
+@utility edge-hairline {
+  border: 1px solid var(--edge-hairline);
+}
+
+@utility edge-milled {
+  border: 1px solid var(--edge-hairline);
+  box-shadow: var(--edge-milled);
+}
+
+@utility edge-recessed {
+  border: 1px solid var(--edge-hairline);
+  box-shadow: var(--edge-recessed);
+}
+
+@utility tray-panel {
+  background: var(--surface-tray);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-tray);
+  box-shadow: var(--edge-recessed);
+}
+
+@utility tray-inset {
+  background: var(--surface-inset);
+  border: 1px solid var(--edge-hairline);
+  border-radius: var(--radius-inset);
+  box-shadow: var(--edge-recessed);
+}
+
+@utility radius-concentric {
+  border-radius: max(0px, calc(var(--_r, var(--radius-tray)) - var(--_p, var(--space-tray-nest))));
+}
+
+@utility divider-indented {
+  border: 0;
+  border-bottom: 1px solid var(--edge-hairline);
+  margin-inline: var(--pad-tray);
+}
+
+@utility island-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  border: 1px solid var(--edge-hairline);
+  box-shadow: none;
+}
