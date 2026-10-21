@@ -856,7 +856,7 @@ function ProgressNotesPageContent() {
       />
 
       {linkedAppointment ? (
-        <div className="progress-notes-page__banner linked-record-banner">
+        <div className={`progress-notes-page__banner linked-record-banner${phone && !filingError ? ' progress-notes-page__banner--sheet' : ''}`}>
           <span className="text-small">
             {formatAppointmentDateTime(linkedAppointment.scheduled_at)}
             {' · '}{APPOINTMENT_TYPES[linkedAppointment.appointment_type]}
@@ -972,6 +972,14 @@ function ProgressNotesPageContent() {
       </div>
       {phone && (
         <EditorInspector open={inspectorOpen} title="Note details" onClose={closeInspector}>
+          {linkedAppointment ? (
+            <p className="editor-inspector__context text-small">
+              {formatAppointmentDateTime(linkedAppointment.scheduled_at)}
+              {' · '}{APPOINTMENT_TYPES[linkedAppointment.appointment_type]}
+              {linkedAppointment.location ? ` · ${linkedAppointment.location}` : ''}
+              {filingError ? ` · ${filingError}` : ''}
+            </p>
+          ) : null}
           {metaBar}
           <div className="editor-inspector__extras">
             <button type="button" className="secondary" onClick={handleDownload}>

@@ -381,7 +381,12 @@ export default function PracticeDocumentsPage() {
       <DocumentWorkspace
         title={name.trim() || 'Document'}
         onBack={closeEditor}
-        actions={(
+        actions={!openReadOnly ? (
+          <button type="button" className="primary" onClick={saveDocument} disabled={mutate.isPending}>
+            {mutate.isPending ? 'Saving…' : 'Save'}
+          </button>
+        ) : null}
+        inspectorExtras={(
           <>
             {selectedId !== 'new' && currentItem && openStatus === 'archive' && (
               <button type="button" className="secondary" onClick={() => moveStatus(currentItem, 'active', 'Document restored')} disabled={mutate.isPending}>Restore</button>
@@ -396,11 +401,6 @@ export default function PracticeDocumentsPage() {
             >
               Download
             </button>
-            {!openReadOnly && (
-              <button type="button" className="primary" onClick={saveDocument} disabled={mutate.isPending}>
-                {mutate.isPending ? 'Saving…' : 'Save'}
-              </button>
-            )}
           </>
         )}
         meta={(

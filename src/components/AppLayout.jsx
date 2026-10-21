@@ -132,15 +132,29 @@ function AppShell() {
           <NavLink to="/home" className="top-nav__brand top-nav__brand--compact" aria-label={PRODUCT_NAME}>
             <img className="top-nav__brand-mark" src={brandIconUrl} alt="" />
           </NavLink>
-          <button
-            type="button"
-            className="top-nav__menu-btn"
-            onClick={() => setMenuOpen(o => !o)}
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            aria-expanded={menuOpen}
-          >
-            {menuOpen ? '✕' : '☰'}
-          </button>
+          <div className="top-nav__mobile-tools">
+            <div className="top-nav__phone-utilities">
+              <ThemeToggle />
+              <button
+                type="button"
+                className="top-nav__utility-btn"
+                onClick={() => navigate('/settings/account')}
+                aria-label="Settings"
+                title="Settings"
+              >
+                <GearIcon />
+              </button>
+            </div>
+            <button
+              type="button"
+              className="top-nav__menu-btn"
+              onClick={() => setMenuOpen(o => !o)}
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={menuOpen}
+            >
+              {menuOpen ? '✕' : '☰'}
+            </button>
+          </div>
         </div>
         <div className="viewport-tray">
           <div className="tray-utilities">

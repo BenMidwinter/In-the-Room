@@ -23,6 +23,7 @@ export default function DocumentWorkspace({
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const canvasRef = useRef(null)
   const showInspector = phone && Boolean(meta || inspectorExtras)
+  const hasHeaderActions = Boolean((!phone && inspectorExtras) || actions)
 
   const closeInspector = () => {
     setInspectorOpen(false)
@@ -54,12 +55,12 @@ export default function DocumentWorkspace({
               {contextLabel || 'Details'}
             </button>
           ) : null}
-          trailing={(
+          trailing={hasHeaderActions ? (
             <div className="progress-notes-page__header-actions">
               {!phone && inspectorExtras}
               {actions}
             </div>
-          )}
+          ) : null}
         />
         {meta && !phone ? (
           <div className="progress-notes-page__meta-bar" role="group" aria-label="Document details">

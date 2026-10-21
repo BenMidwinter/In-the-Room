@@ -301,7 +301,12 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
         title={editorTitle}
         clientName={client?.real_name}
         onBack={handleCancel}
-        actions={(
+        actions={!openReadOnly ? (
+          <button type="button" className="primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save document'}
+          </button>
+        ) : null}
+        inspectorExtras={(
           <>
             {selectedId !== 'new' && openDoc && openStatus === 'archive' && (
               <button type="button" className="secondary" onClick={() => moveStatus(openDoc, 'active', 'Document restored')}>Restore</button>
@@ -310,11 +315,6 @@ export default function WorkingDocumentsPanel({ embedded = false }) {
               <button type="button" className="secondary" onClick={() => moveStatus(openDoc, 'archive', 'Document restored to archive')}>Restore to archive</button>
             )}
             <button type="button" className="secondary" onClick={handleDownload}>Download</button>
-            {!openReadOnly && (
-              <button type="button" className="primary" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save document'}
-              </button>
-            )}
           </>
         )}
         meta={(

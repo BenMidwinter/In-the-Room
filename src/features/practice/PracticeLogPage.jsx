@@ -295,7 +295,12 @@ export default function PracticeLogPage({ kind }) {
       <DocumentWorkspace
         title={label.trim() || copy.title}
         onBack={close}
-        actions={(
+        actions={!openReadOnly ? (
+          <button type="button" className="primary" onClick={save} disabled={saveEntry.isPending}>
+            {saveEntry.isPending ? 'Saving…' : 'Save'}
+          </button>
+        ) : null}
+        inspectorExtras={(
           <>
             {openId !== 'new' && openEntry && openStatus === 'archive' && (
               <button type="button" className="secondary" onClick={() => moveStatus(openEntry, 'active', 'Entry restored')} disabled={setLogStatus.isPending}>Restore</button>
@@ -315,11 +320,6 @@ export default function PracticeLogPage({ kind }) {
             >
               Download
             </button>
-            {!openReadOnly && (
-              <button type="button" className="primary" onClick={save} disabled={saveEntry.isPending}>
-                {saveEntry.isPending ? 'Saving…' : 'Save'}
-              </button>
-            )}
           </>
         )}
         meta={(

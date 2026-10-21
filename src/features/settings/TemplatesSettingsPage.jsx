@@ -96,14 +96,14 @@ export default function TemplatesSettingsPage({ kind, title }) {
         title={name.trim() || title}
         onBack={() => setSelectedId(null)}
         actions={(
-          <>
-            <button type="button" className="secondary" onClick={() => remove(selectedId)} disabled={removeTemplate.isPending}>
-              Delete
-            </button>
-            <button type="button" className="primary" onClick={save} disabled={saveTemplate.isPending}>
-              {saveTemplate.isPending ? 'Saving…' : 'Save template'}
-            </button>
-          </>
+          <button type="button" className="primary" onClick={save} disabled={saveTemplate.isPending}>
+            {saveTemplate.isPending ? 'Saving…' : 'Save template'}
+          </button>
+        )}
+        inspectorExtras={(
+          <button type="button" className="secondary" onClick={() => remove(selectedId)} disabled={removeTemplate.isPending}>
+            Delete
+          </button>
         )}
         meta={(
           <label className="progress-notes-page__meta-field progress-notes-page__meta-field--title">

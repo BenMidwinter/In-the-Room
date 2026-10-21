@@ -330,7 +330,12 @@ export default function LettersPanel({ embedded = false }) {
         title={editorTitle}
         clientName={client?.real_name}
         onBack={handleCancel}
-        actions={(
+        actions={!openReadOnly ? (
+          <button type="button" className="primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save letter'}
+          </button>
+        ) : null}
+        inspectorExtras={(
           <>
             {selectedId !== 'new' && openLetter && openStatus === 'archive' && (
               <button type="button" className="secondary" onClick={() => moveStatus(openLetter, 'active', 'Letter restored')}>Restore</button>
@@ -339,11 +344,6 @@ export default function LettersPanel({ embedded = false }) {
               <button type="button" className="secondary" onClick={() => moveStatus(openLetter, 'archive', 'Letter restored to archive')}>Restore to archive</button>
             )}
             <button type="button" className="secondary" onClick={handleDownload}>Download</button>
-            {!openReadOnly && (
-              <button type="button" className="primary" onClick={handleSave} disabled={saving}>
-                {saving ? 'Saving…' : 'Save letter'}
-              </button>
-            )}
           </>
         )}
         meta={(

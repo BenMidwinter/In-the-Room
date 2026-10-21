@@ -406,7 +406,12 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
         title={title.trim() || 'Report'}
         clientName={client?.real_name}
         onBack={() => setOpenId(null)}
-        actions={(
+        actions={!openReadOnly ? (
+          <button type="button" className="primary" onClick={save} disabled={saveReport.isPending}>
+            {saveReport.isPending ? 'Saving…' : 'Save report'}
+          </button>
+        ) : null}
+        inspectorExtras={(
           <>
             {openReportRow && openStatus === 'archive' && (
               <button type="button" className="secondary" onClick={() => moveStatus(openReportRow, 'active', 'Report restored')} disabled={setReportStatus.isPending}>Restore</button>
@@ -421,11 +426,6 @@ function EpisodeReports({ episode, client, clientId, userId, organizationId, ope
             >
               Download
             </button>
-            {!openReadOnly && (
-              <button type="button" className="primary" onClick={save} disabled={saveReport.isPending}>
-                {saveReport.isPending ? 'Saving…' : 'Save report'}
-              </button>
-            )}
           </>
         )}
         meta={(

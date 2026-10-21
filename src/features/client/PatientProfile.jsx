@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Outlet, useLocation, matchPath } from 'react-router-dom'
+import EditorInspector from '../../components/EditorInspector'
 import { useAppSession } from '../../lib/AppSessionContext'
+import { usePhoneLayout } from '../../lib/usePhoneLayout'
 import { useAppClients } from '../../lib/queries'
 import ClientDetailsBar from './ClientDetailsBar'
 import ClientNav from './ClientNav'
@@ -16,6 +18,8 @@ function PatientProfileFrame({ client: initialClient }) {
   const { clients } = useAppClients()
   const [client, setClient] = useState(initialClient)
   const [exportOpen, setExportOpen] = useState(false)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const phone = usePhoneLayout()
   const onDocuments = Boolean(matchPath(
     { path: '/clients/:clientId/documents', end: true },
     location.pathname,
@@ -38,27 +42,42 @@ function PatientProfileFrame({ client: initialClient }) {
     if (updated) setClient(updated)
   }
 
-  const assignmentHint = client.workplace_id && client.user_id !== session?.user?.id
-    ? ' · Assigned to another clinician'
-    : ''
+  const assignedElsewhere = Boolean(client.workplace_id && client.user_id !== session?.user?.id)
 
   return (
     <div className="page page--client">
       {!editorOpen && (
       <header className="client-shell__header">
         <div className="client-shell__identity">
-          <h1>
-            {client.real_name}
-          </h1>
+          <div className="client-shell__title-row">
+            <h1>
+              {client.real_name}
+            </h1>
+            {phone && (
+              <button
+                type="button"
+                className="editor-context-chip"
+                aria-expanded={detailsOpen}
+                aria-haspopup="dialog"
+                onClick={() => setDetailsOpen(true)}
+              >
+                Details
+              </button>
+            )}
+          </div>
           <p className="client-shell__subtitle">
             DOB {client.dob || '—'}
-            {' · '}
-            {client.gender?.trim() || 'Gender not recorded'}
-            {assignmentHint}
+            {!phone && (
+              <>
+                {' · '}
+                {client.gender?.trim() || 'Gender not recorded'}
+                {assignedElsewhere ? ' · Assigned to another clinician' : ''}
+              </>
+            )}
           </p>
         </div>
 
-        {!onOverview && (
+        {!phone && !onOverview && (
           <ClientDetailsBar
             client={client}
             embedded
@@ -66,10 +85,37 @@ function PatientProfileFrame({ client: initialClient }) {
           />
         )}
 
-        <div className="client-shell__actions">
-          <button type="button" className="secondary" onClick={() => setExportOpen(true)}>Export</button>
-        </div>
+        {!phone && (
+          <div className="client-shell__actions">
+            <button type="button" className="secondary" onClick={() => setExportOpen(true)}>Export</button>
+          </div>
+        )}
       </header>
+      )}
+
+      {phone && !editorOpen && (
+        <EditorInspector open={detailsOpen} title="Details" onClose={() => setDetailsOpen(false)}>
+          {assignedElsewhere ? (
+            <p className="editor-inspector__context text-small">Assigned to another clinician</p>
+          ) : null}
+          <ClientDetailsBar
+            client={client}
+            embedded
+            onClientUpdated={handleClientUpdated}
+          />
+          <div className="editor-inspector__extras">
+            <button
+              type="button"
+              className="secondary"
+              onClick={() => {
+                setDetailsOpen(false)
+                setExportOpen(true)
+              }}
+            >
+              Export
+            </button>
+          </div>
+        </EditorInspector>
       )}
 
       {!editorOpen && <ClientNav clientId={client.id} client={client} />}
