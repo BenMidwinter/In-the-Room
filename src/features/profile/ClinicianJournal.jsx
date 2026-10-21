@@ -19,6 +19,7 @@ import {
   statusLabelOf,
   statusMenuItems,
 } from '../../lib/recordStatus'
+import { journalPreviewLine } from '../../lib/journalEntry'
 import {
   useDeleteJournalEntryMutation,
   useJournalEntriesQuery,
@@ -43,11 +44,6 @@ function formatJournalDate(date) {
   })
 }
 
-function stripHtml(html) {
-  if (!html) return ''
-  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-}
-
 function sortJournalEntries(items) {
   return [...items].sort((a, b) => {
     const byDate = b.date.localeCompare(a.date)
@@ -60,7 +56,7 @@ const COLUMNS = [
   { key: 'date', label: 'Date', sort: 'date' },
   { key: 'time', label: 'Time', sort: 'text' },
   { key: 'somatic', label: 'Somatic state', filter: 'choice', sort: 'text' },
-  { key: 'preview', label: 'Preview', filter: 'text' },
+  { key: 'preview', label: 'Preview', filter: 'text', className: 'record-table__col--preview' },
   STATUS_COLUMN,
   { key: 'actions', label: '', sort: false, className: 'record-table__col--actions' },
 ]
@@ -212,7 +208,7 @@ export default function ClinicianJournal() {
   })
 
   const rows = sortedEntries.map((entry) => {
-    const preview = stripHtml(entry.body_text).slice(0, 90) || 'Empty entry'
+    const preview = journalPreviewLine(entry.body_text) || 'Empty entry'
     const status = recordStatusOf(entry)
     const readOnly = status !== 'active'
     return {
@@ -239,7 +235,7 @@ export default function ClinicianJournal() {
             {entry.somatic_state || '—'}
           </span>
         ),
-        preview: <span className="record-table__primary">{preview}</span>,
+        preview: <span className="record-table__primary journal-preview">{preview}</span>,
         state: <StatusBadge status={status} />,
         actions: (
           <RowMenu

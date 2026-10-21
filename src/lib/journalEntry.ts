@@ -20,6 +20,20 @@ const SOMATIC_STATES = new Set([
   'Settled',
 ])
 
+/** First line of a journal document, for the list preview. Later lines stay in the entry. */
+export function journalPreviewLine(html: string | null | undefined): string {
+  if (!html) return ''
+  const withBreaks = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6]|blockquote)>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+  const line = withBreaks
+    .split('\n')
+    .map((part) => part.replace(/[ \t\f\v]+/g, ' ').trim())
+    .find(Boolean)
+  return line || ''
+}
+
 export function journalContentFromPayload(payload: Json | null | undefined): { time: string; body_text: string } {
   const row = payload && typeof payload === 'object' && !Array.isArray(payload)
     ? payload as Record<string, unknown>

@@ -1,5 +1,17 @@
 /* ── Clinician journal ── */
 
+.record-table td.record-table__col--preview {
+  max-width: 28rem;
+}
+
+.journal-preview {
+  display: block;
+  max-width: 28rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .journal {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);

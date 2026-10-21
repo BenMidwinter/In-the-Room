@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { journalContentFromPayload, journalEntryFromRow } from './journalEntry'
+import { journalContentFromPayload, journalEntryFromRow, journalPreviewLine } from './journalEntry'
 
 describe('journal entry payload', () => {
   it('reads the time and body stored beside the date', () => {
@@ -22,6 +22,15 @@ describe('journal entry payload', () => {
       time: '09:00',
       body_text: '<p></p>',
     })
+  })
+
+  it('previews only the first line of the document', () => {
+    const html = '<p>Opened with a walk.</p><p>The rest of the afternoon stayed quiet.</p>'
+    expect(journalPreviewLine(html)).toBe('Opened with a walk.')
+    expect(journalPreviewLine('<p>Hello<br>and the next line</p>')).toBe('Hello')
+    expect(journalPreviewLine('<p></p><p>Second block</p>')).toBe('Second block')
+    expect(journalPreviewLine('<p>   </p>')).toBe('')
+    expect(journalPreviewLine('')).toBe('')
   })
 
   it('maps a stored row onto the journal book', () => {
