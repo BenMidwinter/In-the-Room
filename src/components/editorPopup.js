@@ -1,4 +1,5 @@
 const VIEWPORT_MARGIN = 8
+const FONT_MENU_WIDTH = 248
 
 /**
  * Park line for the formatting bar: the bottom of sticky chrome that
@@ -26,6 +27,30 @@ export function stuckChromeBottom(toolbar) {
   return bottom
 }
 
+/**
+ * Sticky offset for the formatting bar. A larger visual-viewport offset
+ * (the keyboard has panned the page) parks the bar at the top of the screen
+ * you can see. The bar stays sticky, so it cannot leave its place in the
+ * page. While the session header is still visible, the stick line stays at
+ * or below that header: scrolling back up with the keyboard open settles
+ * the bar under the header instead of covering it.
+ */
+export function formattingBarStickTop(toolbar) {
+  const chrome = stuckChromeBottom(toolbar)
+  const viewport = window.visualViewport
+  const visibleTop = viewport ? viewport.offsetTop : 0
+  let top = Math.max(chrome, visibleTop)
+  const page = toolbar.closest('.progress-notes-page')
+  const header = page?.querySelector('.room-sticky-bar')
+  if (!header || header === toolbar || toolbar.contains(header)) return top
+  const rect = header.getBoundingClientRect()
+  const visibleHeight = viewport ? viewport.height : window.innerHeight
+  if (rect.bottom > 0 && rect.top < visibleHeight) {
+    top = Math.max(top, rect.bottom + visibleTop)
+  }
+  return top
+}
+
 export function placeEditorPopup(anchor, host) {
   const anchorRect = anchor.getBoundingClientRect()
   const panel = host.firstElementChild
@@ -33,7 +58,9 @@ export function placeEditorPopup(anchor, host) {
   const palette = panel?.classList.contains('doc-editor__palette')
   const maxWidth = wide
     ? Math.min(448, window.innerWidth - VIEWPORT_MARGIN * 2)
-    : Math.min(360, window.innerWidth - VIEWPORT_MARGIN * 2)
+    : palette
+      ? Math.min(FONT_MENU_WIDTH, window.innerWidth - VIEWPORT_MARGIN * 2)
+      : Math.min(360, window.innerWidth - VIEWPORT_MARGIN * 2)
   host.classList.toggle('doc-editor__popup-host--card', Boolean(palette))
   host.style.position = 'fixed'
   host.style.zIndex = '80'

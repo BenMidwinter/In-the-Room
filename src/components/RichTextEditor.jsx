@@ -29,7 +29,7 @@ import {
 } from './EditorToolbarIcons'
 import SignatureMenu from './SignatureMenu'
 import EditorPopup from './useAnchoredPopup'
-import { isEditorPopupEvent, stuckChromeBottom } from './editorPopup'
+import { formattingBarStickTop, isEditorPopupEvent } from './editorPopup'
 import ErrorBoundary from './ErrorBoundary'
 
 /** Chrome layout — theme editor tokens keep toolbar/canvas legible across themes. */
@@ -73,6 +73,7 @@ function ToolbarButton({ onClick, active, disabled, children, title, wide, class
       disabled={disabled}
       title={title}
       aria-label={title}
+      aria-pressed={active ? 'true' : 'false'}
     >
       {children}
     </button>
@@ -104,8 +105,8 @@ function FormattingBar({ className, children }) {
         el.style.removeProperty('top')
         return
       }
-      const bottom = stuckChromeBottom(el)
-      if (bottom > 0) el.style.top = `${bottom}px`
+      const top = formattingBarStickTop(el)
+      if (top > 0) el.style.top = `${top}px`
       else el.style.removeProperty('top')
     }
     measure()
@@ -115,11 +116,17 @@ function FormattingBar({ className, children }) {
       '.top-nav__mobile-bar, .client-nav-bar, .room-sticky-bar, .progress-notes-page__header',
     ).forEach((node) => observer.observe(node))
     window.addEventListener('resize', measure)
+    window.addEventListener('scroll', measure, { passive: true })
     media.addEventListener('change', measure)
+    window.visualViewport?.addEventListener('resize', measure)
+    window.visualViewport?.addEventListener('scroll', measure)
     return () => {
       observer.disconnect()
       window.removeEventListener('resize', measure)
+      window.removeEventListener('scroll', measure)
       media.removeEventListener('change', measure)
+      window.visualViewport?.removeEventListener('resize', measure)
+      window.visualViewport?.removeEventListener('scroll', measure)
     }
   }, [])
 

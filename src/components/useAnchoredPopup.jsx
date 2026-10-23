@@ -24,15 +24,32 @@ export default function EditorPopup({ open, anchorRef, children }) {
     const toolbar = anchorRef.current?.closest('.doc-editor__toolbar')
     toolbar?.addEventListener('scroll', place, { passive: true })
     window.addEventListener('resize', place)
-    window.addEventListener('scroll', place, true)
-    window.visualViewport?.addEventListener('resize', place)
-    window.visualViewport?.addEventListener('scroll', place)
+    let lastY = 0
+    const rememberTouch = (event) => {
+      lastY = event.touches[0]?.clientY ?? lastY
+    }
+    const keepPageStill = (event) => {
+      const palette = event.target instanceof Element
+        ? event.target.closest('.doc-editor__popup-host--card .doc-editor__palette')
+        : null
+      const currentY = event.touches[0]?.clientY ?? lastY
+      const dy = currentY - lastY
+      lastY = currentY
+      if (palette && palette.scrollHeight > palette.clientHeight + 1) {
+        const atTop = palette.scrollTop <= 0
+        const atBottom = palette.scrollTop + palette.clientHeight >= palette.scrollHeight - 1
+        if ((atTop && dy > 0) || (atBottom && dy < 0)) event.preventDefault()
+        return
+      }
+      event.preventDefault()
+    }
+    document.addEventListener('touchstart', rememberTouch, { passive: true })
+    document.addEventListener('touchmove', keepPageStill, { passive: false })
     return () => {
       toolbar?.removeEventListener('scroll', place)
       window.removeEventListener('resize', place)
-      window.removeEventListener('scroll', place, true)
-      window.visualViewport?.removeEventListener('resize', place)
-      window.visualViewport?.removeEventListener('scroll', place)
+      document.removeEventListener('touchstart', rememberTouch)
+      document.removeEventListener('touchmove', keepPageStill)
     }
   }, [open, phone, anchorRef])
 

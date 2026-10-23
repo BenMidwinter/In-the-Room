@@ -706,6 +706,15 @@ body:has(.app-shell--tray) {
   box-shadow: var(--edge-recessed);
 }
 
+/* Pressed formatting controls. A dedicated rule, so the tint is not lost
+   behind the button's transparent background. */
+.app-shell--tray .doc-editor__btn--active,
+.app-shell--tray .doc-editor__style-btn--open {
+  background: color-mix(in srgb, var(--col-primary) 24%, var(--editor-chrome-bg, var(--bg-surface)));
+  color: var(--col-primary-dark, var(--col-primary));
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--col-primary) 55%, transparent);
+}
+
 /* The formatting controls sit in this wrapper. On a phone it is the sticky
    element, so it stays free of overflow. Wider layouts leave it in normal flow. */
 .doc-editor__toolbar-stick {
@@ -1004,6 +1013,11 @@ body:has(.app-shell--tray) {
     min-width: calc(7 * 4.75rem);
   }
 
+  .app-shell--tray .progress-notes-page .room-sticky-bar {
+    position: static;
+    top: auto;
+  }
+
   .app-shell--tray .doc-editor__toolbar-stick {
     position: sticky;
     top: var(--phone-bar-height);
@@ -1071,6 +1085,7 @@ body:has(.app-shell--tray) {
     box-sizing: border-box;
     overflow: visible;
     background: transparent;
+    touch-action: none;
   }
 
   body:has(.app-shell--tray) .doc-editor__popup-host > :is(
@@ -1096,7 +1111,9 @@ body:has(.app-shell--tray) {
 
   body:has(.app-shell--tray) .doc-editor__popup-host--card > .doc-editor__palette {
     width: 100%;
+    min-width: 0;
     margin: 0;
+    padding: 0.45rem;
     border: 0;
     border-radius: 0;
     box-shadow: none;
@@ -1104,6 +1121,21 @@ body:has(.app-shell--tray) {
     overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
+    touch-action: pan-y;
+  }
+
+  body:has(.app-shell--tray) .doc-editor__popup-host--card .doc-editor__palette-row,
+  body:has(.app-shell--tray) .doc-editor__popup-host--card .doc-editor__palette-grid {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body:has(.app-shell--tray) .doc-editor__popup-host--card .doc-editor__palette-font,
+  body:has(.app-shell--tray) .doc-editor__popup-host--card .doc-editor__palette-chip {
+    width: 100%;
+    justify-content: flex-start;
+    text-align: left;
   }
 
   body:has(.app-shell--tray) .doc-editor__popup-host > .signature-pad {
