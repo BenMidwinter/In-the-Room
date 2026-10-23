@@ -28,23 +28,33 @@ export function stuckChromeBottom(toolbar) {
 
 export function placeEditorPopup(anchor, host) {
   const anchorRect = anchor.getBoundingClientRect()
+  const panel = host.firstElementChild
   const wide = anchor.classList.contains('doc-editor__menu--signature')
+  const palette = panel?.classList.contains('doc-editor__palette')
   const maxWidth = wide
     ? Math.min(448, window.innerWidth - VIEWPORT_MARGIN * 2)
     : Math.min(360, window.innerWidth - VIEWPORT_MARGIN * 2)
+  host.classList.toggle('doc-editor__popup-host--card', Boolean(palette))
   host.style.position = 'fixed'
   host.style.zIndex = '80'
-  host.style.maxWidth = `${maxWidth}px`
-  host.style.width = wide ? `${maxWidth}px` : 'max-content'
   host.style.right = 'auto'
+  host.style.maxWidth = `${maxWidth}px`
+  host.style.width = (wide || palette) ? `${maxWidth}px` : 'max-content'
   const width = Math.min(host.offsetWidth || maxWidth, maxWidth)
   let left = wide ? anchorRect.right - width : anchorRect.left
   left = Math.max(VIEWPORT_MARGIN, Math.min(left, window.innerWidth - VIEWPORT_MARGIN - width))
   const top = anchorRect.bottom + 4
-  const spaceBelow = window.innerHeight - top - VIEWPORT_MARGIN
+  const spaceBelow = Math.max(160, window.innerHeight - top - VIEWPORT_MARGIN)
   host.style.left = `${left}px`
   host.style.top = `${top}px`
-  host.style.maxHeight = `${Math.max(120, spaceBelow)}px`
+  if (panel && palette) {
+    panel.style.boxSizing = 'border-box'
+    panel.style.width = '100%'
+    panel.style.maxHeight = `${spaceBelow}px`
+    panel.style.overflowX = 'hidden'
+    panel.style.overflowY = 'auto'
+    panel.style.overscrollBehavior = 'contain'
+  }
 }
 
 export function isEditorPopupEvent(event) {

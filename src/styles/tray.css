@@ -1040,11 +1040,37 @@ body:has(.app-shell--tray) {
     font-size: 16px;
   }
 
+  /* The window is the only scroller on a process note. The canvas grows with
+     the writing, and the spare room under the last line stays inside the
+     editor so the formatting bar can keep sticking. */
+  .app-shell--tray .progress-notes-page.room-workspace {
+    min-height: calc(100lvh - var(--phone-bar-height));
+  }
+
+  .app-shell--tray .progress-notes-page__canvas-zone .doc-editor__canvas {
+    overflow: visible;
+    height: auto;
+    flex: 1 0 auto;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .app-shell--tray .progress-notes-page__canvas-zone .doc-editor__write {
+    min-height: calc(100lvh - var(--phone-bar-height) - 10rem + 45vh);
+    padding-bottom: 45vh;
+  }
+
+  .app-shell--tray .progress-notes-page__canvas-zone .doc-editor .ProseMirror,
+  .app-shell--tray .progress-notes-page__canvas-zone .doc-editor__prose {
+    min-height: 0;
+  }
+
+  /* Fixed host positions the menu. It does not scroll. A tall font card
+     scrolls on the panel inside the host. */
   body:has(.app-shell--tray) .doc-editor__popup-host {
     box-sizing: border-box;
-    overflow: auto;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible;
+    background: transparent;
   }
 
   body:has(.app-shell--tray) .doc-editor__popup-host > :is(
@@ -1057,10 +1083,27 @@ body:has(.app-shell--tray) {
     top: auto;
     right: auto;
     left: auto;
-    width: auto;
     max-width: 100%;
-    max-height: none;
-    overflow: visible;
+  }
+
+  body:has(.app-shell--tray) .doc-editor__popup-host--card {
+    overflow: hidden;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+  }
+
+  body:has(.app-shell--tray) .doc-editor__popup-host--card > .doc-editor__palette {
+    width: 100%;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   body:has(.app-shell--tray) .doc-editor__popup-host > .signature-pad {

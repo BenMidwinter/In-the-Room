@@ -144,7 +144,17 @@ describe('hardware inset tray tokens', () => {
     expect(phone).toContain('z-index: 15')
     expect(phone).toContain('font-size: 16px')
     expect(phone).toContain('.doc-editor__popup-host')
+    expect(phone).toContain('.doc-editor__popup-host--card')
+    expect(phone).toContain('padding-bottom: 45vh')
+    expect(phone).toContain('.progress-notes-page__canvas-zone .doc-editor__canvas')
     expect(phone).toContain('.app-shell--tray .doc-editor {')
+    const popupHost = phone.slice(
+      phone.indexOf('body:has(.app-shell--tray) .doc-editor__popup-host {'),
+      phone.indexOf('body:has(.app-shell--tray) .doc-editor__popup-host >'),
+    )
+    expect(popupHost).toContain('overflow: visible')
+    expect(popupHost).not.toContain('-webkit-overflow-scrolling')
+    expect(popupHost).not.toContain('overflow: auto')
     expect(phone).toContain('position: static')
     expect(phone).toContain('.calendar-toolbar__label-short')
     expect(phone).toContain('.client-shell__title-row')
