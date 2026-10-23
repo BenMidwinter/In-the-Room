@@ -56,6 +56,25 @@ describe('hardware inset tray tokens', () => {
     }
   })
 
+  it('keeps the signed-in shell flat, without an outer frame or a recessed nav', () => {
+    expect(tray).not.toContain('background: var(--surface-bezel)')
+    const shell = tray.slice(tray.indexOf('body:has(.app-shell--tray)'), tray.indexOf('.viewport-tray {'))
+    expect(shell).toContain('background-color: var(--surface-tray)')
+    expect(shell).toContain('padding: 0;')
+    expect(shell).toContain('background: var(--surface-tray);')
+    expect(shell).toContain('border-right: 1px solid var(--edge-hairline)')
+    const links = tray.slice(
+      tray.indexOf('.app-shell--tray .top-nav__links {'),
+      tray.indexOf('.app-shell--tray .top-nav__link {'),
+    )
+    expect(links).toContain('background: transparent')
+    expect(links).not.toContain('var(--edge-recessed)')
+    const viewport = tray.slice(tray.indexOf('.viewport-tray {'), tray.indexOf('.app-shell--tray .page,'))
+    expect(viewport).toContain('margin: 0;')
+    expect(viewport).toContain('box-shadow: none;')
+    expect(viewport).not.toContain('var(--edge-recessed)')
+  })
+
   it('seats the signed-in shell in a bezel and a viewport tray', () => {
     expect(layout).toContain('data-chrome="tray"')
     expect(layout).toContain('app-bezel')

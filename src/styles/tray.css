@@ -64,11 +64,14 @@
 }
 
 /* Phase B: signed-in chassis. Auth screens stay outside this shell.
-   The bezel does not clip, so the theme menu can open over the tray. */
+   The shell is one light surface. There is no outer frame, and the
+   primary nav sits flush on that same surface. The shell does not clip,
+   so the theme menu can open over the page. */
 
 body:has(.app-shell--tray) {
   height: 100dvh;
   overflow: hidden;
+  background-color: var(--surface-tray);
 }
 
 .app-shell--tray {
@@ -77,8 +80,8 @@ body:has(.app-shell--tray) {
   max-height: 100dvh;
   min-height: 0;
   overflow: hidden;
-  padding: var(--pad-bezel);
-  background: var(--surface-base);
+  padding: 0;
+  background: var(--surface-tray);
 }
 
 .app-bezel {
@@ -87,10 +90,10 @@ body:has(.app-shell--tray) {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  background: var(--surface-bezel);
-  border: 1px solid var(--edge-hairline);
-  border-radius: var(--radius-bezel);
-  box-shadow: var(--edge-milled);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .app-shell--tray .top-nav--tray {
@@ -100,15 +103,15 @@ body:has(.app-shell--tray) {
   align-self: stretch;
   margin: 0;
   overflow: visible;
-  background: transparent;
+  background: var(--surface-tray);
   border: 0;
+  border-right: 1px solid var(--edge-hairline);
   border-radius: 0;
   box-shadow: none;
 }
 
 .app-shell--tray .top-nav__inner {
   padding: var(--pad-bezel);
-  padding-right: 0;
   gap: var(--pad-bezel);
   text-align: left;
 }
@@ -126,10 +129,10 @@ body:has(.app-shell--tray) {
   gap: 0.15rem;
   overflow: visible;
   box-sizing: border-box;
-  background: var(--surface-tray);
-  border: 1px solid var(--edge-hairline);
-  border-radius: var(--radius-tray);
-  box-shadow: var(--edge-recessed);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .app-shell--tray .top-nav__link {
@@ -145,9 +148,9 @@ body:has(.app-shell--tray) {
 }
 
 .app-shell--tray .top-nav__link--active {
-  border-color: var(--edge-hairline);
+  border-color: transparent;
   background: var(--col-primary-light);
-  box-shadow: var(--edge-recessed);
+  box-shadow: none;
 }
 
 .app-shell--tray .top-nav__actions {
@@ -175,12 +178,12 @@ body:has(.app-shell--tray) {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  margin: var(--pad-bezel);
+  margin: 0;
   overflow: auto;
   background: var(--surface-tray);
-  border: 1px solid var(--edge-hairline);
-  border-radius: var(--radius-tray);
-  box-shadow: var(--edge-recessed);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .app-shell--tray .page,
@@ -189,9 +192,8 @@ body:has(.app-shell--tray) {
 .app-shell--tray .progress-notes-page,
 .app-shell--tray .room-workspace {
   min-height: 100%;
-  /* Cover the viewport inset ring. A transparent page let that ring
-     show beside the body, so the body looked a pixel narrower than
-     the opaque header and subheader above it. */
+  /* Keep the page opaque so a transparent stretch cannot show a different
+     colour beside the header and subheader. */
   background: var(--surface-tray);
 }
 
@@ -236,7 +238,7 @@ body:has(.app-shell--tray) {
     margin: 0;
     overflow: auto;
     transform: translateX(-105%);
-    background: var(--surface-bezel);
+    background: var(--surface-tray);
     border: 0;
     border-right: 1px solid var(--edge-hairline);
     border-radius: 0;
@@ -704,7 +706,7 @@ body:has(.app-shell--tray) {
   box-shadow: var(--edge-recessed);
 }
 
-/* Phone only. Wider layouts keep the bezel, the calendar pill, and the editor chrome.
+/* Phone only. Wider layouts keep the calendar pill and the editor chrome.
    The window itself scrolls. An inner frame with overflow hidden stops iOS from
    collapsing the address bar, and the clipped edge reads as a hard stop. */
 @media (max-width: 639px) {
