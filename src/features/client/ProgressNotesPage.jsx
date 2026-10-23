@@ -763,6 +763,24 @@ function ProgressNotesPageContent() {
           ))}
         </select>
       </label>
+
+      <ArtworkAttachmentZone
+        compact
+        clientId={client?.id}
+        attachments={artworkAttachments}
+        onChange={setArtworkAttachments}
+        disabled={!editorEditable}
+      />
+      {!phone && (
+        <button
+          type="button"
+          className="secondary progress-notes-page__history-toggle"
+          aria-pressed={historyOpen}
+          onClick={() => setHistoryOpen((open) => !open)}
+        >
+          {historyOpen ? 'Hide notes' : 'Show notes'}
+        </button>
+      )}
     </div>
   )
 
@@ -811,11 +829,6 @@ function ProgressNotesPageContent() {
             <button type="button" className="secondary editor-header__overflow" onClick={handleDownload}>
               Download
             </button>
-            {!historyOpen && (
-              <button type="button" className="secondary editor-header__overflow" onClick={() => setHistoryOpen(true)}>
-                Previous notes
-              </button>
-            )}
             {noteLocked ? (
               <button
                 type="button"
@@ -895,14 +908,6 @@ function ProgressNotesPageContent() {
               clinicianProfile={clinicianProfile}
             />
           </div>
-          {!phone && (
-            <ArtworkAttachmentZone
-              clientId={client?.id}
-              attachments={artworkAttachments}
-              onChange={setArtworkAttachments}
-              disabled={!editorEditable}
-            />
-          )}
           {addendums.length > 0 && (
             <div className="progress-note-addenda">
               {addendums.map((item) => (
@@ -963,9 +968,6 @@ function ProgressNotesPageContent() {
             >
               <div className="note-split__history-bar">
                 <h2>Previous notes</h2>
-                <button type="button" className="secondary" onClick={() => setHistoryOpen(false)}>
-                  Hide
-                </button>
               </div>
               {historyPanel}
             </aside>
@@ -983,21 +985,11 @@ function ProgressNotesPageContent() {
             </p>
           ) : null}
           {metaBar}
-          <ArtworkAttachmentZone
-            clientId={client?.id}
-            attachments={artworkAttachments}
-            onChange={setArtworkAttachments}
-            disabled={!editorEditable}
-          />
           <div className="editor-inspector__extras">
             <button type="button" className="secondary" onClick={handleDownload}>
               Download
             </button>
           </div>
-          <details className="editor-inspector__notes">
-            <summary>Previous notes</summary>
-            {historyPanel}
-          </details>
         </EditorInspector>
       )}
     </WorkspaceLayout>

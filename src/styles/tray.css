@@ -984,9 +984,25 @@ body:has(.app-shell--tray) {
     padding-right: var(--space-inline);
   }
 
-  .app-shell--tray .progress-notes-page__editor > .artwork-zone {
-    box-sizing: border-box;
-    padding: 0.65rem var(--space-inline) 0.85rem;
+  .form-overlay__panel--sheet .artwork-zone--bar {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: none;
+    align-self: stretch;
+  }
+
+  .form-overlay__panel--sheet .artwork-zone__bar-row {
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 36px;
+    flex-wrap: wrap;
+    padding: 0.3rem;
+  }
+
+  .form-overlay__panel--sheet .artwork-zone--bar .artwork-zone__list {
+    flex-wrap: wrap;
+    overflow: visible;
   }
 
   .app-shell--tray .artwork-zone__header .text-small {

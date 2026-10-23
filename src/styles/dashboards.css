@@ -1025,6 +1025,87 @@ button.timeline__body--link {
 .artwork-zone__file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .artwork-zone__remove { border: none; background: none; color: var(--txt-muted); cursor: pointer; font-size: var(--text-meta); }
 
+.artwork-zone--bar {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 18rem;
+  min-width: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-self: flex-end;
+}
+
+.artwork-zone__bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 18rem;
+  height: 36px;
+  padding-right: 0.35rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+.artwork-zone__bar-row--active {
+  border-color: var(--col-primary);
+  background: var(--brand-teal-muted);
+}
+
+.artwork-zone__bar-row--disabled {
+  opacity: 0.55;
+}
+
+.artwork-zone__pick {
+  flex: 0 0 auto;
+  height: 28px;
+  margin-left: 0.3rem;
+  padding: 0 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  background: var(--bg-surface);
+  color: var(--txt-body);
+  font: inherit;
+  font-size: var(--text-meta);
+  font-weight: 650;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.artwork-zone__pick:disabled {
+  cursor: not-allowed;
+}
+
+.artwork-zone--bar .artwork-zone__list {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  min-width: 0;
+  overflow: auto;
+  scrollbar-width: none;
+}
+
+.artwork-zone--bar .artwork-zone__list::-webkit-scrollbar {
+  display: none;
+}
+
+.artwork-zone--bar .artwork-zone__file {
+  flex: 0 0 auto;
+  max-width: 8.5rem;
+  height: 24px;
+  padding: 0 0.35rem;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted);
+}
+
 .notes-history { padding-bottom: 5.5rem; max-width: none; width: 100%; }
 .notes-history__header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-light); }
 .notes-history__title { margin: 0; font-size: var(--text-section); color: var(--col-accent); }

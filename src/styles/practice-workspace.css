@@ -864,6 +864,13 @@ select.progress-notes-page__meta-input {
   white-space: nowrap;
 }
 
+.progress-notes-page__history-toggle {
+  align-self: flex-end;
+  flex: 0 0 auto;
+  height: 36px;
+  white-space: nowrap;
+}
+
 .progress-notes-page__rail {
   display: flex;
   flex-direction: column;
