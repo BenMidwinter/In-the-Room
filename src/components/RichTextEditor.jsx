@@ -28,6 +28,7 @@ import {
   IconFormat,
 } from './EditorToolbarIcons'
 import SignatureMenu from './SignatureMenu'
+import useAnchoredPopup from './useAnchoredPopup'
 import ErrorBoundary from './ErrorBoundary'
 
 /** Chrome layout — theme editor tokens keep toolbar/canvas legible across themes. */
@@ -66,6 +67,7 @@ function ToolbarButton({ onClick, active, disabled, children, title, wide, class
     <button
       type="button"
       className={`${EDITOR_BTN}${active ? ` ${EDITOR_BTN_ACTIVE}` : ''}${wide ? ` ${EDITOR_BTN_WIDE}` : ''}${className ? ` ${className}` : ''}`}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       disabled={disabled}
       title={title}
@@ -78,18 +80,19 @@ function ToolbarButton({ onClick, active, disabled, children, title, wide, class
 
 function useCloseOnOutsideClick(open, ref, onClose) {
   useEffect(() => {
-    if (!open) return
-    const close = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) onClose()
+    if (!open) return undefined
+    const close = (event) => {
+      if (ref.current && !ref.current.contains(event.target)) onClose()
     }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
   }, [open, ref, onClose])
 }
 
 function MergeFieldMenu({ editor }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
+  const popupStyle = useAnchoredPopup(open, menuRef)
   useCloseOnOutsideClick(open, menuRef, () => setOpen(false))
 
   return (
@@ -98,11 +101,12 @@ function MergeFieldMenu({ editor }) {
         {'{ }'}
       </ToolbarButton>
       {open && (
-        <ul className="doc-editor__menu-list">
+        <ul className="doc-editor__menu-list" style={popupStyle}>
           {MERGE_FIELD_OPTIONS.map(({ key, label }) => (
             <li key={key}>
               <button
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   editor.chain().focus().insertMergeField(key).run()
                   setOpen(false)
@@ -121,6 +125,7 @@ function MergeFieldMenu({ editor }) {
 function FormatMenu({ editor }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
+  const popupStyle = useAnchoredPopup(open, menuRef)
   useCloseOnOutsideClick(open, menuRef, () => setOpen(false))
 
   const apply = (fn) => {
@@ -134,7 +139,7 @@ function FormatMenu({ editor }) {
         <IconFormat />
       </ToolbarButton>
       {open && (
-        <div className="doc-editor__palette doc-editor__palette--format">
+        <div className="doc-editor__palette doc-editor__palette--format" style={popupStyle}>
           <section className="doc-editor__palette-section">
             <h4 className="doc-editor__palette-title">Font</h4>
             <div className="doc-editor__palette-row">
@@ -144,6 +149,7 @@ function FormatMenu({ editor }) {
                   type="button"
                   className="doc-editor__palette-font"
                   style={{ fontFamily: font.css }}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => apply(() => editor.chain().focus().setFontFamily(font.id).run())}
                 >
                   {font.label}
@@ -159,6 +165,7 @@ function FormatMenu({ editor }) {
                   key={size.id}
                   type="button"
                   className="doc-editor__palette-chip"
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => apply(() => editor.chain().focus().setStandardTextSize(size.id).run())}
                 >
                   <span className={`doc-editor__palette-preview ${size.className}`}>Aa</span>
@@ -178,6 +185,7 @@ function FormatMenu({ editor }) {
                   title={color.label}
                   aria-label={color.label}
                   style={color.hex ? { background: color.hex } : undefined}
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => apply(() => editor.chain().focus().setTextColor(color.id).run())}
                 />
               ))}
@@ -191,6 +199,7 @@ function FormatMenu({ editor }) {
                   key={hl.id}
                   type="button"
                   className="doc-editor__palette-chip"
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => apply(() => editor.chain().focus().setExpressiveHighlight(hl.id).run())}
                 >
                   {hl.isClear ? (
@@ -211,6 +220,7 @@ function FormatMenu({ editor }) {
                   key={voice.id}
                   type="button"
                   className="doc-editor__palette-chip"
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => apply(() => editor.chain().focus().setExpressiveSize(voice.id).run())}
                 >
                   <span className={`doc-editor__palette-preview ${voice.className}`}>Aa</span>
@@ -242,6 +252,7 @@ function currentBlockStyle(toolbar) {
 function StyleMenu({ editor, toolbar }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
+  const popupStyle = useAnchoredPopup(open, menuRef)
   useCloseOnOutsideClick(open, menuRef, () => setOpen(false))
   const current = currentBlockStyle(toolbar)
 
@@ -252,13 +263,14 @@ function StyleMenu({ editor, toolbar }) {
         className={`doc-editor__style-btn${open ? ' doc-editor__style-btn--open' : ''}`}
         aria-expanded={open}
         aria-haspopup="listbox"
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => setOpen(o => !o)}
       >
         <span className={`doc-editor__style-label doc-editor__style-label--${current.id}`}>{current.label}</span>
         <span className="doc-editor__style-caret" aria-hidden />
       </button>
       {open && (
-        <ul className="doc-editor__style-list" role="listbox" aria-label="Text style">
+        <ul className="doc-editor__style-list" role="listbox" aria-label="Text style" style={popupStyle}>
           {BLOCK_STYLES.map(style => (
             <li key={style.id}>
               <button
@@ -266,6 +278,7 @@ function StyleMenu({ editor, toolbar }) {
                 role="option"
                 aria-selected={current.id === style.id}
                 className={`doc-editor__style-option doc-editor__style-option--${style.id}${current.id === style.id ? ' doc-editor__style-option--on' : ''}`}
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => {
                   style.apply(editor)
                   setOpen(false)

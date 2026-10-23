@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export default function SignaturePad({ onCancel, onSave }) {
+export default function SignaturePad({ onCancel, onSave, style }) {
   const canvasRef = useRef(null)
   const drawingRef = useRef(false)
   const lastPointRef = useRef(null)
@@ -68,7 +68,7 @@ export default function SignaturePad({ onCancel, onSave }) {
   }
 
   return (
-    <div className="signature-pad" role="dialog" aria-label="Draw your signature">
+    <div className="signature-pad" role="dialog" aria-label="Draw your signature" style={style}>
       <p className="signature-pad__label">Draw your signature</p>
       <canvas
         ref={canvasRef}

@@ -714,7 +714,9 @@ body:has(.app-shell--tray) {
   body:has(.app-shell--tray) {
     height: auto;
     max-height: none;
-    overflow: visible;
+    max-width: 100%;
+    overflow-x: clip;
+    overflow-y: visible;
     background-color: var(--surface-tray);
   }
 
@@ -731,6 +733,8 @@ body:has(.app-shell--tray) {
     height: auto;
     max-height: none;
     min-height: 100lvh;
+    min-width: 0;
+    max-width: 100%;
     overflow: visible;
     background: var(--surface-tray);
   }
@@ -740,13 +744,24 @@ body:has(.app-shell--tray) {
   .app-shell--tray .main-content:has(.page--calendar),
   .app-shell--tray .viewport-tray,
   .app-shell--tray .viewport-tray:has(.page--calendar),
+  .app-shell--tray .page,
   .app-shell--tray .page--calendar,
   .app-shell--tray .note-split,
+  .app-shell--tray .progress-notes-page,
   .app-shell--tray .progress-notes-page__editor,
   .app-shell--tray .progress-notes-page__canvas-zone {
     height: auto;
     max-height: none;
+    min-width: 0;
+    max-width: 100%;
     overflow: visible;
+  }
+
+  .app-shell--tray .clinical-doc-overlay,
+  .app-shell--tray .clinical-doc-page,
+  .app-shell--tray .doc-editor {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .app-shell--tray .app-bezel {
@@ -975,13 +990,38 @@ body:has(.app-shell--tray) {
 
   .app-shell--tray .doc-editor__toolbar {
     box-sizing: border-box;
+    display: flex;
     flex-wrap: nowrap;
+    align-items: center;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
     scrollbar-width: none;
     padding-top: 0.25rem;
     padding-bottom: 0.25rem;
     padding-left: var(--space-inline);
     padding-right: var(--space-inline);
+  }
+
+  .app-shell--tray .doc-editor__toolbar > *,
+  .app-shell--tray .doc-editor__toolbar-group,
+  .app-shell--tray .doc-editor__btn,
+  .app-shell--tray .doc-editor__style-btn {
+    flex-shrink: 0;
+    touch-action: manipulation;
+  }
+
+  .app-shell--tray .doc-editor__palette,
+  .app-shell--tray .doc-editor__menu-list,
+  .app-shell--tray .doc-editor__style-list,
+  .app-shell--tray .signature-pad {
+    max-width: calc(100vw - 1rem);
+    min-width: 0;
   }
 
   .form-overlay__panel--sheet .artwork-zone--bar {

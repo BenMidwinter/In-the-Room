@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import SignaturePad from './SignaturePad'
 import { usePrompt } from './ui'
 import { IconSign } from './EditorToolbarIcons'
+import useAnchoredPopup from './useAnchoredPopup'
 
 const BTN =
   'doc-editor__btn inline-flex min-h-[1.85rem] min-w-[1.85rem] items-center justify-center rounded border-0 bg-transparent px-1.5 text-[0.82rem] text-accent transition-colors hover:enabled:bg-primary/15 disabled:cursor-default disabled:opacity-35'
@@ -11,6 +12,7 @@ export default function SignatureMenu({ editor, clinicianProfile }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [padOpen, setPadOpen] = useState(false)
   const menuRef = useRef(null)
+  const popupStyle = useAnchoredPopup(menuOpen || padOpen, menuRef)
   const prompt = usePrompt()
 
   useEffect(() => {
@@ -21,8 +23,8 @@ export default function SignatureMenu({ editor, clinicianProfile }) {
         setPadOpen(false)
       }
     }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
   }, [menuOpen, padOpen])
 
   const closeAll = () => {
@@ -65,6 +67,7 @@ export default function SignatureMenu({ editor, clinicianProfile }) {
       <button
         type="button"
         className={`${BTN}${menuOpen || padOpen ? ` ${BTN_ACTIVE}` : ''}`}
+        onMouseDown={(event) => event.preventDefault()}
         onClick={() => setMenuOpen(open => !open)}
         title="Insert signature"
         aria-label="Insert signature"
@@ -73,21 +76,21 @@ export default function SignatureMenu({ editor, clinicianProfile }) {
         <IconSign />
       </button>
       {menuOpen && !padOpen && (
-        <ul className="doc-editor__menu-list doc-editor__menu-list--signature">
+        <ul className="doc-editor__menu-list doc-editor__menu-list--signature" style={popupStyle}>
           <li>
-            <button type="button" onClick={useStored}>
+            <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={useStored}>
               {clinicianProfile?.signature_image_url
                 ? 'Use account signature'
                 : 'Use account sign-off'}
             </button>
           </li>
           <li>
-            <button type="button" onClick={() => setPadOpen(true)}>
+            <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => setPadOpen(true)}>
               Handwrite here
             </button>
           </li>
           <li>
-            <button type="button" onClick={useScript}>
+            <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={useScript}>
               Handwritten style font
             </button>
           </li>
@@ -95,6 +98,7 @@ export default function SignatureMenu({ editor, clinicianProfile }) {
       )}
       {padOpen && (
         <SignaturePad
+          style={popupStyle}
           onCancel={() => setPadOpen(false)}
           onSave={useDrawn}
         />
