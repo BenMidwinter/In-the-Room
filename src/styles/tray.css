@@ -706,6 +706,15 @@ body:has(.app-shell--tray) {
   box-shadow: var(--edge-recessed);
 }
 
+/* The formatting controls sit in this wrapper. On a phone it is the sticky
+   element, so it stays free of overflow. Wider layouts leave it in normal flow. */
+.doc-editor__toolbar-stick {
+  flex-shrink: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 /* Phone only. Wider layouts keep the calendar pill and the editor chrome.
    The window itself scrolls. An inner frame with overflow hidden stops iOS from
    collapsing the address bar, and the clipped edge reads as a hard stop. */
@@ -758,10 +767,17 @@ body:has(.app-shell--tray) {
   }
 
   .app-shell--tray .clinical-doc-overlay,
-  .app-shell--tray .clinical-doc-page,
+  .app-shell--tray .clinical-doc-page {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  /* Sticky reaches the window only when no ancestor clips. Editors inside a
+     fixed-height document keep their own canvas scroll. */
   .app-shell--tray .doc-editor {
     min-width: 0;
     max-width: 100%;
+    overflow: visible;
   }
 
   .app-shell--tray .app-bezel {
@@ -988,7 +1004,17 @@ body:has(.app-shell--tray) {
     min-width: calc(7 * 4.75rem);
   }
 
+  .app-shell--tray .doc-editor__toolbar-stick {
+    position: sticky;
+    top: var(--phone-bar-height);
+    z-index: 15;
+    overflow: visible;
+    background: var(--editor-chrome-bg, var(--bg-surface));
+  }
+
   .app-shell--tray .doc-editor__toolbar {
+    position: static;
+    top: auto;
     box-sizing: border-box;
     display: flex;
     flex-wrap: nowrap;
@@ -1006,6 +1032,39 @@ body:has(.app-shell--tray) {
     padding-bottom: 0.25rem;
     padding-left: var(--space-inline);
     padding-right: var(--space-inline);
+  }
+
+  .app-shell--tray .doc-editor .ProseMirror,
+  .app-shell--tray .doc-editor__prose,
+  .app-shell--tray .rich-editor .ProseMirror {
+    font-size: 16px;
+  }
+
+  body:has(.app-shell--tray) .doc-editor__popup-host {
+    box-sizing: border-box;
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  body:has(.app-shell--tray) .doc-editor__popup-host > :is(
+    .doc-editor__style-list,
+    .doc-editor__menu-list,
+    .doc-editor__palette,
+    .signature-pad
+  ) {
+    position: static;
+    top: auto;
+    right: auto;
+    left: auto;
+    width: auto;
+    max-width: 100%;
+    max-height: none;
+    overflow: visible;
+  }
+
+  body:has(.app-shell--tray) .doc-editor__popup-host > .signature-pad {
+    width: 100%;
   }
 
   .app-shell--tray .doc-editor__toolbar > *,

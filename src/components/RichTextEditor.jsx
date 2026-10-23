@@ -1,5 +1,5 @@
 import { useEditor, EditorContent, useEditorState } from '@tiptap/react'
-import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
+import { useEffect, useLayoutEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { buildEditorExtensions, publishMergeContext } from '../lib/tiptapExtensions'
 import { MERGE_FIELD_OPTIONS } from '../lib/mergeFields'
 import { useChoose, usePrompt } from './ui'
@@ -28,7 +28,8 @@ import {
   IconFormat,
 } from './EditorToolbarIcons'
 import SignatureMenu from './SignatureMenu'
-import useAnchoredPopup from './useAnchoredPopup'
+import EditorPopup from './useAnchoredPopup'
+import { isEditorPopupEvent, stuckChromeBottom } from './editorPopup'
 import ErrorBoundary from './ErrorBoundary'
 
 /** Chrome layout — theme editor tokens keep toolbar/canvas legible across themes. */
@@ -82,17 +83,58 @@ function useCloseOnOutsideClick(open, ref, onClose) {
   useEffect(() => {
     if (!open) return undefined
     const close = (event) => {
-      if (ref.current && !ref.current.contains(event.target)) onClose()
+      if (ref.current?.contains(event.target)) return
+      if (isEditorPopupEvent(event)) return
+      onClose()
     }
     document.addEventListener('pointerdown', close)
     return () => document.removeEventListener('pointerdown', close)
   }, [open, ref, onClose])
 }
 
+function FormattingBar({ className, children }) {
+  const ref = useRef(null)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return undefined
+    const media = window.matchMedia('(max-width: 639px)')
+    const measure = () => {
+      if (!media.matches) {
+        el.style.removeProperty('top')
+        return
+      }
+      const bottom = stuckChromeBottom(el)
+      if (bottom > 0) el.style.top = `${bottom}px`
+      else el.style.removeProperty('top')
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    const root = el.closest('.app-shell') || document
+    root.querySelectorAll(
+      '.top-nav__mobile-bar, .client-nav-bar, .room-sticky-bar, .progress-notes-page__header',
+    ).forEach((node) => observer.observe(node))
+    window.addEventListener('resize', measure)
+    media.addEventListener('change', measure)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
+      media.removeEventListener('change', measure)
+    }
+  }, [])
+
+  return (
+    <div ref={ref} className="doc-editor__toolbar-stick">
+      <div className={className} role="toolbar" aria-label="Formatting">
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function MergeFieldMenu({ editor }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
-  const popupStyle = useAnchoredPopup(open, menuRef)
   useCloseOnOutsideClick(open, menuRef, () => setOpen(false))
 
   return (
@@ -100,8 +142,8 @@ function MergeFieldMenu({ editor }) {
       <ToolbarButton onClick={() => setOpen(o => !o)} active={open} title="Insert field">
         {'{ }'}
       </ToolbarButton>
-      {open && (
-        <ul className="doc-editor__menu-list" style={popupStyle}>
+      <EditorPopup open={open} anchorRef={menuRef}>
+        <ul className="doc-editor__menu-list">
           {MERGE_FIELD_OPTIONS.map(({ key, label }) => (
             <li key={key}>
               <button
@@ -117,7 +159,7 @@ function MergeFieldMenu({ editor }) {
             </li>
           ))}
         </ul>
-      )}
+      </EditorPopup>
     </div>
   )
 }
@@ -125,7 +167,6 @@ function MergeFieldMenu({ editor }) {
 function FormatMenu({ editor }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
-  const popupStyle = useAnchoredPopup(open, menuRef)
   useCloseOnOutsideClick(open, menuRef, () => setOpen(false))
 
   const apply = (fn) => {
@@ -138,8 +179,8 @@ function FormatMenu({ editor }) {
       <ToolbarButton onClick={() => setOpen(o => !o)} active={open} title="Font, size & colour">
         <IconFormat />
       </ToolbarButton>
-      {open && (
-        <div className="doc-editor__palette doc-editor__palette--format" style={popupStyle}>
+      <EditorPopup open={open} anchorRef={menuRef}>
+        <div className="doc-editor__palette doc-editor__palette--format">
           <section className="doc-editor__palette-section">
             <h4 className="doc-editor__palette-title">Font</h4>
             <div className="doc-editor__palette-row">
@@ -230,7 +271,7 @@ function FormatMenu({ editor }) {
             </div>
           </section>
         </div>
-      )}
+      </EditorPopup>
     </div>
   )
 }
@@ -252,7 +293,6 @@ function currentBlockStyle(toolbar) {
 function StyleMenu({ editor, toolbar }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
-  const popupStyle = useAnchoredPopup(open, menuRef)
   useCloseOnOutsideClick(open, menuRef, () => setOpen(false))
   const current = currentBlockStyle(toolbar)
 
@@ -269,8 +309,8 @@ function StyleMenu({ editor, toolbar }) {
         <span className={`doc-editor__style-label doc-editor__style-label--${current.id}`}>{current.label}</span>
         <span className="doc-editor__style-caret" aria-hidden />
       </button>
-      {open && (
-        <ul className="doc-editor__style-list" role="listbox" aria-label="Text style" style={popupStyle}>
+      <EditorPopup open={open} anchorRef={menuRef}>
+        <ul className="doc-editor__style-list" role="listbox" aria-label="Text style">
           {BLOCK_STYLES.map(style => (
             <li key={style.id}>
               <button
@@ -290,7 +330,7 @@ function StyleMenu({ editor, toolbar }) {
             </li>
           ))}
         </ul>
-      )}
+      </EditorPopup>
     </div>
   )
 }
@@ -528,7 +568,7 @@ function DocToolbar({
   const isClinical = mode === 'clinical'
 
   return (
-    <div className={toolbarClassName} role="toolbar" aria-label="Formatting">
+    <FormattingBar className={toolbarClassName}>
       <div className={EDITOR_TOOLBAR_GROUP}>
         <ToolbarButton onClick={() => editor.chain().focus().undo().run()} disabled={!toolbar.canUndo} title="Undo">
           <IconUndo />
@@ -592,7 +632,7 @@ function DocToolbar({
         </>
       )}
       <span className="doc-editor__slash-cue">Type / to insert</span>
-    </div>
+    </FormattingBar>
   )
 }
 
